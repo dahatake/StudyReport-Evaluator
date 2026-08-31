@@ -53,6 +53,18 @@ public sealed class ResultsSheetWriterTests
         Assert.Equal(1, writeResult.HeaderRow);
         Assert.Equal(1, writeResult.DataRowCount);
         Assert.Equal(23, writeResult.ColumnCount);
+        Assert.Equal(7, writeResult.FormulaCells.Length);
+        Assert.Equal(
+            writeResult.FormulaCells.Length,
+            writeResult.FormulaCells.Select(item => item.Definition.Target).Distinct().Count());
+        Assert.Equal(
+            CachedDecimal(Cell(worksheet, "W2")),
+            Assert.Single(
+                writeResult.FormulaCells,
+                item => item.Definition.Identity.Field == ResultsSheetWriter.OverallScoreHeader).CachedValue);
+        Assert.All(
+            writeResult.FormulaCells,
+            item => Assert.Contains("<redacted>", item.ToString(), StringComparison.Ordinal));
         Assert.Contains("<redacted>", writeResult.ToString(), StringComparison.Ordinal);
 
         string[] expectedHeaders =

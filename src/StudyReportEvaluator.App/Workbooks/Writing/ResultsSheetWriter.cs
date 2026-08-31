@@ -116,14 +116,28 @@ public sealed class ResultsSheetValidationException : Exception
         $"{nameof(ResultsSheetValidationException)} {{ ErrorCount = {Errors.Length}, Content = <redacted> }}";
 }
 
+public sealed record WrittenFormulaCell(
+    FormulaCellDefinition Definition,
+    decimal? CachedValue)
+{
+    public override string ToString() =>
+        $"{nameof(WrittenFormulaCell)} {{ Content = <redacted> }}";
+}
+
 public sealed class ResultsSheetWriteResult
 {
-    internal ResultsSheetWriteResult(string sheetName, int headerRow, int dataRowCount, int columnCount)
+    internal ResultsSheetWriteResult(
+        string sheetName,
+        int headerRow,
+        int dataRowCount,
+        int columnCount,
+        ImmutableArray<WrittenFormulaCell> formulaCells)
     {
         SheetName = sheetName;
         HeaderRow = headerRow;
         DataRowCount = dataRowCount;
         ColumnCount = columnCount;
+        FormulaCells = formulaCells;
     }
 
     public string SheetName { get; }
@@ -134,8 +148,10 @@ public sealed class ResultsSheetWriteResult
 
     public int ColumnCount { get; }
 
+    public ImmutableArray<WrittenFormulaCell> FormulaCells { get; }
+
     public override string ToString() =>
-        $"{nameof(ResultsSheetWriteResult)} {{ DataRowCount = {DataRowCount}, ColumnCount = {ColumnCount}, Content = <redacted> }}";
+        $"{nameof(ResultsSheetWriteResult)} {{ DataRowCount = {DataRowCount}, ColumnCount = {ColumnCount}, FormulaCount = {FormulaCells.Length}, Content = <redacted> }}";
 }
 
 public sealed class ResultsSheetWriter
@@ -195,7 +211,8 @@ public sealed class ResultsSheetWriter
             sheetNames.ResultsSheetName,
             snapshot.Definition.HeaderRow,
             prepared.Rows.Length,
-            prepared.Layout.ColumnCount);
+            prepared.Layout.ColumnCount,
+            prepared.FormulaCells);
     }
 
     public override string ToString() =>
@@ -231,11 +248,18 @@ public sealed class ResultsSheetWriter
 
         Dictionary<FormulaCellAddress, FormulaCellDefinition> formulasByTarget = formulas.ToDictionary(
             definition => definition.Target);
+        ImmutableArray<WrittenFormulaCell>.Builder writtenFormulaCells =
+            ImmutableArray.CreateBuilder<WrittenFormulaCell>(formulas.Length);
         SheetData sheetData = new();
         sheetData.Append(CreateHeaderRow(snapshot.Definition.HeaderRow, layout));
         foreach (PreparedRow preparedRow in preparedRows)
         {
-            sheetData.Append(CreateDataRow(preparedRow, formulasByTarget, sheetNames, layout.Overall));
+            sheetData.Append(CreateDataRow(
+                preparedRow,
+                formulasByTarget,
+                sheetNames,
+                layout.Overall,
+                writtenFormulaCells));
         }
 
         Worksheet worksheet = new(sheetData);
@@ -249,7 +273,11 @@ public sealed class ResultsSheetWriter
             worksheet.Append(dataValidations);
         }
 
-        return new PreparedSheet(worksheet, layout, preparedRows);
+        return new PreparedSheet(
+            worksheet,
+            layout,
+            preparedRows,
+            writtenFormulaCells.ToImmutable());
     }
 
     private static void ValidateWorkbookBinding(
@@ -940,7 +968,8 @@ public sealed class ResultsSheetWriter
         PreparedRow prepared,
         IReadOnlyDictionary<FormulaCellAddress, FormulaCellDefinition> formulas,
         AppOwnedSheetNames sheetNames,
-        ColumnLayout overallColumn)
+        ColumnLayout overallColumn,
+        ImmutableArray<WrittenFormulaCell>.Builder writtenFormulaCells)
     {
         Row row = new() { RowIndex = checked((uint)prepared.SourceRowNumber) };
         foreach (PreparedQuestion question in prepared.Questions)
@@ -960,8 +989,8 @@ public sealed class ResultsSheetWriter
                         criterion.Layout.Override,
                         prepared.SourceRowNumber,
                         criterion.Override));
-                    AppendFormula(row, formulas, sheetNames, criterion.Layout.EffectiveRaw, prepared.SourceRowNumber, criterion.EffectiveRaw);
-                    AppendFormula(row, formulas, sheetNames, criterion.Layout.Normalized, prepared.SourceRowNumber, criterion.Normalized);
+                    AppendFormula(row, formulas, sheetNames, criterion.Layout.EffectiveRaw, prepared.SourceRowNumber, criterion.EffectiveRaw, writtenFormulaCells);
+                    AppendFormula(row, formulas, sheetNames, criterion.Layout.Normalized, prepared.SourceRowNumber, criterion.Normalized, writtenFormulaCells);
                     stringCellWriter.Write(row, CellReference(criterion.Layout.Reason, prepared.SourceRowNumber), criterion.Reason);
                     stringCellWriter.Write(row, CellReference(criterion.Layout.Evidence, prepared.SourceRowNumber), criterion.Evidence);
                     stringCellWriter.Write(row, CellReference(criterion.Layout.EvidenceSource, prepared.SourceRowNumber), criterion.EvidenceSource);
@@ -969,13 +998,13 @@ public sealed class ResultsSheetWriter
                     stringCellWriter.Write(row, CellReference(criterion.Layout.Status, prepared.SourceRowNumber), criterion.Status);
                 }
 
-                AppendFormula(row, formulas, sheetNames, evaluator.Layout.Score, prepared.SourceRowNumber, evaluator.Score);
+                AppendFormula(row, formulas, sheetNames, evaluator.Layout.Score, prepared.SourceRowNumber, evaluator.Score, writtenFormulaCells);
             }
 
-            AppendFormula(row, formulas, sheetNames, question.Layout.Score, prepared.SourceRowNumber, question.Score);
+            AppendFormula(row, formulas, sheetNames, question.Layout.Score, prepared.SourceRowNumber, question.Score, writtenFormulaCells);
         }
 
-        AppendFormula(row, formulas, sheetNames, overallColumn, prepared.SourceRowNumber, prepared.Overall);
+        AppendFormula(row, formulas, sheetNames, overallColumn, prepared.SourceRowNumber, prepared.Overall, writtenFormulaCells);
         return row;
     }
 
@@ -985,10 +1014,13 @@ public sealed class ResultsSheetWriter
         AppOwnedSheetNames sheetNames,
         ColumnLayout column,
         int sourceRow,
-        decimal? cachedValue)
+        decimal? cachedValue,
+        ImmutableArray<WrittenFormulaCell>.Builder writtenFormulaCells)
     {
         FormulaCellAddress target = Address(sheetNames.ResultsSheetName, column, sourceRow);
-        formulaCellWriter.Write(row, formulas[target], cachedValue);
+        FormulaCellDefinition definition = formulas[target];
+        formulaCellWriter.Write(row, definition, cachedValue);
+        writtenFormulaCells.Add(new WrittenFormulaCell(definition, cachedValue));
     }
 
     private DataValidations CreateDataValidations(
@@ -1216,5 +1248,6 @@ public sealed class ResultsSheetWriter
     private sealed record PreparedSheet(
         Worksheet Worksheet,
         ResultsLayout Layout,
-        ImmutableArray<PreparedRow> Rows);
+        ImmutableArray<PreparedRow> Rows,
+        ImmutableArray<WrittenFormulaCell> FormulaCells);
 }
