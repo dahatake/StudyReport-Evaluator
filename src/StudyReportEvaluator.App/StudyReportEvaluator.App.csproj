@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>StudyReportEvaluator.App</AssemblyName>
+    <RootNamespace>StudyReportEvaluator.App</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <CopilotSkipCliDownload>true</CopilotSkipCliDownload>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\StudyReportEvaluator.Core\StudyReportEvaluator.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="DocumentFormat.OpenXml" />
+    <PackageReference Include="GitHub.Copilot.SDK" />
+  </ItemGroup>
+</Project>
