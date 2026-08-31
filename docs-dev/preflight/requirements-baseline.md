@@ -58,7 +58,7 @@
 | synthetic JA schema vector | 2,903 | `9658BB80242B5E4F996A17E151F1F11DC3E469BE84D37BA599C0B7F35023D734` |
 | synthetic EN schema vector | 2,236 | `9BC498D5347A9849DEC122208B16AA3FAC1912634AB8B2816137CB0A0107E98B` |
 
-Hashes identify current working-tree bytes; they are not signatures, identities, or proof of a Git commit.
+The byte counts and SHA-256 values identify the exact artifact bytes stored in baseline content commit `a06dc33639fbb904b14bc0ed0ae853bd7841e1a8`. At anchor-record update time, `git diff --quiet <anchor> -- <artifact>` confirmed that all eight listed working-tree artifacts were identical to their commit-tree versions. SHA-256 is an integrity value, not an organizational signature or signer identity.
 
 ## Block release table
 
