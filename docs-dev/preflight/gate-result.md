@@ -1,129 +1,129 @@
-# Revised GATE-0 result — single-input implementation
+# Revised GATE-0 result — dynamic Excel quantification
 
 | 項目 | 値 |
 |---|---|
 | Gate | GATE-0 |
-| Requirement | `docs/requirements-definition.md` v2.0 |
-| Plan | `work/20260831-implementation-plan.md` v3.0 |
-| Scope decision | ADR-0010 |
-| Evaluation snapshot HEAD | `34e2dc334bba2bb9fef291ca76b176611f75d475` |
-| Previous gate result | v1.2/v2.1 `BLOCKED` record — **SUPERSEDED** |
+| Requirement | `docs/requirements-definition.md` v3.0 |
+| Plan | `work/20260831-implementation-plan.md` v4.0 |
+| Scope decision | ADR-0011 |
+| Evaluation snapshot HEAD | `dfeb25408756c8626f1d2cab0995bed107167415` |
+| Previous gate result | requirement v2.0 / plan v3.0 PASS — **SUPERSEDED FOR CURRENT IMPLEMENTATION** |
 | Current result | **PASS** |
-| Phase 1 authorization | **GRANTED** |
+| Phase 1 authorization | **GRANTED — F-01 may begin** |
 | Production `src/` files at evaluation | `0` |
-| Record date | 2026-08-31 |
+| Record date | 2026-09-01 |
 
 ## Decision rule
 
-Requirement v2.0 section 15、plan v3.0 phase dependencies、ADR-0010 section 8を統合し、次の7条件をGATE-0の論理積として評価する。
+Requirement v3.0 section 18、plan v4.0 phase 0、ADR-0011、current baseline/map/traceabilityを統合し、次の8条件をGATE-0の論理積として評価する。
 
-1. Requirement v2.0 and plan v3.0 are committed.
-2. ADR-0010 is approved and committed.
-3. 単一Excel入力、editable preset、AI候補と人の確認、およびsynthetic fixtureのcontractが明文化されている。
-4. The current baseline, exact task file map, and traceability are committed.
-5. Independent document review reports zero unresolved blocker/high defects.
-6. Production `src/` contains zero files at gate evaluation.
-7. The initial implementation has zero hidden external blockers.
+1. Requirement v3.0 and plan v4.0 are committed with exact identities。
+2. ADR-0011 and the read-only sample structural profile are committed。
+3. Dynamic question/evaluator/criterion、Knowledge/Custom Prompt、Scorable/override/blank、3-level Excel formula、warning-only contract are unambiguous。
+4. Current baseline and exact 37-task/gate path map are committed and have no hidden project/file owner。
+5. All AC-001〜AC-015 and 15 required test surfaces have implementation/test/gate traceability。
+6. Independent final document review reports zero unresolved blocker/high defects。
+7. Production `src/` contains zero files at evaluation。
+8. Initial implementation has zero hidden external blockers, including policy、legal、education approval、signing、cross-platform runner、or Office installation。
 
-All seven conditions pass. Revised GATE-0 therefore grants Phase 1 implementation authorization.
+All eight conditions pass。The independent read-only final review performed after candidate creation returned `PROMOTION_SAFE=YES` with unresolved blocker `0` and unresolved high `0`。This PASS authorizes F-01 only; every successor remains subject to the plan dependency chain and its own gate。
 
-Requirement v2.0 section 15 condition 3の「合成fixture仕様」は、section 14に列挙した入力組合せ、境界、negative scenarioと、plan T-10／current path mapに固定した生成物の種類・pathを指す。JSONおよびworkbook fixtureの実体生成とexpected valueの固定はGATE-1後のT-10で行い、その生成物自体をGATE-0の事前条件にはしない。
-
-This result applies only to requirement v2.0 / plan v3.0. It does not retroactively change the correct historical `BLOCKED` result for v1.2 / v2.1.
+This decision applies only to requirement v3.0 / plan v4.0 / ADR-0011。It does not retroactively alter the historically correct v2.0 / v3.0 GATE-0 decision。
 
 ## Evidence identity
 
-| Evidence | Commit | SHA-256 | Result |
-|---|---|---|---|
-| `docs/requirements-definition.md` v2.0 | `740736f0ccc5df2dbf94989227b50a0ea34f480e` | `D401EEC4778E5A088D1674F65F5E036C4957713BADAC86B5D162584ABFB9FE31` | PASS |
-| `work/20260831-implementation-plan.md` v3.0 | `23c48392a124541386f7d0d880a576943b1ef0ad` | `63E0669916B27E0ADF2FD1A44435EE20EC664B57D624EA949DCD2B3AED0C504E` | PASS |
-| `docs-dev/adr/0010-single-input-local-scope.md` | `84484fb912a474b9ec36e0e240407af3e7cfea01` | `E6849DBFD0FE7C86782440E3C1AB99920AAE369F79D6D3D0B88DE7B2377038E6` | PASS |
-| `docs-dev/preflight/requirements-baseline.md` | `3f40760bb05ee6fdc3837368cb835ec75ececd7d` | `36A9815BAAFE22AB69614BC48FAF8E27A4FDF352AFF68A3956F2DBEAC7D66535` | PASS |
-| `docs-dev/preflight/implementation-task-file-map.md` | `3f40760bb05ee6fdc3837368cb835ec75ececd7d` | `519044E8CA218C24AF27EB3A85B1D5C376C7FCBF4C08E87FC16E42B56C987E63` | PASS |
-| `docs-dev/traceability.md` | `34e2dc334bba2bb9fef291ca76b176611f75d475` | `53115D459F1EE8CCADFAD951F67792092354F4263A459D27CDBBC9639D464E26` | PASS |
+| Evidence | Commit | Bytes | SHA-256 | Gate result |
+|---|---|---:|---|---|
+| `docs/requirements-definition.md` v3.0 | `adc6ad12a3c80b4a92c9453d8b7a58e2daeb346f` | 30,480 | `ACB7E1C524E1628C48AC2669B5B2FC730B3EF7EED96723D02F1B5AA6B6264C03` | PASS |
+| `work/20260831-implementation-plan.md` v4.0 | `adc6ad12a3c80b4a92c9453d8b7a58e2daeb346f` | 30,790 | `F63D0E1A9AAABFA4C0F2C0A0F032AFE5F5674A64B76723F82D68000A7A506BCD` | PASS |
+| `docs-dev/adr/0011-dynamic-quantification-excel-formulas.md` | `502b48898411ca247543143773be8a3ee28ea7e5` | 10,919 | `33A678396FFC9BFB7B5726B34B1874ADC9868C97E9C6EAA3E94FFB0F9C14CC65` | PASS |
+| `docs-dev/preflight/sample-workbook-profile.md` | `502b48898411ca247543143773be8a3ee28ea7e5` | 4,898 | `A0BA407B55A59363649FE3CEB001B7219838B2F216D8B74FF7E74B9A3B17A2C1` | PASS |
+| `docs-dev/preflight/requirements-baseline.md` | `da8ced2f3ff78f7d3c1d7ed0c95c8de359bcbaab` | 9,708 | `0EC8C1591195ECE3A5DF880CC553C0831383B2309D1D867A9BF4911700515CBE` | PASS |
+| `docs-dev/preflight/implementation-task-file-map.md` | `da8ced2f3ff78f7d3c1d7ed0c95c8de359bcbaab` | 13,552 | `A2A9BD9A9E8E6026AAF89E3889D6A48192AF83056C294579706FD9BBB3AFD68C` | PASS |
+| `docs-dev/traceability.md` | `dfeb25408756c8626f1d2cab0995bed107167415` | 13,848 | `054D46AC8FD16605A6429DB7255D678F7992802C6AF4876D69F473A258047983` | PASS |
 
-The hashes identify exact repository bytes. They are not organizational signatures, legal approvals, production signing identities, or proof of educational validity.
+Hashes identify exact repository bytes。They are not organizational signatures、identity proof、legal approval、educational validation、or proof of production behavior。
+
+B-03 baselineとB-04 traceabilityに残る`pending`／`next action`は、それぞれのcommit時点における正しい進捗snapshotである。評価後にそれらを書き換えると本表のidentity anchorが変わるため変更しない。現在の実装開始authorizationについては、時間的に後続する本GATE-0記録を正本とし、それらのprogress文だけを本PASSがsupersedeする。requirement、ownership、traceability mappingは引き続き上記exact identitiesを適用する。
 
 ## Gate checks
 
 | Check | Evidence | Actual result | Gate result |
 |---|---|---|---|
-| Current canonical requirement | v2.0 identity above | committed | PASS |
-| Current implementation plan | v3.0 identity above; `SCOPE-01`〜`SCOPE-10` distinct from documentation tasks | committed | PASS |
-| Current scope decision | ADR-0010 identity above | approved in the requirement-owner session and committed | PASS |
-| Input/preset/review contract | requirement v2.0 sections 2、4〜8、13 | one `.xlsx`; editable presets; candidate/human boundary | PASS |
-| Synthetic fixture specification | requirement v2.0 section 14; plan T-10; current path map | fixed-seed JSON surfaces、1/2/10 questions、optional columns、security negatives specified; generation remains a post-GATE task | PASS |
-| Baseline and exact paths | G0-03; 72 expected task/gate rows | 72 unique; missing 0; extra 0 | PASS |
-| Acceptance traceability | G0-04 | 12 AC, 18 mandatory surfaces, 12 test surfaces | PASS |
-| Document diagnostics | Markdown diagnostics | errors 0 | PASS |
-| Adversarial review — requirement/plan | independent read-only review | 4 findings corrected; focused re-review defects 0 | PASS |
-| Adversarial review — ADR | independent read-only review | 1 low wording variance corrected; unresolved defects 0 | PASS |
-| Adversarial review — baseline/map | independent read-only review | defects 0 | PASS |
-| Adversarial review — traceability | independent read-only review | defects 0 | PASS |
-| Sole user-provided information | INPUT-01 | one Forms response `.xlsx` at runtime | PASS |
-| Hidden external implementation input | baseline and 72-task dependency scan | 0 | PASS |
-| Production source before gate | recursive file count under `src/` | 0 | PASS |
+| Current requirement/plan | v3.0/v4.0 identities above | committed together at B-01 | PASS |
+| Current scope decision | ADR-0011 identity above | session-scope requirement decision committed at B-02 | PASS |
+| Sample boundary | sample profile; sample SHA-256 `446386E20BB4096561CB4AFD6D74B8EAA9D50EAE53C97F984BA7F70EBEAD0DE5` | metadata/header-role only; body not copied to evidence/live smoke | PASS |
+| Baseline | B-03 identity above | current dependency and supersession boundary fixed | PASS |
+| Exact ownership | 37 expected task/gate rows | 37 unique; 2 production + 2 test projects; missing 0 | PASS |
+| Acceptance traceability | B-04 identity above | 15 AC、15 tests、18 mandatory surfaces | PASS |
+| Dynamic model | requirement §§5〜7; plan C-01〜C-06 | arbitrary selected primary; dynamic hierarchy; Knowledge/Custom split | PASS |
+| AI boundary | requirement §8; plan C-03/C-04/A-01〜A-03 | criterion raw only; exact source-map validation; no aggregate | PASS |
+| Formula contract | requirement §9; plan §3/C-05/X-03〜X-05 | Scorable、blank-safe override、rounded-child hierarchy、Config refs、preflight | PASS |
+| Office independence | requirement §§3/9; plan §§1/3 | cached Core preview + formula AST/oracle; external recalc optional | PASS |
+| Warning semantics | requirement §11; plan U-02〜U-04 | persistent display; acknowledgment/dependency 0 | PASS |
+| Input/output safety | requirement §§5/10/13; plan X/U | read-only input; strict recheck; validated same-volume atomic output | PASS |
+| Auth/security | requirement §§12/13; plan A/C/U | existing CLI login; selected same-row only; minimal capability; no-content log | PASS |
+| Snapshot isolation | requirement §6; plan C-02/U-01 | range/weight/enabled/mapping/Prompt/formula use original run snapshot | PASS |
+| Formula/source edge ownership | exact map boundary allocation | invalid override no fallback; source-ID-to-cell roundtrip; regression tests owned | PASS |
+| Document diagnostics | current Markdown diagnostics | errors 0 at candidate creation | PASS |
+| Mechanical invariants | scripted checks | sample identity、37 task/gates、15 AC、6 placeholders、diff format pass | PASS |
+| Production source before gate | recursive files under `src/` | 0 | PASS |
+| Hidden external implementation input | baseline and dependency scan | 0 | PASS |
+| Independent final candidate review | read-only review of all 8 current gate documents | `PROMOTION_SAFE=YES`; unresolved blocker 0; unresolved high 0 | PASS |
 
-## Sole-input boundary
+## Current functional boundary
 
-The only information or artifact the user must provide to operate the initial application is one standard, non-encrypted Forms response `.xlsx`.
+GATE-0 evaluates whether implementation may begin; it does not prove implementation。The intended initial application will:
 
-The following are built into the application or selected at runtime and are not pre-implementation inputs:
+1. Read one standard `.xlsx` without modifying it。
+2. Let the user map arbitrary primary/supporting columns and dynamically define questions、Knowledge/Custom evaluators、criteria、ranges、weights。
+3. Send only selected same-row content through one constrained structured-result capability。
+4. Store AI criterion raw values and compute effective/normalized/evaluator/question/overall values with Excel formulas referencing Config cells。
+5. Keep empty primary unscorable, permit valid optional override only for nonempty primary, and never fall back from an invalid nonempty override to AI。
+6. Display an educational-ethics warning without requiring interaction or blocking any processing action。
+7. Create a separate validated output by target-local temp and same-volume atomic rename。
 
-- two editable question presets;
-- editable report and Prompt evaluation templates;
-- editable criteria/viewpoints;
-- default report score range 0–30;
-- default Prompt score range 1–10;
-- editable column mappings for required report answers and optional Prompt/considerations;
-- candidate score and human review workflow.
+Every behavior remains `PLANNED` until its implementation task and required tests pass。
 
-Existing Copilot CLI login is an interactive runtime prerequisite, not project information supplied to the developer. The user performs authentication directly with GitHub; no credential value is provided to the application project.
+## External and optional boundaries
 
-## Former external gates
+The following are not initial GATE-0 prerequisites:
 
-EXT-03 through EXT-09 are outside the current initial scope. Their absence does not block implementation. This GATE-0 result does not claim that any former external policy, privacy, education, legal, platform, signing, review, or dump-policy input was provided or verified.
+- managed organization policy or app-owned OAuth registration;
+- privacy/legal/education approval artifacts;
+- educational fairness threshold or mandatory human review;
+- production certificate、signed installer、notarization;
+- macOS、Linux、Windows Arm64 runners;
+- Excel、Office、LibreOffice、COM automation;
+- actual sample/student content sent to live AI;
+- repeated stochastic evaluation or voting。
 
-| Former surface | Current treatment |
-|---|---|
-| Managed organization policy and production trust | Future requirement; not implemented in initial version |
-| Institutional privacy/legal approval verification | Future requirement; user responsibility notice remains |
-| Formal educational baseline and thresholds | Future requirement; no accuracy or validity claim |
-| Cross-platform runners and signing | Future requirement; Windows 11 x64 local scope only |
-| Independent signed release record | Future requirement; internal adversarial review only |
-| Dump-policy attestation | Future requirement; no institutional real-data mode claim |
+Their absence is not a claim that they exist、are approved、or are unnecessary in every institutional setting。
 
-## Authorized implementation scope
+Optional authenticated Copilot smoke and optional external spreadsheet recalculation record advisory status separately。`PASS`、`SKIPPED_*`、`NOT_RUN`、`FAILED_ADVISORY` remain distinguishable; none can substitute for required fake-transport/formula-oracle evidence。
 
-GATE-0 authorizes plan v3.0 Phase 1 and its dependency-ordered successors:
+## Authorized scope
 
-1. Foundation and locked projects.
-2. Domain, editable presets, mapping, payload, validation, and review contracts.
-3. Workbook and Copilot lanes.
-4. Run orchestration.
-5. Seven-step Avalonia UI.
-6. Windows x64 E2E, self-contained folder publish, unsigned local zip, README, and developer documentation.
+This `GATE-0 = PASS` authorizes Phase 1 to create or edit only the map-owned F-01 foundation files:
 
-Authorization does not include:
+1. exact .NET 10 SDK/build/package configuration;
+2. one `.slnx`, two production projects, and two test projects;
+3. locked dependency files and architecture/supply-chain tests。
 
-- macOS, Linux, or Windows Arm64 support claims;
-- production code signing or signed installer;
-- protected workbook decryption;
-- automatic grade finalization from AI candidates;
-- managed organizational policy enforcement;
-- formal legal compliance or educational validity claims.
+Later phases remain dependent on their own prerequisite gates。GATE-0 does not authorize skipping GATE-1、GATE-CORE、GATE-EXCEL、GATE-AI、GATE-APP、or GATE-ACCEPTANCE。
 
-## Runtime and testing boundaries
+GATE-0 never authorizes:
 
-- Production implementation may now create `src/` and production/test projects listed in the current path map.
-- Development and required E2E use fixed-seed synthetic workbooks and fake Copilot adapters.
-- Optional authenticated smoke sends only fixed synthetic text. If no logged-in Copilot account is available, it is recorded as `SKIPPED_NOT_AUTHENTICATED` and does not block implementation completion.
-- An actual Forms workbook is never committed and is not needed to build or test the application.
-- When a user selects an actual workbook, it is read-only and identifiers are excluded from Copilot payloads.
-- `NOT_RUN` is not treated as PASS except that the explicitly optional A-08 smoke may be skipped with its exact nonblocking status.
+- implementation outside the 37-row ownership map;
+- input workbook mutation;
+- mandatory review/consent/warning gates;
+- unsupported platform、signing、legal、privacy、or educational-validity claims;
+- real sample body in logs、fixtures、live smoke、or gate artifacts。
 
 ## Final disposition
 
-**GATE-0 = PASS. Phase 1 authorization = GRANTED.**
+**GATE-0 = PASS. Phase 1 authorization = GRANTED FOR F-01.**
 
-Implementation must follow the 72-task ownership map and phase gates. The unrelated existing changes in `.gitignore`, `README.md`, and `.vscode/settings.json` remain outside this gate record and must not be staged, reverted, or overwritten by this task.
+All objective/mechanical conditions pass。Independent final review of the current requirement、plan、ADR、profile、baseline、map、traceability、and gate record reports zero unresolved blocker/high defects。Production behavior is still unimplemented and must not be described as passing until its task tests and phase gates pass。
+
+Unrelated existing changes in `.gitignore`、`README.md`、and `.vscode/` remain outside this gate record and must not be staged、reverted、or overwritten。
