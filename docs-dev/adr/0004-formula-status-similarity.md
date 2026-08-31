@@ -2,7 +2,7 @@
 
 | 項目 | 内容 |
 |---|---|
-| 状態 | **承認済み・G-04完了・要求v1.2へG-RB反映済み（ADR-0009 launcher訂正を含む）** |
+| 状態 | **承認済み・G-04完了・要求v1.2へG-RB反映済み（ADR-0009 launcher訂正、G-16 ROUND sentinel訂正を含む）** |
 | 対象決定 | DEC-05、DEC-06、DEC-21 |
 | 要求 | FR-071〜075、FR-080〜086、第15節、AC-002、AC-005 |
 | 決定 | `ROUND` だけを関数 allowlistへ追加し、既存5軸を維持する。類似度 metric/数値閾値に製品既定を持たず、署名済み校正 recordで選択する |
@@ -119,7 +119,11 @@ validation formula の優先構造は次に固定し、全体を `IFERROR(...,"F
 
 各段階は scalar guardを外側の `IF` に置き、非数値を `ROUND` や比較へ渡さない。rangeの完全性は `COUNT(range)=schema_cardinality`、負weightは `SUMPRODUCT(1*(weight_range<0))>0`、合計0以下は `SUM(weight_range)<=0` で検査する。range長は生成時に一致を検証する。
 
-丸め桁数の supported minimum/maximum は教育上の既定値ではなく、採用する Excel/LibreOffice versionで共通に安全評価できる範囲である。G-16 の cross-engine known-answerで境界内・境界外・巨大値を実測し、`eng/platform-matrix.json` の versioned release constantとして1組だけ固定する。G-16 が共通rangeを確定できなければ GATE-0を通さず、L-10を開始しない。validation formula はその上下限を app-owned Config cellから参照し、さらに `IFERROR` 内の `ROUND(0,round_digits)=0` sentinelで当該engineの受理を確認する。具体値を本 ADR で捏造しない。
+丸め桁数の supported minimum/maximum は教育上の既定値ではなく、採用する Excel/LibreOffice versionで共通に安全評価できる範囲である。G-16 の cross-engine known-answerで境界内・境界外・巨大値を実測し、`eng/platform-matrix.json` の versioned release constantとして1組だけ固定する。G-16 が共通rangeを確定できなければ GATE-0を通さず、L-10を開始しない。validation formula はその上下限を app-owned Config cellから参照し、数値かつ整数かつ範囲内であることを外側の`IF`で確認してから`ROUND`分岐へ進む。
+
+G-16ではMicrosoft Excel `16.0.20402.20050`とLibreOffice Calc `26.8.0.3`に同一の非整数値を与え、`rounding_digits=-400..400`を再計算した。Excelは801件すべて数値、LibreOfficeは`-20..20`の41件だけ数値で、その41件はIEEE 754 binary64でbit-exact一致した。したがって、このengine組合せの共通range候補はinclusive `-20..20`である。最終release constantはG-17のplatform matrixが同じbinary/versionを対象に確認して固定し、未試験engine/versionへ流用しない。
+
+旧案の`ROUND(0,round_digits)=0` sentinelはproductionのvalidation/adoption formulaから削除する。G-16 spikeには欠陥再現用probeとして残す。LibreOfficeでは非整数値の`ROUND`が`-21`、`21`、`-400`、`400`でerrorになる一方、zero sentinelは同じ全点でtrueとなり、範囲外を検出しなかった。固定witness値に対するengineの特例をrange認可と誤認しないため、formula probeをrange認可へ使わない。range認可はG-16/G-17で固定したversioned boundsとの比較だけで行い、engine保存後のerror検査は別のE-07証跡とする。
 
 `VALID` へ進める条件は次の全てである。
 
