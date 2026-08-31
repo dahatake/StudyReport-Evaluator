@@ -163,6 +163,48 @@ P1363 signature base64url:
 | duplicate JSON property、noncanonical key順/number/string、padding付きbase64url、lone surrogate | parse/canonicalization拒否 |
 | body tamper、body schema unknown/additional property | signatureまたはbody schema拒否 |
 
+## G-12 test-only operational-policy fixtures
+
+G-12のproduction bundleとは分離して、次のraw Flattened JWS JSONをtest-only fixtureとして固定した。
+
+- `tests/fixtures/policy/test-only/valid.json`
+- `tests/fixtures/policy/test-only/expired.json`
+- `tests/fixtures/policy/test-only/wrong-signature.json`
+- `tests/fixtures/policy/test-only/revoked-key.json`
+
+全payloadは合成値だけを持つ`operational-policy`であり、実在機関、GitHub org、OAuth App、model、価格、地域、承認者、local launcher、学生data、token、secretを表さない。body shapeはA-03へ入力する署名・time・trust negative fixture用のtest contractであり、EXT-03 production policy body schemaの承認や実値を代替しない。body内の`schema=urn:study-report-evaluator:operational-policy-body:v1`はrecord固有body用の識別子であり、outer payloadの`schema=urn:study-report-evaluator:record:operational-policy:v1`やenvelope schema patternへ適用しない。signature/common payload検証後のpipeline step 8で別schemaとして扱う。
+
+### Test trust entry
+
+| 項目 | 値 |
+|---|---|
+| curve / algorithm | P-256 / ES256 / SHA-256 / 64-byte IEEE P1363 |
+| issuer | `study-report-evaluator-test-fixtures` |
+| audience | `study-report-evaluator-test` |
+| record type / schema | `operational-policy` / `urn:study-report-evaluator:record:operational-policy:v1` |
+| active kid | `g12-active-test-key-2026` |
+| revoked kid | `g12-revoked-test-key-2026`（同じ公開鍵をtest trust storeでrevoked扱い） |
+| public JWK `x` | `jTQ7exubZt-CP1Rr_w-pYHehG6gDgDw_GazGOnmpUp0` |
+| public JWK `y` | `qW8r69ET00JKANkBa5B5k_xWKjUNBWaXa7UGFDZwNNY` |
+| fixed verification time | `2026-09-01T00:00:00Z` |
+
+P-256 private componentはfixture生成時にprocess memory内だけで作り、exportまたはfile書込みを行わず、4 signature生成後に`ECDsa` objectをdisposeした。repositoryとtemp outputへprivate `d`、PEM、PFX、secretを保存していない。このtest公開鍵をproduction trust storeへ登録してはならない。production build inputは`iss=study-report-evaluator-test-fixtures`、`aud=study-report-evaluator-test`、`kid`中の`test-key`を1件も含めず、F-08/F-10/P-08のpublish/supply-chain検査は`tests/fixtures/policy/test-only/`を配布物から除外する。path名だけで安全性を主張せず、production trust lookupに対応tupleが存在しないことをA-01/A-03でもnegative testする。
+
+### Expected outcomes and artifact identity
+
+| Fixture | Bytes | SHA-256 | Cryptographic verification | Expected final disposition |
+|---|---:|---|---|---|
+| `valid.json` | 1,194 | `BBB8F78A99C61908554C1861F92B0D94390FE9E8B9BA78C81523A9567B3854AC` | valid | accept in test trust profile |
+| `expired.json` | 1,194 | `196D5A1118069D3856894C7C6D1973A8BCF8649C5B245890B2FDC654E1E050EA` | valid | `RECORD_EXPIRED` because `now == exp` |
+| `wrong-signature.json` | 1,194 | `107FECE08021EE5BAF68A9480D4C67724C26B36949DF098C1C4407222AD3F387` | invalid; valid signatureから1 bitだけ変更 | `SIGNATURE_INVALID`。valid fixtureと同じpayload/id/sequenceを意図的に使い、pipeline step 6がstep 7のreplay/rollback state lookup・更新より先に失敗することを検査 |
+| `revoked-key.json` | 1,195 | `EF92C31CC295C71FECD2D7967D3116D6CF0AC8905F4CA595A4271A7B35033854` | valid | `KEY_REVOKED` after trust lookup |
+
+独立verifierは4 envelopeのroot schema、base64url、64-byte P1363、decoded header/payloadの再帰key sort canonical bytes、P-256 signature、fixed-time expiry、kid、1-bit差、禁止field不在を検査した。JCS再serializeのnumber処理一般を実装したとは主張せず、このfixture payloadがstring、Boolean、array、objectだけで構成される範囲のcanonical byte一致を確認した。
+
+### G-12 status boundary
+
+Test-only fixturesは完了したが、EXT-03のproduction issuer/trust root、OAuth client ID/scope、GitHub org、Business/Enterprise条件、許可model、保持/所在/費用、署名済みproduction policyは未提供である。したがってG-12全体は**BLOCKED**であり、test key/fixtureをproduction bundle、機関承認、実データmode許可として扱わない。
+
 ## Checkpoint encryption profile
 
 checkpointは署名recordではなく、local authenticated-encryption envelopeとする。
