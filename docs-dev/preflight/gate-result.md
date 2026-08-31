@@ -1,118 +1,129 @@
-# GATE-0 preflight result
+# Revised GATE-0 result — single-input implementation
 
 | 項目 | 値 |
 |---|---|
-| Task | GATE-0 |
-| 判定 | **BLOCKED** |
-| Phase 1 authorization | **NOT GRANTED** |
-| Requirement baseline | `docs/requirements-definition.md` v1.2 |
-| Plan | `work/20260831-implementation-plan.md` v2.1 |
-| Baseline content commit | `a06dc33639fbb904b14bc0ed0ae853bd7841e1a8` |
-| Baseline anchor record commit | `921edc0eb2be13edad1db0688a63bb8fa555fa6d` |
-| Evaluation snapshot HEAD | `df98ea0e29c6b66afd30a38ee369f53821a8436c` |
-| G-18 traceability commit | `df98ea0e29c6b66afd30a38ee369f53821a8436c` |
-| Production `src/` file count | `0` |
-| 記録日 | 2026-08-31 |
+| Gate | GATE-0 |
+| Requirement | `docs/requirements-definition.md` v2.0 |
+| Plan | `work/20260831-implementation-plan.md` v3.0 |
+| Scope decision | ADR-0010 |
+| Evaluation snapshot HEAD | `34e2dc334bba2bb9fef291ca76b176611f75d475` |
+| Previous gate result | v1.2/v2.1 `BLOCKED` record — **SUPERSEDED** |
+| Current result | **PASS** |
+| Phase 1 authorization | **GRANTED** |
+| Production `src/` files at evaluation | `0` |
+| Record date | 2026-08-31 |
 
 ## Decision rule
 
-GATE-0は、次の全条件を同時に満たした場合だけ`PASS`とする。
+Requirement v2.0 section 15、plan v3.0 phase dependencies、ADR-0010 section 8を統合し、次の7条件をGATE-0の論理積として評価する。
 
-1. G-RBで承認・固定した要求改版がcommitへ結合されている。
-2. `docs/requirements-definition.md` v1.2第17節の8項目がすべて`PASS`である。
-3. G-10〜G-18の各直接依存が完了している。
-4. `src/`配下のproduction fileが0件である。
-5. test-only、synthetic、local、candidate、`NOT_RUN`、外部入力待ちをproductionまたはcross-platformの`PASS`へ読み替えていない。
+1. Requirement v2.0 and plan v3.0 are committed.
+2. ADR-0010 is approved and committed.
+3. 単一Excel入力、editable preset、AI候補と人の確認、およびsynthetic fixtureのcontractが明文化されている。
+4. The current baseline, exact task file map, and traceability are committed.
+5. Independent document review reports zero unresolved blocker/high defects.
+6. Production `src/` contains zero files at gate evaluation.
+7. The initial implementation has zero hidden external blockers.
 
-現在は、要求baselineと`src/`ゼロ件は成立しているが、第17節は2/8項目だけがpreflight水準で`PASS`し、6項目がblocking resultである。したがって論理積はfalseで、最終判定は**BLOCKED**である。`NOT_RUN`は`PASS`ではなく、local overrideも設けない。
+All seven conditions pass. Revised GATE-0 therefore grants Phase 1 implementation authorization.
 
-## Status vocabulary
+Requirement v2.0 section 15 condition 3の「合成fixture仕様」は、section 14に列挙した入力組合せ、境界、negative scenarioと、plan T-10／current path mapに固定した生成物の種類・pathを指す。JSONおよびworkbook fixtureの実体生成とexpected valueの固定はGATE-1後のT-10で行い、その生成物自体をGATE-0の事前条件にはしない。
 
-| Status | Gate meaning |
+This result applies only to requirement v2.0 / plan v3.0. It does not retroactively change the correct historical `BLOCKED` result for v1.2 / v2.1.
+
+## Evidence identity
+
+| Evidence | Commit | SHA-256 | Result |
+|---|---|---|---|
+| `docs/requirements-definition.md` v2.0 | `740736f0ccc5df2dbf94989227b50a0ea34f480e` | `D401EEC4778E5A088D1674F65F5E036C4957713BADAC86B5D162584ABFB9FE31` | PASS |
+| `work/20260831-implementation-plan.md` v3.0 | `23c48392a124541386f7d0d880a576943b1ef0ad` | `63E0669916B27E0ADF2FD1A44435EE20EC664B57D624EA949DCD2B3AED0C504E` | PASS |
+| `docs-dev/adr/0010-single-input-local-scope.md` | `84484fb912a474b9ec36e0e240407af3e7cfea01` | `E6849DBFD0FE7C86782440E3C1AB99920AAE369F79D6D3D0B88DE7B2377038E6` | PASS |
+| `docs-dev/preflight/requirements-baseline.md` | `3f40760bb05ee6fdc3837368cb835ec75ececd7d` | `36A9815BAAFE22AB69614BC48FAF8E27A4FDF352AFF68A3956F2DBEAC7D66535` | PASS |
+| `docs-dev/preflight/implementation-task-file-map.md` | `3f40760bb05ee6fdc3837368cb835ec75ececd7d` | `519044E8CA218C24AF27EB3A85B1D5C376C7FCBF4C08E87FC16E42B56C987E63` | PASS |
+| `docs-dev/traceability.md` | `34e2dc334bba2bb9fef291ca76b176611f75d475` | `53115D459F1EE8CCADFAD951F67792092354F4263A459D27CDBBC9639D464E26` | PASS |
+
+The hashes identify exact repository bytes. They are not organizational signatures, legal approvals, production signing identities, or proof of educational validity.
+
+## Gate checks
+
+| Check | Evidence | Actual result | Gate result |
+|---|---|---|---|
+| Current canonical requirement | v2.0 identity above | committed | PASS |
+| Current implementation plan | v3.0 identity above; `SCOPE-01`〜`SCOPE-10` distinct from documentation tasks | committed | PASS |
+| Current scope decision | ADR-0010 identity above | approved in the requirement-owner session and committed | PASS |
+| Input/preset/review contract | requirement v2.0 sections 2、4〜8、13 | one `.xlsx`; editable presets; candidate/human boundary | PASS |
+| Synthetic fixture specification | requirement v2.0 section 14; plan T-10; current path map | fixed-seed JSON surfaces、1/2/10 questions、optional columns、security negatives specified; generation remains a post-GATE task | PASS |
+| Baseline and exact paths | G0-03; 72 expected task/gate rows | 72 unique; missing 0; extra 0 | PASS |
+| Acceptance traceability | G0-04 | 12 AC, 18 mandatory surfaces, 12 test surfaces | PASS |
+| Document diagnostics | Markdown diagnostics | errors 0 | PASS |
+| Adversarial review — requirement/plan | independent read-only review | 4 findings corrected; focused re-review defects 0 | PASS |
+| Adversarial review — ADR | independent read-only review | 1 low wording variance corrected; unresolved defects 0 | PASS |
+| Adversarial review — baseline/map | independent read-only review | defects 0 | PASS |
+| Adversarial review — traceability | independent read-only review | defects 0 | PASS |
+| Sole user-provided information | INPUT-01 | one Forms response `.xlsx` at runtime | PASS |
+| Hidden external implementation input | baseline and 72-task dependency scan | 0 | PASS |
+| Production source before gate | recursive file count under `src/` | 0 | PASS |
+
+## Sole-input boundary
+
+The only information or artifact the user must provide to operate the initial application is one standard, non-encrypted Forms response `.xlsx`.
+
+The following are built into the application or selected at runtime and are not pre-implementation inputs:
+
+- two editable question presets;
+- editable report and Prompt evaluation templates;
+- editable criteria/viewpoints;
+- default report score range 0–30;
+- default Prompt score range 1–10;
+- editable column mappings for required report answers and optional Prompt/considerations;
+- candidate score and human review workflow.
+
+Existing Copilot CLI login is an interactive runtime prerequisite, not project information supplied to the developer. The user performs authentication directly with GitHub; no credential value is provided to the application project.
+
+## Former external gates
+
+EXT-03 through EXT-09 are outside the current initial scope. Their absence does not block implementation. This GATE-0 result does not claim that any former external policy, privacy, education, legal, platform, signing, review, or dump-policy input was provided or verified.
+
+| Former surface | Current treatment |
 |---|---|
-| `PASS` | 当該GATE-0項目が要求するPhase 0証拠を検証済み。後続production実装やrelease受入の完了を意味しない。 |
-| `BLOCKED` | 必須external input、owner decision、または直接依存が不足している。GATE-0をblockする。 |
-| `NOT_RUN` | 必要な実行証拠をまだ生成していない。GATE-0ではblocking resultとして扱う。 |
-| `PARTIAL_BLOCKED` | test-onlyまたは限定環境の部分証拠だけが存在する。行全体は`BLOCKED`であり、部分証拠を一般化しない。 |
+| Managed organization policy and production trust | Future requirement; not implemented in initial version |
+| Institutional privacy/legal approval verification | Future requirement; user responsibility notice remains |
+| Formal educational baseline and thresholds | Future requirement; no accuracy or validity claim |
+| Cross-platform runners and signing | Future requirement; Windows 11 x64 local scope only |
+| Independent signed release record | Future requirement; internal adversarial review only |
+| Dump-policy attestation | Future requirement; no institutional real-data mode claim |
 
-## Requirement revision and evidence inventory
+## Authorized implementation scope
 
-| Task | Current result | Evidence identity | Boundary |
-|---|---|---|---|
-| G-RB | `PASS` | `docs-dev/preflight/requirements-baseline.md`; commit `921edc0eb2be13edad1db0688a63bb8fa555fa6d`; SHA-256 `7F5C6276E3F01B3C368A23439002603B53E025C6DA7DE65A01B7445A364C63F9` | v1.2 content is anchored to commit `a06dc33639fbb904b14bc0ed0ae853bd7841e1a8`; the hash is an integrity anchor, not an organizational signature. |
-| G-10 | `PASS` | `docs-dev/preflight/report-definition-contract.md`; commit `a06dc33639fbb904b14bc0ed0ae853bd7841e1a8`; SHA-256 `0E329457B9B2290CD6F25E7269DF5F90AB9A51D2300B232B94B8C074556775BD` | Generic runtime ReportDefinition contract only; production schema factory, serializer preflight, UI, and storage are not implemented. |
-| G-11 | `PASS` | `docs-dev/preflight/fixture-plan.md`; commit `2554b7d7a148717430059ab54302c5d3df6b9400`; SHA-256 `12F382204F2BE47B8D235118998EDEFDCEC2FA8321D0A400078CCF46782DFED6` | Synthetic fixture specifications only; production generators and full E2E fixtures remain later tasks. |
-| G-12 | `PARTIAL_BLOCKED` | `docs-dev/adr/0006-signed-records.md` and four test-only JWS fixtures; commit `b4e32ab5eb83f612ac06bb1c22f9564694e89642`; ADR SHA-256 `E508FC47B46F6E2033C77CFA08C83B9FA8AF32DF8C6BF6E11960588A1366C18D` | EXT-03 production issuer, trust root, policy, OAuth/org/model, retention/location/cost input is absent. Test keys and synthetic policy values are never production trust. |
-| G-13 | `BLOCKED` | `docs-dev/preflight/governance-inputs.md`; commit `2b16986a1d3f22439aabf96df22d1680aebbf8d7`; SHA-256 `5EFB21695D26F8DB1F73DD1D21717CE70F209E0D0826CC4F7C02917276777CA6` | EXT-04の4 rowsとEXT-06の4 rowsはすべて`NOT_PROVIDED`。external SHA-256、owner reference、validity、region、本文を捏造していない。 |
-| G-14 | `PARTIAL_BLOCKED` | `tests/fixtures/evaluation/metric-spec-test.json`; commit `e715fe53a57f1e3ec432e03eb9045340a1c8b8d0`; SHA-256 `88582D01922DC0382AA97A01005D15DD23A90DDE7C49489317D1379137A3EA52` | Synthetic test oracle and test-only thresholds only; EXT-05 target-course baseline、metric spec、pre-threshold、subgroup policyはabsent。 |
-| G-15 | `BLOCKED / NOT_RUN` | `spikes/CopilotContract/*` and `docs-dev/preflight/copilot-contract.md` are absent | G-12/EXT-03が直接blocker。ambient GitHub、Copilot CLI、`gh`、environment credentialを探索・代用していない。 |
-| G-16 | `PASS` | `docs-dev/preflight/document-pipeline.md` and isolated spike; commit `618da0900cdeafb8d62df00bacc089494b3a66e8`; record SHA-256 `CE189797BCE1500911B3BBBF114E6D2F598AE3BE62B64F82F005F705658CF063` | Measured Windows x64 Open XML/ICU/Excel/LibreOffice preflight only; production writer、macOS/Linux、release RC evidenceではない。 |
-| G-17 | `BLOCKED / NOT_RUN` | `spikes/PlatformPreflight/*`, `docs-dev/preflight/platform-matrix.md`, and `eng/platform-matrix.json` are absent | EXT-07 signing、notarization、Arm64、Office/print runner evidenceがabsent。候補matrixを採用済みplatform claimへ昇格しない。 |
-| G-18 | `PASS` | `docs-dev/traceability.md`; commit `df98ea0e29c6b66afd30a38ee369f53821a8436c`; SHA-256 `56972193AADFAFE9BA066F083BD45028B9158079E789AB11C920964F74AAE9F2` | 145 explicit P0 IDsをexactly onceでmapping。mapping completenessはupstream blockerを解消しない。 |
+GATE-0 authorizes plan v3.0 Phase 1 and its dependency-ordered successors:
 
-## Requirements section 17 evaluation
+1. Foundation and locked projects.
+2. Domain, editable presets, mapping, payload, validation, and review contracts.
+3. Workbook and Copilot lanes.
+4. Run orchestration.
+5. Seven-step Avalonia UI.
+6. Windows x64 E2E, self-contained folder publish, unsigned local zip, README, and developer documentation.
 
-| Item | Required evidence | Actual result | Gate effect |
-|---|---|---|---|
-| 17-01 generic ReportDefinition/schema/resource contract | G-10 | `PASS` at preflight contract level. Runtime report values、approval、launcher identityを外部入力にしていない。 | none |
-| 17-02 non-PII synthetic workbook/hostile/Unicode/formula vectors | G-11 | `PASS` at plan v2.1 fixture-specification level. G-11のsynthetic/PII boundaryとcase contractsを検証済み。 | none |
-| 17-03 signed Copilot operations policy/org/model/OAuth conditions | G-12/G-15 and EXT-03 | `BLOCKED`. Test-only JWSは存在するが、production policy/trust/org/model/OAuth/retention/location/cost evidenceは`NOT_PROVIDED`。 | **BLOCK** |
-| 17-04 notice/contact/retention/lawful basis | G-13 and EXT-04 | `BLOCKED`. `EXT-04-NOTICE`、`EXT-04-LAWFUL-BASIS`、`EXT-04-RETENTION-ACCESS`、`EXT-04-CONTACT-REDRESS`の4 rowsはすべて`NOT_PROVIDED`。 | **BLOCK** |
-| 17-05 human baseline/metrics/pre-threshold | G-14 and EXT-05 | `BLOCKED`. Synthetic metric oracleはproduction educational validity、target-course baseline、approved thresholdを証明しない。 | **BLOCK** |
-| 17-06 EU applicability/classification/responsibility/conformity | G-13 and EXT-06 | `BLOCKED`. EU適用・非適用のいずれも推測せず、external legal applicability decisionは`NOT_PROVIDED`。 | **BLOCK** |
-| 17-07 exact SDK/CLI/hash/allowlist/session live canary | G-15 | `NOT_RUN`. G-12/EXT-03が未充足のため、approved auth/org/model/manifest条件なしにlive canaryを開始していない。 | **BLOCK** |
-| 17-08 Office/LibreOffice/Open XML/ICU/RID cross-platform evidence | G-16/G-17 and EXT-07 | `PARTIAL_BLOCKED`. G-16の限定Windows spikeは`PASS`だが、G-17 cross-platform/signing/notary/Arm64/print/package matrixは`NOT_RUN`。 | **BLOCK** |
+Authorization does not include:
 
-### Aggregate
+- macOS, Linux, or Windows Arm64 support claims;
+- production code signing or signed installer;
+- protected workbook decryption;
+- automatic grade finalization from AI candidates;
+- managed organizational policy enforcement;
+- formal legal compliance or educational validity claims.
 
-| Check | Actual |
-|---|---:|
-| Section 17 items | 8 |
-| Passing items | 2 |
-| Blocking items | 6 |
-| `NOT_RUN` items counted as PASS | 0 |
-| Local/test-only evidence promoted to production evidence | 0 |
-| GATE-0 result | **BLOCKED** |
+## Runtime and testing boundaries
 
-## External input disposition
-
-| External input | Current status | Required next evidence |
-|---|---|---|
-| EXT-02 | Satisfied for G-11 preflight scope | Keep synthetic-only boundary; T-08 and later E2E remain future work. |
-| EXT-03 | `NOT_PROVIDED` | Verified production issuer/trust/policy、OAuth App client ID/scope、GitHub org、approved model、retention/location/cost、validity/revocation metadata. |
-| EXT-04 | `NOT_PROVIDED` | Verified notice、lawful basis、retention/access、contact/correction/appeal metadata. |
-| EXT-05 | `NOT_PROVIDED` | Verified human baseline、metric specification、measurement-before-threshold、subgroup policy metadata. |
-| EXT-06 | `NOT_PROVIDED` | Verified EU applicability decision and every classification/responsibility/conformity row it makes required. |
-| EXT-07 | `NOT_PROVIDED` | Production-equivalent signing/notarization、Arm64、Office/LibreOffice、print、clean setup/uninstall runner evidence. |
-
-EXT-08 independent signed release reviewとEXT-09 dump-policy attestationはGATE-0の第17節判定へ代入しないが、後続release/real-data gateで未充足のままである。本記録はそれらを`PASS`としない。
-
-## Fail-closed assertions
-
-- `src/`は存在しないか、配下file数が0でなければならない。評価時の実測は`0`である。
-- Phase 1のF-01以降、正式production/test project、配布物、実データ処理を開始しない。
-- G-15の代わりにambient GitHub/Copilot CLI/`gh`資格情報、environment token、個人accountを使用しない。
-- G-12 test key/fixtureをproduction issuer、機関承認、Business/Enterprise条件として扱わない。
-- G-14 test-only閾値を教育評価責任者の事前登録値として扱わない。
-- G-16 Windows x64結果をmacOS、Linux、Arm64、production package、印刷、署名、notarizationへ一般化しない。
-- ReportDefinitionの作成・保存・実行確認にlocal launcherの本人性、role、teacher/product approvalを追加しない。
-- 外部artifact本文、秘密、token、署名用private key、実在学生dataを不足証拠の代替としてrepositoryへ保存しない。
-- GATE-0 failureにlocal overrideを設けない。
-
-## Re-evaluation conditions
-
-GATE-0は次の順でのみ再評価する。
-
-1. EXT-03を外部ownerから受領し、production trustとtest trustを分離してG-12を完了する。
-2. 完了したG-12を直接依存としてG-15 live synthetic canaryを実行し、exact SDK/CLI/hash、auth、tool、permission、telemetry、session deletion、usageを検証する。
-3. EXT-04/EXT-06を外部ownerから受領し、本文をrepositoryへ保存せずG-13のrequired metadata rowsを検証する。
-4. EXT-05を外部ownerから受領し、結果を見る前のmetric/threshold/subgroup policyとhuman baselineを検証してG-14を完了する。
-5. EXT-07のproduction-equivalent runner/trust inputsでG-17を実行し、各OS/CPU/display/print/package rowを独立判定する。
-6. 変更されたrequirement、evidence、blockerをG-18へ反映し、145-ID completenessと第14/17節mappingを再検証する。
-7. 第17節8項目がすべて`PASS`し、approved requirement revision commitが不変で、`src/` file countが0であることを再確認する。
-
-要求を満たせない場合は、不足証拠を補う、要求を正式改版する、または対象platform/feature/projectを停止する。未実行や限定証拠を読み替えて先へ進めない。
+- Production implementation may now create `src/` and production/test projects listed in the current path map.
+- Development and required E2E use fixed-seed synthetic workbooks and fake Copilot adapters.
+- Optional authenticated smoke sends only fixed synthetic text. If no logged-in Copilot account is available, it is recorded as `SKIPPED_NOT_AUTHENTICATED` and does not block implementation completion.
+- An actual Forms workbook is never committed and is not needed to build or test the application.
+- When a user selects an actual workbook, it is read-only and identifiers are excluded from Copilot payloads.
+- `NOT_RUN` is not treated as PASS except that the explicitly optional A-08 smoke may be skipped with its exact nonblocking status.
 
 ## Final disposition
 
-**GATE-0 = BLOCKED.** Phase 1は許可されない。次の許可作業は、上記external inputsの受領・検証、直接blockされているG-12/G-13/G-14/G-15/G-17の完了、対応するG-18更新、およびGATE-0再評価だけである。
+**GATE-0 = PASS. Phase 1 authorization = GRANTED.**
+
+Implementation must follow the 72-task ownership map and phase gates. The unrelated existing changes in `.gitignore`, `README.md`, and `.vscode/settings.json` remain outside this gate record and must not be staged, reverted, or overwritten by this task.
