@@ -1,152 +1,144 @@
-# Implementation task file map — plan v3.0
+# Implementation task file map — plan v4.0
 
 | 項目 | 内容 |
 |---|---|
 | 状態 | **CURRENT NORMATIVE PATH MAP** |
-| Requirement | `docs/requirements-definition.md` v2.0 |
-| Plan | `work/20260831-implementation-plan.md` v3.0 |
+| Requirement | `docs/requirements-definition.md` v3.0 |
+| Plan | `work/20260831-implementation-plan.md` v4.0 |
+| Scope decision | ADR-0011 |
 | Initial target | Windows 11 x64 |
-| Rule | planのshorthandと`tests`を本表のexact pathへ展開する |
-| 記録日 | 2026-08-31 |
+| Production projects | 2 |
+| Test projects | 2 |
+| Task/gate rows | 37 |
+| Rule | plan shorthandとtestsを本表のexact pathへ展開する |
+| 記録日 | 2026-09-01 |
+
+No production or production-test path may be created before the current GATE-0 passes。This map assigns future ownership and does not authorize implementation by itself。
 
 ## Root aliases
 
 | Alias | Exact root |
 |---|---|
 | `Core/` | `src/StudyReportEvaluator.Core/` |
-| `Workbooks/` | `src/StudyReportEvaluator.Workbooks/` |
-| `Platform/` | `src/StudyReportEvaluator.Platform/` |
-| `Desktop/` | `src/StudyReportEvaluator.Desktop/` |
+| `App/` | `src/StudyReportEvaluator.App/` |
 | `Core.Tests/` | `tests/StudyReportEvaluator.Core.Tests/` |
-| `Workbooks.Tests/` | `tests/StudyReportEvaluator.Workbooks.Tests/` |
-| `Platform.Tests/` | `tests/StudyReportEvaluator.Platform.Tests/` |
-| `Desktop.Tests/` | `tests/StudyReportEvaluator.Desktop.Tests/` |
-| `E2E.Tests/` | `tests/StudyReportEvaluator.E2E.Tests/` |
+| `App.Tests/` | `tests/StudyReportEvaluator.App.Tests/` |
 
-No production or production-test path may be created before revised GATE-0 PASS. The map assigns future ownership and does not itself authorize implementation.
+No `Application/`、`Infrastructure/`、`Platform/`、`Workbooks/`、`Desktop/`、separate `E2E.Tests/` project alias exists in plan v4.0。
 
-## Phase 0
+## Phase 0 — Baseline
 
 | Task | Exact files |
 |---|---|
-| G0-01 | `docs/requirements-definition.md`; `work/20260831-implementation-plan.md` |
-| G0-02 | `docs-dev/adr/0010-single-input-local-scope.md` |
-| G0-03 | `docs-dev/preflight/requirements-baseline.md`; `docs-dev/preflight/implementation-task-file-map.md` |
-| G0-04 | `docs-dev/traceability.md` |
+| B-01 | `docs/requirements-definition.md`; `work/20260831-implementation-plan.md` |
+| B-02 | `docs-dev/adr/0011-dynamic-quantification-excel-formulas.md`; `docs-dev/preflight/sample-workbook-profile.md` |
+| B-03 | `docs-dev/preflight/requirements-baseline.md`; `docs-dev/preflight/implementation-task-file-map.md` |
+| B-04 | `docs-dev/traceability.md` |
 | GATE-0 | `docs-dev/preflight/gate-result.md` |
 
-## Foundation
+## Phase 1 — Foundation
 
 | Task | Exact files |
 |---|---|
-| F-01 | `global.json`; `Directory.Build.props`; `Directory.Packages.props`; `NuGet.Config` |
-| F-02 | `.gitignore` |
-| F-03 | `StudyReportEvaluator.sln`; `Core/StudyReportEvaluator.Core.csproj`; `Workbooks/StudyReportEvaluator.Workbooks.csproj`; `Platform/StudyReportEvaluator.Platform.csproj`; `Desktop/StudyReportEvaluator.Desktop.csproj`; `Desktop/Program.cs`; `Desktop/App.axaml`; `Desktop/App.axaml.cs`; `Core.Tests/StudyReportEvaluator.Core.Tests.csproj`; `Workbooks.Tests/StudyReportEvaluator.Workbooks.Tests.csproj`; `Platform.Tests/StudyReportEvaluator.Platform.Tests.csproj`; `Desktop.Tests/StudyReportEvaluator.Desktop.Tests.csproj`; `E2E.Tests/StudyReportEvaluator.E2E.Tests.csproj` |
-| F-04 | `Core/Ports/Ports.cs`; `Core.Tests/Architecture/DependencyRulesTests.cs` |
-| F-05 | `Core/packages.lock.json`; `Workbooks/packages.lock.json`; `Platform/packages.lock.json`; `Desktop/packages.lock.json`; `Core.Tests/packages.lock.json`; `Workbooks.Tests/packages.lock.json`; `Platform.Tests/packages.lock.json`; `Desktop.Tests/packages.lock.json`; `E2E.Tests/packages.lock.json`; `E2E.Tests/SupplyChain/PackageLockTests.cs` |
-| F-TR | `docs-dev/traceability.md` |
-| GATE-1 | `artifacts/test/gate-foundation.json` |
+| F-01 | `global.json`; `Directory.Build.props`; `Directory.Packages.props`; `NuGet.Config`; `.gitignore` |
+| F-02 | `StudyReportEvaluator.slnx`; `Core/StudyReportEvaluator.Core.csproj`; `App/StudyReportEvaluator.App.csproj`; `App/Program.cs`; `App/App.axaml`; `App/App.axaml.cs`; `Core.Tests/StudyReportEvaluator.Core.Tests.csproj`; `App.Tests/StudyReportEvaluator.App.Tests.csproj` |
+| F-03 | `Core/packages.lock.json`; `App/packages.lock.json`; `Core.Tests/packages.lock.json`; `App.Tests/packages.lock.json`; `Core.Tests/Architecture/DependencyRulesTests.cs`; `App.Tests/SupplyChain/PackageLockTests.cs` |
+| GATE-1 | generated `artifacts/test/gate-foundation.json` |
 
-## Domain and preset contracts
+## Phase 2 — Core
 
 | Task | Exact files |
 |---|---|
-| T-01 | `Core/Domain/StatusCodes.cs`; `Core.Tests/Domain/StatusCodesTests.cs` |
-| T-02 | `Core/Domain/QuestionColumnMapping.cs`; `Core.Tests/Domain/QuestionColumnMappingTests.cs` |
-| T-03 | `Core/Domain/EvaluationDefinition.cs`; `Core/Domain/RunSnapshot.cs`; `Core.Tests/Domain/EvaluationDefinitionTests.cs`; `Core.Tests/Domain/RunSnapshotTests.cs` |
-| T-04 | `Core/Presets/BuiltInEvaluationPresets.cs`; `Core.Tests/Presets/BuiltInEvaluationPresetsTests.cs` |
-| T-05 | `Core/Prompting/PromptTemplateRenderer.cs`; `Core.Tests/Prompting/PromptTemplateRendererTests.cs` |
-| T-06 | `Core/Privacy/PiiCandidateDetector.cs`; `Core/Prompting/SafeEvaluationPayloadBuilder.cs`; `Core.Tests/Privacy/PiiCandidateDetectorTests.cs`; `Core.Tests/Prompting/SafeEvaluationPayloadBuilderTests.cs` |
-| T-07 | `Core/Domain/EvaluationResult.cs`; `Core.Tests/Domain/EvaluationResultTests.cs` |
-| T-08 | `Core/Validation/EvaluationResultValidator.cs`; `Core.Tests/Validation/EvaluationResultValidatorTests.cs` |
-| T-09 | `Core/Review/ReviewDecisionService.cs`; `Core.Tests/Review/ReviewDecisionServiceTests.cs` |
-| T-10 | `tests/fixtures/v2/mapping.json`; `tests/fixtures/v2/evaluation-definitions.json`; `tests/fixtures/v2/evaluation-results.json`; `tests/fixtures/v2/security.json`; `tests/fixtures/v2/manifest.json`; `Core.Tests/Fixtures/SyntheticFixtureContractTests.cs` |
-| T-TR | `docs-dev/traceability.md` |
-| GATE-2 | `artifacts/test/gate-contracts.json` |
+| C-01 | `Core/Domain/QuantificationDefinition.cs`; `Core/Domain/QuestionDefinition.cs`; `Core/Domain/EvaluatorDefinition.cs`; `Core/Domain/CriterionDefinition.cs`; `Core.Tests/Domain/QuantificationDefinitionTests.cs`; `Core.Tests/Domain/DefinitionCollectionTests.cs` |
+| C-02 | `Core/Domain/QuantificationSnapshot.cs`; `Core/Validation/QuantificationDefinitionValidator.cs`; `Core/Serialization/CanonicalDefinitionSerializer.cs`; `Core.Tests/Validation/QuantificationDefinitionValidatorTests.cs`; `Core.Tests/Serialization/CanonicalDefinitionSerializerTests.cs`; `Core.Tests/Domain/QuantificationSnapshotTests.cs` |
+| C-03 | `Core/Prompting/BuiltInPromptTemplates.cs`; `Core/Prompting/PromptRenderContext.cs`; `Core/Prompting/PromptTemplateRenderer.cs`; `Core/Prompting/SafeEvaluationPayloadBuilder.cs`; `Core.Tests/Prompting/BuiltInPromptTemplatesTests.cs`; `Core.Tests/Prompting/PromptTemplateRendererTests.cs`; `Core.Tests/Prompting/SafeEvaluationPayloadBuilderTests.cs` |
+| C-04 | `Core/Domain/QuantificationResult.cs`; `Core/Validation/QuantificationResultValidator.cs`; `Core.Tests/Domain/QuantificationResultTests.cs`; `Core.Tests/Validation/QuantificationResultValidatorTests.cs` |
+| C-05 | `Core/Scoring/WeightedScoreCalculator.cs`; `Core/Formulas/FormulaExpression.cs`; `Core/Formulas/FormulaSerializer.cs`; `Core/Formulas/FormulaPreflightValidator.cs`; `Core.Tests/Scoring/WeightedScoreCalculatorTests.cs`; `Core.Tests/Formulas/FormulaSerializerTests.cs`; `Core.Tests/Formulas/FormulaPreflightValidatorTests.cs` |
+| C-06 | `tests/fixtures/v3/definition-minimal.json`; `tests/fixtures/v3/definition-matrix.json`; `tests/fixtures/v3/result-oracles.json`; `tests/fixtures/v3/workbook-scenarios.json`; `tests/fixtures/v3/manifest.json`; `Core.Tests/Fixtures/SyntheticSpecificationContractTests.cs` |
+| GATE-CORE | generated `artifacts/test/gate-core.json` |
 
-## Workbook lane
+## Phase 3A — Excel adapter
 
 | Task | Exact files |
 |---|---|
-| W-01 | `Workbooks/Intake/FileFormatClassifier.cs`; `Workbooks.Tests/Intake/FileFormatClassifierTests.cs` |
-| W-02 | `Workbooks/Intake/InputSnapshotService.cs`; `Workbooks.Tests/Intake/InputSnapshotServiceTests.cs` |
-| W-03 | `Workbooks/Reading/WorkbookMetadataReader.cs`; `Workbooks.Tests/Reading/WorkbookMetadataReaderTests.cs` |
-| W-04 | `Workbooks/Mapping/ColumnMappingValidator.cs`; `Workbooks.Tests/Mapping/ColumnMappingValidatorTests.cs` |
-| W-05 | `Workbooks/Writing/WorkingPackage.cs`; `Workbooks.Tests/Writing/WorkingPackagePreservationTests.cs` |
-| W-06 | `Workbooks/Writing/ControlSheetWriter.cs`; `Workbooks.Tests/Writing/ControlSheetWriterTests.cs` |
-| W-07 | `Workbooks/Writing/EvaluationResultsWriter.cs`; `Workbooks/Writing/UntrustedStringCellWriter.cs`; `Workbooks.Tests/Writing/EvaluationResultsWriterTests.cs`; `Workbooks.Tests/Writing/UntrustedStringCellWriterTests.cs` |
-| W-08 | `Workbooks/Validation/OutputPackageValidator.cs`; `Workbooks.Tests/Validation/OutputPackageValidatorTests.cs` |
-| W-09 | `Workbooks/Writing/AtomicOutputCommitter.cs`; `Workbooks.Tests/Writing/AtomicOutputCommitterFaultTests.cs` |
-| W-TR | `docs-dev/traceability.md` |
-| GATE-W | `artifacts/test/gate-workbook.json` |
+| X-01 | `App/Workbooks/Intake/FileFormatClassifier.cs`; `App/Workbooks/Intake/InputSnapshotService.cs`; `App/Workbooks/Reading/WorkbookMetadataReader.cs`; `App.Tests/Workbooks/Intake/FileFormatClassifierTests.cs`; `App.Tests/Workbooks/Intake/InputSnapshotServiceTests.cs`; `App.Tests/Workbooks/Reading/WorkbookMetadataReaderTests.cs` |
+| X-02 | `App/Workbooks/Mapping/ColumnMappingSuggester.cs`; `App/Workbooks/Mapping/ColumnMappingValidator.cs`; `App.Tests/Workbooks/Mapping/ColumnMappingSuggesterTests.cs`; `App.Tests/Workbooks/Mapping/ColumnMappingValidatorTests.cs` |
+| X-03 | `App/Workbooks/Writing/WorkingPackage.cs`; `App/Workbooks/Writing/AppOwnedSheetNameResolver.cs`; `App/Workbooks/Writing/ConfigSheetWriter.cs`; `App/Workbooks/Writing/RunSheetWriter.cs`; `App/Workbooks/Writing/CalculationPropertiesWriter.cs`; `App.Tests/Workbooks/Writing/WorkingPackageTests.cs`; `App.Tests/Workbooks/Writing/AppOwnedSheetNameResolverTests.cs`; `App.Tests/Workbooks/Writing/ConfigAndRunSheetWriterTests.cs` |
+| X-04 | `App/Workbooks/Writing/ResultsSheetWriter.cs`; `App/Workbooks/Writing/FormulaCellWriter.cs`; `App/Workbooks/Writing/UntrustedStringCellWriter.cs`; `App.Tests/Workbooks/Writing/ResultsSheetWriterTests.cs`; `App.Tests/Workbooks/Writing/FormulaCellWriterTests.cs`; `App.Tests/Workbooks/Writing/UntrustedStringCellWriterTests.cs` |
+| X-05 | `App/Workbooks/Validation/OutputPackageValidator.cs`; `App/Workbooks/Writing/AtomicOutputCommitter.cs`; `App.Tests/Workbooks/Validation/OutputPackageValidatorTests.cs`; `App.Tests/Workbooks/Writing/AtomicOutputCommitterFaultTests.cs` |
+| GATE-EXCEL | generated `artifacts/test/gate-excel.json` |
 
-## Copilot lane
+## Phase 3B — Copilot adapter
 
 | Task | Exact files |
 |---|---|
-| A-01 | `Platform/Copilot/CopilotClientFactory.cs`; `Platform.Tests/Copilot/CopilotClientFactoryTests.cs` |
-| A-02 | `Platform/Copilot/EvaluationSchemaFactory.cs`; `Platform.Tests/Copilot/EvaluationSchemaFactoryTests.cs` |
-| A-03 | `Platform/Copilot/SubmitEvaluationTool.cs`; `Platform.Tests/Copilot/SubmitEvaluationToolTests.cs` |
-| A-04 | `Platform/Copilot/EphemeralEvaluationRunner.cs`; `Platform.Tests/Copilot/EphemeralEvaluationRunnerTests.cs` |
-| A-05 | `Platform/Copilot/RetryAndCleanupCoordinator.cs`; `Platform.Tests/Copilot/RetryAndCleanupCoordinatorTests.cs` |
-| A-06 | `Platform/Logging/SafeLogger.cs`; `Platform.Tests/Logging/SafeLoggerCanaryTests.cs` |
-| A-07 | `Platform.Tests/Copilot/CapabilityBoundaryTests.cs` |
-| A-08 | `Platform.Tests/Copilot/AuthenticatedSyntheticSmokeTests.cs` |
-| A-TR | `docs-dev/traceability.md` |
-| GATE-AI | `artifacts/test/gate-copilot.json` |
+| A-01 | `App/Copilot/CopilotClientFactory.cs`; `App/Copilot/CopilotAuthenticationService.cs`; `App.Tests/Copilot/CopilotClientFactoryTests.cs`; `App.Tests/Copilot/CopilotAuthenticationServiceTests.cs` |
+| A-02 | `App/Copilot/EvaluationSchemaFactory.cs`; `App/Copilot/SubmitQuantificationTool.cs`; `App.Tests/Copilot/EvaluationSchemaFactoryTests.cs`; `App.Tests/Copilot/SubmitQuantificationToolTests.cs` |
+| A-03 | `App/Copilot/EphemeralEvaluationRunner.cs`; `App/Copilot/RetryAndCleanupCoordinator.cs`; `App/Logging/SafeLogger.cs`; `App.Tests/Copilot/EphemeralEvaluationRunnerTests.cs`; `App.Tests/Copilot/RetryAndCleanupCoordinatorTests.cs`; `App.Tests/Copilot/CapabilityBoundaryTests.cs`; `App.Tests/Copilot/AuthenticatedSyntheticSmokeTests.cs`; `App.Tests/Logging/SafeLoggerCanaryTests.cs` |
+| GATE-AI | generated `artifacts/test/gate-ai.json` |
 
-## Run orchestration
+## Phase 4 — Workflow and UI
 
 | Task | Exact files |
 |---|---|
-| R-01 | `Core/Runs/EvaluationPlanBuilder.cs`; `Core.Tests/Runs/EvaluationPlanBuilderTests.cs` |
-| R-02 | `Core/Runs/EvaluationScheduler.cs`; `Core.Tests/Runs/EvaluationSchedulerTests.cs` |
-| R-03 | `Core/Runs/EvaluationOrchestrator.cs`; `Core.Tests/Runs/EvaluationOrchestratorTests.cs` |
-| R-04 | `Core/Runs/RunSummary.cs`; `Core.Tests/Runs/RunSummaryTests.cs` |
-| R-TR | `docs-dev/traceability.md` |
-| GATE-RUN | `artifacts/test/gate-run.json` |
+| U-01 | `App/Workflow/EvaluationPlanBuilder.cs`; `App/Workflow/EvaluationScheduler.cs`; `App/Workflow/QuantificationOrchestrator.cs`; `App/Workflow/RunSummary.cs`; `App.Tests/Workflow/EvaluationPlanBuilderTests.cs`; `App.Tests/Workflow/EvaluationSchedulerTests.cs`; `App.Tests/Workflow/QuantificationOrchestratorTests.cs` |
+| U-02 | `App/App.axaml`; `App/App.axaml.cs`; `App/Views/MainWindow.axaml`; `App/Views/MainWindow.axaml.cs`; `App/ViewModels/MainWindowViewModel.cs`; `App/Navigation/WorkflowNavigator.cs`; `App/Composition/ServiceRegistration.cs`; `App/Resources/EthicsWarningText.cs`; `App/Styles/Accessibility.axaml`; `App.Tests/UI/MainWindowTests.cs`; `App.Tests/UI/EthicsWarningTests.cs`; `App.Tests/Composition/ServiceRegistrationTests.cs` |
+| U-03 | `App/Views/InputView.axaml`; `App/Views/InputView.axaml.cs`; `App/ViewModels/InputViewModel.cs`; `App/Views/QuantificationDesignView.axaml`; `App/Views/QuantificationDesignView.axaml.cs`; `App/ViewModels/QuantificationDesignViewModel.cs`; `App.Tests/UI/InputViewTests.cs`; `App.Tests/UI/QuantificationDesignViewTests.cs` |
+| U-04 | `App/Views/ExecutionView.axaml`; `App/Views/ExecutionView.axaml.cs`; `App/ViewModels/ExecutionViewModel.cs`; `App/Views/ResultsOutputView.axaml`; `App/Views/ResultsOutputView.axaml.cs`; `App/ViewModels/ResultsOutputViewModel.cs`; `App.Tests/UI/ExecutionViewTests.cs`; `App.Tests/UI/ResultsOutputViewTests.cs`; `App.Tests/UI/PrimaryJourneyAccessibilityTests.cs` |
+| GATE-APP | generated `artifacts/test/gate-app.json` |
 
-## Avalonia UI
-
-| Task | Exact files |
-|---|---|
-| U-01 | `Desktop/Views/MainWindow.axaml`; `Desktop/Views/MainWindow.axaml.cs`; `Desktop/ViewModels/MainWindowViewModel.cs`; `Desktop/Navigation/WorkflowNavigator.cs`; `Desktop/Styles/Accessibility.axaml`; `Desktop.Tests/Views/MainWindowTests.cs` |
-| U-02 | `Desktop/Views/FileSelectionView.axaml`; `Desktop/Views/FileSelectionView.axaml.cs`; `Desktop/ViewModels/FileSelectionViewModel.cs`; `Desktop.Tests/Views/FileSelectionViewTests.cs` |
-| U-03 | `Desktop/Views/ColumnMappingView.axaml`; `Desktop/Views/ColumnMappingView.axaml.cs`; `Desktop/ViewModels/ColumnMappingViewModel.cs`; `Desktop.Tests/Views/ColumnMappingViewTests.cs` |
-| U-04 | `Desktop/Views/EvaluationSettingsView.axaml`; `Desktop/Views/EvaluationSettingsView.axaml.cs`; `Desktop/ViewModels/EvaluationSettingsViewModel.cs`; `Desktop.Tests/Views/EvaluationSettingsViewTests.cs` |
-| U-05 | `Desktop/Views/SendPreviewView.axaml`; `Desktop/Views/SendPreviewView.axaml.cs`; `Desktop/ViewModels/SendPreviewViewModel.cs`; `Desktop.Tests/Views/SendPreviewViewTests.cs` |
-| U-06 | `Desktop/Views/ExecutionReviewView.axaml`; `Desktop/Views/ExecutionReviewView.axaml.cs`; `Desktop/ViewModels/ExecutionReviewViewModel.cs`; `Desktop.Tests/Views/ExecutionReviewViewTests.cs` |
-| U-07 | `Desktop/Views/CompletionView.axaml`; `Desktop/Views/CompletionView.axaml.cs`; `Desktop/ViewModels/CompletionViewModel.cs`; `Desktop/Composition/ServiceRegistration.cs`; `Desktop.Tests/Views/CompletionViewTests.cs`; `Desktop.Tests/Composition/ServiceRegistrationTests.cs` |
-| U-08 | `Desktop.Tests/Accessibility/PrimaryJourneyAccessibilityTests.cs` |
-| U-TR | `docs-dev/traceability.md` |
-| GATE-UI | `artifacts/test/gate-ui.json` |
-
-## End-to-end, packaging, and docs
+## Phase 5 — Acceptance, package, docs
 
 | Task | Exact files |
 |---|---|
-| E-01 | `E2E.Tests/Flows/SyntheticEvaluationJourneyTests.cs`; generated fixed-seed workbooks under ignored `artifacts/test/fixtures/` |
-| E-02 | `E2E.Tests/Security/HostileInputAndFailureTests.cs` |
-| E-03 | `E2E.Tests/Windows/WindowsLocalApplicationTests.cs` |
-| E-04 | `E2E.Tests/Performance/LocalPipelineBenchmarks.cs`; `artifacts/test/performance-windows-x64.json` |
-| P-01 | `scripts/publish-windows.ps1`; `E2E.Tests/Packaging/WindowsPublishLayoutTests.cs` |
-| P-02 | `scripts/package-windows.ps1`; `E2E.Tests/Packaging/WindowsPackageTests.cs`; generated ignored `artifacts/package/StudyReportEvaluator-win-x64.zip`; generated ignored `artifacts/package/StudyReportEvaluator-win-x64.zip.sha256` |
-| D-01 | `README.md` |
-| D-02 | `docs-dev/architecture.md`; `docs-dev/excel-contract.md`; `docs-dev/customization.md` |
-| D-03 | `E2E.Tests/Content/DocumentationContractTests.cs` |
+| E-01 | `App.Tests/E2E/SyntheticWorkbookFactory.cs`; `App.Tests/E2E/FakeCopilotTransport.cs`; `App.Tests/E2E/SyntheticQuantificationJourneyTests.cs`; generated ignored workbooks under `artifacts/test/fixtures/` |
+| E-02 | `App.Tests/E2E/SampleWorkbookStructuralTests.cs`; `App.Tests/E2E/WindowsLocalApplicationTests.cs`; `App.Tests/E2E/HostileInputAndFailureTests.cs`; `artifacts/test/performance-windows-x64.json` |
+| P-01 | `scripts/publish-windows.ps1`; `scripts/package-windows.ps1`; `App.Tests/Packaging/WindowsPublishPackageTests.cs`; generated ignored `artifacts/package/StudyReportEvaluator-win-x64.zip`; generated ignored `artifacts/package/StudyReportEvaluator-win-x64.zip.sha256` |
+| D-01 | `README.md`; `docs-dev/architecture.md`; `docs-dev/excel-contract.md`; `docs-dev/custom-evaluator-guide.md`; `App.Tests/Content/DocumentationContractTests.cs` |
 | E-TR | `docs-dev/traceability.md` |
-| GATE-ACCEPTANCE | `artifacts/test/gate-acceptance.json` |
+| GATE-ACCEPTANCE | generated `artifacts/test/gate-acceptance.json` |
 
-## Shared-file and generated-artifact rules
+## Shared and sequential ownership
 
-1. `.gitignore` has existing uncommitted changes. F-02 must read and merge them; it must not reset or overwrite them.
-2. `README.md` has existing uncommitted changes. D-01 must read and merge them; it must not reset or overwrite them.
-3. `.vscode/settings.json` is untracked and has no owner in plan v3.0. Do not stage, modify, or delete it.
-4. Gate JSON and package/performance output under `artifacts/` are generated evidence. They are ignored unless a later task explicitly changes the release policy.
-5. Actual Forms workbooks are never committed. Test workbooks are generated from fixed-seed JSON specifications.
-6. `docs-dev/traceability.md` is edited only by the listed `*-TR` owner tasks.
-7. A task must not invent alternate production paths. A necessary path change requires a plan/map update before implementation.
+| Path | Ordered owners | Rule |
+|---|---|---|
+| `App/App.axaml`; `App/App.axaml.cs` | F-02 → U-02 | F-02 creates minimal bootstrap; U-02 integrates shell/resources without changing project topology |
+| `docs-dev/traceability.md` | B-04 → E-TR | B-04 creates planned mapping; E-TR replaces planned status with final evidence only after task/gate completion |
+| `.gitignore` | F-01 | Read and merge existing uncommitted content; never reset or overwrite unrelated lines |
+| `README.md` | D-01 | Read and merge existing uncommitted content; never reset or overwrite unrelated sections |
+
+No other production/source path has multiple task owners。A necessary ownership change requires plan/map revision before editing。
+
+## Generated artifact rules
+
+1. Gate JSON、synthetic workbook、performance output、package ZIP/hash under `artifacts/` are generated evidence and remain ignored unless release policy is explicitly changed。
+2. Generated evidence never contains sample/student answer、Prompt、reason、evidence、token、credential、file path。
+3. Actual input workbooks are not copied into test output or package artifacts。
+4. Optional live Copilot smoke uses fixed synthetic text only and records advisory status separately。
+5. Optional external spreadsheet recalculation never replaces required formula/cached-value oracle evidence。
+
+## Task execution rules
+
+1. A task edits only its listed files and direct generated evidence。
+2. Production implementation starts only after current GATE-0 PASS。
+3. Each implementation task adds or updates its listed tests in the same commit。
+4. Each task runs diagnostics、target tests、applicable build、`git diff --check` before commit。
+5. Gate rows verify all prerequisite tasks and record exact commit/test status; they do not implement missing behavior。
+6. `NOT_RUN`、`SKIPPED`、optional advisory PASS are not promoted to required-test PASS。
+7. A task does not invent alternate project roots or silently split projects。
+
+## Required boundary allocation
+
+- C-02 `QuantificationDefinitionValidatorTests.cs` owns selected-row boundaries of 1、20,000、20,001, reversed ranges, enabled-child minima, numeric range, and weight validation。
+- C-03 `SafeEvaluationPayloadBuilderTests.cs` owns selected same-row primary/supporting inclusion, other-row/nonselected-column/file-path exclusion, stable source IDs, and opaque placeholder insertion。
+- C-04 `QuantificationResultValidatorTests.cs` consumes the exact source-ID map created for dispatch, resolves each returned ID to its same-row cell, and rejects evidence found only in a different sent or unsent cell。
+- C-05 formula tests own 8,191／8,192-character, function-argument, Excel-column, reference allowlist, and cycle boundaries。
+- X-01 tests own file/ZIP/relationship、sheet/dimension/header、cell-length metadata, and exact input snapshot behavior。
+- X-04 tests own Scorable、blank AI raw、valid/invalid override、cached value、literal-string injection, and rounded-child formula serialization。
+- U-01 `QuantificationOrchestratorTests.cs` changes criterion range/weight/enabled state/mapping during a run and proves override validation, Prompt, result validation, and formula layout continue to use the original run snapshot。
+- E-02 Windows local E2E runs against normal GATE-APP build output and does not require P-01 artifacts。P-01 alone owns self-contained publish/package generation and layout verification。
+- GATE-CORE、GATE-EXCEL、GATE-AI、GATE-APP、GATE-ACCEPTANCE rerun F-03 architecture and supply-chain regression tests; a foundation invariant cannot become stale after GATE-1。
 
 ## Superseded map
 
-The previous map for requirement v1.2 / plan v2.1 is historical. Paths for signed policy, platform matrix, cross-platform packages, row printing, educational validation, and release signing are not part of current initial implementation. Their files may remain as historical design artifacts but are not task dependencies.
+The previous requirement v2.0 / plan v3.0 map with 5 production projects、5 test projects、72 task/gate rows is historical。Its fixed candidate-review、send-confirmation、Workbooks/Platform/Desktop project paths do not authorize or constrain current implementation。
