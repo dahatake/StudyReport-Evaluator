@@ -3,11 +3,11 @@
 | 項目 | 値 |
 |---|---|
 | Task | G-RB |
-| 状態 | **内容反映完了・commit anchor待ち** |
+| 状態 | **完了・baseline content commit anchored** |
 | Requirement | `docs/requirements-definition.md` v1.2 |
 | Plan | `work/20260831-implementation-plan.md` v2.1 |
 | Base commit | `bc12522864235b9089dd474560d6222973eb2e92` |
-| Working-tree commit | **未作成。GATE-0前にcommit hashを追記する** |
+| Baseline content commit | `a06dc33639fbb904b14bc0ed0ae853bd7841e1a8` |
 | 記録日 | 2026-08-31 |
 
 ## Requirement owner correction
@@ -65,12 +65,12 @@ Hashes identify current working-tree bytes; they are not signatures, identities,
 | Surface | Previous blocker | v1.2 result | Remaining blocker |
 |---|---|---|---|
 | G-05 / DEC-09 | EXT-01 corpus + educator/product approval | **UNBLOCKED and complete** | none at decision level |
-| G-10 | lesson-specific evaluation design hash | **contract-complete**: generic ReportDefinition schema/contract/2 synthetic vectorsを確定。production/operational実装完了は主張しない | G-RB commit anchor。GATE-0には別途EXT-02〜09、G-11〜G-18が必要 |
+| G-10 | lesson-specific evaluation design hash | **contract-complete**: generic ReportDefinition schema/contract/2 synthetic vectorsを確定。production/operational実装完了は主張しない | GATE-0には別途EXT-02〜09、G-11〜G-18が必要 |
 | T-03/T-06/C-01 | fixed release field constants | dynamic config + actual serializer preflight | GATE-0 before production implementation |
 | L-12 | EXT-01 aggregate formula | runtime closed AST | GATE-0 |
 | A-03/A-10/A-14 | allowed local user/launcher identity | GitHub account/org authorization only | EXT-03/04/05/09 and GATE-0 |
 | R-10/R-11 | authenticated actor | explicit action/timestamp + optional unverified label | GATE-0 |
-| GATE-0 | all Phase 0 evidence | **still BLOCKED** | EXT-02〜09 as applicable、G-11〜G-18、commit anchor |
+| GATE-0 | all Phase 0 evidence | **still BLOCKED** | EXT-02〜09 as applicable、G-11〜G-18 |
 
 ## Gate integrity
 
@@ -82,4 +82,4 @@ Hashes identify current working-tree bytes; they are not signatures, identities,
 
 ## Completion condition
 
-Requirement content integration and owner-directed semantic correction are complete. G-RB cannot be marked fully anchored until this working tree is committed and the resulting commit hash replaces `Working-tree commit`. No commit was fabricated or created without an explicit commit request.
+Requirement content integration and owner-directed semantic correction are complete. G-RB is anchored by baseline content commit `a06dc33639fbb904b14bc0ed0ae853bd7841e1a8`. This record update is intentionally a later commit so the recorded hash does not create a self-reference. The anchor does not satisfy G-11〜G-18 or imply GATE-0 PASS.
