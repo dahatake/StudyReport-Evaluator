@@ -6,8 +6,10 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using StudyReportEvaluator.App.Composition;
 using StudyReportEvaluator.App.Navigation;
+using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.App.ViewModels;
 using StudyReportEvaluator.App.Views;
 using Xunit;
@@ -84,8 +86,13 @@ public sealed class MainWindowTests
 
             Border warning = Required<Border>(window, "EthicsWarningBanner");
             Button input = Required<Button>(window, "InputStepButton");
+            ContentControl content = Required<ContentControl>(window, "CurrentStepContent");
             Assert.True(warning.IsVisible);
             Assert.Same(input, window.FocusManager?.GetFocusedElement());
+            Assert.Same(window.ViewModel.InputViewModel, content.Content);
+            InputView inputView = Assert.Single(window.GetVisualDescendants().OfType<InputView>());
+            Assert.Same(window.ViewModel.InputViewModel, inputView.DataContext);
+            Assert.False(Required<Grid>(window, "CurrentStepPlaceholderHost").IsVisible);
         }
         finally
         {
@@ -122,6 +129,7 @@ public sealed class MainWindowTests
             Assert.Equal("●", window.ViewModel.InputStep.StatusIcon);
             Assert.Contains("current", input.Classes);
             Assert.Contains("upcoming", execution.Classes);
+            Assert.Single(window.GetVisualDescendants().OfType<InputView>());
 
             Assert.True(input.Focus(NavigationMethod.Tab, KeyModifiers.None));
             Press(window, Key.Tab);
@@ -133,6 +141,9 @@ public sealed class MainWindowTests
             Assert.Contains("現在", window.ViewModel.DesignStep.StatusText, StringComparison.Ordinal);
             Assert.Contains("completed", input.Classes);
             Assert.Contains("current", design.Classes);
+            QuantificationDesignView designView = Assert.Single(
+                window.GetVisualDescendants().OfType<QuantificationDesignView>());
+            Assert.Same(window.ViewModel.DesignViewModel, designView.DataContext);
 
             Assert.True(next.Focus(NavigationMethod.Tab, KeyModifiers.None));
             Press(window, Key.Enter);
@@ -143,6 +154,7 @@ public sealed class MainWindowTests
             Assert.Contains("現在", window.ViewModel.ResultsStep.StatusText, StringComparison.Ordinal);
             Assert.False(next.IsEffectivelyEnabled);
             Assert.True(Required<Border>(window, "EthicsWarningBanner").IsVisible);
+            Assert.True(Required<Border>(window, "CurrentStepPlaceholder").IsVisible);
         }
         finally
         {
@@ -178,7 +190,58 @@ public sealed class MainWindowTests
             Assert.Same(next, window.FocusManager?.GetFocusedElement());
             Assert.Equal(new Thickness(3d), next.BorderThickness);
             Assert.True(Required<Border>(window, "EthicsWarningBanner").IsVisible);
-            Assert.True(Required<Border>(window, "CurrentStepPlaceholder").IsVisible);
+            Assert.True(Required<ContentControl>(window, "CurrentStepContent").IsVisible);
+            Assert.False(Required<Grid>(window, "CurrentStepPlaceholderHost").IsVisible);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Shell_round_trips_loaded_input_mapping_and_quantification_design_without_losing_edits()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        WorkflowNavigator navigator = new();
+        InputViewModel inputViewModel = new();
+        await inputViewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        MainWindowViewModel viewModel = new(
+            navigator,
+            inputViewModel,
+            new QuantificationDesignViewModel());
+        MainWindow window = new(viewModel);
+
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+            Assert.Single(window.GetVisualDescendants().OfType<InputView>());
+
+            viewModel.NextCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+
+            QuantificationDesignView designView = Assert.Single(
+                window.GetVisualDescendants().OfType<QuantificationDesignView>());
+            Assert.Same(viewModel.DesignViewModel, designView.DataContext);
+            Assert.Equal("Original", viewModel.DesignViewModel.Draft.SourceSheet);
+            Assert.Equal(
+                inputViewModel.DefinitionDraft.Questions.Select(question => question.PrimarySourceColumn),
+                viewModel.DesignViewModel.Draft.Questions.Select(question => question.PrimarySourceColumn));
+
+            viewModel.DesignViewModel.DefinitionName = "往復後も保持する設計";
+            viewModel.PreviousCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal("往復後も保持する設計", inputViewModel.DefinitionDraft.Name);
+
+            inputViewModel.FirstDataRow = 3;
+            viewModel.NextCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("往復後も保持する設計", viewModel.DesignViewModel.DefinitionName);
+            Assert.Equal(3, viewModel.DesignViewModel.Draft.FirstDataRow);
+            Assert.Single(window.GetVisualDescendants().OfType<QuantificationDesignView>());
+            Assert.False(Required<Grid>(window, "CurrentStepPlaceholderHost").IsVisible);
         }
         finally
         {

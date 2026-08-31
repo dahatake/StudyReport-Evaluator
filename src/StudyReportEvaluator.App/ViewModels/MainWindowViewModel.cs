@@ -30,11 +30,24 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private readonly DelegateCommand nextCommand;
     private readonly DelegateCommand previousCommand;
     private ImmutableArray<WorkflowStepPresentation> stepPresentations;
+    private QuantificationDesignViewModel designViewModel;
+    private WorkflowStep previousStep;
     private bool disposed;
 
     public MainWindowViewModel(WorkflowNavigator navigator)
+        : this(navigator, new InputViewModel(), new QuantificationDesignViewModel())
+    {
+    }
+
+    public MainWindowViewModel(
+        WorkflowNavigator navigator,
+        InputViewModel inputViewModel,
+        QuantificationDesignViewModel designViewModel)
     {
         this.navigator = navigator ?? throw new ArgumentNullException(nameof(navigator));
+        InputViewModel = inputViewModel ?? throw new ArgumentNullException(nameof(inputViewModel));
+        this.designViewModel = designViewModel ?? throw new ArgumentNullException(nameof(designViewModel));
+        previousStep = navigator.CurrentStep;
         stepPresentations = BuildStepPresentations();
         navigateCommand = new DelegateCommand(
             ExecuteNavigate,
@@ -52,7 +65,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public WorkflowNavigator Navigator => navigator;
 
+    public InputViewModel InputViewModel { get; }
+
+    public QuantificationDesignViewModel DesignViewModel => designViewModel;
+
     public WorkflowStep CurrentStep => navigator.CurrentStep;
+
+    public UiObservableObject? CurrentEditorViewModel => CurrentStep switch
+    {
+        WorkflowStep.Input => InputViewModel,
+        WorkflowStep.Design => DesignViewModel,
+        _ => null,
+    };
+
+    public bool HasEditorContent => CurrentEditorViewModel is not null;
+
+    public bool HasPlaceholderContent => !HasEditorContent;
 
     public ImmutableArray<WorkflowStepPresentation> Steps => stepPresentations;
 
@@ -119,8 +147,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     private void HandleCurrentStepChanged(object? sender, EventArgs e)
     {
+        SynchronizeDraftsForTransition(previousStep, navigator.CurrentStep);
+        previousStep = navigator.CurrentStep;
         stepPresentations = BuildStepPresentations();
+        OnPropertyChanged(nameof(DesignViewModel));
         OnPropertyChanged(nameof(CurrentStep));
+        OnPropertyChanged(nameof(CurrentEditorViewModel));
+        OnPropertyChanged(nameof(HasEditorContent));
+        OnPropertyChanged(nameof(HasPlaceholderContent));
         OnPropertyChanged(nameof(Steps));
         OnPropertyChanged(nameof(InputStep));
         OnPropertyChanged(nameof(DesignStep));
@@ -138,6 +172,19 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         navigateCommand.RaiseCanExecuteChanged();
         nextCommand.RaiseCanExecuteChanged();
         previousCommand.RaiseCanExecuteChanged();
+    }
+
+    private void SynchronizeDraftsForTransition(WorkflowStep from, WorkflowStep to)
+    {
+        if (from == WorkflowStep.Design && InputViewModel.HasLoadedWorkbook)
+        {
+            InputViewModel.SynchronizeFromDesignDraft(DesignViewModel.Draft);
+        }
+
+        if (to == WorkflowStep.Design)
+        {
+            designViewModel = new QuantificationDesignViewModel(InputViewModel.DefinitionDraft);
+        }
     }
 
     private ImmutableArray<WorkflowStepPresentation> BuildStepPresentations() =>

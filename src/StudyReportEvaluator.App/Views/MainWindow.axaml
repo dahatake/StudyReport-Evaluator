@@ -8,6 +8,7 @@
     xmlns:navigation="using:StudyReportEvaluator.App.Navigation"
     xmlns:resources="using:StudyReportEvaluator.App.Resources"
     xmlns:viewModels="using:StudyReportEvaluator.App.ViewModels"
+    xmlns:views="using:StudyReportEvaluator.App.Views"
     Title="StudyReport Evaluator"
     Width="1180"
     Height="800"
@@ -212,7 +213,7 @@
               Background="{DynamicResource AppAccentSoftBrush}"
               VerticalAlignment="Center">
             <TextBlock
-                Text="LOCAL DESKTOP · U-02 SHELL"
+              Text="LOCAL DESKTOP · 4-STEP WORKFLOW"
                 Foreground="{DynamicResource AppAccentStrongBrush}"
                 FontSize="11"
                 FontWeight="SemiBold"
@@ -295,7 +296,28 @@
               AutomationProperties.Name="{Binding ResultsStep.AccessibleName}" />
         </Grid>
 
-        <Grid Grid.Row="3" ColumnDefinitions="2*,*" ColumnSpacing="20">
+        <Grid Grid.Row="3">
+          <ContentControl
+              x:Name="CurrentStepContent"
+              Content="{Binding CurrentEditorViewModel}"
+              IsVisible="{Binding HasEditorContent}"
+              KeyboardNavigation.TabNavigation="Local"
+              AutomationProperties.AutomationId="CurrentStepContent">
+            <ContentControl.DataTemplates>
+              <DataTemplate DataType="{x:Type viewModels:InputViewModel}" x:DataType="viewModels:InputViewModel">
+                <views:InputView DataContext="{Binding}" />
+              </DataTemplate>
+              <DataTemplate DataType="{x:Type viewModels:QuantificationDesignViewModel}" x:DataType="viewModels:QuantificationDesignViewModel">
+                <views:QuantificationDesignView DataContext="{Binding}" />
+              </DataTemplate>
+            </ContentControl.DataTemplates>
+          </ContentControl>
+
+          <Grid
+              x:Name="CurrentStepPlaceholderHost"
+              ColumnDefinitions="2*,*"
+              ColumnSpacing="20"
+              IsVisible="{Binding HasPlaceholderContent}">
           <StackPanel Grid.Column="0" Spacing="16">
             <Border
                 x:Name="CurrentStepPlaceholder"
@@ -324,7 +346,7 @@
                     Background="#20AAB6FF"
                     HorizontalAlignment="Left">
                   <TextBlock
-                      Text="U-02 プレースホルダー · 実画面は U-03 / U-04 で接続"
+                      Text="U-04 で実行・結果画面を接続"
                       Foreground="White"
                       FontSize="12"
                       FontWeight="SemiBold" />
@@ -386,7 +408,7 @@
                       Foreground="{DynamicResource TechnicalTextBrush}"
                       TextWrapping="Wrap" />
                   <TextBlock
-                      Text="現在は U-02 の表示プレースホルダーです。"
+                      Text="実行・結果画面は U-04 で接続します。"
                       Foreground="{DynamicResource TechnicalTextBrush}"
                       FontSize="12" />
                 </StackPanel>
@@ -434,6 +456,7 @@
               </Grid>
             </StackPanel>
           </Border>
+          </Grid>
         </Grid>
 
         <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
