@@ -1,0 +1,473 @@
+<Window
+    x:Class="StudyReportEvaluator.App.Views.MainWindow"
+    x:DataType="viewModels:MainWindowViewModel"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:navigation="using:StudyReportEvaluator.App.Navigation"
+    xmlns:resources="using:StudyReportEvaluator.App.Resources"
+    xmlns:viewModels="using:StudyReportEvaluator.App.ViewModels"
+    Title="StudyReport Evaluator"
+    Width="1180"
+    Height="800"
+    MinWidth="1024"
+    MinHeight="720"
+    Background="{DynamicResource AppCanvasBrush}"
+    Foreground="{DynamicResource AppTextBrush}"
+    WindowStartupLocation="CenterScreen"
+    AutomationProperties.AutomationId="StudyReportEvaluatorMainWindow"
+    mc:Ignorable="d">
+
+  <Window.Resources>
+    <DataTemplate x:Key="WorkflowStepTemplate" x:DataType="viewModels:WorkflowStepPresentation">
+      <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*" ColumnSpacing="11">
+        <Border
+            Grid.RowSpan="2"
+            Width="38"
+            Height="38"
+            CornerRadius="19"
+            Background="#22FFFFFF"
+            VerticalAlignment="Center">
+          <TextBlock
+              Text="{Binding StatusIcon}"
+              FontSize="17"
+              FontWeight="Bold"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center" />
+        </Border>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7">
+          <TextBlock Text="{Binding NumberText}" Classes="step-number" />
+          <TextBlock Text="{Binding Title}" Classes="step-title" />
+        </StackPanel>
+        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="{Binding EnglishTitle}" Classes="step-english" />
+          <TextBlock Text="·" Classes="step-english" />
+          <TextBlock Text="{Binding StatusText}" Classes="step-status" />
+        </StackPanel>
+      </Grid>
+    </DataTemplate>
+  </Window.Resources>
+
+  <Window.Styles>
+    <Style Selector="Border.surface-card">
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="18" />
+    </Style>
+    <Style Selector="Border.ethics-warning">
+      <Setter Property="Background" Value="{DynamicResource WarningBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1.5" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Padding" Value="16,13" />
+    </Style>
+    <Style Selector="Border.warning-icon">
+      <Setter Property="Background" Value="{DynamicResource WarningTextBrush}" />
+      <Setter Property="CornerRadius" Value="16" />
+      <Setter Property="Width" Value="32" />
+      <Setter Property="Height" Value="32" />
+    </Style>
+    <Style Selector="Border.hero-card">
+      <Setter Property="Background" Value="{DynamicResource AppHeroBrush}" />
+      <Setter Property="CornerRadius" Value="22" />
+      <Setter Property="Padding" Value="28" />
+    </Style>
+    <Style Selector="Border.detail-card">
+      <Setter Property="Background" Value="#18FFFFFF" />
+      <Setter Property="BorderBrush" Value="#35FFFFFF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="Border.technical-validation">
+      <Setter Property="Background" Value="{DynamicResource TechnicalBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource TechnicalBorderBrush}" />
+      <Setter Property="BorderThickness" Value="2,0,0,0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="16" />
+    </Style>
+    <Style Selector="Border.technical-icon">
+      <Setter Property="Background" Value="{DynamicResource TechnicalTextBrush}" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Width" Value="32" />
+      <Setter Property="Height" Value="32" />
+    </Style>
+    <Style Selector="TextBlock.page-title">
+      <Setter Property="FontSize" Value="24" />
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="TextBlock.section-kicker">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="1.1" />
+      <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+    </Style>
+    <Style Selector="TextBlock.hero-title">
+      <Setter Property="FontSize" Value="30" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="TextBlock.hero-body">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="LineHeight" Value="23" />
+      <Setter Property="Foreground" Value="{DynamicResource AppHeroMutedBrush}" />
+    </Style>
+    <Style Selector="TextBlock.card-heading">
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}" />
+    </Style>
+    <Style Selector="Button.primary-action">
+      <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Padding" Value="20,11" />
+    </Style>
+    <Style Selector="Button.secondary-action">
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Padding" Value="20,11" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,*" KeyboardNavigation.TabNavigation="Continue">
+    <Border
+        x:Name="EthicsWarningBanner"
+        Grid.Row="0"
+        Margin="24,20,24,0"
+        Classes="ethics-warning"
+        Focusable="False"
+        IsTabStop="False"
+        IsHitTestVisible="False"
+        AutomationProperties.AutomationId="EthicsWarningBanner">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+        <Border Classes="warning-icon" VerticalAlignment="Top">
+          <TextBlock
+              Text="!"
+              FontSize="18"
+              FontWeight="Bold"
+              Foreground="White"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="3">
+          <TextBlock
+              Text="AI 定量化について"
+              FontSize="14"
+              FontWeight="Bold"
+              Foreground="{DynamicResource WarningTextBrush}" />
+          <TextBlock
+              x:Name="EthicsWarningMessage"
+              Text="{x:Static resources:EthicsWarningText.Message}"
+              FontSize="14"
+              Foreground="{DynamicResource WarningTextBrush}"
+              TextWrapping="Wrap" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <ScrollViewer
+        x:Name="ShellScrollViewer"
+        Grid.Row="1"
+        HorizontalScrollBarVisibility="Auto"
+        VerticalScrollBarVisibility="Auto">
+      <Grid
+          MinWidth="880"
+          Margin="24"
+          RowDefinitions="Auto,Auto,Auto,*,Auto"
+          RowSpacing="20">
+
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+          <Border
+              Width="48"
+              Height="48"
+              CornerRadius="14"
+              Background="{DynamicResource AppAccentBrush}">
+            <TextBlock
+                Text="SR"
+                FontSize="17"
+                FontWeight="Bold"
+                Foreground="White"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center" />
+          </Border>
+          <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+            <TextBlock Text="StudyReport Evaluator" Classes="page-title" />
+            <TextBlock
+                Text="回答を、説明可能な定量値と Excel 数式へ。"
+                Classes="muted"
+                FontSize="13" />
+          </StackPanel>
+          <Border
+              Grid.Column="2"
+              Padding="12,7"
+              CornerRadius="12"
+              Background="{DynamicResource AppAccentSoftBrush}"
+              VerticalAlignment="Center">
+            <TextBlock
+                Text="LOCAL DESKTOP · U-02 SHELL"
+                Foreground="{DynamicResource AppAccentStrongBrush}"
+                FontSize="11"
+                FontWeight="SemiBold"
+                LetterSpacing="0.8" />
+          </Border>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+          <StackPanel Spacing="3">
+            <TextBlock Text="ワークフロー" Classes="card-heading" />
+            <TextBlock
+                Text="{Binding NavigationProgressText}"
+                Classes="muted"
+                FontSize="13" />
+          </StackPanel>
+          <TextBlock
+              Grid.Column="1"
+              Text="Tab / Enter で操作できます"
+              Classes="muted"
+              FontSize="12"
+              VerticalAlignment="Bottom" />
+        </Grid>
+
+        <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
+          <Button
+              x:Name="InputStepButton"
+              Grid.Column="0"
+              Classes="step-button"
+              Classes.current="{Binding InputStep.IsCurrent}"
+              Classes.completed="{Binding InputStep.IsCompleted}"
+              Classes.upcoming="{Binding InputStep.IsUpcoming}"
+              Content="{Binding InputStep}"
+              ContentTemplate="{StaticResource WorkflowStepTemplate}"
+              Command="{Binding NavigateCommand}"
+              CommandParameter="{x:Static navigation:WorkflowStep.Input}"
+              TabIndex="0"
+              AutomationProperties.AutomationId="WorkflowStepInput"
+              AutomationProperties.Name="{Binding InputStep.AccessibleName}" />
+          <Button
+              x:Name="DesignStepButton"
+              Grid.Column="1"
+              Classes="step-button"
+              Classes.current="{Binding DesignStep.IsCurrent}"
+              Classes.completed="{Binding DesignStep.IsCompleted}"
+              Classes.upcoming="{Binding DesignStep.IsUpcoming}"
+              Content="{Binding DesignStep}"
+              ContentTemplate="{StaticResource WorkflowStepTemplate}"
+              Command="{Binding NavigateCommand}"
+              CommandParameter="{x:Static navigation:WorkflowStep.Design}"
+              TabIndex="1"
+              AutomationProperties.AutomationId="WorkflowStepDesign"
+              AutomationProperties.Name="{Binding DesignStep.AccessibleName}" />
+          <Button
+              x:Name="ExecutionStepButton"
+              Grid.Column="2"
+              Classes="step-button"
+              Classes.current="{Binding ExecutionStep.IsCurrent}"
+              Classes.completed="{Binding ExecutionStep.IsCompleted}"
+              Classes.upcoming="{Binding ExecutionStep.IsUpcoming}"
+              Content="{Binding ExecutionStep}"
+              ContentTemplate="{StaticResource WorkflowStepTemplate}"
+              Command="{Binding NavigateCommand}"
+              CommandParameter="{x:Static navigation:WorkflowStep.Execution}"
+              TabIndex="2"
+              AutomationProperties.AutomationId="WorkflowStepExecution"
+              AutomationProperties.Name="{Binding ExecutionStep.AccessibleName}" />
+          <Button
+              x:Name="ResultsStepButton"
+              Grid.Column="3"
+              Classes="step-button"
+              Classes.current="{Binding ResultsStep.IsCurrent}"
+              Classes.completed="{Binding ResultsStep.IsCompleted}"
+              Classes.upcoming="{Binding ResultsStep.IsUpcoming}"
+              Content="{Binding ResultsStep}"
+              ContentTemplate="{StaticResource WorkflowStepTemplate}"
+              Command="{Binding NavigateCommand}"
+              CommandParameter="{x:Static navigation:WorkflowStep.Results}"
+              TabIndex="3"
+              AutomationProperties.AutomationId="WorkflowStepResults"
+              AutomationProperties.Name="{Binding ResultsStep.AccessibleName}" />
+        </Grid>
+
+        <Grid Grid.Row="3" ColumnDefinitions="2*,*" ColumnSpacing="20">
+          <StackPanel Grid.Column="0" Spacing="16">
+            <Border
+                x:Name="CurrentStepPlaceholder"
+                Classes="hero-card"
+                AutomationProperties.AutomationId="CurrentStepPlaceholder">
+              <StackPanel Spacing="18">
+                <StackPanel Spacing="7">
+                  <TextBlock
+                      Text="{Binding CurrentStepKicker}"
+                      Foreground="#9FABFF"
+                      FontSize="12"
+                      FontWeight="SemiBold"
+                      LetterSpacing="1.2" />
+                  <TextBlock Text="{Binding CurrentStepTitle}" Classes="hero-title" />
+                  <TextBlock
+                      Text="{Binding CurrentStepDescription}"
+                      Classes="hero-body"
+                      TextWrapping="Wrap"
+                      MaxWidth="700"
+                      HorizontalAlignment="Left" />
+                </StackPanel>
+
+                <Border
+                    Padding="12,8"
+                    CornerRadius="10"
+                    Background="#20AAB6FF"
+                    HorizontalAlignment="Left">
+                  <TextBlock
+                      Text="U-02 プレースホルダー · 実画面は U-03 / U-04 で接続"
+                      Foreground="White"
+                      FontSize="12"
+                      FontWeight="SemiBold" />
+                </Border>
+
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                  <Border Grid.Column="0" Classes="detail-card">
+                    <StackPanel Spacing="7">
+                      <TextBlock Text="01" Foreground="#9FABFF" FontWeight="Bold" />
+                      <TextBlock
+                          Text="{Binding CurrentDetailOne}"
+                          Foreground="White"
+                          TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                  <Border Grid.Column="1" Classes="detail-card">
+                    <StackPanel Spacing="7">
+                      <TextBlock Text="02" Foreground="#9FABFF" FontWeight="Bold" />
+                      <TextBlock
+                          Text="{Binding CurrentDetailTwo}"
+                          Foreground="White"
+                          TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                  <Border Grid.Column="2" Classes="detail-card">
+                    <StackPanel Spacing="7">
+                      <TextBlock Text="03" Foreground="#9FABFF" FontWeight="Bold" />
+                      <TextBlock
+                          Text="{Binding CurrentDetailThree}"
+                          Foreground="White"
+                          TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border
+                x:Name="TechnicalValidationPlaceholder"
+                Classes="technical-validation"
+                AutomationProperties.AutomationId="TechnicalValidationPlaceholder">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                <Border Classes="technical-icon">
+                  <TextBlock
+                      Text="◆"
+                      FontSize="12"
+                      Foreground="White"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="3">
+                  <TextBlock
+                      Text="技術的検証メッセージ"
+                      Foreground="{DynamicResource TechnicalTextBrush}"
+                      FontWeight="Bold" />
+                  <TextBlock
+                      x:Name="TechnicalValidationMessage"
+                      Text="ファイル形式や設定値など、処理可否に関わる技術的な問題はここへ明確に表示されます。"
+                      Foreground="{DynamicResource TechnicalTextBrush}"
+                      TextWrapping="Wrap" />
+                  <TextBlock
+                      Text="現在は U-02 の表示プレースホルダーです。"
+                      Foreground="{DynamicResource TechnicalTextBrush}"
+                      FontSize="12" />
+                </StackPanel>
+              </Grid>
+            </Border>
+          </StackPanel>
+
+          <Border Grid.Column="1" Classes="surface-card" Padding="22">
+            <StackPanel Spacing="18">
+              <StackPanel Spacing="4">
+                <TextBlock Text="SHELL PRINCIPLES" Classes="section-kicker" />
+                <TextBlock Text="迷わず進める設計" Classes="card-heading" />
+                <TextBlock
+                    Text="色だけに頼らず、番号・記号・状態文で現在地を伝えます。"
+                    Classes="muted"
+                    TextWrapping="Wrap" />
+              </StackPanel>
+
+              <Border Height="1" Background="{DynamicResource AppBorderBrush}" />
+
+              <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="Auto,*" RowSpacing="14" ColumnSpacing="11">
+                <TextBlock Grid.Row="0" Text="⌨" FontSize="18" Foreground="{DynamicResource AppAccentBrush}" />
+                <StackPanel Grid.Row="0" Grid.Column="1" Spacing="2">
+                  <TextBlock Text="Keyboard first" FontWeight="SemiBold" />
+                  <TextBlock Text="Tab 順序と明瞭なフォーカス" Classes="muted" FontSize="12" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="1" Text="↕" FontSize="18" Foreground="{DynamicResource AppAccentBrush}" />
+                <StackPanel Grid.Row="1" Grid.Column="1" Spacing="2">
+                  <TextBlock Text="Scale friendly" FontWeight="SemiBold" />
+                  <TextBlock Text="論理ピクセルとスクロールで 200% に対応" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="2" Text="✓" FontSize="18" Foreground="{DynamicResource AppCompletedBrush}" />
+                <StackPanel Grid.Row="2" Grid.Column="1" Spacing="2">
+                  <TextBlock Text="State in words" FontWeight="SemiBold" />
+                  <TextBlock Text="完了・現在・未着手を文字でも表示" Classes="muted" FontSize="12" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="3" Text="∞" FontSize="18" Foreground="{DynamicResource AppAccentBrush}" />
+                <StackPanel Grid.Row="3" Grid.Column="1" Spacing="2">
+                  <TextBlock Text="Non-blocking notice" FontWeight="SemiBold" />
+                  <TextBlock Text="注意表示は操作や処理の条件にしません" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+              </Grid>
+            </StackPanel>
+          </Border>
+        </Grid>
+
+        <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+          <Button
+              x:Name="PreviousStepButton"
+              Grid.Column="0"
+              Classes="secondary-action"
+              Content="←  前へ"
+              Command="{Binding PreviousCommand}"
+              TabIndex="10"
+              AutomationProperties.AutomationId="PreviousStepButton"
+              AutomationProperties.Name="前のステップへ移動" />
+          <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
+            <TextBlock
+                Text="{Binding CurrentStepStatusText}"
+                FontWeight="SemiBold"
+                HorizontalAlignment="Center" />
+            <TextBlock
+                Text="{Binding NavigationProgressText}"
+                Classes="muted"
+                FontSize="12"
+                HorizontalAlignment="Center" />
+          </StackPanel>
+          <Button
+              x:Name="NextStepButton"
+              Grid.Column="2"
+              Classes="primary-action"
+              Content="{Binding NextButtonText}"
+              Command="{Binding NextCommand}"
+              TabIndex="11"
+              AutomationProperties.AutomationId="NextStepButton"
+              AutomationProperties.Name="次のステップへ移動" />
+        </Grid>
+      </Grid>
+    </ScrollViewer>
+  </Grid>
+</Window>
