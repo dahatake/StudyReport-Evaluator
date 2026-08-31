@@ -2,433 +2,538 @@
 
 | 項目 | 内容 |
 |---|---|
-| 文書版 | 2.0 |
-| 基準日 | 2026-08-31 |
-| 状態 | 単一入力・ローカル実行版（実装開始前） |
-| 唯一の利用者提供ファイル | Microsoft Forms等から出力した回答Excel（標準 `.xlsx`） |
+| 文書版 | 3.0 |
+| 基準日 | 2026-09-01 |
+| 状態 | 動的Prompt定量化・Excel加重計算版（実装前） |
+| 入力 | レポート回答を含む標準 `.xlsx` 1ファイル |
+| 出力 | 入力を変更せず作成する別の `.xlsx` 1ファイル |
 | 初版対応環境 | Windows 11 x64 |
 | UI / Runtime | Avalonia / .NET 10 |
 | AI | GitHub Copilot SDK for .NET。既存のCopilot CLIログインを使用 |
-| 旧版 | v1.2は本版により全面的にsupersede |
+| 旧版 | v2.0は本版により全面的にsupersede |
 
-> 本版は、2026-08-31の要求所有者指示「Formsの回答のExcelのファイルだけで実行できるようにする」を反映する。機関policy、署名鍵、教育評価baseline、法務判断、cross-platform runner等を実装開始条件または利用者提供情報にしない。
+> 本版は、2026-09-01の要求所有者指示「入力Excelの内容をPromptで定量化し、アプリで設定した重みをExcel数式で計算し、別ファイルへ出力する」「知識評価と自由Prompt評価を動的に増減する」「教育倫理は警告表示だけにし、処理を制限しない」を反映する。
 >
-> 未回答だった設計選択には、安全かつ実装可能な既定を採用した。AI点は候補点として人が確認する、送信前に内容を表示して確認する、初版はWindows 11 x64だけを対象とする、提示されたPrompt例は意味を保ちながら誤字と技術表現を校正する、という既定である。
+> `/samle/`は実在しないため、サンプル正本は`sample/機械学習 サブフィールド PBL 2025 レポート - コピー.xlsx`とする。
 
 ## 1. 目的
 
-Microsoft Forms等から出力した回答 `.xlsx` を読み込み、複数のレポート設問について、利用者が画面で自由に編集できる設問・論点・Promptを用いてGitHub Copilotへ評価を依頼し、定量的な候補点、論点別判定、理由、回答中の根拠を新しい `.xlsx` へ出力するWindowsデスクトップアプリケーションを提供する。
+本アプリケーションは、Forms等から出力されたレポート回答Excelを読み込み、利用者が選択した回答列へ1件以上の評価方法を適用して数値化し、その数値を利用者がアプリ内で設定した重みとExcel数式で集計した別のExcelファイルを作る。
 
-初版の目的は次の4点である。
+最小workflowは次のとおりである。
 
-1. 入力Excelを変更しない。
-2. レポート本文を設問ごとに0〜30点で定量化する。
-3. 任意の学生PromptおよびPrompt考慮事項を1〜10点で定量化する。
-4. AI候補、根拠、人による確認結果を分離して出力する。
+1. 入力 `.xlsx` を選択する。
+2. 回答sheet、見出し行、回答行、定量化する列を選択する。
+3. 質問ごとに評価方法を追加する。
+4. 知識評価では、含まれるべき知識ポイントを入力する。
+5. それ以外の評価では、分析用Promptを入力する。
+6. 評価項目と重みをアプリで設定する。
+7. Copilotが評価項目ごとの数値を返す。
+8. 別ファイルのExcel数式が評価方法別点、質問別点、全体点を計算する。
 
-## 2. 提供情報と実行前提
+## 2. 基本原則
 
-### 2.1 利用者が提供する唯一の情報
+1. 入力workbookは変更しない。
+2. 出力は必ず別fileとして作る。
+3. 質問数、評価方法数、評価項目数を固定しない。
+4. AIは評価項目ごとのraw数値だけを返し、重み付けと集計はExcel数式で行う。
+5. 重みは利用者がアプリ内で設定し、出力workbookのConfig sheetへ保存する。
+6. 倫理上の注意は画面へ表示するだけで、設定、checkbox、承認、score gate、実行blockにしない。
+7. 妥当なAI数値は既定で直ちにExcel式へ使い、有効range内の任意の手動上書きがある場合だけ上書き値を優先する。
+8. 技術的に不正なfile、設定、AI応答は安全に停止または空欄化する。これは倫理制限ではなく、破損・計算不能・security事故を防ぐ技術境界である。
 
-利用者が本プロジェクトへ提供する必須情報は、次の1ファイルだけである。
+## 3. 利用者が用意するもの
 
-- Microsoft Forms等の回答を含む、標準Office Open XML形式の非暗号化 `.xlsx`
+### 3.1 必須
 
-ファイルには複数の回答行を含められる。アプリは見出しを読み取り、利用者が画面で列を割り当てる。具体的な設問、論点、Prompt、採点範囲は初期プリセットから開始でき、すべて画面で編集できるため、実装前に別文書として提供する必要はない。
+- Forms等の回答を含む標準Office Open XML `.xlsx` 1ファイル
 
-### 2.2 利用者が提供しなくてよいもの
+質問、知識ポイント、分析Prompt、評価項目、配点range、重みはアプリ内で入力・保存できる。実装前の別artifactとして提供する必要はない。
 
-次は実装開始条件でも、開発者へ提供する情報でもない。
+### 3.2 Runtime前提
 
-- GitHub OAuth App client ID、client secret、PAT、access token
-- GitHub organization、Business/Enterprise承認記録、署名済み運用policy
-- production署名鍵、certificate、notarization情報
-- privacy／法務approval artifact
-- 教育評価baseline、事前登録threshold、部分集団policy
-- macOS／Linux／Arm64 runner
-- local launcherの氏名、所属、role、本人確認
-- 特定授業のPrompt、rubric、reason/evidence例
+AI定量化を実行する端末では、GitHub Copilotを利用できるaccountでCopilot CLIへlogin済みである必要がある。
 
-### 2.3 実行時の前提
+- アプリ固有OAuth App、client ID、client secret、PATを要求しない。
+- credentialは利用者がGitHubとの対話画面で直接扱い、アプリの設定・log・Excelへ保存しない。
+- 未login時はAI実行だけを利用不可とし、Excel読込、定義編集、既存結果表示は利用できる。
+- アプリの読込、preview、出力にMicrosoft Excel、Office、LibreOffice、COM automationのinstallを要求しない。
 
-AI評価を実行する端末では、GitHub Copilotを利用できるGitHub accountでCopilot CLIへログイン済みである必要がある。これは開発者へ提供する設定情報ではなく、利用者がGitHubの画面で直接行う対話的な認証である。
+## 4. サンプルworkbook profile
 
-- SDKの標準動作で既存のlogged-in user credentialsを使用する。
-- 未認証時はアプリが認証不足を表示し、Copilot CLIの対話的loginを案内または起動する。
-- アプリはpassword、token、client secretを入力・保存・表示しない。
-- 未認証でもExcel読込、列mapping、評価設定編集、過去結果確認は利用できる。
+### 4.1 実測identity
 
-## 3. 初版scope
+2026-09-01に、回答本文を出力せずread-onlyで構造だけを確認した。
 
-### 3.1 対象
+| 項目 | 実測値 |
+|---|---|
+| Path | `sample/機械学習 サブフィールド PBL 2025 レポート - コピー.xlsx` |
+| Bytes | 661,189 |
+| SHA-256 | `446386E20BB4096561CB4AFD6D74B8EAA9D50EAE53C97F984BA7F70EBEAD0DE5` |
+| Container | 読取可能なZIP / Office Open XML |
+| ZIP entries | 18 |
+| Structural entries | `[Content_Types].xml`; `xl/workbook.xml`; `xl/_rels/workbook.xml.rels` |
+| `Old` | `A1:AF531` |
+| `Original` | `A1:L531` |
+| `Final` | `A1:AD531` |
 
-- Windows 11 x64
-- 1回答者または1提出を1行とする表形式 `.xlsx`
-- 複数設問
-- 設問ごとの必須レポート回答列
-- 設問ごとの任意学生Prompt列
-- 設問ごとの任意Prompt考慮事項列
-- 既存Copilot CLI認証を利用した評価
-- 新規 `.xlsx` への結果出力
-- ローカルfolderから起動するself-contained build
+### 4.2 初期mapping候補
 
-### 3.2 初版の対象外
+`Original`を初期候補sheet、1行目を見出し、2〜531行を回答候補とする。次は見出しから得た候補であり、固定mappingではない。
 
-- macOS、Linux、Windows Arm64の正式対応
-- installerのproduction code signing、Apple notarization、Linux package signing
-- 機関policyをアプリが検証する仕組み
-- 教育評価の統計的妥当性をproduction release条件にすること
-- AI候補だけによる成績の自動確定
-- Forms API、LMS API、回答の書戻し
-- 暗号化、MIP、password保護ファイルの復号
-- PDF、CSV、`.xls`、Google Sheets URLの直接入力
-- 行単位印刷、AI文章検出、不正行為認定
-- 設問文と学生Promptの類似度による減点
+| Column | 初期候補 |
+|---|---|
+| A〜E | 管理metadata。初期状態では評価対象にしない |
+| F | 質問1のレポート回答 |
+| G | 質問1に関連する学生Prompt |
+| H | `質問`という別回答。利用者が評価対象または補助列として選択可能 |
+| I | 質問2のレポート回答 |
+| J | 質問2に関連する学生Prompt |
+| K | Prompt作成時の工夫・観点・論点。Jの補助列候補 |
+| L | PBL feedback。初期状態では評価対象にしない |
 
-これらは将来追加できるが、初版実装をblockしない。
+`Old`と`Final`は入力内に保持するが、初期評価対象にしない。アプリはsheet名や列位置だけで確定せず、利用者が変更できるmapping候補として表示する。
 
-## 4. Excel入力契約
+## 5. Excel入力契約
 
-### 4.1 行と列
+### 5.1 行・列
 
 1. 既定では1行目を見出し、2行目以降を回答とする。
-2. 1回答者または1提出を1行として扱う。
-3. 見出し行と最終行は画面で変更できる。
-4. 設問数は固定しない。
-5. 各設問は次の列mappingを持つ。
+2. 1行を1回答者または1提出として扱う。
+3. sheet、見出し行、開始行、終了行は変更できる。
+4. 1つの質問定義は1つの主回答列と0件以上の補助列を持つ。
+5. 主回答には任意の選択列を使える。レポート本文列だけでなく、学生Prompt列をCustom evaluatorの主回答にすることもできる。
+6. 同じ列を複数の質問または補助情報へ使用できる。同一質問内では、補助列の重複と主回答列との重複を拒否する。
+7. 空の主回答は`EMPTY`としてAIへ送らず、`ScorableCell=0`、AI raw cell、effective raw、normalized score、上位集計を空欄にする。score cellへ0やsentinel文字列を入れず、overrideも受け付けない。
+8. 補助列が空でも主回答があれば評価を続ける。
+9. 質問の追加、複製、並べ替え、無効化、削除ができる。
+10. mapping候補は自動提示できるが、すべて画面で変更できる。
 
-| 列role | 必須 | 内容 |
-|---|---:|---|
-| `REPORT_ANSWER` | Yes | 設問に対する学生レポート本文 |
-| `STUDENT_PROMPT` | No | 学生がレポート作成に使用したPrompt |
-| `PROMPT_CONSIDERATIONS` | No | Prompt作成時に学生が意識した視点・論点・考慮事項 |
-| `IDENTIFIER` | No | 氏名、メール、回答ID等。出力へ残せるがCopilotへ送らない |
-| `IGNORE` | No | 評価にも出力追加列にも使用しない列 |
+### 5.2 対応file
 
-6. 同じExcel列を複数roleへ割り当てる場合は警告し、明示確認を要求する。
-7. アプリは見出し文字列から候補を提示できるが、自動確定しない。
-8. `STUDENT_PROMPT`と`PROMPT_CONSIDERATIONS`は独立して省略可能である。
-9. `STUDENT_PROMPT`がなく`PROMPT_CONSIDERATIONS`だけがある場合は、実Promptの品質とは称さず、`CONSIDERATIONS_ONLY`として考慮事項の品質だけを評価する。
-10. 両方空欄の場合、Prompt候補点は空欄、状態は`NOT_APPLICABLE`とする。
-
-### 4.2 ファイル安全性
-
-- 入力をread-onlyで開き、同一pathへ保存しない。
+- 標準 `.xlsx`だけを受け入れる。
+- `.xls`、CSV、PDF、macro-enabled形式、破損ZIP、password／rights-protected fileは対象外として明示する。
+- 入力をread-onlyで開く。
 - 処理前後のSHA-256、size、last-write timeを比較する。
-- 出力は別pathの一時ファイルへ保存し、再open・検証後に完成名へrenameする。
-- ZIPではない `.xlsx`、破損ZIP、macro-enabled形式、暗号化compound fileは安全に拒否する。
-- 入力本文をlogへ記録しない。
-- 暗号化sampleの方式を推測したり、復号を試みたりしない。
+- 同じpathまたは同じfileへ出力しない。
 
-## 5. 評価設定
+## 6. 動的定量化definition
 
-### 5.1 設問設定
+### 6.1 Root
 
-利用者は設問ごとに次を作成・編集・並べ替え・無効化できる。
+1つの`QuantificationDefinition`は次を持つ。
 
-- 設問IDと表示名
-- 設問本文
-- レポート評価Prompt
-- レポート評価の視点・論点・観点
-- レポート候補点の最小値・最大値（初期値0〜30）
-- Prompt評価Prompt
-- Prompt評価の視点・論点・観点
-- Prompt候補点の最小値・最大値（初期値1〜10）
-- 出力理由の最大長
+- definition ID、name、revision
+- source sheet、header row、first/last data row
+- 1件以上の`QuestionDefinition`
+- rounding digits（既定1、小数0〜6）
 
-設定はアプリ内で自由に変更でき、local launcherの本人性・role・approvalを要求しない。実行開始時に設定snapshotとSHA-256を作り、そのrun中は変更しない。
+実行開始時にdefinitionをcanonical JSONへserializeし、SHA-256 snapshotを作る。実行中の編集は現在runへ反映せず、次runで新snapshotを使う。
 
-Prompt考慮事項が存在する場合は、それをPrompt能力評価の最優先基準とし、学生Promptがその考慮事項を実際に引き出せる構造になっているかを評価する。ただし、考慮事項に記載された内容が実際の学生Promptへ反映されているとは推測しない。この規則は初期Promptへ明記し、利用者はPrompt全文を自由に編集できる。独立したBoolean設定や非公開の数値weightは設けない。
+run、Prompt rendering、結果validation、formula生成は同じimmutable snapshotだけを参照する。実行中もUIのdraftは次run用として編集できるが、現在runのcollection、range、weight、Prompt、mappingは変化しない。full snapshotは`Quantification_Config`へ、hashは`Quantification_Run`へ保存する。
 
-`MET`または`PARTIAL`と判定する論点には根拠を必須とする。`NOT_FOUND`では根拠を空にし、存在しない引用を生成しない。この規則も独立した切替設定にせず、schemaとvalidatorで一貫して強制する。
+教育倫理warningは`QuantificationDefinition`へ保存せず、UIの固定説明resourceとして表示する。
 
-### 5.2 共通placeholder
+### 6.2 QuestionDefinition
 
-初版は次のplaceholderだけを許す。
+各質問は次を持つ。
+
+- question ID、display name、question text
+- primary answer column
+- 0件以上のsupporting columns
+- question weight（有限数、0より大きい）
+- 1件以上の`EvaluatorDefinition`
+- enabled flag
+
+複数質問を同じ列へ設定できる。これは同じ回答を異なるPrompt・評価方法で数値化する用途に使う。Custom evaluatorでは、学生Prompt列を含む任意の選択列を主回答にできる。
+
+### 6.3 EvaluatorDefinition
+
+各評価方法は次を持つ。
+
+- evaluator ID、display name
+- type: `KNOWLEDGE_COVERAGE`または`CUSTOM_PROMPT`
+- evaluator weight（有限数、0より大きい）
+- score minimum / maximum（有限数、minimum < maximum）
+- 1件以上の`CriterionDefinition`
+- Knowledgeの場合はapp-owned built-in template version、Customの場合は利用者入力Prompt template
+- enabled flag
+
+1質問へ任意数の評価方法を追加、複製、並べ替え、無効化、削除できる。複数評価方法は、異なる尺度を同じ回答へ各1回適用する意味であり、同じPromptの反復実行回数ではない。
+
+### 6.4 CriterionDefinition
+
+各評価項目は次を持つ。
+
+- criterion ID、display name、description
+- criterion weight（有限数、0より大きい）
+- score minimum / maximum。省略時は親evaluatorのrangeを使う
+- enabled flag
+
+重みは合計100へ手入力で揃える必要はない。アプリとExcel式は各階層で`個別weight / weight合計`へ正規化し、UIには実効percentageを表示する。
+
+実行可能snapshotは、1件以上のenabled question、各enabled question内に1件以上のenabled evaluator、各enabled evaluator内に1件以上のenabled criterionを必須とする。disabled nodeとその子孫はAI呼出し、blank判定、formula、Results列から除外するが、監査用definition snapshotには保持する。
+
+## 7. 評価方法
+
+### 7.1 Knowledge coverage
+
+`KNOWLEDGE_COVERAGE`では、利用者が入力した各知識ポイントを1つのcriterionとして扱う。AIは文字列の単純一致ではなく、回答がその知識を説明・適用している程度をcriterion range内で数値化する。
+
+このsemantic coverage規則とstructured-output instructionはapp-owned instructionとし、利用者が削除またはkeyword件数評価へ置換できない。利用者が編集するのは知識ポイント、criterion description、range、weightである。別の分析方法が必要な場合は`CUSTOM_PROMPT`を使う。
+
+初期Prompt template:
+
+```text
+次の設問への回答について、指定された各知識ポイントが回答内でどの程度説明されているかを評価してください。
+単語が存在するだけで満点にせず、内容上の説明、関係、適用が確認できる程度を評価してください。
+各評価項目について指定range内の数値、短い理由、回答内の根拠を返してください。
+
+### 設問
+{設問}
+
+### 評価対象回答
+{回答}
+
+### 補助情報
+{補助情報}
+
+### 知識ポイントと評価項目
+{評価項目}
+```
+
+### 7.2 Custom Prompt
+
+`CUSTOM_PROMPT`では、利用者が分析用Promptと評価項目を自由入力する。Prompt能力、論理性、具体性、調査の深さ、文章品質など、知識含有以外の評価に使用できる。
+
+Custom evaluatorは、レポート本文に限らず、学生が入力したPrompt列など任意の選択列を`{回答}`として評価できる。主回答列の種類をheader名や列位置で制限しない。
+
+Prompt能力用の初期preset:
+
+```text
+次の設問に対して作成されたPromptを分析してください。
+評価項目ごとに、そのPromptが必要な視点を引き出せる具体性、論理性、実行可能性を指定range内で数値化してください。
+補助情報にPrompt作成時の工夫・観点・論点がある場合は、それを重要な評価情報として使い、実際のPromptへ反映されているかを評価してください。
+各評価項目について短い理由と、評価対象回答または補助情報内の根拠を返してください。
+
+### 設問
+{設問}
+
+### 評価対象Prompt
+{回答}
+
+### 補助情報
+{補助情報}
+
+### 評価項目
+{評価項目}
+```
+
+### 7.3 Placeholder
+
+許可するplaceholderは次だけとする。
 
 - `{設問}`
-- `{論点}`
-- `{学生のレポート}`
-- `{学生のPrompt}`
-- `{学生のPrompt考慮事項}`
+- `{回答}`
+- `{補助情報}`
+- `{評価項目}`
 - `{最小点}`
 - `{最大点}`
 
-未知placeholder、未閉鎖brace、再帰展開は実行前に拒否する。学生入力をinstructionとして解釈せず、明示的な引用data区画へ挿入する。
+Custom Prompt templateは空でなく、`{回答}`と`{評価項目}`をそれぞれ1回以上含むことを必須とする。`{最小点}`と`{最大点}`はcriterion固有rangeの有無にかかわらず、常に親evaluatorの既定rangeへ展開する。criterionごとのeffective rangeは`{評価項目}`へ含める。
 
-## 6. 初期プリセット
+literal braceは`{{`と`}}`でescapeする。未知placeholder、未閉鎖brace、不正なescapeを実行前に拒否する。placeholderへ挿入した回答、補助情報、評価項目の文字列は再走査せず、内部のbraceやplaceholder風文字列を展開しない。Knowledgeのsemantic instructionと全type共通のstructured-output instructionはappが利用者templateの外側へ付加し、利用者Promptから削除できない。
 
-以下は初期表示用の編集可能なプリセットであり、固定された正解や最終判定ではない。利用者は削除、追加、修正できる。
+## 8. AI出力contract
 
-### 6.1 レポート評価Prompt
+AIは1 evaluatorについて次だけを返す。
+
+- evaluator ID
+- criterion results
+  - criterion ID
+  - raw score
+  - short reason
+  - evidence
+  - evidence source: `PRIMARY_ANSWER` / `SUPPORTING_COLUMN` / `NONE`
+  - evidence source column ID: appがPrompt内で割り当てたstable source ID。`NONE`では空
+
+AIにevaluator総合点、question総合点、全体点、weight、合否を返させない。これらはExcel数式だけで計算する。
+
+Validation:
+
+- expected evaluator/criterion IDと完全一致
+- raw scoreは有限数かつcriterion range内
+- `PRIMARY_ANSWER`ではsource column IDが主回答IDと一致し、evidenceは同じ行の主回答に存在する連続substring
+- `SUPPORTING_COLUMN`ではsource column IDが実際に送った補助列の1つと一致し、evidenceはその列の同じ行に存在する連続substring
+- evidenceがない場合は空文字、`NONE`、空のsource column ID
+- unknown field、missing criterion、duplicate criterion、NaN、Infinity、range外、複数提出を拒否
+- criterionが1件でも欠落したpartial responseは全体を不正応答として拒否し、一部scoreだけを採用しない
+- 不正応答を0点へ変換しない
+
+## 9. 重み・Excel計算式
+
+### 9.1 Effective raw score
+
+各criterionについて、手動上書きが有効なら上書き値、そうでなければ妥当なAI raw scoreを使う。
+
+$$
+R_{effective}=\begin{cases}
+R_{override} & \text{主回答が非空で、overrideが有効range内の数値}\\
+R_{AI} & \text{主回答が非空、overrideが空で、AI rawが妥当}\\
+\mathrm{blank} & \text{それ以外}
+\end{cases}
+$$
+
+手動上書きは任意であり、未入力でも妥当なAI raw scoreを直接計算へ使用する。主回答が非空なら、有効なoverrideはAI失敗または空欄時にもscoreを補完できる。overrideは空欄またはcriterion effective range内の有限数だけを受け入れ、範囲外、NaN、Infinity、非数値はfield errorとして出力前に訂正またはclearを要求する。空の主回答にはoverrideを許可しない。これは人手確認gateではなく数値整合性validationである。
+
+出力後にExcelでoverride cellが範囲外数値へ変更された場合も、formulaはclampやAI値へのfallbackをせずeffective rawを空欄にする。人手確認statusや承認checkboxを数式条件にしない。
+
+### 9.2 Criterion normalization
+
+$$
+N_c=100\times\frac{R_{effective}-min_c}{max_c-min_c}
+$$
+
+Excel式はeffective raw選択とnormalizationを別cellに分ける。`ScorableCell`はappが主回答の非空／空から作るliteral `1`／`0`である。AI未実行、AI失敗、cancelによる空AI rawをExcelの算術0として扱わない。
 
 ```text
-次の設問に対する学生レポートを分析し、{最小点}〜{最大点}の範囲で候補点を付けてください。
-各論点が説明されているかを主要な評価基準とし、論点ごとに「説明あり」「一部あり」「確認できず」を判定してください。
-根拠のない内容を推測せず、根拠を示す場合は学生レポート内の短い連続した抜粋だけを使用してください。
+EffectiveRaw:
+=IF(ScorableCell<>1,"",IF(OverrideCell="",IF(ISNUMBER(AiRawCell),IF(AiRawCell<MinCell,"",IF(AiRawCell>MaxCell,"",AiRawCell)),""),IF(ISNUMBER(OverrideCell),IF(OverrideCell<MinCell,"",IF(OverrideCell>MaxCell,"",OverrideCell)),"")))
 
-### 設問
-{設問}
-
-### 論点
-{論点}
-
-### 学生レポート
-{学生のレポート}
+Normalized:
+=IF(ISNUMBER(EffectiveRawCell),IFERROR(ROUND((EffectiveRawCell-MinCell)/(MaxCell-MinCell)*100,RoundingDigitsCell),""),"")
 ```
 
-### 6.2 設問1プリセット
+### 9.3 Evaluator score
 
-**設問**
+$$
+E=\frac{\sum_c N_c w_c}{\sum_c w_c}
+$$
 
-ソフトウェアでの実装手段として、プログラミングと機械学習の違いを述べてください。なぜ機械学習という手法が必要になったのか、実現できることやテスト方法の違いなどを含めて説明してください。生成AIを使用した場合は、その結果を踏まえたレポートを記述してください。
+1件でもenabled criterion scoreが空欄ならevaluator scoreを空欄にする。disabled criterionはscore参照、blank count、weight分母から除外する。不要なcriterionはweight 0にせずdefinitionから無効化または削除する。
 
-**レポート評価の論点**
+### 9.4 Question score
 
-- 従来のプログラミングでは人が明示的なロジックを設計するため、ルール化が難しい複雑な課題に限界がある一方、機械学習はデータからパターンを学習できること。
-- 一般的な整理として、ルールから結果を導くプログラミングは演繹的、例からモデルを学習する機械学習は帰納的な側面を持つこと。
-- テストと品質評価の考え方が異なり、機械学習では一般に精度100%を前提にできないこと。
-- 追加の考察や、自ら調査したことが分かる具体的な根拠があること。
+$$
+Q=\frac{\sum_e E_e w_e}{\sum_e w_e}
+$$
 
-### 6.3 設問2プリセット
+1件でもenabled evaluator scoreが空欄ならquestion scoreを空欄にする。
 
-**設問**
+### 9.5 Overall score
 
-実世界（社会、企業、組織など）における機械学習またはAIの利用事例を1つ調査してください。どの場面で、どの技術が、どのように使われ、なぜ機械学習が選ばれたのかを説明してください。
+$$
+O=\frac{\sum_q Q_q w_q}{\sum_q w_q}
+$$
 
-**レポート評価の論点**
+1件でもenabled question scoreが空欄ならoverall scoreを空欄にする。
 
-- 機械学習が社会またはビジネス上の課題解決へどう貢献したか。特に投資対効果に触れているか。
-- 具体的な企業名または組織名があるか。
-- 具体的な技術、ツール、製品名があるか。
-- 追加の考察や、自ら調査したことが分かる具体的な根拠があるか。
+### 9.6 Formula rules
 
-### 6.4 Prompt能力評価Prompt
+- weight、minimum、maximum、rounding digitsは`Quantification_Config`のcellを参照する。
+- 集計式の分子と分母はenabled childのscore cellとConfig上のraw weight cellを参照し、weightやrangeをformulaへliteral埋込みしない。
+- scoreは0〜100へ正規化する。
+- 各親式は算術前に`COUNT`で全enabled child scoreが数値であることを確認し、欠損時は空文字を返す。
+- 結果は設定したrounding digitsで`ROUND`する。Excelと同じmidpoint away-from-zeroを使い、Core previewは`decimal`と`MidpointRounding.AwayFromZero`で最終丸め値を一致させる。
+- normalized、evaluator、question、overallの各階層で丸め、親階層は既に丸められたchild score cellを入力にする。
+- formulaは`IF`、`IFERROR`、`ISNUMBER`、`COUNT`、`SUM`、`SUMPRODUCT`、`ROUND`、比較、四則演算、cell/range参照だけを使う。
+- 循環参照、外部参照、raw user formula、macroを生成しない。
+- 生成前に各formulaの文字数、function引数数、参照、DAGを検証する。8,192文字以上になるformulaはwriteも切詰めもせず、該当question／evaluator／criterionのIDと表示名、fieldまたはformula階層、実測dimensionを示してdefinitionを拒否する。回答本文やPrompt本文はerrorへ含めない。
+- app内previewとformula cellのcached valueは、独立した手計算oracleの最終丸め値と一致させる。
+- formula cellへcached preview valueを書き、workbookをautomatic／full-calculation-on-loadに設定する。Excel、Office、LibreOffice、COM automationをapp実行またはrequired testの前提にしない。外部spreadsheetでの再計算smokeはoptionalとする。
 
-```text
-次の設問に対して学生が作成したPromptと、その考慮事項を分析し、{最小点}〜{最大点}の範囲で候補点を付けてください。
-そのPromptが、指定された視点・観点・論点をレポート生成時に引き出せるほど具体的か、論理的か、実行可能かを評価してください。
-1は論理性、具体性、必要な視点が大きく不足する状態、10は論理的かつ具体的で、必要な視点を十分に引き出せる状態の初期アンカーです。
-Prompt考慮事項が存在する場合は、それを最優先の評価基準とし、学生のPromptが各考慮事項を実際に引き出せる構造になっているかを評価してください。ただし、考慮事項に書かれただけで実際のPromptに反映されているとは推測しないでください。
+## 10. 出力workbook
 
-### 視点・観点・論点
-{論点}
+### 10.1 File
 
-### 設問
-{設問}
+- 既定名: `{入力名}_quantified_{yyyyMMdd-HHmmss}.xlsx`
+- 入力を別pathへbyte-copyし、元sheetを保持したcopyへ結果を追加する。
+- 入力file自体へ書き込まない。
+- target directory内の一意な一時fileへwrite、flush、close、reopen、validateした後だけ、同一volumeで完成名へrenameする。既存fileを黙って上書きしない。
+- final commit開始前のcancelは一時fileをbest effortで削除し、完成名を作らない。rename critical section開始後はcancelを次の安全点まで遅延し、valid finalかfinalなしのどちらかにする。
 
-### 学生のPrompt
-{学生のPrompt}
-
-### 学生のPrompt考慮事項
-{学生のPrompt考慮事項}
-```
-
-設問1のPrompt評価では、設問1の論点を初期値として使用する。設問2および追加設問も、各設問の論点を初期値にできる。利用者はレポート評価用とPrompt評価用の論点を別々に編集できる。
-
-## 7. AI評価契約
-
-### 7.1 認証とclient
-
-- GitHub Copilot SDK for .NETの固定versionを使用する。
-- 既定のlogged-in user credentialsを使用し、アプリ固有OAuth Appを要求しない。
-- 実行時に認証状態とGitHub loginを表示するが、local launcher本人との同一性を主張しない。
-- token、password、credential valueをlogまたはExcelへ保存しない。
-
-### 7.2 送信内容
-
-各評価単位で送る内容は次だけとする。
-
-- 設問本文
-- 編集済み評価Prompt
-- 評価論点
-- 対象行のレポート本文
-- mappedされている場合だけ、対象行の学生PromptとPrompt考慮事項
-
-氏名、メール、回答ID、時刻、file path、他の回答行、他の設問回答を送らない。実行前に代表1件の送信previewを表示し、利用者の明示確認後だけ送信する。
-
-### 7.3 toolと出力
-
-Copilot sessionは評価用途に限定し、filesystem、shell、Web検索、GitHub write、MCPを公開しない。構造化出力toolは1件だけとする。
-
-レポート評価結果:
-
-- `overall_score`: 設定range内の有限数
-- `criterion_results[]`: 論点ID、`MET` / `PARTIAL` / `NOT_FOUND`、短い説明、根拠、`evidence_source`
-- `reason`: 総合理由
-
-Prompt評価結果:
-
-- `prompt_score`: 設定range内の有限数
-- `mode`: `PROMPT` / `PROMPT_WITH_CONSIDERATIONS` / `CONSIDERATIONS_ONLY`
-- `criterion_results[]`: 論点ID、判定、短い説明、根拠、`evidence_source`
-- `reason`
-
-`evidence_source`は`REPORT_ANSWER`、`STUDENT_PROMPT`、`PROMPT_CONSIDERATIONS`、`NONE`のclosed enumとする。レポート評価の根拠は、Copilotへ送った同じ行・同じ設問の`REPORT_ANSWER`内に存在する短い連続substringだけを受理する。Prompt評価の根拠は、同じ評価単位で実際に送った`STUDENT_PROMPT`または`PROMPT_CONSIDERATIONS`のうち、`evidence_source`が示すfield内に存在する短い連続substringだけを受理する。他行、他設問、送信していないfieldからの引用は拒否する。暗黙の正規化、翻訳、case-foldで一致を推測しない。
-
-`MET`または`PARTIAL`では`evidence_source`を`NONE`以外にし、実在する非空根拠を必須とする。`NOT_FOUND`では根拠を空文字、`evidence_source=NONE`とする。不正JSON、未知field、欠落論点、範囲外、NaN／Infinity、過長文字列、根拠不一致、複数提出は失敗として扱い、0点へ変換しない。
-
-### 7.4 sessionと再試行
-
-- 1行×1設問×1評価種別を1評価単位とする。
-- 評価単位ごとに新しいsessionを使用する。
-- 構造不正は新sessionで最大1回再試行する。
-- transient network errorは最大2回再試行する。
-- cancel後に新規送信しない。
-- sessionを明示削除し、削除失敗時は後続送信を停止する。
-- 既定並列度は1、最大3とする。
-
-## 8. 候補点と人の確認
-
-1. AIが返す点数は常に`AI候補点`である。
-2. AI候補だけで`確認済み点`や最終点を自動確定しない。
-3. 利用者は設問ごとに`採用`、`上書き`、`保留`、`却下`を選べる。
-4. `採用`時だけ候補点を確認済み点へ反映する。
-5. `上書き`時は利用者入力値を反映し、AI候補を残す。
-6. `保留`、`却下`、未実行、失敗では確認済み点を空欄にする。
-7. Prompt列がない場合、Prompt候補点と確認済み点を空欄にする。
-
-## 9. Excel出力契約
-
-入力をbyte-copyした作業copyを基礎にし、アプリ所有sheetだけを追加する。入力workbook自体は変更しない。
-
-### 9.1 必須sheet
+### 10.2 App-owned sheets
 
 | Sheet | 内容 |
 |---|---|
-| 元の全sheet | 入力から保持し、変更しない |
-| `Evaluation_Config` | 設問、Prompt、論点、score range、設定snapshot hash |
-| `Evaluation_Results` | 行ごとのAI候補、論点判定、理由、根拠、人の確認結果、状態 |
-| `Evaluation_Run` | 入力hash、実行日時、app/SDK/CLI/model version、件数、状態。本文・tokenなし |
+| `Quantification_Config` | definition snapshot、質問、評価方法、評価項目、range、weight、rounding、source mapping |
+| `Quantification_Results` | 行ごとのscorable flag、AI raw、override、effective raw／normalized formula、evaluator/question/overall formula、reason、evidence、source column ID、status |
+| `Quantification_Run` | input hash、definition hash、app/SDK/CLI/model version、開始/終了、件数、error count |
 
-### 9.2 結果列
+同名sheetがある場合は既存sheetを変更せず、`Quantification_Config (2)`のように一意名を作る。
 
-各設問について少なくとも次を出力する。
+### 10.3 Formula ownership
 
-- レポートAI候補点
-- レポート論点別判定
-- レポート理由
-- レポート根拠
-- レポート確認状態
-- レポート確認済み点
-- Prompt評価mode
-- Prompt AI候補点
-- Prompt論点別判定
-- Prompt理由
-- Prompt確認状態
-- Prompt確認済み点
-- AI／validation error code
+- scorable flag、AI raw、override、reason、evidence、source、statusはliteral value／string cell。
+- effective raw、normalized、evaluator、question、overall scoreはExcel formula cell。
+- formulaは`Quantification_Config`のweight/range cellsを参照する。
+- アプリでweightを変更して再出力するとConfig値と式参照先が新snapshotへ一致する。
+- override cellにはeffective rangeのdata validationを設定する。ただし式自身のrange checkを最終防御とする。
 
-不信文字列は内容にかかわらずOpen XML string cellとして書き、formulaとして解釈させない。
+## 11. UI
 
-## 10. Privacy・security
+初版は4 stepで構成する。
 
-- 回答本文、学生Prompt、考慮事項、reason、evidence、tokenをlogへ記録しない。
-- identifier列はCopilot payloadへ入れない。
-- 回答本文内のメール、電話番号等を簡易検知し、previewで警告・伏字できるようにする。ただし完全検出とは表示しない。
-- 利用者は送信前に、選択したfieldがGitHub Copilotへ送信されることを毎run確認する。
-- アプリは利用者の法的権限や機関承認の有効性を判定しない。入力と送信の権限確認は利用者の責任として画面とREADMEに明記する。
-- TLS検証を無効化しない。
-- telemetryを可能な範囲で無効化し、アプリ独自telemetryを実装しない。
-- workbook、Prompt、AI出力を不信入力として扱う。
+1. **入力**: file、sheet、header/data rows、質問と主回答／補助列mapping。
+2. **定量化設計**: 質問、Knowledgeの知識ポイント／built-in Prompt preview、Custom分析Prompt、評価項目、range、3階層weight。
+3. **実行**: Copilot login状態、model、評価単位数、progress、cancel、technical error。
+4. **結果・出力**: AI raw、任意override、Excel計算preview、別file出力、input不変確認。
 
-外部privacy／legal／educational approval artifactはアプリの実装・起動条件にしない。この簡素化は法的助言や機関内手続の免除を意味しない。
+### 11.1 教育倫理warning
 
-## 11. UI要求
+次の趣旨を入力画面と結果画面のpersistent non-modal bannerとして常時表示する。
 
-初版は次の7画面または同等のstep UIを持つ。
+> AIによる定量値には誤りや偏りが含まれる可能性があります。利用目的に応じて結果を確認してください。
 
-1. **開始**: 入力不変、AI候補、人の確認、データ送信の説明。
-2. **ファイル選択**: `.xlsx`選択、hash、sheet、見出し、保護／破損判定。
-3. **列mapping**: 設問追加、必須回答列、任意Prompt／考慮事項列、identifier／ignore列。
-4. **評価設定**: プリセット選択、設問、Prompt、論点、点数rangeの自由編集。
-5. **送信preview・実行確認**: 代表payload、除外列、件数、model、最大request数。
-6. **実行・レビュー**: 進捗、cancel、候補点、論点、理由、根拠、採用／上書き／保留／却下。
-7. **出力完了**: 入力hash不変、出力path、成功／失敗／要確認件数。
+このwarningは表示専用とする。
 
-全操作をkeyboardで実行でき、状態を色だけで表さず、日本語で「何が起きたか」「入力への影響」「次の操作」を表示する。
+- 設定値として保存しない。
+- checkbox、同意、role、承認、期限を要求しない。
+- 実行、AI呼出し、formula計算、出力をblockしない。
+- scoreやweightを変更しない。
+- warningを閉じる操作を必須にしない。
+- warningへfocusまたは操作をしなくてもmapping、実行、cancel、override、出力を行える。
 
-## 12. 非機能要求
+## 12. Copilot実行
 
-### 12.1 Reliability
+- current stable GitHub Copilot SDK for .NETをexact versionで固定する。
+- SDKの既定logged-in user credentialsを使う。
+- 評価単位は1行×1質問×1evaluator。
+- evaluatorごとに新しいephemeral sessionを使う。
+- structured result toolを1件だけ公開し、shell、filesystem、Web、GitHub write、MCPを公開しない。
+- 構造不正は新sessionで最大1回、transient network errorは最大2回再試行する。
+- 各attemptはapp-ownedの有限timeoutを持ち、既定120秒とする。timeout後のretry上限到達時は`AI_TIMEOUT`とし、0点へ変換しない。
+- cancel後に新規sessionを開始しない。
+- sessionを明示削除する。
+- 既定並列度1、最大3。
+- 回答本文、Prompt、reason、evidence、tokenをlogへ記録しない。
 
-- 取消、通信失敗、disk full、process異常で入力を変更しない。
-- 完成前fileを完成名にしない。
-- 同じ設定とmodelでもAI結果が一致するとは表示しない。
-- UI threadでworkbook全走査やAI待機をしない。
-- 20,000行を上限とし、超過は実行前に拒否する。
-- 1 cellはExcel上限32,767文字以内とする。
+## 13. Technical safety and failure behavior
 
-### 12.2 Performance
+### 13.1 維持する技術境界
 
-この開発端末上の合成531行workbookについて、Copilot待機を除く読込、mapping解析、出力生成、再検証を30秒以内に完了することを目標とする。実測環境と結果を記録し、未測定値を保証として表示しない。
+- input immutability
+- output atomicity
+- selected primary/supporting columnsだけをAIへ送る
+- 他行、file path、非選択列を送らない
+- untrusted textをExcel string cellとして保存する
+- closed structured output validation
+- no-content/no-token logging
+- session cleanup
+- formula allowlistとDAG validation
 
-### 12.3 Platform
+これらは教育倫理gateではなく、file破損、情報漏えい、formula injection、計算不正を防ぐ技術要件である。
 
-- Windows 11 x64のみを初版の検証済み対象とする。
-- .NET 10 self-contained folder publishを生成する。
-- 開発SDKなしで起動できることをlocal clean-user相当環境で確認する。
-- code signing済みinstallerを初版必須成果物にしない。
-- macOS、Linux、Arm64はsource上のportable性を妨げないが、実測なしに対応済みと表示しない。
+### 13.2 Failure
 
-## 13. Acceptance criteria
+| Condition | Result |
+|---|---|
+| Empty primary answer | AI callなし、raw/formula score空欄、`EMPTY` |
+| Invalid definition | run開始前に具体的field errorを表示 |
+| Invalid AI response after retry | raw/formula score空欄、`AI_OUTPUT_INVALID` |
+| Authentication unavailable | AI callなし、`AUTH_REQUIRED` |
+| AI attempt timeout after retry | raw/formula score空欄、`AI_TIMEOUT` |
+| Network failure after retry | raw/formula score空欄、`NETWORK_FAILED` |
+| Cancel | 新規送信停止。完了済みraw値だけを保持し、部分結果の出力を許可 |
+| Input changed during run | final renameを行わず、出力を完成扱いにせず`INPUT_CHANGED` |
+| Output validation failure | 完成名を作らず`OUTPUT_INVALID` |
+
+技術的失敗以外の教育倫理warningをerror codeやblock条件にしない。
+
+## 14. Performance and limits
+
+- 使用行上限: 20,000。超過選択は実行前に拒否し、黙って切り詰めない
+- 質問: 1件以上。技術上限は出力列数とrequest budgetから実行前に計算する
+- evaluator/criterion: 1件以上。Excel列上限を超えるdefinitionは実行前に拒否する
+- 1 cell: 32,767 characters以下
+- 1 formula: 8,192 characters未満。出力列数、function引数数、formula長から実行可能上限をpreflightで計算する
+- concurrency: 1〜3
+- 開発端末の合成531行workbookで、AI待機を除くread/write/validationの中央値30秒以下を目標とする
+- 実測していない値を保証として表示しない
+
+## 15. Scope
+
+### 15.1 Initial release
+
+- Windows 11 x64
+- .NET 10 self-contained folder
+- unsigned local ZIP + SHA-256
+- standard `.xlsx`
+- dynamic Knowledge/Custom evaluators
+- GitHub Copilot CLI logged-in user
+- separate output workbook with Excel formulas
+
+### 15.2 Out of scope
+
+- macOS、Linux、Windows Arm64 support claim
+- production installer signing／notarization
+- protected workbook decryption
+- Forms／LMS API
+- cloud database／server backend
+- repeated stochastic evaluation／majority vote／median aggregation
+- AI text detection or misconduct determination
+- institutional policy／legal／education approval enforcement
+- educational fairness threshold or mandatory human review gate
+
+## 16. Acceptance criteria
 
 | ID | 条件 |
 |---|---|
-| AC-001 | 利用者が提供する必須情報は回答 `.xlsx` 1ファイルだけである。 |
-| AC-002 | 1回答者1行、複数設問、必須回答列、任意Prompt／考慮事項列を画面でmappingできる。 |
-| AC-003 | 提示された2設問と2種類のPromptが編集可能な初期プリセットとして表示される。 |
-| AC-004 | レポートは既定0〜30、Prompt能力は既定1〜10の候補点として出力される。 |
-| AC-005 | 各論点の判定、理由、検証済み根拠が候補点とともに出力される。 |
-| AC-006 | Prompt／考慮事項がない行でもレポート評価を継続し、Prompt点を空欄にする。 |
-| AC-007 | identifier列と他行データをCopilotへ送信せず、送信前previewを毎run確認する。 |
-| AC-008 | AI候補だけで確認済み点を確定しない。 |
-| AC-009 | 入力SHA-256、size、last-write timeが処理前後で一致する。 |
-| AC-010 | 出力 `.xlsx` を一時保存、再open検証、atomic renameの順で確定する。 |
-| AC-011 | 既存Copilot CLI認証で動作し、アプリ固有client ID、secret、組織policyを要求しない。 |
-| AC-012 | Windows 11 x64でbuild、unit test、synthetic E2E、self-contained起動確認が成功する。 |
+| AC-001 | 標準 `.xlsx`を1file選び、inputを変更せず別 `.xlsx`を作る。 |
+| AC-002 | 指定sampleをread-onlyで開き、`Original!A1:L531`とF/G/H/I/J/K/Lのmapping候補を表示できる。 |
+| AC-003 | 質問数を動的に追加、複製、並べ替え、無効化、削除できる。 |
+| AC-004 | 1質問へKnowledge/Custom evaluatorを任意数追加し、Knowledgeの知識ポイントとCustomの分析Prompt、および各criterion、range、weightを設定できる。 |
+| AC-005 | Knowledge evaluatorはapp-owned semantic instructionにより、利用者入力の各知識ポイントについて単語有無ではなく説明・関係・適用の含有度をraw scoreとして返す。 |
+| AC-006 | Custom evaluatorは学生Prompt列を含む任意の選択列を主回答にでき、利用者入力Promptでcriterion別raw scoreへ定量化する。 |
+| AC-007 | AIはcriterion raw scoreだけを返し、evaluator/question/overall scoreを返さない。 |
+| AC-008 | アプリでcriterion/evaluator/question weightを設定し、Configのrange/weight/rounding cellを参照するExcel式が各階層を0〜100の加重平均へ計算する。 |
+| AC-009 | 主回答が非空なら、有効なoverrideはAI rawの有無にかかわらず優先し、overrideが空なら妥当なAI rawを確認待ちなく使い、どちらもなければscoreを空欄にする。 |
+| AC-010 | Config、Results、Run sheetと式を持つ別fileをatomicに出力し、元sheetを保持する。 |
+| AC-011 | 空回答はoverrideの有無にかかわらず、失敗・取消は有効なoverrideがない限り、scoreを0へ変換せず空欄とstatusを出力する。 |
+| AC-012 | 教育倫理warningはpersistent non-modal banner表示だけで、操作を要求せず、設定、確認、承認、score、実行、出力へ影響しない。 |
+| AC-013 | selected primary/supporting columns以外、他行、file pathをCopilotへ送らず、本文/tokenをlogへ残さない。 |
+| AC-014 | 既存Copilot CLI loginで動作し、アプリ固有client ID、secret、org policyを要求しない。 |
+| AC-015 | Windows 11 x64でbuild、unit/integration/E2E、self-contained publish、local ZIP生成が成功する。 |
 
-## 14. Test requirements
+## 17. Test requirements
 
-1. 1／2／10設問、列順変更、同名見出し、空列、途中空行のmapping test。
-2. Prompt列なし、考慮事項列なし、両方なし、考慮事項だけのtest。
-3. 初期プリセット内容、自由編集、snapshot/hash、run開始後不変test。
-4. 0〜30、1〜10の境界、範囲外、NaN、欠落論点、未知field、複数提出test。
-5. Prompt Injection、formula marker、長文、Unicode、改行を含む不信入力test。
-6. identifier除外、回答本文内のemail／電話番号候補検知、warning、伏字preview、検知限界表示、回答本文を含まないlog test。
-7. fake Copilot clientによる正常、schema不正、network失敗、cancel、cleanup失敗test。
-8. 認証済み環境がある場合のsynthetic live smoke test。未認証環境ではskip可能で、build gateをblockしない。
-9. Open XML package preservation、string cell、atomic output、disk full／rename失敗test。
-10. Windows 11 x64のsynthetic end-to-end test。
-11. keyboard navigation、focus、200% scaleのbasic accessibility test。
-12. `src/`、test、docsのrequirement traceability検査。
+1. sample identity、sheet、dimension、header-role suggestion test。
+2. 1／2／10 questions、1／2／5 evaluators、1／4／20 criteria、各階層のenabled最小数のdynamic definition test。
+3. Knowledge evaluatorの知識point、semantic coverage instruction、criterion schema test。
+4. Custom evaluatorの任意主回答列、学生Prompt列、自由Prompt、brace escape、unknown placeholder、supporting columns test。
+5. score range、weight正規化、override absent/present/AI失敗/range外、blank raw、midpoint roundingのhand-calculated test。
+6. criterion→evaluator→question→overallのExcel formula、Config参照、cached preview、blank propagation golden test。
+7. empty、invalid AI、auth、network、cancel、input changed、output invalidのsingle-cause test。
+8. formula injection、external reference、cycle、formula length、cell length test。
+9. input hash/size/time不変、copy preservation、atomic output fault test。
+10. selected columns only、exact evidence source column、other-row isolation、no-content log、tool capability test。
+11. ethics warning visible and nonblocking test。
+12. existing login auth、finite timeout contract、Office非依存required test、optional synthetic live／external spreadsheet recalculation smoke test。
+13. 4-step keyboard/focus/200% UI test。
+14. sample-like fixed-seed 531-row synthetic E2E。
+15. Windows x64 publish/package/documentation contract test。
 
-## 15. Implementation start gate
+## 18. Implementation start gate
 
-GATE-0は次だけを要求する。
+Revised GATE-0 requires:
 
-1. 本要求v2.0と対応実装計画v3.0がcommitされている。
-2. 単一Excel入力contract、初期Promptプリセット、AI候補／人確認境界が明文化されている。
-3. 合成fixture仕様が存在する。
-4. production `src/` fileがgate判定前に0件である。
-5. 独立した文書reviewでblocker/high defectが0件である。
+1. Requirement v3.0 and plan v4.0 committed.
+2. Sample profile、dynamic evaluator model、weight/formula contract、warning-only semantics documented.
+3. Current baseline、task map、traceability updated.
+4. Independent review has zero unresolved blocker/high defects.
+5. Production `src/` file count is 0 before gate evaluation.
 
-機関policy、法務判断、教育評価baseline、署名、cross-platform実機、外部owner approvalはGATE-0条件ではない。GATE-0 PASS後は、実装計画v3.0を依存順に全て実行する。
+No external policy、education approval、legal decision、signing identity、cross-platform runner is required for this gate。
 
-## 16. Traceability summary
+## 19. Traceability summary
 
-| Requirement surface | Primary implementation lane |
+| Surface | Primary lane |
 |---|---|
-| Excel intake/mapping | Core + Workbooks + Desktop |
-| Editable presets/config | Core + Desktop |
-| Copilot auth/evaluation | Platform + Core |
-| Candidate/review | Core + Desktop |
-| XLSX output/preservation | Workbooks |
-| Privacy/security | Core + Platform + tests |
-| Windows build/E2E | Desktop + E2E |
-
-## 17. Source note
-
-- GitHub Copilot SDKの現行authentication contractでは、`.NET`の`new CopilotClient()`は既定でlogged-in user credentialsを使用し、未ログイン時はCopilot CLIの対話的loginが必要である。
-- 旧v1.2のADR、signed policy、cross-platform、教育評価gate文書は設計参考としてGit履歴に残すが、本v2.0の初版completion条件ではない。
-- 本書は法的助言ではない。実データを処理する権限と所属組織の規則確認は利用者が行う。
+| Input/sample/mapping | App Excel adapter |
+| Dynamic questions/evaluators | Core domain |
+| Knowledge/Custom Prompt | Core prompting + Copilot adapter |
+| Weights/formulas | Core scoring + App Excel writer |
+| Separate output | App Excel writer |
+| Nonblocking warning | App UI |
+| Technical safety | Core validation + App adapters |
+| Windows delivery | App publish/package tests |
