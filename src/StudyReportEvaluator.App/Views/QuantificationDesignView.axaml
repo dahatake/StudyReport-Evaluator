@@ -1,0 +1,261 @@
+<UserControl
+    x:Class="StudyReportEvaluator.App.Views.QuantificationDesignView"
+    x:DataType="viewModels:QuantificationDesignViewModel"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:viewModels="using:StudyReportEvaluator.App.ViewModels"
+    Background="{DynamicResource AppCanvasBrush}"
+    Foreground="{DynamicResource AppTextBrush}"
+    AutomationProperties.AutomationId="QuantificationDesignView">
+  <UserControl.Styles>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="Border.editor">
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceMutedBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="12" />
+    </Style>
+    <Style Selector="Border.prompt">
+      <Setter Property="Background" Value="#EEF1FF" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+      <Setter Property="BorderThickness" Value="3,0,0,0" />
+      <Setter Property="Padding" Value="10" />
+    </Style>
+    <Style Selector="Border.ok">
+      <Setter Property="Background" Value="{DynamicResource AppCompletedSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppCompletedBrush}" />
+      <Setter Property="BorderThickness" Value="2,0,0,0" />
+      <Setter Property="Padding" Value="12" />
+    </Style>
+    <Style Selector="Border.invalid">
+      <Setter Property="Background" Value="{DynamicResource TechnicalBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource TechnicalBorderBrush}" />
+      <Setter Property="BorderThickness" Value="2,0,0,0" />
+      <Setter Property="Padding" Value="12" />
+    </Style>
+    <Style Selector="TextBlock.heading"><Setter Property="FontSize" Value="18" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+    <Style Selector="TextBlock.label"><Setter Property="FontWeight" Value="SemiBold" /></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}" /></Style>
+    <Style Selector="Button.primary"><Setter Property="Background" Value="{DynamicResource AppAccentBrush}" /><Setter Property="Foreground" Value="White" /></Style>
+    <Style Selector="TextBox:focus-visible"><Setter Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" /><Setter Property="BorderThickness" Value="3" /></Style>
+    <Style Selector="ListBox.navigator"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" /><Setter Property="BorderThickness" Value="1" /></Style>
+  </UserControl.Styles>
+
+  <ScrollViewer
+      x:Name="QuantificationDesignScrollViewer"
+      HorizontalScrollBarVisibility="Auto"
+      VerticalScrollBarVisibility="Auto"
+      AutomationProperties.AutomationId="QuantificationDesignScrollViewer">
+    <StackPanel Width="900" Margin="24" Spacing="14" KeyboardNavigation.TabNavigation="Continue">
+      <Border Background="{DynamicResource AppHeroBrush}" CornerRadius="18" Padding="20">
+        <StackPanel Spacing="6">
+          <TextBlock Text="STEP 02 · QUANTIFICATION DESIGN" Foreground="#9FABFF" FontWeight="SemiBold" />
+          <TextBlock Text="動的な定量化 tree" Foreground="White" FontSize="27" FontWeight="Bold" />
+          <TextBlock Text="各階層の一覧をvirtualizeし、選択した項目だけを編集します。" Foreground="{DynamicResource AppHeroMutedBrush}" />
+        </StackPanel>
+      </Border>
+
+      <Border Classes="card">
+        <StackPanel Spacing="8">
+          <TextBlock Text="定義情報" Classes="heading" />
+          <TextBlock Text="定義名" Classes="label" />
+          <TextBox x:Name="DefinitionNameTextBox" Text="{Binding DefinitionName, Mode=TwoWay}" AutomationProperties.AutomationId="DesignDefinitionName" />
+          <TextBlock Text="revision" Classes="label" />
+          <TextBox Text="{Binding Revision, Mode=TwoWay}" />
+          <TextBlock Text="丸め桁数（0～6）" Classes="label" />
+          <TextBox Text="{Binding RoundingDigits, Mode=TwoWay}" />
+          <TextBlock Text="{Binding SourceSummary}" Classes="muted" />
+          <TextBlock Text="{Binding HierarchySummary}" Classes="muted" />
+        </StackPanel>
+      </Border>
+
+      <Border Classes="card">
+        <StackPanel Spacing="8">
+          <TextBlock Text="質問 navigator" Classes="heading" />
+          <Button Classes="primary" Content="質問を追加" Command="{Binding AddQuestionCommand}" HorizontalAlignment="Left" AutomationProperties.AutomationId="AddDesignQuestion" />
+          <ListBox
+              x:Name="QuestionEditorList"
+              Classes="navigator"
+              ItemsSource="{Binding Questions}"
+              SelectedItem="{Binding SelectedQuestion, Mode=TwoWay}"
+              Height="120"
+              AutomationProperties.AutomationId="DesignQuestions">
+            <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="viewModels:QuestionDesignItemViewModel">
+                <StackPanel Margin="8,4" Orientation="Horizontal" Spacing="12">
+                  <TextBlock Text="{Binding DisplayName}" Width="340" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding PrimarySourceColumn, StringFormat='主回答 {0}'}" Width="130" />
+                  <TextBlock Text="{Binding EffectiveWeightText}" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </StackPanel>
+      </Border>
+
+      <ContentControl Content="{Binding SelectedQuestion}">
+        <ContentControl.ContentTemplate>
+          <DataTemplate x:DataType="viewModels:QuestionDesignItemViewModel">
+            <Border Classes="card">
+              <StackPanel Spacing="8">
+                <TextBlock Text="選択した質問" Classes="heading" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <CheckBox IsChecked="{Binding Enabled, Mode=TwoWay}" Content="有効" />
+                  <Button Content="複製" Command="{Binding DuplicateCommand}" />
+                  <Button Content="上へ" Command="{Binding MoveUpCommand}" />
+                  <Button Content="下へ" Command="{Binding MoveDownCommand}" />
+                  <Button Content="削除" Command="{Binding DeleteCommand}" />
+                </StackPanel>
+                <TextBlock Text="質問の表示名" Classes="label" />
+                <TextBox Text="{Binding DisplayName, Mode=TwoWay}" AutomationProperties.AutomationId="{Binding NameAutomationId}" />
+                <TextBlock Text="設問 text" Classes="label" />
+                <TextBox Text="{Binding QuestionText, Mode=TwoWay}" />
+                <TextBlock Text="質問 weight" Classes="label" />
+                <TextBox Text="{Binding Weight, Mode=TwoWay}" AutomationProperties.AutomationId="{Binding WeightAutomationId}" />
+                <TextBlock Text="主回答列" Classes="label" />
+                <TextBlock Text="{Binding PrimarySourceColumn}" />
+                <TextBlock Text="補助列" Classes="label" />
+                <TextBlock Text="{Binding SupportingColumnsText}" />
+                <TextBlock Text="{Binding ValidationText}" IsVisible="{Binding HasErrors}" Foreground="{DynamicResource TechnicalTextBrush}" />
+
+                <TextBlock Text="評価方法 navigator" Classes="heading" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Content="Knowledgeを追加" Command="{Binding AddKnowledgeEvaluatorCommand}" />
+                  <Button Content="Customを追加" Command="{Binding AddCustomEvaluatorCommand}" />
+                </StackPanel>
+                <ListBox
+                    Classes="navigator"
+                    ItemsSource="{Binding Evaluators}"
+                    SelectedItem="{Binding SelectedEvaluator, Mode=TwoWay}"
+                    Height="110">
+                  <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:EvaluatorDesignItemViewModel">
+                      <StackPanel Margin="8,4" Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="{Binding DisplayName}" Width="300" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding TypeContractName}" Width="190" />
+                        <TextBlock Text="{Binding EffectiveWeightText}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+
+                <ContentControl Content="{Binding SelectedEvaluator}">
+                  <ContentControl.ContentTemplate>
+                    <DataTemplate x:DataType="viewModels:EvaluatorDesignItemViewModel">
+                      <Border Classes="editor">
+                        <StackPanel Spacing="8">
+                          <TextBlock Text="選択した評価方法" Classes="heading" />
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <CheckBox IsChecked="{Binding Enabled, Mode=TwoWay}" Content="有効" />
+                            <Button Content="複製" Command="{Binding DuplicateCommand}" />
+                            <Button Content="上へ" Command="{Binding MoveUpCommand}" />
+                            <Button Content="下へ" Command="{Binding MoveDownCommand}" />
+                            <Button Content="削除" Command="{Binding DeleteCommand}" />
+                          </StackPanel>
+                          <TextBlock Text="評価方法名" Classes="label" />
+                          <TextBox Text="{Binding DisplayName, Mode=TwoWay}" />
+                          <TextBlock Text="type" Classes="label" />
+                          <TextBlock Text="{Binding TypeContractName}" />
+                          <TextBlock Text="weight" Classes="label" />
+                          <TextBox Text="{Binding Weight, Mode=TwoWay}" />
+                          <TextBlock Text="range minimum" Classes="label" />
+                          <TextBox Text="{Binding Minimum, Mode=TwoWay}" />
+                          <TextBlock Text="range maximum" Classes="label" />
+                          <TextBox Text="{Binding Maximum, Mode=TwoWay}" />
+
+                          <Border Classes="prompt">
+                            <StackPanel Spacing="6">
+                              <TextBlock Text="{Binding PromptSurfaceLabel}" FontWeight="Bold" />
+                              <TextBlock Text="{Binding PromptGuidance}" Classes="muted" TextWrapping="Wrap" />
+                              <TextBox Text="{Binding PromptPreview}" IsReadOnly="True" IsVisible="{Binding IsKnowledge}" AcceptsReturn="True" Height="130" AutomationProperties.AutomationId="{Binding KnowledgePromptPreviewAutomationId}" />
+                              <TextBox Text="{Binding CustomPromptTemplate, Mode=TwoWay}" IsVisible="{Binding IsCustom}" AcceptsReturn="True" Height="130" AutomationProperties.AutomationId="{Binding PromptAutomationId}" />
+                              <TextBox Text="{Binding PromptPreview}" IsReadOnly="True" IsVisible="{Binding IsCustom}" AcceptsReturn="True" Height="110" AutomationProperties.AutomationId="{Binding CustomPromptPreviewAutomationId}" />
+                            </StackPanel>
+                          </Border>
+                          <TextBlock Text="{Binding ValidationText}" IsVisible="{Binding HasErrors}" Foreground="{DynamicResource TechnicalTextBrush}" />
+
+                          <TextBlock Text="評価項目 navigator" Classes="heading" />
+                          <Button Content="評価項目を追加" Command="{Binding AddCriterionCommand}" HorizontalAlignment="Left" />
+                          <ListBox
+                              Classes="navigator"
+                              ItemsSource="{Binding Criteria}"
+                              SelectedItem="{Binding SelectedCriterion, Mode=TwoWay}"
+                              Height="100">
+                            <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
+                              <DataTemplate x:DataType="viewModels:CriterionDesignItemViewModel">
+                                <StackPanel Margin="8,4" Orientation="Horizontal" Spacing="12">
+                                  <TextBlock Text="{Binding DisplayName}" Width="300" FontWeight="SemiBold" />
+                                  <TextBlock Text="{Binding EffectiveRangeText}" Width="280" />
+                                  <TextBlock Text="{Binding EffectiveWeightText}" />
+                                </StackPanel>
+                              </DataTemplate>
+                            </ListBox.ItemTemplate>
+                          </ListBox>
+
+                          <ContentControl Content="{Binding SelectedCriterion}">
+                            <ContentControl.ContentTemplate>
+                              <DataTemplate x:DataType="viewModels:CriterionDesignItemViewModel">
+                                <Border Classes="editor">
+                                  <StackPanel Spacing="8">
+                                    <TextBlock Text="選択した評価項目" Classes="heading" />
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                      <CheckBox IsChecked="{Binding Enabled, Mode=TwoWay}" Content="有効" />
+                                      <Button Content="複製" Command="{Binding DuplicateCommand}" />
+                                      <Button Content="上へ" Command="{Binding MoveUpCommand}" />
+                                      <Button Content="下へ" Command="{Binding MoveDownCommand}" />
+                                      <Button Content="削除" Command="{Binding DeleteCommand}" />
+                                    </StackPanel>
+                                    <TextBlock Text="項目名 / 知識ポイント" Classes="label" />
+                                    <TextBox Text="{Binding DisplayName, Mode=TwoWay}" AutomationProperties.AutomationId="{Binding NameAutomationId}" />
+                                    <TextBlock Text="説明" Classes="label" />
+                                    <TextBox Text="{Binding Description, Mode=TwoWay}" />
+                                    <TextBlock Text="weight" Classes="label" />
+                                    <TextBox Text="{Binding Weight, Mode=TwoWay}" />
+                                    <CheckBox IsChecked="{Binding HasCustomRange, Mode=TwoWay}" Content="個別 range" AutomationProperties.AutomationId="{Binding RangeAutomationId}" />
+                                    <TextBox Text="{Binding Minimum, Mode=TwoWay}" IsEnabled="{Binding HasCustomRange}" />
+                                    <TextBox Text="{Binding Maximum, Mode=TwoWay}" IsEnabled="{Binding HasCustomRange}" />
+                                    <TextBlock Text="{Binding EffectiveRangeText}" Classes="muted" />
+                                    <TextBlock Text="{Binding ValidationText}" IsVisible="{Binding HasErrors}" Foreground="{DynamicResource TechnicalTextBrush}" />
+                                  </StackPanel>
+                                </Border>
+                              </DataTemplate>
+                            </ContentControl.ContentTemplate>
+                          </ContentControl>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ContentControl.ContentTemplate>
+                </ContentControl>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ContentControl.ContentTemplate>
+      </ContentControl>
+
+      <Border
+          x:Name="DesignValidationSummary"
+          Classes.ok="{Binding IsValid}"
+          Classes.invalid="{Binding HasTechnicalErrors}"
+          AutomationProperties.AutomationId="DesignValidationSummary">
+        <StackPanel Spacing="6">
+          <TextBlock Text="snapshot preflight" FontWeight="Bold" />
+          <TextBlock Text="{Binding ValidationSummary}" />
+          <ItemsControl ItemsSource="{Binding ValidationErrors}" IsVisible="{Binding HasTechnicalErrors}">
+            <ItemsControl.ItemTemplate><DataTemplate x:DataType="viewModels:DesignValidationError"><TextBlock Text="{Binding AccessibleText}" /></DataTemplate></ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Button Content="現在のdraftを再検証" Command="{Binding ValidateCommand}" HorizontalAlignment="Left" AutomationProperties.AutomationId="ValidateDesignDraft" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
