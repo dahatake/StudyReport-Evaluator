@@ -22,16 +22,16 @@
 
 | ID | 決定 |
 |---|---|
-| D-01 | 1回答者または1提出を1行とする。Forms列を画面でmanual mappingする。 |
-| D-02 | 設問本文・論点は提示された2設問をeditable presetとして初期表示し、Excel見出しも候補にできる。 |
-| D-03 | レポートは総合0〜30、Prompt能力は総合1〜10を既定とし、論点別に`MET/PARTIAL/NOT_FOUND`を返す。 |
-| D-04 | AI点は候補点。人が採用または上書きするまで確認済み点を空欄にする。 |
-| D-05 | アプリ固有OAuth Appを作らず、GitHub Copilot SDKの既存logged-in user credentialsを使用する。 |
-| D-06 | identifierを除外し、毎runの送信previewと利用者確認後だけ送信する。 |
-| D-07 | 初版正式targetはWindows 11 x64のみ。macOS/Linux/Arm64を未検証のまま対応表示しない。 |
-| D-08 | 提示Promptの誤字を修正し、一般的な整理に合わせ「プログラミングは演繹的、機械学習は帰納的な側面」を初期論点にする。 |
-| D-09 | 学生PromptとPrompt考慮事項は独立した任意列。考慮事項だけなら`CONSIDERATIONS_ONLY`とし、存在時は考慮事項を最優先基準として実Promptへの反映度を評価する。 |
-| D-10 | 入力を変更せず、新しい `.xlsx` へConfig、Results、Run sheetを追加する。 |
+| SCOPE-01 | 1回答者または1提出を1行とする。Forms列を画面でmanual mappingする。 |
+| SCOPE-02 | 設問本文・論点は提示された2設問をeditable presetとして初期表示し、Excel見出しも候補にできる。 |
+| SCOPE-03 | レポートは総合0〜30、Prompt能力は総合1〜10を既定とし、論点別に`MET/PARTIAL/NOT_FOUND`を返す。 |
+| SCOPE-04 | AI点は候補点。人が採用または上書きするまで確認済み点を空欄にする。 |
+| SCOPE-05 | アプリ固有OAuth Appを作らず、GitHub Copilot SDKの既存logged-in user credentialsを使用する。 |
+| SCOPE-06 | identifierを除外し、毎runの送信previewと利用者確認後だけ送信する。 |
+| SCOPE-07 | 初版正式targetはWindows 11 x64のみ。macOS/Linux/Arm64を未検証のまま対応表示しない。 |
+| SCOPE-08 | 提示Promptの誤字を修正し、一般的な整理に合わせ「プログラミングは演繹的、機械学習は帰納的な側面」を初期論点にする。 |
+| SCOPE-09 | 学生PromptとPrompt考慮事項は独立した任意列。考慮事項だけなら`CONSIDERATIONS_ONLY`とし、存在時は考慮事項を最優先基準として実Promptへの反映度を評価する。 |
+| SCOPE-10 | 入力を変更せず、新しい `.xlsx` へConfig、Results、Run sheetを追加する。 |
 
 ## 3. Architecture
 
