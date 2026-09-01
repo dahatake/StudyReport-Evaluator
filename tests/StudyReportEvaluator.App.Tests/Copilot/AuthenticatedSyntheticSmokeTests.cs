@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using StudyReportEvaluator.App.Copilot;
+using StudyReportEvaluator.App.Tests.Evidence;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Prompting;
 using Xunit;
@@ -59,6 +60,11 @@ public sealed partial class AuthenticatedSyntheticSmokeTests
         else
         {
             result = await RunOptedInSmokeAsync(TestContext.Current.CancellationToken);
+            AdvisoryEvidenceWriter.Write(
+                "live-copilot-smoke.json",
+                "authenticated_live_copilot_smoke",
+                result.Status.ToString(),
+                result.Rationale);
         }
 
         Assert.Contains(result.Status, Enum.GetValues<AdvisoryStatus>());
