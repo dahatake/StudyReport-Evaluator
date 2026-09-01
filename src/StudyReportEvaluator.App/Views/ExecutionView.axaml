@@ -1,0 +1,206 @@
+<UserControl
+    x:Class="StudyReportEvaluator.App.Views.ExecutionView"
+    x:DataType="viewModels:ExecutionViewModel"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:viewModels="using:StudyReportEvaluator.App.ViewModels"
+    Background="{DynamicResource AppCanvasBrush}"
+    Foreground="{DynamicResource AppTextBrush}"
+    AutomationProperties.AutomationId="ExecutionView">
+  <UserControl.Styles>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Padding" Value="18" />
+    </Style>
+    <Style Selector="Border.ok">
+      <Setter Property="Background" Value="{DynamicResource AppCompletedSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppCompletedBrush}" />
+      <Setter Property="BorderThickness" Value="3,0,0,0" />
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="Border.invalid">
+      <Setter Property="Background" Value="{DynamicResource TechnicalBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource TechnicalBorderBrush}" />
+      <Setter Property="BorderThickness" Value="3,0,0,0" />
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="TextBlock.kicker">
+      <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="1" />
+    </Style>
+    <Style Selector="TextBlock.heading">
+      <Setter Property="FontSize" Value="18" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.label">
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.cancel">
+      <Setter Property="Background" Value="#FFF0F0" />
+      <Setter Property="Foreground" Value="#8E2525" />
+      <Setter Property="BorderBrush" Value="#D68A8A" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="ComboBox:focus-visible">
+      <Setter Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+      <Setter Property="BorderThickness" Value="3" />
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer
+      x:Name="ExecutionScrollViewer"
+      HorizontalScrollBarVisibility="Auto"
+      VerticalScrollBarVisibility="Auto"
+      AutomationProperties.AutomationId="ExecutionScrollViewer">
+    <StackPanel
+        Width="900"
+        Margin="24"
+        Spacing="16"
+        KeyboardNavigation.TabNavigation="Continue">
+      <Border Background="{DynamicResource AppHeroBrush}" CornerRadius="18" Padding="22">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+          <StackPanel Spacing="6">
+            <TextBlock Text="STEP 03 · EXECUTION" Foreground="#9FABFF" FontWeight="SemiBold" LetterSpacing="1.1" />
+            <TextBlock Text="snapshot-bound quantification" Foreground="White" FontSize="27" FontWeight="Bold" />
+            <TextBlock
+                Text="既存の Copilot CLI login を確認し、選択した model で行 × 質問 × evaluator を実行します。"
+                Foreground="{DynamicResource AppHeroMutedBrush}"
+                TextWrapping="Wrap" />
+          </StackPanel>
+          <Border Grid.Column="1" Padding="12,8" CornerRadius="10" Background="#20AAB6FF" VerticalAlignment="Top">
+            <TextBlock Text="NO SECRET INPUT · EPHEMERAL SESSIONS" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+          </Border>
+        </Grid>
+      </Border>
+
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+        <Border Grid.Column="0" Classes="card">
+          <StackPanel Spacing="11">
+            <TextBlock Text="COPILOT RUNTIME" Classes="kicker" />
+            <TextBlock Text="login と identity" Classes="heading" />
+            <TextBlock Text="{Binding AuthenticationStatusText}" TextWrapping="Wrap" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding RuntimeIdentityText}" Classes="muted" TextWrapping="Wrap" FontSize="12" />
+            <Button
+                x:Name="CheckAuthenticationButton"
+                Content="Copilot 状態を確認"
+                Command="{Binding CheckAuthenticationCommand}"
+                HorizontalAlignment="Left"
+                TabIndex="0"
+                AutomationProperties.AutomationId="CheckCopilotAuthentication"
+                AutomationProperties.Name="既存 Copilot CLI login と model を確認" />
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsCheckingAuthentication}" Height="5" />
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="1" Classes="card">
+          <StackPanel Spacing="11">
+            <TextBlock Text="RUN OPTIONS" Classes="kicker" />
+            <TextBlock Text="model と並列度" Classes="heading" />
+            <TextBlock Text="Model" Classes="label" />
+            <ComboBox
+                x:Name="ModelComboBox"
+                ItemsSource="{Binding AvailableModelIds}"
+                SelectedItem="{Binding SelectedModelId, Mode=TwoWay}"
+                TabIndex="1"
+                AutomationProperties.AutomationId="ExecutionModel"
+                AutomationProperties.Name="評価に使用する Copilot model" />
+            <TextBlock Text="Concurrency" Classes="label" />
+            <ComboBox
+                x:Name="ConcurrencyComboBox"
+                ItemsSource="{Binding ConcurrencyOptions}"
+                SelectedItem="{Binding MaxConcurrency, Mode=TwoWay}"
+                TabIndex="2"
+                AutomationProperties.AutomationId="ExecutionConcurrency"
+                AutomationProperties.Name="評価の最大並列度 1 から 3" />
+            <TextBlock Text="{Binding ConcurrencyText}" Classes="muted" FontSize="12" />
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Border Classes="card">
+        <StackPanel Spacing="12">
+          <TextBlock Text="EVALUATION PLAN" Classes="kicker" />
+          <TextBlock Text="実行単位と snapshot" Classes="heading" />
+          <TextBlock Text="{Binding PlanSummary}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock
+              Text="run 開始後の draft 編集は次回だけへ反映され、現在の Prompt・schema・range・weight・formula layout は変わりません。"
+              Classes="muted"
+              TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button
+                x:Name="StartRunButton"
+                Classes="primary"
+                Content="定量化を開始"
+                Command="{Binding StartCommand}"
+                TabIndex="3"
+                AutomationProperties.AutomationId="StartQuantification"
+                AutomationProperties.Name="現在の設計 snapshot で定量化を開始" />
+            <Button
+                x:Name="CancelRunButton"
+                Classes="cancel"
+                Content="cancel"
+                Command="{Binding CancelCommand}"
+                TabIndex="4"
+                AutomationProperties.AutomationId="CancelQuantification"
+                AutomationProperties.Name="新規 evaluator の送信を停止して部分結果を保持" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Classes="card">
+        <StackPanel Spacing="10">
+          <TextBlock Text="PROGRESS" Classes="kicker" />
+          <TextBlock Text="{Binding RunStatusText}" Classes="heading" TextWrapping="Wrap" />
+          <ProgressBar
+              x:Name="RunProgressBar"
+              Minimum="0"
+              Maximum="{Binding ProgressTotal}"
+              Value="{Binding ProgressCompleted}"
+              Height="14"
+              AutomationProperties.AutomationId="ExecutionProgress"
+              AutomationProperties.Name="定量化の完了進捗" />
+          <TextBlock Text="{Binding ProgressText}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+
+      <Border
+          x:Name="ExecutionValidationSummary"
+          Classes.ok="{Binding IsTechnicallyValid}"
+          Classes.invalid="{Binding HasTechnicalErrors}"
+          AutomationProperties.AutomationId="ExecutionValidationSummary">
+        <StackPanel Spacing="7">
+          <TextBlock Text="技術検証" FontWeight="Bold" />
+          <TextBlock Text="{Binding ValidationSummary}" TextWrapping="Wrap" />
+          <ListBox
+              ItemsSource="{Binding TechnicalErrors}"
+              MaxHeight="190"
+              IsVisible="{Binding HasTechnicalErrors}"
+              AutomationProperties.AutomationId="ExecutionTechnicalErrors"
+              AutomationProperties.Name="実行を止めている技術検証エラー">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="viewModels:ExecutionTechnicalError">
+                <TextBlock Text="{Binding AccessibleText}" TextWrapping="Wrap" Margin="0,3" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

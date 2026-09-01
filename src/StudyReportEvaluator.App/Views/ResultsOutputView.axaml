@@ -1,0 +1,276 @@
+<UserControl
+    x:Class="StudyReportEvaluator.App.Views.ResultsOutputView"
+    x:DataType="viewModels:ResultsOutputViewModel"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:viewModels="using:StudyReportEvaluator.App.ViewModels"
+    Background="{DynamicResource AppCanvasBrush}"
+    Foreground="{DynamicResource AppTextBrush}"
+    AutomationProperties.AutomationId="ResultsOutputView">
+  <UserControl.Styles>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Padding" Value="18" />
+    </Style>
+    <Style Selector="Border.metric">
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceMutedBrush}" />
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="Padding" Value="10" />
+    </Style>
+    <Style Selector="Border.ok">
+      <Setter Property="Background" Value="{DynamicResource AppCompletedSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppCompletedBrush}" />
+      <Setter Property="BorderThickness" Value="3,0,0,0" />
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="Border.invalid">
+      <Setter Property="Background" Value="{DynamicResource TechnicalBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource TechnicalBorderBrush}" />
+      <Setter Property="BorderThickness" Value="3,0,0,0" />
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="TextBlock.kicker">
+      <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="1" />
+    </Style>
+    <Style Selector="TextBlock.heading">
+      <Setter Property="FontSize" Value="18" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.value">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.cancel">
+      <Setter Property="Background" Value="#FFF0F0" />
+      <Setter Property="Foreground" Value="#8E2525" />
+      <Setter Property="BorderBrush" Value="#D68A8A" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBox.invalid">
+      <Setter Property="BorderBrush" Value="{DynamicResource TechnicalBorderBrush}" />
+      <Setter Property="BorderThickness" Value="3" />
+    </Style>
+    <Style Selector="TextBox:focus-visible">
+      <Setter Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+      <Setter Property="BorderThickness" Value="3" />
+    </Style>
+    <Style Selector="ListBox#ResultsList > ListBoxItem">
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid>
+    <ScrollViewer
+        x:Name="ResultsOutputScrollViewer"
+        HorizontalScrollBarVisibility="Auto"
+        VerticalScrollBarVisibility="Auto"
+        AutomationProperties.AutomationId="ResultsOutputScrollViewer">
+      <StackPanel
+          Width="1120"
+          Margin="24"
+          Spacing="16"
+          KeyboardNavigation.TabNavigation="Continue">
+        <Border Background="{DynamicResource AppHeroBrush}" CornerRadius="18" Padding="22">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+            <StackPanel Spacing="6">
+              <TextBlock Text="STEP 04 · RESULTS / OUTPUT" Foreground="#9FABFF" FontWeight="SemiBold" LetterSpacing="1.1" />
+              <TextBlock Text="review, override, export" Foreground="White" FontSize="27" FontWeight="Bold" />
+              <TextBlock Text="AI raw と status を確認し、必要な値だけ override して、別 workbook へ安全に出力します。" Foreground="{DynamicResource AppHeroMutedBrush}" TextWrapping="Wrap" />
+            </StackPanel>
+            <Border Grid.Column="1" Padding="12,8" CornerRadius="10" Background="#20AAB6FF" VerticalAlignment="Top">
+              <TextBlock Text="NO OVERWRITE · EXACT RECHECK" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+            </Border>
+          </Grid>
+        </Border>
+
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+          <Border Grid.Column="0" Classes="card">
+            <StackPanel Spacing="8">
+              <TextBlock Text="RUN SUMMARY" Classes="kicker" />
+              <TextBlock Text="{Binding RunSummaryText}" Classes="heading" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding PartialResultText}" Classes="muted" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+          <Border
+              Grid.Column="1"
+              Classes.ok="{Binding IsInputUnchanged}"
+              Classes.invalid="{Binding !IsInputUnchanged}">
+            <StackPanel Spacing="8">
+              <TextBlock Text="INPUT IDENTITY" Classes="kicker" />
+              <TextBlock Text="入力不変確認" Classes="heading" />
+              <TextBlock Text="{Binding InputStateText}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+        </Grid>
+
+        <Border Classes="card">
+          <StackPanel Spacing="12">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+              <StackPanel Spacing="4">
+                <TextBlock Text="RESULT REVIEW" Classes="kicker" />
+                <TextBlock Text="raw → effective → normalized → aggregate" Classes="heading" />
+              </StackPanel>
+              <Border Grid.Column="1" Classes="metric">
+                <TextBlock Text="空欄は 0 ではありません" FontWeight="SemiBold" />
+              </Border>
+            </Grid>
+
+            <ListBox
+                x:Name="ResultsList"
+                ItemsSource="{Binding Results}"
+                Height="430"
+                Focusable="True"
+                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                TabIndex="0"
+                AutomationProperties.AutomationId="ResultsReviewList"
+                AutomationProperties.Name="行ごとの AI raw、override、formula preview">
+              <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <VirtualizingStackPanel />
+                </ItemsPanelTemplate>
+              </ListBox.ItemsPanel>
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="viewModels:ResultsCriterionViewModel">
+                  <Border
+                      Width="1050"
+                      Margin="0,0,0,8"
+                      Padding="12"
+                      CornerRadius="10"
+                      Background="{DynamicResource AppSurfaceMutedBrush}"
+                      BorderBrush="{DynamicResource AppBorderBrush}"
+                      BorderThickness="1"
+                      AutomationProperties.AutomationId="{Binding AutomationId}"
+                      AutomationProperties.Name="{Binding AccessibleSummary}">
+                    <Grid ColumnDefinitions="58,210,100,100,150,100,100,100,100" ColumnSpacing="10">
+                      <StackPanel Grid.Column="0" Spacing="3">
+                        <TextBlock Text="ROW" Classes="label" />
+                        <TextBlock Text="{Binding SourceRowNumber}" Classes="value" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Text="{Binding QuestionName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding EvaluatorName}" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding CriterionName}" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding RangeText}" Classes="label" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="2" Spacing="3">
+                        <TextBlock Text="STATUS" Classes="label" />
+                        <TextBlock Text="{Binding StatusCode}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="3" Spacing="3">
+                        <TextBlock Text="AI RAW" Classes="label" />
+                        <TextBlock Text="{Binding AiRawText}" Classes="value" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="4" Spacing="3">
+                        <TextBlock Text="OVERRIDE" Classes="label" />
+                        <TextBox
+                            Text="{Binding OverrideText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            IsEnabled="{Binding CanOverride}"
+                            Classes.invalid="{Binding HasOverrideError}"
+                            PlaceholderText="optional"
+                            AutomationProperties.AutomationId="{Binding AutomationId, StringFormat='{}{0}-Override'}"
+                            AutomationProperties.Name="任意 override。空欄または range 内の数値" />
+                        <TextBlock Text="{Binding OverrideError}" Foreground="{DynamicResource TechnicalBorderBrush}" FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasOverrideError}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="5" Spacing="3">
+                        <TextBlock Text="EFFECTIVE" Classes="label" />
+                        <TextBlock Text="{Binding EffectiveRawText}" Classes="value" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="6" Spacing="3">
+                        <TextBlock Text="NORMALIZED" Classes="label" />
+                        <TextBlock Text="{Binding NormalizedScoreText}" Classes="value" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="7" Spacing="3">
+                        <TextBlock Text="EVALUATOR" Classes="label" />
+                        <TextBlock Text="{Binding EvaluatorScoreText}" Classes="value" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="8" Spacing="3">
+                        <TextBlock Text="OVERALL" Classes="label" />
+                        <TextBlock Text="{Binding OverallScoreText}" Classes="value" />
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <Border
+                Classes.ok="{Binding !HasOverrideErrors}"
+                Classes.invalid="{Binding HasOverrideErrors}"
+                AutomationProperties.AutomationId="OverrideValidationSummary">
+              <TextBlock Text="{Binding OverrideValidationText}" TextWrapping="Wrap" />
+            </Border>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="12">
+            <TextBlock Text="ATOMIC OUTPUT" Classes="kicker" />
+            <TextBlock Text="別 workbook へ出力" Classes="heading" />
+            <TextBlock Text="Output path" FontWeight="SemiBold" />
+            <TextBox
+                x:Name="OutputPathTextBox"
+                Text="{Binding OutputPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                PlaceholderText="C:\...\report_quantified_yyyyMMdd-HHmmss.xlsx"
+                TabIndex="1"
+                AutomationProperties.AutomationId="ResultsOutputPath"
+                AutomationProperties.Name="上書きしない完成 workbook path" />
+            <Border
+                Classes.ok="{Binding IsOutputPathValid}"
+                Classes.invalid="{Binding !IsOutputPathValid}"
+                AutomationProperties.AutomationId="OutputPathValidationSummary">
+              <TextBlock Text="{Binding OutputPathStatusText}" TextWrapping="Wrap" />
+            </Border>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Button
+                  x:Name="ExportButton"
+                  Classes="primary"
+                  Content="検証して出力"
+                  Command="{Binding ExportCommand}"
+                  TabIndex="2"
+                  AutomationProperties.AutomationId="ExportQuantifiedWorkbook"
+                  AutomationProperties.Name="working copy を検証して新規 workbook として atomic commit" />
+              <Button
+                  x:Name="CancelExportButton"
+                  Classes="cancel"
+                  Content="cancel output"
+                  Command="{Binding CancelExportCommand}"
+                  TabIndex="3"
+                  AutomationProperties.AutomationId="CancelWorkbookOutput"
+                  AutomationProperties.Name="final commit 前の workbook 出力を取り消す" />
+            </StackPanel>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsExporting}" Height="6" />
+            <TextBlock
+                Text="{Binding ExportStatusText}"
+                FontWeight="SemiBold"
+                TextWrapping="Wrap"
+                AutomationProperties.AutomationId="ExportStatus"
+                AutomationProperties.Name="workbook 出力 status" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>
