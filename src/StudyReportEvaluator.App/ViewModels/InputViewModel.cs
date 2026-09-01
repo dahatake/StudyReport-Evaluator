@@ -9,6 +9,7 @@ using StudyReportEvaluator.App.Workbooks.Mapping;
 using StudyReportEvaluator.App.Workbooks.Reading;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Prompting;
+using StudyReportEvaluator.Core.Scoring;
 using StudyReportEvaluator.Core.Validation;
 
 namespace StudyReportEvaluator.App.ViewModels;
@@ -402,8 +403,8 @@ public sealed class InputQuestionMappingViewModel : UiObservableObject
 
     public decimal Weight
     {
-        get => definition.Weight;
-        set => owner.UpdateQuestion(Id, question => question with { Weight = value });
+        get => definition.Points;
+        set => owner.UpdateQuestion(Id, question => question with { Points = value });
     }
 
     public ReadOnlyObservableCollection<string> AvailableColumnNames => owner.AvailableColumnNames;
@@ -479,6 +480,8 @@ public sealed class InputQuestionMappingViewModel : UiObservableObject
 
 public sealed class InputViewModel : UiObservableObject
 {
+    private static readonly IReadOnlyList<int> ClosedHeaderRowOptions = Array.AsReadOnly([1, 2]);
+
     private readonly IInputWorkbookLoader loader;
     private readonly ColumnMappingValidator mappingValidator = new();
     private readonly QuantificationDefinitionValidator definitionValidator = new();
@@ -504,6 +507,7 @@ public sealed class InputViewModel : UiObservableObject
     private int lastDataRow = 2;
     private bool isBusy;
     private bool isUsingSuggestedMapping;
+    private bool launchAutoLoadPending;
     private long loadSequence;
 
     public InputViewModel()
@@ -526,7 +530,7 @@ public sealed class InputViewModel : UiObservableObject
             _ => !IsBusy && !string.IsNullOrWhiteSpace(FilePath));
         refreshHeaderCommand = new ViewModelCommand(
             _ => _ = RefreshHeaderAsync(),
-            _ => !IsBusy && HasLoadedWorkbook && HeaderRow >= 1);
+            _ => !IsBusy && HasLoadedWorkbook && HeaderRow is 1 or 2);
         applySuggestionsCommand = new ViewModelCommand(
             _ => ApplySuggestedMapping(),
             _ => !IsBusy && CurrentWorksheetSuggestion is not null);
@@ -547,6 +551,8 @@ public sealed class InputViewModel : UiObservableObject
     public ReadOnlyObservableCollection<InputQuestionMappingViewModel> Questions { get; }
 
     public ReadOnlyObservableCollection<InputValidationError> ValidationErrors { get; }
+
+    public IReadOnlyList<int> HeaderRowOptions => ClosedHeaderRowOptions;
 
     public QuantificationDefinition DefinitionDraft => definitionDraft;
 
@@ -593,6 +599,13 @@ public sealed class InputViewModel : UiObservableObject
         get => headerRow;
         set
         {
+            if (value is not 1 and not 2)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    "The question-text row must be 1 or 2.");
+            }
+
             if (SetProperty(ref headerRow, value))
             {
                 SupersedeActiveLoad();
@@ -706,6 +719,25 @@ public sealed class InputViewModel : UiObservableObject
         }
     }
 
+    public void ApplyLaunchInput(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        SetFilePath(path);
+        launchAutoLoadPending = true;
+    }
+
+    public async Task LoadLaunchInputIfRequestedAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (!launchAutoLoadPending)
+        {
+            return;
+        }
+
+        launchAutoLoadPending = false;
+        await LoadAsync(cancellationToken);
+    }
+
     public async Task SetFilePathAsync(
         string path,
         CancellationToken cancellationToken = default)
@@ -728,13 +760,13 @@ public sealed class InputViewModel : UiObservableObject
             return;
         }
 
-        if (HeaderRow is < 1 or > (int)WorkbookMetadataReader.MaxWorksheetRows)
+        if (HeaderRow is not 1 and not 2)
         {
             loadError = CreateError(
                 "HEADER_ROW_OUT_OF_RANGE",
                 "<input>",
                 "HeaderRow",
-                "見出し行は Excel の有効範囲で指定してください。");
+                "質問文の行は 1 または 2 を選択してください。");
             Revalidate();
             return;
         }
@@ -838,7 +870,8 @@ public sealed class InputViewModel : UiObservableObject
             index,
             NewId("question"),
             _ => NewId("evaluator"),
-            _ => NewId("criterion"));
+            _ => NewId("criterion"),
+            _ => NewId("special"));
         string duplicateId = next.Questions[index + 1].Id;
         CommitDraft(next, suggested: false);
         return questionItems.Single(item => string.Equals(item.Id, duplicateId, StringComparison.Ordinal));
@@ -1038,7 +1071,10 @@ public sealed class InputViewModel : UiObservableObject
 
         if (applySuggestion)
         {
-            headerRow = checked((int)(worksheetSuggestion?.HeaderRow ?? metadata.HeaderRowNumber));
+            uint suggestedHeaderRow = worksheetSuggestion?.HeaderRow ?? metadata.HeaderRowNumber;
+            headerRow = suggestedHeaderRow is 1 or 2
+                ? checked((int)suggestedHeaderRow)
+                : 1;
             firstDataRow = checked((int)(worksheetSuggestion?.FirstDataRow
                 ?? Math.Min(worksheet.LastRowIndex, metadata.HeaderRowNumber + 1)));
             lastDataRow = checked((int)(worksheetSuggestion?.LastDataRow ?? worksheet.LastRowIndex));
@@ -1104,7 +1140,17 @@ public sealed class InputViewModel : UiObservableObject
                 supportingColumns: []));
         }
 
-        return questions.ToImmutable();
+        ImmutableArray<QuestionDefinition> materialized = questions.ToImmutable();
+        ImmutableArray<decimal> allocations = new ScoringAllocationCalculator().Equalize(
+            definitionDraft.BasePoints,
+            definitionDraft.SpecialPoints,
+            materialized.Count(question => question.Enabled));
+        int allocationIndex = 0;
+        return materialized
+            .Select(question => question.Enabled
+                ? question with { Points = allocations[allocationIndex++] }
+                : question)
+            .ToImmutableArray();
     }
 
     private QuestionDefinition CreateDefaultQuestion(
@@ -1147,7 +1193,7 @@ public sealed class InputViewModel : UiObservableObject
                 : questionText,
             PrimarySourceColumn = primaryColumn,
             SupportingSourceColumns = [.. supportingColumns],
-            Weight = 1m,
+            Points = 0m,
             Evaluators = [evaluator],
             Enabled = true,
         };
@@ -1386,6 +1432,10 @@ public sealed class InputViewModel : UiObservableObject
             Evaluators = [.. question.Evaluators.Select(evaluator => evaluator with
             {
                 Criteria = [.. evaluator.Criteria.Select(criterion => criterion with { })],
+            })],
+            SpecialEvaluations = [.. question.SpecialEvaluations.Select(special => special with
+            {
+                SupportingSourceColumns = [.. special.SupportingSourceColumns],
             })],
         })],
     };

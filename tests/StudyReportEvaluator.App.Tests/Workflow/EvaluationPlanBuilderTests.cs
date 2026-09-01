@@ -180,8 +180,10 @@ internal static class U01TestSupport
     internal static QuantificationDefinition Definition(
         int firstDataRow,
         int lastDataRow,
-        params QuestionDefinition[] questions) =>
-        new()
+        params QuestionDefinition[] questions)
+    {
+        decimal enabledPoints = questions.Where(question => question.Enabled).Sum(question => question.Points);
+        return new QuantificationDefinition
         {
             Id = "DEF-U01",
             Name = "Synthetic U-01 definition",
@@ -190,9 +192,11 @@ internal static class U01TestSupport
             HeaderRow = 1,
             FirstDataRow = firstDataRow,
             LastDataRow = lastDataRow,
+            BasePoints = 100m - enabledPoints,
             RoundingDigits = 1,
             Questions = [.. questions],
         };
+    }
 
     internal static QuestionDefinition Question(
         string id,
@@ -207,7 +211,7 @@ internal static class U01TestSupport
             QuestionText = "Question text " + id,
             PrimarySourceColumn = primary,
             SupportingSourceColumns = [.. supporting],
-            Weight = 2m,
+            Points = 2m,
             Enabled = enabled,
             Evaluators = [.. evaluators],
         };

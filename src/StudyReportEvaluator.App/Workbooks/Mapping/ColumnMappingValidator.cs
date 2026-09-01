@@ -371,6 +371,55 @@ public sealed class ColumnMappingValidator
             }
         }
 
+        if (!question.SpecialEvaluations.IsDefault)
+        {
+            for (int specialIndex = 0; specialIndex < question.SpecialEvaluations.Length; specialIndex++)
+            {
+                SpecialEvaluationDefinition? special = question.SpecialEvaluations[specialIndex];
+                if (special is null)
+                {
+                    Add(errors, "NULL_SPECIAL_EVALUATION", path, safeQuestionId, "SpecialEvaluations", "<null>");
+                    continue;
+                }
+
+                string specialPath = $"{path}.specialEvaluations[{specialIndex.ToString(CultureInfo.InvariantCulture)}]";
+                ValidateColumn(
+                    worksheet,
+                    special.PrimarySourceColumn,
+                    specialPath,
+                    SafeIdentity(special.Id),
+                    "PrimarySourceColumn",
+                    errors);
+                HashSet<string> uniqueSpecialSupporting = new(StringComparer.OrdinalIgnoreCase);
+                foreach ((string? sourceColumn, int supportingIndex) in special.SupportingSourceColumns
+                             .Select((column, index) => (column, index)))
+                {
+                    string field = $"SupportingSourceColumns[{supportingIndex.ToString(CultureInfo.InvariantCulture)}]";
+                    ValidateColumn(
+                        worksheet,
+                        sourceColumn,
+                        specialPath,
+                        SafeIdentity(special.Id),
+                        field,
+                        errors);
+                    if (string.IsNullOrWhiteSpace(sourceColumn))
+                    {
+                        continue;
+                    }
+
+                    if (!uniqueSpecialSupporting.Add(sourceColumn))
+                    {
+                        Add(errors, "DUPLICATE_SUPPORTING_COLUMN", specialPath, SafeIdentity(special.Id), field, SafeScalar(sourceColumn));
+                    }
+
+                    if (string.Equals(special.PrimarySourceColumn, sourceColumn, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Add(errors, "PRIMARY_COLUMN_REUSED", specialPath, SafeIdentity(special.Id), field, SafeScalar(sourceColumn));
+                    }
+                }
+            }
+        }
+
         if (errors.Count == initialErrorCount && primary is not null)
         {
             validated.Add(new ValidatedQuestionColumnMapping(

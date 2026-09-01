@@ -269,7 +269,7 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
                     DisplayName = "Synthetic question",
                     QuestionText = "Synthetic question",
                     PrimarySourceColumn = "A",
-                    Weight = 1m,
+                    Points = 1m,
                     Evaluators =
                     [
                         new EvaluatorDefinition

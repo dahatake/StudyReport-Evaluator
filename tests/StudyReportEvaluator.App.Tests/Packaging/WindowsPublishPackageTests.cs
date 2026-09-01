@@ -41,6 +41,7 @@ public sealed class WindowsPublishPackageTests
         "docs/getting-started.md",
         "docs/features.md",
         "docs/custom-evaluator-guide.md",
+        "docs/prompt-launch.md",
         "docs/privacy-and-data-handling.md",
         "docs/troubleshooting.md",
         "images/README.md",

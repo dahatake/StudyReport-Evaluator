@@ -9,7 +9,7 @@ namespace StudyReportEvaluator.Core.Serialization;
 
 public sealed class CanonicalDefinitionSerializer
 {
-    public const string SchemaVersion = "3.0";
+    public const string SchemaVersion = "4.0";
 
     public string Serialize(QuantificationDefinition definition) =>
         Encoding.UTF8.GetString(SerializeToUtf8Bytes(definition));
@@ -39,6 +39,9 @@ public sealed class CanonicalDefinitionSerializer
         writer.WriteNumber("headerRow", definition.HeaderRow);
         writer.WriteNumber("firstDataRow", definition.FirstDataRow);
         writer.WriteNumber("lastDataRow", definition.LastDataRow);
+        WriteDecimal(writer, "basePoints", definition.BasePoints);
+        WriteDecimal(writer, "specialPoints", definition.SpecialPoints);
+        WriteDecimal(writer, "similarityPenaltyWeight", definition.SimilarityPenaltyWeight);
         writer.WriteNumber("roundingDigits", definition.RoundingDigits);
         writer.WriteStartArray("questions");
         foreach (QuestionDefinition question in DefinitionCollectionOperations.Normalize(definition.Questions))
@@ -64,7 +67,7 @@ public sealed class CanonicalDefinitionSerializer
         }
 
         writer.WriteEndArray();
-        WriteDecimal(writer, "weight", question.Weight);
+        WriteDecimal(writer, "points", question.Points);
         writer.WriteBoolean("enabled", question.Enabled);
         writer.WriteStartArray("evaluators");
         foreach (EvaluatorDefinition evaluator in DefinitionCollectionOperations.Normalize(question.Evaluators))
@@ -73,6 +76,33 @@ public sealed class CanonicalDefinitionSerializer
         }
 
         writer.WriteEndArray();
+        writer.WriteStartArray("specialEvaluations");
+        foreach (SpecialEvaluationDefinition special in DefinitionCollectionOperations.Normalize(question.SpecialEvaluations))
+        {
+            WriteSpecialEvaluation(writer, special);
+        }
+
+        writer.WriteEndArray();
+        writer.WriteEndObject();
+    }
+
+    private static void WriteSpecialEvaluation(
+        Utf8JsonWriter writer,
+        SpecialEvaluationDefinition special)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("id", special.Id);
+        writer.WriteString("displayName", special.DisplayName);
+        writer.WriteString("primarySourceColumn", special.PrimarySourceColumn);
+        writer.WriteStartArray("supportingSourceColumns");
+        foreach (string column in DefinitionCollectionOperations.Normalize(special.SupportingSourceColumns))
+        {
+            writer.WriteStringValue(column);
+        }
+
+        writer.WriteEndArray();
+        writer.WriteString("promptTemplate", special.PromptTemplate);
+        writer.WriteBoolean("enabled", special.Enabled);
         writer.WriteEndObject();
     }
 

@@ -407,7 +407,7 @@ public sealed class QuantificationOrchestratorTests
             QuestionText = "ORIGINAL QUESTION",
             PrimarySourceColumn = "A",
             SupportingSourceColumns = ["B"],
-            Weight = 2m,
+            Points = 2m,
             Evaluators = [originalEvaluator],
         };
         QuantificationDefinition draft = U01TestSupport.Definition(2, 2, originalQuestion);
@@ -468,10 +468,10 @@ public sealed class QuantificationOrchestratorTests
             QuestionText = "EDITED QUESTION",
             PrimarySourceColumn = "C",
             SupportingSourceColumns = ["A"],
-            Weight = 20m,
+            Points = 20m,
             Evaluators = [editedEvaluator],
         };
-        draft = draft with { Revision = "2", Questions = [editedQuestion] };
+        draft = draft with { Revision = "2", BasePoints = 80m, Questions = [editedQuestion] };
         releaseFirst.TrySetResult();
         RunSummary current = await currentRun;
 
@@ -486,7 +486,7 @@ public sealed class QuantificationOrchestratorTests
         Assert.Equal("C1", expectedCurrent.CriterionId);
         Assert.Equal(new ScoreRange(1m, 5m), expectedCurrent.Range);
         Assert.Equal(5m, Assert.Single(Assert.Single(current.Units).AcceptedResult!.Criteria).RawScore);
-        Assert.Equal(2m, current.Snapshot.Definition.Questions[0].Weight);
+        Assert.Equal(2m, current.Snapshot.Definition.Questions[0].Points);
         Assert.Equal(3m, current.Snapshot.Definition.Questions[0].Evaluators[0].Weight);
         Assert.Equal(4m, current.Snapshot.Definition.Questions[0].Evaluators[0].Criteria[0].Weight);
         RunOutputPreparation currentOutput = current.PrepareOutput(
@@ -515,7 +515,7 @@ public sealed class QuantificationOrchestratorTests
         ExpectedCriterion expectedNext = Assert.Single(nextPayload.ExpectedCriteria);
         Assert.Equal("C2", expectedNext.CriterionId);
         Assert.Equal(new ScoreRange(70m, 80m), expectedNext.Range);
-        Assert.Equal(20m, next.Snapshot.Definition.Questions[0].Weight);
+        Assert.Equal(20m, next.Snapshot.Definition.Questions[0].Points);
         Assert.Equal(30m, next.Snapshot.Definition.Questions[0].Evaluators[0].Weight);
         Assert.True(next.PrepareOutput([Override("C2", "80")]).IsExportReady);
     }

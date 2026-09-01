@@ -71,6 +71,21 @@ public sealed class WorkbookMetadataReaderTests
     }
 
     [Fact]
+    public void Reads_question_text_from_the_second_row_for_forms_exports()
+    {
+        using TemporaryWorkbook workbook = X01SyntheticWorkbookFactory.Create();
+
+        WorkbookMetadata metadata = reader.Read(workbook.Path, headerRowNumber: 2);
+
+        Assert.Equal(2U, metadata.HeaderRowNumber);
+        Assert.Collection(
+            metadata.Worksheets[0].HeaderCells,
+            cell => AssertHeader(cell, 1, "A", "1"),
+            cell => AssertHeader(cell, 3, "C", "2"));
+        Assert.Empty(metadata.Worksheets[1].HeaderCells);
+    }
+
+    [Fact]
     public void Accepts_a_cell_value_at_the_32767_character_boundary()
     {
         string boundaryValue = CreateDeterministicText(WorkbookMetadataReader.MaxCellCharacters);

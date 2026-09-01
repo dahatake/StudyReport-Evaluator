@@ -2,8 +2,10 @@ using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows.Input;
+using StudyReportEvaluator.App.Launch;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Prompting;
+using StudyReportEvaluator.Core.Scoring;
 using StudyReportEvaluator.Core.Validation;
 
 namespace StudyReportEvaluator.App.ViewModels;
@@ -56,6 +58,33 @@ public sealed record EvaluatorTypeChoice(
     string DisplayName,
     string ContractName);
 
+public enum ImportedPromptTarget
+{
+    CustomEvaluator,
+    SpecialEvaluation,
+}
+
+public sealed record ImportedPromptTargetChoice(
+    ImportedPromptTarget Target,
+    string DisplayName);
+
+public sealed class ImportedPromptViewModel
+{
+    internal ImportedPromptViewModel(ImportedPrompt source)
+    {
+        Source = source ?? throw new ArgumentNullException(nameof(source));
+    }
+
+    internal ImportedPrompt Source { get; }
+
+    public string DisplayName => Source.DisplayName;
+
+    public string Content => Source.Content;
+
+    public override string ToString() =>
+        $"{nameof(ImportedPromptViewModel)} {{ DisplayName = {DisplayName}, Content = <redacted> }}";
+}
+
 public sealed class QuestionDesignItemViewModel : UiObservableObject
 {
     private readonly QuantificationDesignViewModel owner;
@@ -66,7 +95,9 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
     private readonly ViewModelCommand deleteCommand;
     private readonly ViewModelCommand addKnowledgeEvaluatorCommand;
     private readonly ViewModelCommand addCustomEvaluatorCommand;
+    private readonly ViewModelCommand addSpecialEvaluationCommand;
     private EvaluatorDesignItemViewModel? selectedEvaluator;
+    private SpecialEvaluationDesignItemViewModel? selectedSpecialEvaluation;
 
     internal QuestionDesignItemViewModel(
         QuantificationDesignViewModel owner,
@@ -75,13 +106,16 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
         this.owner = owner;
         this.definition = definition;
         Evaluators = [];
+        SpecialEvaluations = [];
         duplicateCommand = new ViewModelCommand(_ => owner.DuplicateQuestion(Id));
         moveUpCommand = new ViewModelCommand(_ => owner.MoveQuestionUp(Id), _ => owner.CanMoveQuestionUp(Id));
         moveDownCommand = new ViewModelCommand(_ => owner.MoveQuestionDown(Id), _ => owner.CanMoveQuestionDown(Id));
         deleteCommand = new ViewModelCommand(_ => owner.DeleteQuestion(Id));
         addKnowledgeEvaluatorCommand = new ViewModelCommand(_ => owner.AddEvaluator(Id, EvaluatorType.KnowledgeCoverage));
         addCustomEvaluatorCommand = new ViewModelCommand(_ => owner.AddEvaluator(Id, EvaluatorType.CustomPrompt));
+        addSpecialEvaluationCommand = new ViewModelCommand(_ => owner.AddSpecialEvaluation(Id));
         SynchronizeEvaluators();
+        SynchronizeSpecialEvaluations();
     }
 
     public string Id => definition.Id;
@@ -106,8 +140,14 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
 
     public decimal Weight
     {
-        get => definition.Weight;
-        set => owner.UpdateQuestion(Id, question => question with { Weight = value });
+        get => definition.Points;
+        set => owner.UpdateQuestion(Id, question => question with { Points = value });
+    }
+
+    public decimal Points
+    {
+        get => Weight;
+        set => Weight = value;
     }
 
     public bool Enabled
@@ -122,10 +162,30 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
 
     public ObservableCollection<EvaluatorDesignItemViewModel> Evaluators { get; }
 
+    public ObservableCollection<SpecialEvaluationDesignItemViewModel> SpecialEvaluations { get; }
+
     public EvaluatorDesignItemViewModel? SelectedEvaluator
     {
         get => selectedEvaluator;
-        set => SetProperty(ref selectedEvaluator, value);
+        set
+        {
+            if (SetProperty(ref selectedEvaluator, value))
+            {
+                owner.NotifyPromptTargetChanged();
+            }
+        }
+    }
+
+    public SpecialEvaluationDesignItemViewModel? SelectedSpecialEvaluation
+    {
+        get => selectedSpecialEvaluation;
+        set
+        {
+            if (SetProperty(ref selectedSpecialEvaluation, value))
+            {
+                owner.NotifyPromptTargetChanged();
+            }
+        }
     }
 
     public bool HasErrors => owner.HasErrorsFor(Id);
@@ -150,10 +210,13 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
 
     public ICommand AddCustomEvaluatorCommand => addCustomEvaluatorCommand;
 
+    public ICommand AddSpecialEvaluationCommand => addSpecialEvaluationCommand;
+
     internal void Synchronize(QuestionDefinition updated)
     {
         definition = updated;
         SynchronizeEvaluators();
+        SynchronizeSpecialEvaluations();
         RefreshAll();
     }
 
@@ -166,6 +229,7 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
             nameof(PrimarySourceColumn),
             nameof(SupportingColumnsText),
             nameof(Weight),
+            nameof(Points),
             nameof(Enabled),
             nameof(EffectiveWeightPercentage),
             nameof(EffectiveWeightText),
@@ -179,6 +243,11 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
         foreach (EvaluatorDesignItemViewModel evaluator in Evaluators)
         {
             evaluator.RefreshAll();
+        }
+
+        foreach (SpecialEvaluationDesignItemViewModel special in SpecialEvaluations)
+        {
+            special.RefreshAll();
         }
     }
 
@@ -211,6 +280,35 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
                 StringComparison.Ordinal)) ?? Evaluators.FirstOrDefault();
     }
 
+    private void SynchronizeSpecialEvaluations()
+    {
+        string? selectedId = selectedSpecialEvaluation?.Id;
+        Dictionary<string, SpecialEvaluationDesignItemViewModel> existing = SpecialEvaluations
+            .ToDictionary(item => item.Id, StringComparer.Ordinal);
+        List<SpecialEvaluationDesignItemViewModel> ordered = [];
+        foreach (SpecialEvaluationDefinition special in definition.SpecialEvaluations)
+        {
+            if (!existing.Remove(special.Id, out SpecialEvaluationDesignItemViewModel? item))
+            {
+                item = new SpecialEvaluationDesignItemViewModel(owner, Id, special);
+            }
+            else
+            {
+                item.Synchronize(special);
+            }
+
+            ordered.Add(item);
+        }
+
+        SynchronizeCollection(SpecialEvaluations, ordered);
+        SelectedSpecialEvaluation = selectedId is null
+            ? SpecialEvaluations.FirstOrDefault()
+            : SpecialEvaluations.FirstOrDefault(item => string.Equals(
+                item.Id,
+                selectedId,
+                StringComparison.Ordinal)) ?? SpecialEvaluations.FirstOrDefault();
+    }
+
     internal static void SynchronizeCollection<T>(
         ObservableCollection<T> target,
         IReadOnlyList<T> ordered)
@@ -241,6 +339,217 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
 
     public override string ToString() =>
         $"{nameof(QuestionDesignItemViewModel)} {{ Id = {Id}, Content = <redacted> }}";
+}
+
+public sealed class SpecialSupportingColumnSelectionViewModel : UiObservableObject
+{
+    private readonly SpecialEvaluationDesignItemViewModel owner;
+    private bool isSelected;
+
+    internal SpecialSupportingColumnSelectionViewModel(
+        SpecialEvaluationDesignItemViewModel owner,
+        string columnName,
+        bool selected)
+    {
+        this.owner = owner;
+        ColumnName = columnName;
+        isSelected = selected;
+    }
+
+    public string ColumnName { get; }
+
+    public bool CanSelect => !string.Equals(
+        owner.PrimarySourceColumn,
+        ColumnName,
+        StringComparison.OrdinalIgnoreCase);
+
+    public bool IsSelected
+    {
+        get => isSelected;
+        set
+        {
+            if (value && !CanSelect)
+            {
+                return;
+            }
+
+            owner.SetSupportingColumn(ColumnName, value);
+        }
+    }
+
+    internal void Synchronize(bool selected)
+    {
+        SetProperty(ref isSelected, selected, nameof(IsSelected));
+        OnPropertyChanged(nameof(CanSelect));
+    }
+}
+
+public sealed class SpecialEvaluationDesignItemViewModel : UiObservableObject
+{
+    private readonly QuantificationDesignViewModel owner;
+    private readonly string questionId;
+    private SpecialEvaluationDefinition definition;
+    private readonly ViewModelCommand duplicateCommand;
+    private readonly ViewModelCommand moveUpCommand;
+    private readonly ViewModelCommand moveDownCommand;
+    private readonly ViewModelCommand deleteCommand;
+
+    internal SpecialEvaluationDesignItemViewModel(
+        QuantificationDesignViewModel owner,
+        string questionId,
+        SpecialEvaluationDefinition definition)
+    {
+        this.owner = owner;
+        this.questionId = questionId;
+        this.definition = definition;
+        SupportingColumns = [];
+        duplicateCommand = new ViewModelCommand(_ => owner.DuplicateSpecialEvaluation(questionId, Id));
+        moveUpCommand = new ViewModelCommand(
+            _ => owner.MoveSpecialEvaluationUp(questionId, Id),
+            _ => owner.CanMoveSpecialEvaluationUp(questionId, Id));
+        moveDownCommand = new ViewModelCommand(
+            _ => owner.MoveSpecialEvaluationDown(questionId, Id),
+            _ => owner.CanMoveSpecialEvaluationDown(questionId, Id));
+        deleteCommand = new ViewModelCommand(_ => owner.DeleteSpecialEvaluation(questionId, Id));
+        SynchronizeSupportingColumns();
+    }
+
+    public string Id => definition.Id;
+
+    public string DisplayName
+    {
+        get => definition.DisplayName;
+        set => owner.UpdateSpecialEvaluation(questionId, Id, special => special with
+        {
+            DisplayName = value ?? string.Empty,
+        });
+    }
+
+    public string PrimarySourceColumn
+    {
+        get => definition.PrimarySourceColumn;
+        set
+        {
+            string next = value ?? string.Empty;
+            owner.UpdateSpecialEvaluation(questionId, Id, special => special with
+            {
+                PrimarySourceColumn = next,
+                SupportingSourceColumns = special.SupportingSourceColumns
+                    .Where(column => !string.Equals(column, next, StringComparison.OrdinalIgnoreCase))
+                    .ToImmutableArray(),
+            });
+        }
+    }
+
+    public IReadOnlyList<string> AvailableColumnNames => owner.AvailableColumnNames;
+
+    public ObservableCollection<SpecialSupportingColumnSelectionViewModel> SupportingColumns { get; }
+
+    public string PromptTemplate
+    {
+        get => definition.PromptTemplate;
+        set => owner.UpdateSpecialEvaluation(questionId, Id, special => special with
+        {
+            PromptTemplate = value ?? string.Empty,
+        });
+    }
+
+    public bool Enabled
+    {
+        get => definition.Enabled;
+        set => owner.UpdateSpecialEvaluation(questionId, Id, special => special with { Enabled = value });
+    }
+
+    public bool HasErrors => owner.HasErrorsFor(Id);
+
+    public string ValidationText => owner.ValidationTextFor(Id);
+
+    public string CardAutomationId => $"DesignSpecial-{Id}";
+
+    public string PromptAutomationId => $"DesignSpecial-{Id}-Prompt";
+
+    public ICommand DuplicateCommand => duplicateCommand;
+
+    public ICommand MoveUpCommand => moveUpCommand;
+
+    public ICommand MoveDownCommand => moveDownCommand;
+
+    public ICommand DeleteCommand => deleteCommand;
+
+    internal void SetSupportingColumn(string columnName, bool selected)
+    {
+        ImmutableArray<string> current = definition.SupportingSourceColumns.IsDefault
+            ? []
+            : definition.SupportingSourceColumns;
+        int existing = -1;
+        for (int index = 0; index < current.Length; index++)
+        {
+            if (string.Equals(current[index], columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                existing = index;
+                break;
+            }
+        }
+        ImmutableArray<string> next = selected
+            ? existing >= 0 ? current : current.Add(columnName)
+            : existing >= 0 ? current.RemoveAt(existing) : current;
+        owner.UpdateSpecialEvaluation(questionId, Id, special => special with
+        {
+            SupportingSourceColumns = next,
+        });
+    }
+
+    internal void Synchronize(SpecialEvaluationDefinition updated)
+    {
+        definition = updated;
+        SynchronizeSupportingColumns();
+        RefreshAll();
+    }
+
+    internal void RefreshAll()
+    {
+        OnPropertiesChanged(
+            nameof(Id),
+            nameof(DisplayName),
+            nameof(PrimarySourceColumn),
+            nameof(AvailableColumnNames),
+            nameof(PromptTemplate),
+            nameof(Enabled),
+            nameof(HasErrors),
+            nameof(ValidationText),
+            nameof(CardAutomationId),
+            nameof(PromptAutomationId));
+        moveUpCommand.RaiseCanExecuteChanged();
+        moveDownCommand.RaiseCanExecuteChanged();
+        SynchronizeSupportingColumns();
+    }
+
+    public override string ToString() =>
+        $"{nameof(SpecialEvaluationDesignItemViewModel)} {{ Id = {Id}, Content = <redacted> }}";
+
+    private void SynchronizeSupportingColumns()
+    {
+        Dictionary<string, SpecialSupportingColumnSelectionViewModel> existing = SupportingColumns
+            .ToDictionary(item => item.ColumnName, StringComparer.OrdinalIgnoreCase);
+        HashSet<string> selected = definition.SupportingSourceColumns
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        List<SpecialSupportingColumnSelectionViewModel> ordered = [];
+        foreach (string column in owner.AvailableColumnNames)
+        {
+            if (!existing.Remove(column, out SpecialSupportingColumnSelectionViewModel? item))
+            {
+                item = new SpecialSupportingColumnSelectionViewModel(this, column, selected.Contains(column));
+            }
+            else
+            {
+                item.Synchronize(selected.Contains(column));
+            }
+
+            ordered.Add(item);
+        }
+
+        QuestionDesignItemViewModel.SynchronizeCollection(SupportingColumns, ordered);
+    }
 }
 
 public sealed class EvaluatorDesignItemViewModel : UiObservableObject
@@ -652,6 +961,11 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         new EvaluatorTypeChoice(EvaluatorType.KnowledgeCoverage, "Knowledge", "KNOWLEDGE_COVERAGE"),
         new EvaluatorTypeChoice(EvaluatorType.CustomPrompt, "Custom", "CUSTOM_PROMPT"),
     ]);
+    private static readonly IReadOnlyList<ImportedPromptTargetChoice> ClosedPromptTargets = Array.AsReadOnly(
+    [
+        new ImportedPromptTargetChoice(ImportedPromptTarget.CustomEvaluator, "選択中のCustom evaluator"),
+        new ImportedPromptTargetChoice(ImportedPromptTarget.SpecialEvaluation, "選択中の固有評価"),
+    ]);
 
     private static readonly PromptRenderContext PreviewContext = new(
         "【設問 preview】",
@@ -662,41 +976,150 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         "10");
 
     private readonly QuantificationDefinitionValidator definitionValidator = new();
+    private readonly ScoringAllocationCalculator allocationCalculator = new();
     private readonly PromptTemplateRenderer promptRenderer = new();
+    private readonly IReadOnlyList<string> availableColumnNames;
+    private readonly ImmutableArray<ImportedPrompt> importedPromptSources;
     private readonly ObservableCollection<QuestionDesignItemViewModel> questionItems = [];
+    private readonly ObservableCollection<ImportedPromptViewModel> importedPromptItems = [];
     private readonly ObservableCollection<DesignValidationError> validationErrorItems = [];
     private readonly ViewModelCommand addQuestionCommand;
+    private readonly ViewModelCommand equalizeQuestionPointsCommand;
+    private readonly ViewModelCommand applyImportedPromptCommand;
     private readonly ViewModelCommand validateCommand;
     private QuantificationDefinition draft;
     private QuestionDesignItemViewModel? selectedQuestion;
+    private ImportedPromptViewModel? selectedImportedPrompt;
+    private ImportedPromptTarget selectedPromptTarget = ImportedPromptTarget.CustomEvaluator;
 
     public QuantificationDesignViewModel()
-        : this(null)
+        : this(null, null, null)
     {
     }
 
     public QuantificationDesignViewModel(QuantificationDefinition? initialDefinition)
+        : this(initialDefinition, null, null)
     {
+    }
+
+    public QuantificationDesignViewModel(
+        QuantificationDefinition? initialDefinition,
+        IEnumerable<string>? availableColumnNames,
+        IEnumerable<ImportedPrompt>? importedPrompts = null)
+    {
+        QuantificationDefinition seed = initialDefinition ?? CreateSafeDefault();
+        this.availableColumnNames = NormalizeAvailableColumns(seed, availableColumnNames);
+        importedPromptSources = (importedPrompts ?? []).ToImmutableArray();
+        if (importedPromptSources.Any(prompt => prompt is null))
+        {
+            throw new ArgumentException("Imported prompts cannot contain null values.", nameof(importedPrompts));
+        }
+
         Questions = new ReadOnlyObservableCollection<QuestionDesignItemViewModel>(questionItems);
+        ImportedPrompts = new ReadOnlyObservableCollection<ImportedPromptViewModel>(importedPromptItems);
         ValidationErrors = new ReadOnlyObservableCollection<DesignValidationError>(validationErrorItems);
-        draft = CloneDefinition(initialDefinition ?? CreateSafeDefault());
+        draft = CloneDefinition(seed);
         addQuestionCommand = new ViewModelCommand(_ => AddQuestion());
+        equalizeQuestionPointsCommand = new ViewModelCommand(
+            _ => EqualizeQuestionPoints(),
+            _ => draft.Questions.Any(question => question.Enabled)
+                && draft.BasePoints + draft.SpecialPoints <= 100m);
+        applyImportedPromptCommand = new ViewModelCommand(
+            _ => ApplyImportedPrompt(),
+            _ => CanApplyImportedPrompt);
         validateCommand = new ViewModelCommand(_ => Revalidate());
+        foreach (ImportedPrompt prompt in importedPromptSources)
+        {
+            importedPromptItems.Add(new ImportedPromptViewModel(prompt));
+        }
+
+        selectedImportedPrompt = importedPromptItems.FirstOrDefault();
         SynchronizeQuestions();
         Revalidate();
     }
 
     public static IReadOnlyList<EvaluatorTypeChoice> EvaluatorTypes => ClosedEvaluatorTypes;
 
+    public static IReadOnlyList<ImportedPromptTargetChoice> PromptTargets => ClosedPromptTargets;
+
+    public IReadOnlyList<ImportedPromptTargetChoice> AvailablePromptTargets => ClosedPromptTargets;
+
     public ReadOnlyObservableCollection<QuestionDesignItemViewModel> Questions { get; }
 
     public QuestionDesignItemViewModel? SelectedQuestion
     {
         get => selectedQuestion;
-        set => SetProperty(ref selectedQuestion, value);
+        set
+        {
+            if (SetProperty(ref selectedQuestion, value))
+            {
+                NotifyPromptTargetChanged();
+            }
+        }
     }
 
+    public ReadOnlyObservableCollection<ImportedPromptViewModel> ImportedPrompts { get; }
+
+    public IReadOnlyList<ImportedPrompt> ImportedPromptSources => importedPromptSources;
+
+    public ImportedPromptViewModel? SelectedImportedPrompt
+    {
+        get => selectedImportedPrompt;
+        set
+        {
+            if (SetProperty(ref selectedImportedPrompt, value))
+            {
+                OnPropertiesChanged(nameof(ImportedPromptPreview), nameof(CanApplyImportedPrompt));
+                applyImportedPromptCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public ImportedPromptTarget SelectedPromptTarget
+    {
+        get => selectedPromptTarget;
+        set
+        {
+            if (!Enum.IsDefined(value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value));
+            }
+
+            if (SetProperty(ref selectedPromptTarget, value))
+            {
+                OnPropertiesChanged(nameof(SelectedPromptTargetChoice), nameof(CanApplyImportedPrompt));
+                applyImportedPromptCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public ImportedPromptTargetChoice SelectedPromptTargetChoice
+    {
+        get => ClosedPromptTargets.Single(choice => choice.Target == SelectedPromptTarget);
+        set
+        {
+            if (value is not null)
+            {
+                SelectedPromptTarget = value.Target;
+            }
+        }
+    }
+
+    public string ImportedPromptPreview => SelectedImportedPrompt?.Content
+        ?? "command lineで --prompt を指定するとここに表示されます。";
+
+    public bool CanApplyImportedPrompt => SelectedImportedPrompt is not null
+        && SelectedQuestion is not null
+        && (SelectedPromptTarget switch
+        {
+            ImportedPromptTarget.CustomEvaluator => SelectedQuestion.SelectedEvaluator?.IsCustom == true,
+            ImportedPromptTarget.SpecialEvaluation => SelectedQuestion.SelectedSpecialEvaluation is not null,
+            _ => false,
+        });
+
     public ReadOnlyObservableCollection<DesignValidationError> ValidationErrors { get; }
+
+    public IReadOnlyList<string> AvailableColumnNames => availableColumnNames;
 
     public QuantificationDefinition Draft => draft;
 
@@ -720,6 +1143,40 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         set => Commit(draft with { RoundingDigits = value });
     }
 
+    public decimal BasePoints
+    {
+        get => draft.BasePoints;
+        set => Commit(draft with { BasePoints = value });
+    }
+
+    public decimal SpecialPoints
+    {
+        get => draft.SpecialPoints;
+        set => Commit(draft with { SpecialPoints = value });
+    }
+
+    public decimal SimilarityPenaltyWeight
+    {
+        get => draft.SimilarityPenaltyWeight;
+        set => Commit(draft with { SimilarityPenaltyWeight = value });
+    }
+
+    public decimal? AllocationTotal => allocationCalculator.Validate(
+        draft.BasePoints,
+        draft.SpecialPoints,
+        draft.Questions.Where(question => question.Enabled).Select(question => question.Points)).Total;
+
+    public decimal? AllocationRemaining => AllocationTotal is decimal total ? 100m - total : null;
+
+    public bool IsAllocationValid => allocationCalculator.Validate(
+        draft.BasePoints,
+        draft.SpecialPoints,
+        draft.Questions.Where(question => question.Enabled).Select(question => question.Points)).IsValid;
+
+    public string AllocationSummary => AllocationTotal is decimal total
+        ? $"配点合計 {total.ToString("G29", CultureInfo.InvariantCulture)} / 100 · 残り {(100m - total).ToString("G29", CultureInfo.InvariantCulture)}"
+        : "配点合計を計算できません。";
+
     public bool IsValid => validationErrorItems.Count == 0;
 
     public bool CanBuildSnapshot => IsValid;
@@ -734,7 +1191,54 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
 
     public ICommand AddQuestionCommand => addQuestionCommand;
 
+    public ICommand EqualizeQuestionPointsCommand => equalizeQuestionPointsCommand;
+
+    public ICommand ApplyImportedPromptCommand => applyImportedPromptCommand;
+
     public ICommand ValidateCommand => validateCommand;
+
+    public void ApplyImportedPrompt()
+    {
+        if (!CanApplyImportedPrompt
+            || SelectedImportedPrompt is null
+            || SelectedQuestion is null)
+        {
+            return;
+        }
+
+        string template = SelectedImportedPrompt.Content;
+        switch (SelectedPromptTarget)
+        {
+            case ImportedPromptTarget.CustomEvaluator:
+                EvaluatorDesignItemViewModel evaluator = SelectedQuestion.SelectedEvaluator!;
+                evaluator.CustomPromptTemplate = template;
+                break;
+            case ImportedPromptTarget.SpecialEvaluation:
+                SpecialEvaluationDesignItemViewModel special = SelectedQuestion.SelectedSpecialEvaluation!;
+                special.PromptTemplate = template;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(SelectedPromptTarget));
+        }
+
+        NotifyPromptTargetChanged();
+    }
+
+    public void EqualizeQuestionPoints()
+    {
+        QuestionDefinition[] enabled = draft.Questions.Where(question => question.Enabled).ToArray();
+        ImmutableArray<decimal> points = allocationCalculator.Equalize(
+            draft.BasePoints,
+            draft.SpecialPoints,
+            enabled.Length);
+        int pointIndex = 0;
+        ImmutableArray<QuestionDefinition> questions = draft.Questions
+            .Select(question => question.Enabled
+                ? question with { Points = points[pointIndex++] }
+                : question)
+            .ToImmutableArray();
+        Commit(draft with { Questions = questions });
+    }
 
     public QuestionDesignItemViewModel AddQuestion()
     {
@@ -755,7 +1259,8 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             index,
             NewId("question"),
             _ => NewId("evaluator"),
-            _ => NewId("criterion"));
+            _ => NewId("criterion"),
+            _ => NewId("special"));
         string duplicateId = next.Questions[index + 1].Id;
         Commit(next);
         return questionItems.Single(item => string.Equals(item.Id, duplicateId, StringComparison.Ordinal));
@@ -851,6 +1356,91 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
     {
         int evaluatorIndex = FindEvaluatorIndex(questionId, evaluatorId);
         UpdateQuestion(questionId, question => question.RemoveEvaluator(evaluatorIndex));
+    }
+
+    public SpecialEvaluationDesignItemViewModel AddSpecialEvaluation(string questionId)
+    {
+        QuestionDefinition question = GetQuestion(questionId);
+        string specialId = NewId("special");
+        string primaryColumn = availableColumnNames.FirstOrDefault()
+            ?? question.PrimarySourceColumn;
+        SpecialEvaluationDefinition special = new()
+        {
+            Id = specialId,
+            DisplayName = $"固有評価 {question.SpecialEvaluations.Length + 1}",
+            PrimarySourceColumn = primaryColumn,
+            SupportingSourceColumns = [],
+            PromptTemplate = "次の内容を固有観点で評価してください。\n{回答}",
+            Enabled = true,
+        };
+        UpdateQuestion(questionId, item => item.AddSpecialEvaluation(special));
+        return FindQuestionItem(questionId).SpecialEvaluations.Single(item => item.Id == specialId);
+    }
+
+    public SpecialEvaluationDesignItemViewModel DuplicateSpecialEvaluation(
+        string questionId,
+        string specialEvaluationId)
+    {
+        int index = FindSpecialEvaluationIndex(questionId, specialEvaluationId);
+        string duplicateId = NewId("special");
+        UpdateQuestion(questionId, question => question.DuplicateSpecialEvaluation(index, duplicateId));
+        return FindQuestionItem(questionId).SpecialEvaluations.Single(item => item.Id == duplicateId);
+    }
+
+    public bool CanMoveSpecialEvaluationUp(string questionId, string specialEvaluationId) =>
+        FindSpecialEvaluationIndex(questionId, specialEvaluationId, throwIfMissing: false) > 0;
+
+    public bool CanMoveSpecialEvaluationDown(string questionId, string specialEvaluationId)
+    {
+        QuestionDefinition? question = TryGetQuestion(questionId);
+        int index = FindSpecialEvaluationIndex(questionId, specialEvaluationId, throwIfMissing: false);
+        return question is not null && index >= 0 && index < question.SpecialEvaluations.Length - 1;
+    }
+
+    public void MoveSpecialEvaluationUp(string questionId, string specialEvaluationId)
+    {
+        int index = FindSpecialEvaluationIndex(questionId, specialEvaluationId);
+        if (index > 0)
+        {
+            UpdateQuestion(questionId, question => question.MoveSpecialEvaluation(index, index - 1));
+        }
+    }
+
+    public void MoveSpecialEvaluationDown(string questionId, string specialEvaluationId)
+    {
+        QuestionDefinition question = GetQuestion(questionId);
+        int index = FindSpecialEvaluationIndex(questionId, specialEvaluationId);
+        if (index < question.SpecialEvaluations.Length - 1)
+        {
+            UpdateQuestion(questionId, item => item.MoveSpecialEvaluation(index, index + 1));
+        }
+    }
+
+    public void DeleteSpecialEvaluation(string questionId, string specialEvaluationId)
+    {
+        int index = FindSpecialEvaluationIndex(questionId, specialEvaluationId);
+        UpdateQuestion(questionId, question => question.RemoveSpecialEvaluation(index));
+    }
+
+    internal void UpdateSpecialEvaluation(
+        string questionId,
+        string specialEvaluationId,
+        Func<SpecialEvaluationDefinition, SpecialEvaluationDefinition> update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        int index = FindSpecialEvaluationIndex(questionId, specialEvaluationId);
+        QuestionDefinition question = GetQuestion(questionId);
+        SpecialEvaluationDefinition current = question.SpecialEvaluations[index];
+        SpecialEvaluationDefinition updated = update(current);
+        if (updated == current)
+        {
+            return;
+        }
+
+        UpdateQuestion(questionId, item => item with
+        {
+            SpecialEvaluations = item.SpecialEvaluations.SetItem(index, updated),
+        });
     }
 
     public CriterionDesignItemViewModel AddCriterion(string questionId, string evaluatorId)
@@ -972,6 +1562,7 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             },
             _ => throw new ArgumentOutOfRangeException(nameof(type)),
         });
+        NotifyPromptTargetChanged();
     }
 
     public bool TryBuildSnapshot(out QuantificationSnapshot? snapshot)
@@ -1011,6 +1602,12 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         }
 
         Commit(draft with { Questions = draft.Questions.SetItem(questionIndex, updated) });
+    }
+
+    internal void NotifyPromptTargetChanged()
+    {
+        OnPropertyChanged(nameof(CanApplyImportedPrompt));
+        applyImportedPromptCommand.RaiseCanExecuteChanged();
     }
 
     internal void UpdateEvaluator(
@@ -1062,7 +1659,7 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         Percentage(
             draft.Questions,
             question => question.Id,
-            question => question.Weight,
+            question => question.Points,
             question => question.Enabled,
             questionId);
 
@@ -1147,7 +1744,15 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             nameof(Revision),
             nameof(SourceSummary),
             nameof(RoundingDigits),
+            nameof(BasePoints),
+            nameof(SpecialPoints),
+            nameof(SimilarityPenaltyWeight),
+            nameof(AllocationTotal),
+            nameof(AllocationRemaining),
+            nameof(IsAllocationValid),
+            nameof(AllocationSummary),
             nameof(HierarchySummary));
+        equalizeQuestionPointsCommand.RaiseCanExecuteChanged();
     }
 
     private void SynchronizeQuestions()
@@ -1374,8 +1979,48 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         return index;
     }
 
+    private int FindSpecialEvaluationIndex(
+        string questionId,
+        string specialEvaluationId,
+        bool throwIfMissing = true)
+    {
+        QuestionDefinition? question = TryGetQuestion(questionId);
+        int index = -1;
+        if (question is not null)
+        {
+            for (int candidateIndex = 0;
+                 candidateIndex < question.SpecialEvaluations.Length;
+                 candidateIndex++)
+            {
+                if (string.Equals(
+                    question.SpecialEvaluations[candidateIndex].Id,
+                    specialEvaluationId,
+                    StringComparison.Ordinal))
+                {
+                    index = candidateIndex;
+                    break;
+                }
+            }
+        }
+
+        if (index < 0 && throwIfMissing)
+        {
+            throw new ArgumentException(
+                "The special-evaluation identity does not exist in the design draft.",
+                nameof(specialEvaluationId));
+        }
+
+        return index;
+    }
+
     private QuestionDefinition GetQuestion(string questionId) =>
         draft.Questions[FindQuestionIndex(questionId)];
+
+    private QuestionDefinition? TryGetQuestion(string questionId)
+    {
+        int index = FindQuestionIndex(questionId, throwIfMissing: false);
+        return index < 0 ? null : draft.Questions[index];
+    }
 
     private EvaluatorDefinition GetEvaluator(string questionId, string evaluatorId) =>
         GetQuestion(questionId).Evaluators[FindEvaluatorIndex(questionId, evaluatorId)];
@@ -1471,8 +2116,11 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             HeaderRow = 1,
             FirstDataRow = 2,
             LastDataRow = 2,
+            BasePoints = 60m,
+            SpecialPoints = 0m,
+            SimilarityPenaltyWeight = 0.1m,
             RoundingDigits = 1,
-            Questions = [CreateDefaultQuestion(questionId, 1, "A")],
+            Questions = [CreateDefaultQuestion(questionId, 1, "A") with { Points = 40m }],
         };
     }
 
@@ -1486,7 +2134,7 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             QuestionText = "評価する設問を入力してください。",
             PrimarySourceColumn = primaryColumn,
             SupportingSourceColumns = [],
-            Weight = 1m,
+            Points = 0m,
             Evaluators = [CreateDefaultEvaluator(NewId("evaluator"), EvaluatorType.KnowledgeCoverage, 1)],
             Enabled = true,
         };
@@ -1542,8 +2190,32 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
                             ? []
                             : [.. evaluator.Criteria.Select(criterion => criterion with { })],
                     })],
+                SpecialEvaluations = question.SpecialEvaluations.IsDefault
+                    ? []
+                    : [.. question.SpecialEvaluations.Select(special => special with
+                    {
+                        SupportingSourceColumns = special.SupportingSourceColumns.IsDefault
+                            ? []
+                            : [.. special.SupportingSourceColumns],
+                    })],
             })];
         return definition with { Questions = questions };
+    }
+
+    private static IReadOnlyList<string> NormalizeAvailableColumns(
+        QuantificationDefinition definition,
+        IEnumerable<string>? provided)
+    {
+        IEnumerable<string> source = provided ?? definition.Questions
+            .SelectMany(question => question.SupportingSourceColumns
+                .Prepend(question.PrimarySourceColumn)
+                .Concat(question.SpecialEvaluations.SelectMany(special =>
+                    special.SupportingSourceColumns.Prepend(special.PrimarySourceColumn))));
+        string[] columns = source
+            .Where(column => !string.IsNullOrWhiteSpace(column))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return Array.AsReadOnly(columns.Length == 0 ? ["A"] : columns);
     }
 
     internal static string FormatPercentage(decimal value) =>
@@ -1571,6 +2243,12 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         "WEIGHT_MUST_BE_POSITIVE" => "重みは有限かつ 0 より大きい値にしてください。",
         "SCORE_RANGE_INVALID" => "最小点は最大点より小さくしてください。",
         "ROUNDING_OUT_OF_RANGE" => "丸め桁数は 0～6 にしてください。",
+        "BASE_POINTS_OUT_OF_RANGE" => "Base points は 0～100 にしてください。",
+        "SPECIAL_POINTS_OUT_OF_RANGE" => "Special points は 0～100 にしてください。",
+        "SIMILARITY_WEIGHT_OUT_OF_RANGE" => "類似度減点係数は 0～1 にしてください。",
+        "QUESTION_POINTS_OUT_OF_RANGE" => "質問配点は 0 以上にしてください。",
+        "ALLOCATION_TOTAL_INVALID" => "Base、Special、有効質問の配点合計を正確に100にしてください。",
+        "SPECIAL_ITEMS_REQUIRED" => "Special points が正の場合は1件以上の有効な固有評価が必要です。",
         "INVALID_EVALUATOR_TYPE" => "評価方法は Knowledge または Custom にしてください。",
         "PRIMARY_COLUMN_REUSED" => "主回答列と補助列は同一質問内で重複できません。",
         "DUPLICATE_SUPPORTING_COLUMN" => "補助列は同一質問内で重複できません。",

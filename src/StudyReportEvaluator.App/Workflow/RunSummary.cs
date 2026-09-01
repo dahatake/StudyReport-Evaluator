@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using StudyReportEvaluator.App.Copilot;
+using StudyReportEvaluator.App.Workbooks.Checkpoint;
 using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.App.Workbooks.Mapping;
 using StudyReportEvaluator.App.Workbooks.Writing;
@@ -13,6 +14,8 @@ public static class QuantificationRunStatusCodes
     public const string Success = "SUCCESS";
     public const string Cancelled = "CANCELLED";
     public const string InputChanged = "INPUT_CHANGED";
+    public const string CheckpointFailed = "CHECKPOINT_SAVE_FAILED";
+    public const string OutputInvalid = "OUTPUT_INVALID";
 }
 
 public sealed record RunCriterionOverride
@@ -116,13 +119,23 @@ public sealed class RunSummary
         InputSnapshot inputSnapshot,
         string statusCode,
         DateTimeOffset startedAtUtc,
-        DateTimeOffset endedAtUtc)
+        DateTimeOffset endedAtUtc,
+        bool isDurable = false,
+        ImmutableArray<CheckpointReference> references = default,
+        ImmutableArray<CheckpointCompletedRow> completedRows = default,
+        string? finalPath = null,
+        string? partialPath = null,
+        bool wasResumed = false,
+        string? finalizationCode = null,
+        bool partialCleanupFailed = false)
     {
         ArgumentNullException.ThrowIfNull(schedule);
         ArgumentNullException.ThrowIfNull(inputSnapshot);
         if (statusCode is not QuantificationRunStatusCodes.Success
             and not QuantificationRunStatusCodes.Cancelled
-            and not QuantificationRunStatusCodes.InputChanged)
+            and not QuantificationRunStatusCodes.InputChanged
+            and not QuantificationRunStatusCodes.CheckpointFailed
+            and not QuantificationRunStatusCodes.OutputInvalid)
         {
             throw new ArgumentException("The run status is invalid.", nameof(statusCode));
         }
@@ -139,6 +152,14 @@ public sealed class RunSummary
         StatusCode = statusCode;
         StartedAtUtc = startedAtUtc;
         EndedAtUtc = endedAtUtc;
+        IsDurable = isDurable;
+        References = references.IsDefault ? [] : references;
+        CompletedRows = completedRows.IsDefault ? [] : completedRows;
+        FinalPath = finalPath;
+        PartialPath = partialPath;
+        WasResumed = wasResumed;
+        FinalizationCode = finalizationCode;
+        PartialCleanupFailed = partialCleanupFailed;
     }
 
     public EvaluationScheduleResult Schedule { get; }
@@ -160,6 +181,22 @@ public sealed class RunSummary
     public DateTimeOffset StartedAtUtc { get; }
 
     public DateTimeOffset EndedAtUtc { get; }
+
+    public bool IsDurable { get; }
+
+    public ImmutableArray<CheckpointReference> References { get; }
+
+    public ImmutableArray<CheckpointCompletedRow> CompletedRows { get; }
+
+    public string? FinalPath { get; }
+
+    public string? PartialPath { get; }
+
+    public bool WasResumed { get; }
+
+    public string? FinalizationCode { get; }
+
+    public bool PartialCleanupFailed { get; }
 
     public int PlannedEvaluationCount => Units.Length;
 
@@ -187,12 +224,49 @@ public sealed class RunSummary
         EvaluationTokenUsage.Unavailable,
         (total, unit) => total.Add(unit.TokenUsage));
 
-    public bool IsPartial => CancelledCount > 0;
+    public bool IsPartial => CancelledCount > 0
+        || string.Equals(StatusCode, QuantificationRunStatusCodes.Cancelled, StringComparison.Ordinal);
+
+    public int PlannedOperationCount => !IsDurable
+        ? PlannedEvaluationCount
+        : checked(
+            Snapshot.Definition.Questions.Count(question => question.Enabled)
+            + Plan.Mapping.SelectedRowCount * (
+                Plan.Items.Count(item => item.SourceRowNumber == Plan.Mapping.FirstDataRow)
+                + Snapshot.Definition.Questions.Where(question => question.Enabled)
+                    .Sum(question => question.SpecialEvaluations.Count(special => special.Enabled))
+                + Snapshot.Definition.Questions.Count(question => question.Enabled)));
+
+    public int CompletedOperationCount => !IsDurable
+        ? CompletedEvaluationCount
+        : References.Length + CompletedRows.Sum(CompletedRowOperationCount);
+
+    public int OperationFailureCount => !IsDurable
+        ? FailureCount
+        : EnumerateDurableStatuses().Count(status => status is not ResultsStatusCodes.Success
+            and not ResultsStatusCodes.Empty
+            and not ResultsStatusCodes.NotRunZeroBudget);
+
+    public int OperationCancelledCount => !IsDurable
+        ? CancelledCount
+        : Math.Max(0, PlannedOperationCount - CompletedOperationCount);
+
+    public int OperationUsageObservedCount => !IsDurable
+        ? UsageObservedUnitCount
+        : EnumerateDurableUsage().Count(usage => usage.IsAvailable);
+
+    public EvaluationTokenUsage OperationTokenUsage => !IsDurable
+        ? TokenUsage
+        : EnumerateDurableUsage().Aggregate(
+            EvaluationTokenUsage.Unavailable,
+            (total, usage) => total.Add(DurableOperationConversions.ToEvaluationUsage(usage)));
 
     public bool IsExportReady => !string.Equals(
         StatusCode,
         QuantificationRunStatusCodes.InputChanged,
-        StringComparison.Ordinal);
+        StringComparison.Ordinal)
+        && !string.Equals(StatusCode, QuantificationRunStatusCodes.CheckpointFailed, StringComparison.Ordinal)
+        && !string.Equals(StatusCode, QuantificationRunStatusCodes.OutputInvalid, StringComparison.Ordinal);
 
     public RunOverrideValidationResult ValidateOverrides(
         IEnumerable<RunCriterionOverride>? overrides = null)
@@ -371,6 +445,8 @@ public sealed class RunSummary
                 unit.Item.EvaluatorId));
         ImmutableArray<ResultsSheetRowInput>.Builder rows =
             ImmutableArray.CreateBuilder<ResultsSheetRowInput>();
+        Dictionary<int, CheckpointCompletedRow> durableRows = CompletedRows.ToDictionary(
+            row => row.SourceRowNumber);
         for (int sourceRow = Snapshot.Definition.FirstDataRow;
              sourceRow <= Snapshot.Definition.LastDataRow;
              sourceRow++)
@@ -416,11 +492,28 @@ public sealed class RunSummary
                     });
                 }
 
+                durableRows.TryGetValue(sourceRow, out CheckpointCompletedRow? durableRow);
+                ImmutableArray<SpecialResultInput> specialResults = IsDurable
+                    ? question.SpecialEvaluations
+                        .Where(special => special.Enabled)
+                        .Select(special => ToSpecialResult(
+                            durableRow?.SpecialResults.SingleOrDefault(result =>
+                                string.Equals(result.QuestionId, question.Id, StringComparison.Ordinal)
+                                && string.Equals(result.SpecialEvaluationId, special.Id, StringComparison.Ordinal)),
+                            special.Id))
+                        .ToImmutableArray()
+                    : [];
+                SimilarityResultInput? similarity = IsDurable
+                    ? ToSimilarityResult(durableRow?.SimilarityResults.SingleOrDefault(result =>
+                        string.Equals(result.QuestionId, question.Id, StringComparison.Ordinal)))
+                    : null;
                 questions.Add(new QuestionResultInput
                 {
                     QuestionId = question.Id,
                     Scorable = scorable,
                     Evaluators = evaluators.ToImmutable(),
+                    SpecialResults = specialResults,
+                    Similarity = similarity,
                 });
             }
 
@@ -432,6 +525,100 @@ public sealed class RunSummary
         }
 
         return rows.ToImmutable();
+    }
+
+    private static SpecialResultInput ToSpecialResult(
+        CheckpointSpecialResult? result,
+        string specialEvaluationId)
+    {
+        SpecialQuantificationResult? accepted = result?.AcceptedResult;
+        return new SpecialResultInput
+        {
+            SpecialEvaluationId = specialEvaluationId,
+            AiRaw = accepted?.Score ?? (string.Equals(
+                result?.StatusCode,
+                ResultsStatusCodes.Empty,
+                StringComparison.Ordinal) ? 0m : null),
+            Reason = accepted?.Reason ?? string.Empty,
+            Evidence = accepted?.Evidence ?? string.Empty,
+            EvidenceSource = accepted is null ? string.Empty : EvidenceSourceName(accepted.EvidenceSource),
+            EvidenceSourceColumnId = accepted?.EvidenceSourceColumnId ?? string.Empty,
+            Status = result?.StatusCode ?? ResultsStatusCodes.Cancelled,
+        };
+    }
+
+    private static SimilarityResultInput ToSimilarityResult(CheckpointSimilarityResult? result) =>
+        new()
+        {
+            AiRaw = result?.AcceptedResult?.Similarity ?? (string.Equals(
+                result?.StatusCode,
+                ResultsStatusCodes.Empty,
+                StringComparison.Ordinal) ? 0m : null),
+            Reason = result?.AcceptedResult?.Reason ?? string.Empty,
+            Status = result?.StatusCode ?? ResultsStatusCodes.Cancelled,
+        };
+
+    private static string EvidenceSourceName(EvidenceSourceKind source) => source switch
+    {
+        EvidenceSourceKind.PrimaryAnswer => "PRIMARY_ANSWER",
+        EvidenceSourceKind.SupportingColumn => "SUPPORTING_COLUMN",
+        EvidenceSourceKind.None => "NONE",
+        _ => string.Empty,
+    };
+
+    private static int CompletedRowOperationCount(CheckpointCompletedRow row) =>
+        row.NormalResults.Length + row.SpecialResults.Length + row.SimilarityResults.Length;
+
+    private IEnumerable<string> EnumerateDurableStatuses()
+    {
+        foreach (CheckpointReference reference in References)
+        {
+            yield return reference.StatusCode;
+        }
+
+        foreach (CheckpointCompletedRow row in CompletedRows)
+        {
+            foreach (CheckpointNormalResult result in row.NormalResults)
+            {
+                yield return result.StatusCode;
+            }
+
+            foreach (CheckpointSpecialResult result in row.SpecialResults)
+            {
+                yield return result.StatusCode;
+            }
+
+            foreach (CheckpointSimilarityResult result in row.SimilarityResults)
+            {
+                yield return result.StatusCode;
+            }
+        }
+    }
+
+    private IEnumerable<CheckpointTokenUsage> EnumerateDurableUsage()
+    {
+        foreach (CheckpointReference reference in References)
+        {
+            yield return reference.TokenUsage;
+        }
+
+        foreach (CheckpointCompletedRow row in CompletedRows)
+        {
+            foreach (CheckpointNormalResult result in row.NormalResults)
+            {
+                yield return result.TokenUsage;
+            }
+
+            foreach (CheckpointSpecialResult result in row.SpecialResults)
+            {
+                yield return result.TokenUsage;
+            }
+
+            foreach (CheckpointSimilarityResult result in row.SimilarityResults)
+            {
+                yield return result.TokenUsage;
+            }
+        }
     }
 
     private bool DetermineQuestionScorable(int sourceRow, string questionId)

@@ -58,6 +58,34 @@ public sealed class DefinitionCollectionTests
         Assert.False(changed.Criteria[1].Enabled);
     }
 
+    [Fact]
+    public void Special_evaluations_can_be_added_duplicated_moved_disabled_and_deleted_immutably()
+    {
+        QuestionDefinition original = TestDefinitions.Create().Questions[0];
+        SpecialEvaluationDefinition first = new()
+        {
+            Id = "S1",
+            DisplayName = "Student prompt",
+            PrimarySourceColumn = "G",
+            SupportingSourceColumns = ["K"],
+            PromptTemplate = "{回答}",
+        };
+        SpecialEvaluationDefinition second = first with { Id = "S2" };
+
+        QuestionDefinition changed = original
+            .AddSpecialEvaluation(first)
+            .AddSpecialEvaluation(second)
+            .DuplicateSpecialEvaluation(0, "S1-COPY")
+            .MoveSpecialEvaluation(2, 0)
+            .SetSpecialEvaluationEnabled(1, false)
+            .RemoveSpecialEvaluation(2);
+
+        Assert.Empty(original.SpecialEvaluations);
+        Assert.Equal(["S2", "S1"], changed.SpecialEvaluations.Select(item => item.Id));
+        Assert.False(changed.SpecialEvaluations[1].Enabled);
+        Assert.Equal(["K"], changed.SpecialEvaluations[1].SupportingSourceColumns);
+    }
+
     [Theory]
     [InlineData(-1)]
     [InlineData(2)]

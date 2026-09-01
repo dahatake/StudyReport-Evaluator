@@ -18,6 +18,12 @@ public sealed record QuantificationDefinition
 
     public int LastDataRow { get; init; }
 
+    public decimal BasePoints { get; init; } = 60m;
+
+    public decimal SpecialPoints { get; init; }
+
+    public decimal SimilarityPenaltyWeight { get; init; } = 0.1m;
+
     public int RoundingDigits { get; init; } = 1;
 
     public ImmutableArray<QuestionDefinition> Questions { get; init; } = [];
@@ -29,11 +35,12 @@ public sealed record QuantificationDefinition
         int sourceIndex,
         string newId,
         Func<EvaluatorDefinition, string> evaluatorIdFactory,
-        Func<CriterionDefinition, string> criterionIdFactory)
+        Func<CriterionDefinition, string> criterionIdFactory,
+        Func<SpecialEvaluationDefinition, string> specialEvaluationIdFactory)
     {
         ImmutableArray<QuestionDefinition> items = DefinitionCollectionOperations.Normalize(Questions);
         QuestionDefinition duplicate = items[DefinitionCollectionOperations.RequireIndex(items, sourceIndex)]
-            .Duplicate(newId, evaluatorIdFactory, criterionIdFactory);
+            .Duplicate(newId, evaluatorIdFactory, criterionIdFactory, specialEvaluationIdFactory);
         return this with { Questions = items.Insert(sourceIndex + 1, duplicate) };
     }
 

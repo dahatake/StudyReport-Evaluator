@@ -318,8 +318,6 @@ public sealed class MainWindowTests
             Assert.Equal(definition.Name, request.DraftDefinition.Name);
             Assert.True(results.IsLoaded);
             Assert.Equal(summary.CompletedEvaluationCount, results.CompletedEvaluationCount);
-
-            viewModel.NextCommand.Execute(null);
             Dispatcher.UIThread.RunJobs();
 
             Assert.Equal(WorkflowStep.Results, viewModel.CurrentStep);

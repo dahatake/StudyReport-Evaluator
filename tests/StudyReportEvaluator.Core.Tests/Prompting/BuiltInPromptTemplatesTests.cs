@@ -36,4 +36,16 @@ public sealed class BuiltInPromptTemplatesTests
         Assert.Contains("Never return an evaluator score, question score, overall score", contract, StringComparison.Ordinal);
         Assert.Contains("same-row", contract, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Auxiliary_app_owned_contracts_are_operation_specific_and_do_not_make_misconduct_decisions()
+    {
+        Assert.Contains("submit_reference_answer", BuiltInPromptTemplates.ReferenceAnswerTemplate, StringComparison.Ordinal);
+        Assert.Contains("exactly once", BuiltInPromptTemplates.ReferenceAnswerTemplate, StringComparison.Ordinal);
+        Assert.Contains("submit_special_quantification", BuiltInPromptTemplates.SpecialOutputInstruction, StringComparison.Ordinal);
+        Assert.Contains("from 0 through 1", BuiltInPromptTemplates.SpecialOutputInstruction, StringComparison.Ordinal);
+        Assert.Contains("submit_similarity", BuiltInPromptTemplates.SimilarityOutputInstruction, StringComparison.Ordinal);
+        Assert.Contains("不正行為や回答品質を判定せず", BuiltInPromptTemplates.SimilarityInstruction, StringComparison.Ordinal);
+        Assert.Contains("Do not return a misconduct decision", BuiltInPromptTemplates.SimilarityOutputInstruction, StringComparison.Ordinal);
+    }
 }

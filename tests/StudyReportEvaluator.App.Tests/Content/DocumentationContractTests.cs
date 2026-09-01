@@ -1,423 +1,377 @@
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace StudyReportEvaluator.App.Tests.Content;
 
 public sealed class DocumentationContractTests
 {
-    private static readonly string[] CurrentDocumentPaths =
+    private static readonly string[] V4BaselineDocumentPaths =
+    [
+        "docs/requirements-definition.md",
+        "docs-dev/README.md",
+        "docs-dev/architecture.md",
+        "docs-dev/detailed-design.md",
+        "docs-dev/excel-contract.md",
+        "docs-dev/traceability.md",
+        "docs-dev/adr/0012-point-allocation-similarity-resume-portability.md",
+        "work/20260901-v4-implementation-plan.md",
+    ];
+
+    private static readonly string[] ExistingUserDocumentPaths =
     [
         "README.md",
         "docs/README.md",
         "docs/getting-started.md",
         "docs/features.md",
         "docs/custom-evaluator-guide.md",
+        "docs/prompt-launch.md",
         "docs/privacy-and-data-handling.md",
         "docs/troubleshooting.md",
-        "docs/requirements-definition.md",
-        "docs-dev/README.md",
-        "docs-dev/implementation-status.md",
-        "docs-dev/architecture.md",
-        "docs-dev/excel-contract.md",
-        "docs-dev/traceability.md",
         "images/README.md",
     ];
 
     [Fact]
-    public void D01_source_documents_exist()
+    public void V4_baseline_and_existing_user_documents_exist_and_are_nonempty()
     {
-        string root = FindRepositoryRoot();
-
-        foreach (string relativePath in CurrentDocumentPaths)
+        foreach (string relativePath in V4BaselineDocumentPaths.Concat(ExistingUserDocumentPaths))
         {
-            string path = Resolve(root, relativePath);
-            Assert.True(File.Exists(path), $"Missing D-01 source document: {relativePath}");
+            string path = Resolve(FindRepositoryRoot(), relativePath);
+            Assert.True(File.Exists(path), $"Missing documentation source: {relativePath}");
             Assert.False(string.IsNullOrWhiteSpace(File.ReadAllText(path)));
         }
     }
 
     [Fact]
-    public void Readme_preserves_project_context_and_removes_preimplementation_status()
+    public void Requirement_v4_records_approved_defaults_formulas_workflow_and_scope()
     {
-        string readme = Read("README.md");
+        string requirements = Read("docs/requirements-definition.md");
 
         AssertContainsAll(
-            readme,
-            "Excel の学習レポートの採点を数値化・定量化するツールです。",
-            "[はじめに](docs/getting-started.md)",
-            "[機能リファレンス](docs/features.md)",
-            "[Custom evaluatorガイド](docs/custom-evaluator-guide.md)",
-            "[データとprivacy](docs/privacy-and-data-handling.md)",
-            "[トラブルシューティング](docs/troubleshooting.md)",
-            "[要求定義書](docs/requirements-definition.md)",
-            "[アーキテクチャ](docs-dev/architecture.md)",
-            "[Excel / formula 契約](docs-dev/excel-contract.md)",
-            "[現在の実装状態](docs-dev/implementation-status.md)",
-            "このリポジトリへ実在する学生の回答・氏名・メールアドレス等を追加しないでください。");
-
-        AssertDoesNotContainAny(
-            readme,
-            "アプリ実装はまだ開始していません",
-            "全 P0 ゲートを満たすまで",
-            "実データ処理の安全性・妥当性を実装・検証済みではありません",
-            "実装後に実物を使って本 README へ追加します");
-    }
-
-    [Fact]
-    public void Readme_documents_supported_scope_workflow_and_exact_commands()
-    {
-        string readme = Read("README.md");
-
-        AssertContainsAll(
-            readme,
+            requirements,
+            "| 文書版 | 4.0 |",
+            "| 状態 | 要求所有者承認済み baseline |",
+            "ベース点 `BasePoints`。既定60",
+            "固有設定配点 `SpecialPoints`。既定0",
+            "類似度減点係数 `SimilarityPenaltyWeight`。既定0.1",
+            "B+S+\\sum_{q=1}^{N}P_q=100",
+            "QuestionEarned_q=P_qR_q",
+            "SimilarityPenalty_q=P_qL_qW",
+            "FinalRaw=B+\\sum_q QuestionEarned_q+SpecialEarned-\\sum_q SimilarityPenalty_q",
+            "FinalScore=",
+            "0 & FinalRaw<0",
+            "100 & FinalRaw>100",
+            "FinalRaw & \\text{otherwise}",
+            "`eval-{yyyyMMdd-HHmm}-02.xlsx`",
+            "`eval-{yyyyMMdd-HHmm}.partial.xlsx`",
+            "`Quantification_References`",
+            "`Quantification_Checkpoint`",
+            "StudyReportEvaluator.App --input <xlsx-path> --prompt <txt-path>",
             "Windows 11 x64",
-            ".NET 10 / Avalonia",
-            "標準 `.xlsx` 1ファイルのみ",
-            "AI定量化を実行するときだけ、既存の GitHub Copilot CLI ログインを使用",
-            "Microsoft Excel / Office / LibreOffice / COM automation は不要",
-            "現在のUIにnative file pickerはありません",
-            "`copilot.exe`はZIPへ同梱されません",
-            "Windowsの`PATH`から解決できる状態",
-            "1. **入力**",
-            "2. **定量化設計**",
-            "3. **実行**",
-            "4. **結果・出力**",
-            "dotnet restore StudyReportEvaluator.slnx --locked-mode",
-            "dotnet build StudyReportEvaluator.slnx --no-restore -c Release",
-            "dotnet test StudyReportEvaluator.slnx --no-build --no-restore -c Release",
-            "pwsh.exe -NoLogo -NoProfile -File scripts/publish-windows.ps1",
-            "pwsh.exe -NoLogo -NoProfile -File scripts/package-windows.ps1",
-            "artifacts/package/StudyReportEvaluator-win-x64.zip",
-            "artifacts/package/StudyReportEvaluator-win-x64.zip.sha256",
-            "generated ignored artifact",
-            "unsigned");
+            "macOS arm64 / x64",
+            "NOT_RUN_EXTERNAL_PREREQUISITE",
+            "## 22. Approval record");
+
+        AssertSequentialTableIds(requirements, "AC-", 22);
+        Assert.Contains("1. Microsoft Forms型、Google Forms型", requirements, StringComparison.Ordinal);
+        Assert.Contains("24. optional authenticated synthetic Copilot smoke", requirements, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Readme_records_output_security_and_evidence_without_promoting_optional_smokes()
+    public void Current_developer_index_uses_v4_and_adr0012_as_sources_of_truth()
     {
-        string readme = Read("README.md");
-
-        AssertContainsAll(
-            readme,
-            "Quantification_Config",
-            "Quantification_Results",
-            "Quantification_Run",
-            "cached value",
-            "atomic rename",
-            "app-owned database と cloud backend はありません",
-            "sample/機械学習 サブフィールド PBL 2025 レポート - コピー.xlsx",
-            "446386E20BB4096561CB4AFD6D74B8EAA9D50EAE53C97F984BA7F70EBEAD0DE5",
-            "solution tests 452件成功",
-            "test runごとに再測定",
-            "固定保証値ではない",
-            "optional live Copilot smoke | `PASS`",
-            "optional external recalculation smoke | `PASS`",
-            "固定合成payload 1件だけ",
-            "固定合成workbook",
-            "合成100名 × 2設問から7枚を生成",
-            "[標準xlsxのpath、sheet、行範囲を設定する入力画面](images/01-input-workbook.png)",
-            "[Auto、concurrency 2、200 evaluation unitsを示す実行画面](images/05-execution-auto.png)",
-            "入力workbook全体のbyte-copy",
-            "入力と同等以上に機密",
-            "question text、criterion ID",
-            "## 100名 × 2設問のトークン計画値（Auto）",
-            "200 evaluation units",
-            "このケースの実測済みexact token総数はありません",
-            "240,000",
-            "480,000",
-            "528,000",
-            "1,440,000",
-            "全unitが最大3 attempts",
-            "token数自体を10%減らすという意味ではありません",
-            "Quantification_Run`へ数値だけを保存",
-            "65,536 scalars以下",
-            "model prompt/context上限の80%以内",
-            "ZIPには`RELEASE-NOTES.txt`に加えて、本`README.md`、利用者向け`docs/`、合成画面の`images/`を同梱",
-            "Usage and billing",
-            "Auto model selection",
-            "IMPL-GAP-001",
-            "IMPL-GAP-002");
-
-        Assert.DoesNotContain("ZIP は commit 済み", readme, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("443件すべて成功", readme, StringComparison.Ordinal);
-        Assert.DoesNotContain("3.279264 秒", readme, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Architecture_documents_exact_topology_boundaries_and_flows()
-    {
+        string index = Read("docs-dev/README.md");
         string architecture = Read("docs-dev/architecture.md");
 
         AssertContainsAll(
+            index,
+            "[詳細設計書](detailed-design.md)",
+            "[ADR-0012](adr/0012-point-allocation-similarity-resume-portability.md)",
+            "current requirements v4.0 / ADR-0012 / detailed design");
+        AssertContainsAll(
             architecture,
-            "production project は正確に2件、test project は正確に2件",
-            "src/StudyReportEvaluator.Core/",
-            "src/StudyReportEvaluator.App/",
-            "tests/StudyReportEvaluator.Core.Tests/",
-            "tests/StudyReportEvaluator.App.Tests/",
-            "BCL-only",
-            "Avalonia",
-            "DocumentFormat.OpenXml",
-            "GitHub.Copilot.SDK",
-            "flowchart LR",
-            "flowchart TD",
-            "sequenceDiagram",
-            "immutable snapshot",
-            "canonical JSON",
-            "SHA-256",
-            "submit_quantification",
-            "target-local",
-            "no-overwrite atomic rename",
-            "app-owned database と cloud backend はありません",
-            "native pickerではなくfull pathのTextBox",
-            "Reason / Evidence / Question scoreはworkbookだけ",
-            "IMPL-GAP-001 / 002",
-            "run admission",
-            "最大20,000 attempts",
-            "observed numeric usage",
-            "optional live Copilot smokeとoptional Microsoft Excel recalculation smokeは、固定合成データだけで`PASS`",
-            "required test、実在データ品質、全環境保証へ読み替えません");
+            "| Current requirement | requirements v4.0 |",
+            "| Current decision | ADR-0012 |",
+            "ReferenceCheckpoint",
+            "complete-row checkpoint",
+            "submit_reference_answer",
+            "submit_special_quantification",
+            "submit_similarity",
+            "technical failureはblank",
+            "partial | `Quantification_Checkpoint`",
+            "final | `Quantification_Config`, `Quantification_References`, `Quantification_Results`, `Quantification_Run`");
     }
 
     [Fact]
-    public void Excel_document_defines_literals_formulas_rounding_preflight_and_atomicity()
+    public void Adr_and_detailed_design_preserve_minimal_architecture_and_explicit_boundaries()
+    {
+        string adr = Read("docs-dev/adr/0012-point-allocation-similarity-resume-portability.md");
+        string design = Read("docs-dev/detailed-design.md");
+
+        AssertContainsAll(
+            adr,
+            "| 状態 | **承認済み** |",
+            "StudyReportEvaluator.Core",
+            "StudyReportEvaluator.App",
+            "production projectは次の2件だけ",
+            "questionの旧`Weight`は`Points`へ置き換え",
+            "SpecialEvaluationDefinition",
+            "1 question/runで1回",
+            "Copilot session persistenceをjob resumeに使用しない",
+            "汎用plugin typeは導入しない",
+            "SQLite／cloud database");
+        AssertContainsAll(
+            design,
+            "public decimal BasePoints { get; init; } = 60m;",
+            "public decimal SpecialPoints { get; init; }",
+            "public decimal SimilarityPenaltyWeight { get; init; } = 0.1m;",
+            "public decimal Points { get; init; }",
+            "SpecialEvaluationDefinition",
+            "ScoringAllocationCalculator",
+            "Core result型へApp型を参照させない",
+            "row間は並列化しない",
+            "1行内のnormal evaluator、special item、similarity");
+    }
+
+    [Fact]
+    public void Excel_contract_defines_partial_final_sheets_and_blank_safe_formulas()
     {
         string contract = Read("docs-dev/excel-contract.md");
 
         AssertContainsAll(
             contract,
-            "`RawWeight`（R列）",
-            "`EffectiveMinimum`（S列）",
-            "`EffectiveMaximum`（T列）",
-            "`RoundingDigits`（U列）",
-            ".Scorable",
-            ".AI_Raw",
-            ".Override",
-            ".Effective_Raw",
-            ".Normalized",
-            ".Reason",
-            ".Evidence",
-            ".Evidence_Source",
-            ".Evidence_SourceColumn",
-            ".Status",
-            ".Evaluator_Score",
-            ".Question_Score",
-            "Overall_Score",
-            "=IF(ScorableCell<>1",
-            "=IF(ISNUMBER(EffectiveRawCell)",
-            "=IF(COUNT(ChildScoreRef1,...)=EnabledChildCount",
-            "AI rawへfallbackせず",
+            "`eval-20260901-1530.partial.xlsx`",
+            "input byte-copy + `Quantification_Checkpoint`",
+            "input byte-copy + Config / References / Results / Run",
+            "`PayloadSha256`",
+            "replace前の失敗では旧partialを保持",
+            "`Quantification_References`",
+            ".Question_Earned",
+            ".Special_Question_Rate",
+            ".Similarity_Penalty",
+            "`Final_Raw`",
+            "`Final_Score`",
+            "EnabledSpecialCount >= 1",
+            "COUNT(...)=expected",
+            "0は数値として数え、blankは数えない",
             "MidpointRounding.AwayFromZero",
-            "cached value",
-            "`IF`, `IFERROR`, `ISNUMBER`, `COUNT`, `SUM`, `SUMPRODUCT`, `ROUND`",
-            "最大8,191文字",
-            "8,192文字以上",
-            "32,767文字以下",
-            "Quantification_Config (2)",
-            "target-local",
-            "no-overwrite atomic rename",
-            "SHA-256、size、last-write time",
-            "Office-independent required path",
-            "Current timing",
-            "AI run開始前",
-            "入力と同等以上に機密",
-            "Working with formulas",
-            "advisoryなoptional smokeとして`PASS`",
-            "required oracleや全環境保証を代替しません");
+            "same-volume no-overwrite move");
+        AssertDoesNotContainAny(contract, "MIN(`", "MAX(`", "AVERAGE(`", "COUNTIF(`");
     }
 
     [Fact]
-    public void Custom_guide_has_exactly_six_placeholders_and_safe_rendering_contract()
+    public void Plan_and_traceability_map_every_task_acceptance_and_test_requirement()
     {
-        string guide = Read("docs/custom-evaluator-guide.md");
-        string[] catalog = guide
-            .Split('\n')
-            .Select(line => line.TrimEnd('\r'))
-            .Where(line => line.StartsWith("| `{", StringComparison.Ordinal))
-            .Select(line => line.Split('|')[1].Trim().Trim('`'))
-            .ToArray();
-
-        Assert.Equal(
-            ["{設問}", "{回答}", "{補助情報}", "{評価項目}", "{最小点}", "{最大点}"],
-            catalog);
-        AssertContainsAll(
-            guide,
-            "Knowledge (`KNOWLEDGE_COVERAGE`)",
-            "Custom (`CUSTOM_PROMPT`)",
-            "任意の1列をprimary column",
-            "0件以上の列をsupporting columns",
-            "`{回答}` と `{評価項目}` をそれぞれ1回以上",
-            "`{{` と `}}` でescape",
-            "挿入値は **opaque**",
-            "再走査しません",
-            "evaluator default range",
-            "criterion effective range",
-            "個別weight / weight合計",
-            "実効percentage",
-            "安全なtemplate例",
-            "TEMPLATE_REQUIRED",
-            "ANSWER_PLACEHOLDER_REQUIRED",
-            "CRITERIA_PLACEHOLDER_REQUIRED",
-            "UNKNOWN_PLACEHOLDER",
-            "UNCLOSED_PLACEHOLDER",
-            "MALFORMED_PLACEHOLDER",
-            "UNMATCHED_CLOSING_BRACE",
-            "AIへaggregateを要求しないでください",
-            "mandatory human review",
-            "input capture、row read、Copilot session、runner callを開始しません");
-    }
-
-    [Fact]
-    public void User_documents_describe_actual_path_entry_result_surface_and_data_boundary()
-    {
-        string gettingStarted = Read("docs/getting-started.md");
-        string features = Read("docs/features.md");
-        string privacy = Read("docs/privacy-and-data-handling.md");
-        string troubleshooting = Read("docs/troubleshooting.md");
-
-        AssertContainsAll(
-            gettingStarted,
-            "現在のUIにnative file pickerはありません",
-            "Reason、Evidence、Evidence source、Question score",
-            "同一プロセス内で完了またはcancelされたrun",
-            "../images/01-input-workbook.png",
-            "../images/02-input-mapping.png",
-            "../images/03-design-knowledge.png",
-            "../images/04-design-custom-prompt.png",
-            "../images/05-execution-auto.png",
-            "../images/06-results-review.png",
-            "../images/07-output-export.png",
-            "sequenceDiagram");
-        AssertContainsAll(
-            features,
-            "保存済み結果の再import",
-            "reusable definition profile",
-            "画面とworkbookの項目差",
-            "AI_RUNTIME_FAILED");
-        AssertContainsAll(
-            privacy,
-            "definition由来",
-            "question text",
-            "入力と同等以上に機密",
-            "他行、非選択列、workbook path");
-        AssertContainsAll(
-            troubleshooting,
-            "100 MiB",
-            "InvalidRelationship",
-            "REQUEST_SCALAR_LIMIT_EXCEEDED",
-            "REQUEST_CONTEXT_BUDGET_EXCEEDED",
-            "ATTEMPT_BUDGET_TOO_LARGE",
-            "Excel specifications and limits");
-
-        string imageManifest = Read("images/README.md");
-        AssertContainsAll(
-            imageManifest,
-            "Avalonia 12.1.1 Headless + Skia",
-            "fake authentication boundary",
-            "personal/student data: なし",
-            "01-input-workbook.png",
-            "07-output-export.png",
-            "retry込み最大600 attempts",
-            "STUDY_REPORT_EVALUATOR_GENERATE_DOC_IMAGES");
-    }
-
-    [Fact]
-    public void Frozen_requirement_current_status_and_historical_documents_are_explicitly_separated()
-    {
-        string requirements = Read("docs/requirements-definition.md");
-        string implementationStatus = Read("docs-dev/implementation-status.md");
+        string plan = Read("work/20260901-v4-implementation-plan.md");
         string traceability = Read("docs-dev/traceability.md");
-        string developerIndex = Read("docs-dev/README.md");
-        string historicalAdr = Read("docs-dev/adr/0005-copilot-result-protocol.md");
-        string historicalPreflight = Read("docs-dev/preflight/governance-inputs.md");
-        string historicalRelease = Read("docs-dev/release/p1-disposition.md");
 
-        AssertContainsAll(
-            requirements,
-            "| 文書版 | 3.0 |",
-            "動的Prompt定量化・Excel加重計算版（実装前）",
-            "## 19. Traceability summary");
-        AssertContainsAll(
-            implementationStatus,
-            "Historical GATE-ACCEPTANCE record | `PASS`",
-            "Documentation refresh validation | post-gateで文書契約test 2件とvisual documentation test 1件を追加後、Release build PASS、455 passed / 0 failed / 0 skipped",
-            "Gap closure non-document validation | Release build PASS、473 passed / 0 failed / 0 skipped",
-            "Current required validation | locked restore PASS、Release build PASS、485 passed / 0 failed / 0 skipped",
-            "Post-gate conformance gaps | 0 open / 2 closed",
-            "New GATE-ACCEPTANCE | `PASS` for evaluation HEAD `3f4227e",
-            "gate-acceptance-3f4227e.json",
-            "## IMPL-GAP-001 — CLOSED",
-            "## IMPL-GAP-002 — CLOSED");
-        AssertContainsAll(
-            traceability,
-            "PASS recorded for HEAD `62581a3`",
-            "PASS_RECORDED_POST_GATE_GAP_OPEN",
-            "GATE-ACCEPTANCE PASS at 62581a3",
-            "CLOSED_PENDING_NEW_ACCEPTANCE",
-            "IMPL-GAP-001 / 002 closure",
-            "GATE_ACCEPTANCE_RERUN_PASS",
-            "GATE-ACCEPTANCE rerun | PASS",
-            "485/485");
-        AssertContainsAll(
-            developerIndex,
-            "## 現行正本",
-            "## 履歴文書",
-            "Source of truthの優先順位",
-            "exact-byte固定したv3.0規範baseline",
-            "実装後のstatusと差分を`implementation-status.md`へ分離");
-        Assert.Contains("HISTORICAL / SUPERSEDED", historicalAdr, StringComparison.Ordinal);
-        Assert.Contains("HISTORICAL / OUTSIDE CURRENT SCOPE", historicalPreflight, StringComparison.Ordinal);
-        Assert.Contains("HISTORICAL / SUPERSEDED", historicalRelease, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Warning_is_exact_and_nonblocking_where_user_behavior_is_documented()
-    {
-        const string warning =
-            "AIによる定量値には誤りや偏りが含まれる可能性があります。利用目的に応じて結果を確認してください。";
-
-        foreach (string relativePath in new[]
+        foreach (string task in new[]
         {
-            "README.md",
-            "docs-dev/architecture.md",
-            "docs/custom-evaluator-guide.md",
+            "B-01", "B-06", "C-01", "C-06", "X-01", "X-04", "A-01", "A-04",
+            "W-01", "W-02", "U-01", "U-04", "L-01", "P-01", "P-03", "D-01",
+            "D-05", "E-01", "E-03",
         })
         {
-            string content = Read(relativePath);
-            Assert.Contains(warning, content, StringComparison.Ordinal);
-            Assert.Contains("nonblocking", content, StringComparison.OrdinalIgnoreCase);
+            Assert.Matches(
+                $@"(?m)^\| {Regex.Escape(task)}(?:\s|\|)",
+                plan);
         }
+
+        AssertSequentialTableIds(traceability, "AC-", 22);
+        AssertSequentialTableIds(traceability, "TR-", 24);
+        AssertContainsAll(
+            traceability,
+            "IMPLEMENTATION_IN_PROGRESS",
+            "`PLANNED`は未実装をPASSと称しない",
+            "BLOCKED_REVIEW",
+            "NOT_RUN_EXTERNAL_PREREQUISITE",
+            "unresolved reproducible blocker/high finding 0");
     }
 
     [Fact]
-    public void Documentation_has_no_unsupported_claim_or_unavailable_screenshot_reference()
+    public void Historical_v3_decision_is_retained_but_not_current()
     {
-        string allDocuments = string.Join(
-            Environment.NewLine,
-            CurrentDocumentPaths.Select(Read));
+        string adr11 = Read("docs-dev/adr/0011-dynamic-quantification-excel-formulas.md");
+        string adr12 = Read("docs-dev/adr/0012-point-allocation-similarity-resume-portability.md");
+        string developerIndex = Read("docs-dev/README.md");
 
-        AssertDoesNotContainAny(
-            allDocuments,
-            "署名済み ZIP",
-            "署名済みパッケージ",
-            "デジタル署名済み",
-            "Signing: SIGNED",
-            "macOS 対応",
-            "Linux 対応",
-            "Windows Arm64 対応",
-            "教育的妥当性を保証します",
-            "教育的妥当性は保証済み",
-            "公平性を保証します",
-            "公平性は保証済み",
-            "法的適合性を保証します",
-            "法的適合性は保証済み",
-            "品質を保証します",
-            "品質は保証済み");
+        Assert.Contains("| 状態 | **承認済み** |", adr11, StringComparison.Ordinal);
+        Assert.Contains("Supersedes | ADR-0011", adr12, StringComparison.Ordinal);
+        Assert.Contains("ADR-0001〜0011", developerIndex, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "current requirements v3.0",
+            developerIndex,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void V4_baseline_never_promotes_unexecuted_external_evidence_to_pass()
+    {
+        string content = string.Join(Environment.NewLine, V4BaselineDocumentPaths.Select(Read));
+
         AssertContainsAll(
-            allDocuments,
-            "fixed synthetic payload",
-            "required substitute false",
-            "固定合成workbook");
+            content,
+            "NOT_RUN_EXTERNAL_PREREQUISITE",
+            "未実行をPASSとしない",
+            "署名済み／notarized／対応済みと称しない");
+        AssertDoesNotContainAny(
+            content,
+            "macOS signing PASS",
+            "macOS notarization PASS",
+            "signed and notarized artifact is verified");
+    }
+
+    [Fact]
+    public void Prompt_launch_guide_has_copyable_teacher_scenarios_and_never_claims_unattended_grading()
+    {
+        string guide = Read("docs/prompt-launch.md");
+        string root = Read("README.md");
+        string userIndex = Read("docs/README.md");
+        string gettingStarted = Read("docs/getting-started.md");
+        string customGuide = Read("docs/custom-evaluator-guide.md");
+
+        AssertContainsAll(
+            root,
+            "[GitHub CopilotからPromptで起動する](docs/prompt-launch.md)");
+        AssertContainsAll(
+            userIndex,
+            "[GitHub CopilotからPromptで起動する](prompt-launch.md)");
+        AssertContainsAll(gettingStarted, "[GitHub CopilotからPromptで起動する](prompt-launch.md)");
+        AssertContainsAll(customGuide, "[GitHub CopilotからPromptで起動する](prompt-launch.md)");
+        AssertContainsAll(
+            guide,
+            "## できることと安全上の境界",
+            "**Copilot起動依頼Prompt**",
+            "**評価Promptファイル**",
+            "--input",
+            "--prompt",
+            "AI評価を自動開始しません",
+            "定量化を開始",
+            "result/eval-{yyyyMMdd-HHmm}[-NN].xlsx",
+            "sample/機械学習 サブフィールド PBL 2025 レポート - コピー.xlsx",
+            "| F | 設問1のレポート回答primary候補 |",
+            "| G | 設問1に関する学生Prompt候補 |",
+            "| I | 設問2のレポート回答primary候補 |",
+            "| J | 設問2に関する学生Prompt候補 |",
+            "| K | Prompt作成時の考慮事項／観点。Jのsupporting候補 |",
+            "## ユースケース1 — 機械学習概念の理解を確認する",
+            "## ユースケース2 — PBL提案の具体性と実行可能性を確認する",
+            "## ユースケース3 — 学生が作成したPromptの品質を固有評価する",
+            "## ユースケース4 — Prompt作成時の考慮事項を含めて評価する",
+            "## ユースケース5 — まず10行だけpilot実行する",
+            "## ユースケース6 — 中断したrunを再開する",
+            "ml-concept-understanding.txt",
+            "student-prompt-quality.txt",
+            "{回答}",
+            "{評価項目}",
+            "## GitHub Copilotへ結果fileの存在だけ確認してもらう",
+            "workbookを開いてcell、sheet本文、氏名、回答、score、reason、evidenceを読むこと",
+            "存在しないfileを作成済みと報告すること",
+            "類似度は不正行為の証明ではありません",
+            "最終的な評点と利用判断は教員が行います");
+    }
+
+    [Fact]
+    public void System_test_prompt_maps_all_v4_test_requirements_without_stale_v3_expectations()
+    {
+        string prompt = Read("tests/system-test-prompt.md");
+
+        int[] promptIds = Regex.Matches(
+                prompt,
+                @"^### STP-TR-(\d{2}):",
+                RegexOptions.Multiline | RegexOptions.CultureInvariant)
+            .Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))
+            .ToArray();
+
+        Assert.Equal(Enumerable.Range(1, 24), promptIds);
+        foreach (int requirementId in Enumerable.Range(1, 24))
+        {
+            string promptBody = ExtractSystemTestPrompt(prompt, requirementId);
+            AssertContainsAll(
+                promptBody,
+                $"Test ID: STP-TR-{requirementId:00}",
+                $"Requirement: TR-{requirementId:00}",
+                "厳守:",
+                "報告順:");
+        }
+
+        AssertContainsAll(
+            prompt,
+            "| 対象 | StudyReport Evaluator v4.0 |",
+            "**24件**を正本とする");
+        Assert.Matches(@"BasePoints\s*=\s*60", ExtractSystemTestPrompt(prompt, 4));
+        Assert.Matches(@"SpecialPoints\s*=\s*0", ExtractSystemTestPrompt(prompt, 4));
+        Assert.Matches(@"SimilarityPenaltyWeight\s*=\s*0\.1", ExtractSystemTestPrompt(prompt, 4));
+        AssertContainsAll(
+            ExtractSystemTestPrompt(prompt, 6),
+            "6 placeholder制約は利用者編集可能なCustom／Specialだけに適用する",
+            "`{参照回答}`を利用者placeholderとして許可しない",
+            "reference=`submit_reference_answer`",
+            "similarity=`submit_similarity`");
+        AssertContainsAll(
+            ExtractSystemTestPrompt(prompt, 8),
+            "空normal primaryはAI callなし、QuestionRate=0、QuestionEarned=0",
+            "nonempty入力のschema/timeout/network/auth/cleanup failureはraw blankで、0へ変換しない");
+        AssertContainsAll(
+            ExtractSystemTestPrompt(prompt, 11),
+            "Config、References、Results、Runのexact 4件",
+            "finalにはCheckpoint sheetがない");
+        AssertContainsAll(
+            ExtractSystemTestPrompt(prompt, 13),
+            "`Quantification_Checkpoint`",
+            "reference完了およびcomplete student rowごと");
+        AssertContainsAll(
+            ExtractSystemTestPrompt(prompt, 14),
+            "complete rowだけskipし、最初の未完了rowから続行する",
+            "row途中の結果はskipせず、そのrow全体を再実行する");
+        AssertContainsAll(
+            ExtractSystemTestPrompt(prompt, 17),
+            "生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません");
+        AssertContainsAll(
+            ExtractSystemTestPrompt(prompt, 18),
+            "`--input` 0/1回と`--prompt` 0回以上",
+            "startup後のCopilot runner/session call countは0");
+        AssertContainsAll(
+            ExtractSystemTestPrompt(prompt, 19),
+            "bundled CLI",
+            "PATH fallbackしない");
+        AssertContainsAll(
+            ExtractSystemTestPrompt(prompt, 21),
+            "NOT_RUN_EXTERNAL_PREREQUISITE",
+            "未実行をPASSにしない");
+        AssertContainsAll(
+            ExtractSystemTestPrompt(prompt, 24),
+            "required deterministic acceptanceの代替にしない",
+            "A/Bを別statusで記録し、片方のPASSをもう片方またはrequired gateへ代用しない");
+        AssertDoesNotContainAny(
+            prompt,
+            "| 対象 | StudyReport Evaluator v3.0 実装 |",
+            "空回答、失敗、取消、欠損scoreは0ではなく空欄",
+            "Config、Results、Runの3 sheet",
+            "`tests/fixtures/v3/definition-matrix.json`",
+            "`tests/fixtures/v3/result-oracles.json`",
+            "signed installer、signed ZIP、notarization");
+    }
+
+    private static string ExtractSystemTestPrompt(string content, int requirementId)
+    {
+        Match match = Regex.Match(
+            content,
+            $@"(?ms)^### STP-TR-{requirementId:00}:.*?^```text\r?\n(?<body>.*?)^```",
+            RegexOptions.CultureInvariant);
+        Assert.True(match.Success, $"Missing copyable Prompt body for STP-TR-{requirementId:00}.");
+        return match.Groups["body"].Value;
+    }
+
+    private static void AssertSequentialTableIds(string content, string prefix, int expectedCount)
+    {
+        int[] actual = Regex.Matches(
+                content,
+                $@"^\| {Regex.Escape(prefix)}(\d{{2,3}}) \|",
+                RegexOptions.Multiline | RegexOptions.CultureInvariant)
+            .Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))
+            .ToArray();
+
+        Assert.Equal(Enumerable.Range(1, expectedCount), actual);
     }
 
     private static void AssertContainsAll(string content, params string[] expectedFragments)

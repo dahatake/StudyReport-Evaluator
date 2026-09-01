@@ -47,7 +47,7 @@ public sealed class OutputPackageValidatorTests
         const string hostileFormula = "'[private-book.xlsx]Sheet1'!A1|'private-topic'";
         using (SpreadsheetDocument document = fixture.Package.OpenForEditing())
         {
-            Cell(document, fixture.Names.ResultsSheetName, "D2").CellFormula =
+            Cell(document, fixture.Names.ResultsSheetName, "E2").CellFormula =
                 new CellFormula(hostileFormula);
         }
 
@@ -78,7 +78,7 @@ public sealed class OutputPackageValidatorTests
         using ValidationFixture fixture = ValidationFixture.Create();
         using (SpreadsheetDocument document = fixture.Package.OpenForEditing())
         {
-            Cell formulaCell = Cell(document, fixture.Names.ResultsSheetName, "D2");
+            Cell formulaCell = Cell(document, fixture.Names.ResultsSheetName, "E2");
             formulaCell.CellFormula = new CellFormula("=" + formulaCell.CellFormula!.Text);
         }
 
@@ -98,7 +98,7 @@ public sealed class OutputPackageValidatorTests
         using ValidationFixture fixture = ValidationFixture.Create();
         using (SpreadsheetDocument document = fixture.Package.OpenForEditing())
         {
-            Cell(document, fixture.Names.ResultsSheetName, "E2").CellValue = new CellValue("49.9");
+            Cell(document, fixture.Names.ResultsSheetName, "F2").CellValue = new CellValue("49.9");
         }
 
         OutputPackageValidationResult result = validator.Validate(
@@ -167,7 +167,7 @@ public sealed class OutputPackageValidatorTests
     }
 
     [Fact]
-    public void Exactly_three_bound_app_sheets_are_required_with_no_extra_sheet()
+    public void Exactly_four_bound_app_sheets_are_required_with_no_extra_sheet()
     {
         using ValidationFixture fixture = ValidationFixture.Create();
         using (SpreadsheetDocument document = fixture.Package.OpenForEditing())
@@ -185,7 +185,7 @@ public sealed class OutputPackageValidatorTests
     }
 
     [Fact]
-    public void Run_sheet_must_record_the_same_actual_three_sheet_bindings()
+    public void Run_sheet_must_record_the_same_actual_four_sheet_bindings()
     {
         using ValidationFixture fixture = ValidationFixture.Create();
         using (SpreadsheetDocument document = fixture.Package.OpenForEditing())
@@ -212,7 +212,7 @@ public sealed class OutputPackageValidatorTests
     }
 
     [Fact]
-    public void Config_and_Run_sheets_cannot_acquire_formulas()
+    public void Config_cannot_acquire_unplanned_formulas_and_Run_remains_formula_free()
     {
         using ValidationFixture fixture = ValidationFixture.Create();
         using (SpreadsheetDocument document = fixture.Package.OpenForEditing())
@@ -226,8 +226,8 @@ public sealed class OutputPackageValidatorTests
             fixture.Plan,
             TestContext.Current.CancellationToken);
 
-        Assert.Contains(result.Errors, error => error.Code == "FORMULA_OUTSIDE_RESULTS"
-            && error.Identity.NodeKind == "Config");
+        Assert.Contains(result.Errors, error => error.Code == "UNEXPECTED_FORMULA_CELL"
+            && error.Identity.NodeKind == "Formula");
         Assert.Contains(result.Errors, error => error.Code == "FORMULA_OUTSIDE_RESULTS"
             && error.Identity.NodeKind == "Run");
     }
@@ -314,7 +314,7 @@ public sealed class OutputPackageValidatorTests
     public void Expected_formula_plan_itself_is_preflighted_for_cycles_with_hierarchy_identity()
     {
         using ValidationFixture fixture = ValidationFixture.Create();
-        FormulaCellAddress target = new(fixture.Names.ResultsSheetName, "D", 2);
+        FormulaCellAddress target = new(fixture.Names.ResultsSheetName, "E", 2);
         FormulaIdentity identity = new(
             "Criterion",
             "C-CYCLE",
@@ -453,6 +453,20 @@ public sealed class OutputPackageValidatorTests
                 {
                     names = new AppOwnedSheetNameResolver().Resolve(document);
                     config = new ConfigSheetWriter().Write(document, snapshot, names);
+                    new ReferenceAnswersSheetWriter().Write(
+                        document,
+                        snapshot,
+                        names,
+                        [
+                            new ReferenceAnswerSheetRow
+                            {
+                                QuestionId = "Q1",
+                                ModelId = "auto",
+                                Answer = "Private reference canary",
+                                StatusCode = ResultsStatusCodes.Success,
+                                GeneratedAtUtc = new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.Zero),
+                            },
+                        ]);
                     new ResultsSheetWriter().Write(
                         document,
                         snapshot,
@@ -513,6 +527,7 @@ public sealed class OutputPackageValidatorTests
                 HeaderRow = 1,
                 FirstDataRow = 2,
                 LastDataRow = 2,
+                BasePoints = 99m,
                 RoundingDigits = 1,
                 Questions =
                 [
@@ -522,7 +537,7 @@ public sealed class OutputPackageValidatorTests
                         DisplayName = "Question",
                         QuestionText = "Synthetic question",
                         PrimarySourceColumn = "B",
-                        Weight = 1m,
+                        Points = 1m,
                         Evaluators =
                         [
                             new EvaluatorDefinition
@@ -583,6 +598,12 @@ public sealed class OutputPackageValidatorTests
                                 },
                             },
                         ],
+                        Similarity = new SimilarityResultInput
+                        {
+                            AiRaw = 0.5m,
+                            Reason = "Private similarity reason canary",
+                            Status = ResultsStatusCodes.Success,
+                        },
                     },
                 ],
             };
@@ -591,22 +612,42 @@ public sealed class OutputPackageValidatorTests
             AppOwnedSheetNames names,
             ConfigCellAddressMap config)
         {
-            FormulaCellAddress scorable = Address(names.ResultsSheetName, "A", 2);
-            FormulaCellAddress aiRaw = Address(names.ResultsSheetName, "B", 2);
-            FormulaCellAddress overrideValue = Address(names.ResultsSheetName, "C", 2);
-            FormulaCellAddress effective = Address(names.ResultsSheetName, "D", 2);
-            FormulaCellAddress normalized = Address(names.ResultsSheetName, "E", 2);
-            FormulaCellAddress evaluator = Address(names.ResultsSheetName, "K", 2);
-            FormulaCellAddress question = Address(names.ResultsSheetName, "L", 2);
-            FormulaCellAddress overall = Address(names.ResultsSheetName, "M", 2);
+            FormulaCellAddress scorable = Address(names.ResultsSheetName, "B", 2);
+            FormulaCellAddress aiRaw = Address(names.ResultsSheetName, "C", 2);
+            FormulaCellAddress overrideValue = Address(names.ResultsSheetName, "D", 2);
+            FormulaCellAddress effective = Address(names.ResultsSheetName, "E", 2);
+            FormulaCellAddress normalized = Address(names.ResultsSheetName, "F", 2);
+            FormulaCellAddress evaluator = Address(names.ResultsSheetName, "L", 2);
+            FormulaCellAddress answerPresent = Address(names.ResultsSheetName, "M", 2);
+            FormulaCellAddress questionNormalized = Address(names.ResultsSheetName, "N", 2);
+            FormulaCellAddress questionRate = Address(names.ResultsSheetName, "O", 2);
+            FormulaCellAddress questionEarned = Address(names.ResultsSheetName, "P", 2);
+            FormulaCellAddress similarity = Address(names.ResultsSheetName, "Q", 2);
+            FormulaCellAddress similarityPenalty = Address(names.ResultsSheetName, "T", 2);
+            FormulaCellAddress basePoints = Address(names.ResultsSheetName, "U", 2);
+            FormulaCellAddress specialEarned = Address(names.ResultsSheetName, "V", 2);
+            FormulaCellAddress finalRaw = Address(names.ResultsSheetName, "W", 2);
+            FormulaCellAddress finalScore = Address(names.ResultsSheetName, "X", 2);
             FormulaCellReference minimum = Ref(config.CriterionMinimumCells["C1"], absolute: true);
             FormulaCellReference maximum = Ref(config.CriterionMaximumCells["C1"], absolute: true);
             FormulaCellReference rounding = Ref(config.RoundingDigitsCell, absolute: true);
             FormulaCellReference criterionWeight = Ref(config.CriterionWeightCells["C1"], absolute: true);
             FormulaCellReference evaluatorWeight = Ref(config.EvaluatorWeightCells["E1"], absolute: true);
-            FormulaCellReference questionWeight = Ref(config.QuestionWeightCells["Q1"], absolute: true);
             return
             [
+                Expected(
+                    config.AllocationTotalCell,
+                    new FormulaIdentity("Definition", "DEF-X05", "X-05 synthetic definition", "AllocationTotal"),
+                    FormulaExpressions.AllocationTotal(
+                        Ref(config.BasePointsCell, true),
+                        Ref(config.SpecialPointsCell, true),
+                        [Ref(config.QuestionPointsCells["Q1"], true)]),
+                    100m),
+                Expected(
+                    config.AllocationValidCell,
+                    new FormulaIdentity("Definition", "DEF-X05", "X-05 synthetic definition", "AllocationValid"),
+                    FormulaExpressions.AllocationValid(Ref(config.AllocationTotalCell, true)),
+                    1m),
                 Expected(
                     effective,
                     new FormulaIdentity("Criterion", "C1", "Private criterion display canary", ResultsSheetWriter.EffectiveRawSuffix),
@@ -623,15 +664,55 @@ public sealed class OutputPackageValidatorTests
                     FormulaExpressions.Aggregate([new WeightedFormulaChild(Ref(normalized), criterionWeight)], rounding),
                     50m),
                 Expected(
-                    question,
-                    new FormulaIdentity("Question", "Q1", "Question", ResultsSheetWriter.QuestionScoreSuffix),
+                    questionNormalized,
+                    new FormulaIdentity("Question", "Q1", "Question", ResultsSheetWriter.QuestionNormalizedSuffix),
                     FormulaExpressions.Aggregate([new WeightedFormulaChild(Ref(evaluator), evaluatorWeight)], rounding),
                     50m),
                 Expected(
-                    overall,
-                    new FormulaIdentity("Definition", "DEF-X05", "X-05 synthetic definition", ResultsSheetWriter.OverallScoreHeader),
-                    FormulaExpressions.Aggregate([new WeightedFormulaChild(Ref(question), questionWeight)], rounding),
-                    50m),
+                    questionRate,
+                    new FormulaIdentity("Question", "Q1", "Question", ResultsSheetWriter.QuestionRateSuffix),
+                    FormulaExpressions.QuestionRate(Ref(answerPresent), Ref(questionNormalized)),
+                    0.5m),
+                Expected(
+                    questionEarned,
+                    new FormulaIdentity("Question", "Q1", "Question", ResultsSheetWriter.QuestionEarnedSuffix),
+                    FormulaExpressions.QuestionEarned(Ref(questionRate), Ref(config.QuestionPointsCells["Q1"], true), rounding),
+                    0.5m),
+                Expected(
+                    similarityPenalty,
+                    new FormulaIdentity("Question", "Q1", "Question", ResultsSheetWriter.SimilarityPenaltySuffix),
+                    FormulaExpressions.SimilarityPenalty(
+                        Ref(config.QuestionPointsCells["Q1"], true),
+                        Ref(similarity),
+                        Ref(config.SimilarityPenaltyWeightCell, true),
+                        rounding),
+                    0.1m),
+                Expected(
+                    basePoints,
+                    new FormulaIdentity("Definition", "DEF-X05", "X-05 synthetic definition", ResultsSheetWriter.BasePointsHeader),
+                    new FormulaCell(Ref(config.BasePointsCell, true)),
+                    99m),
+                Expected(
+                    specialEarned,
+                    new FormulaIdentity("Definition", "DEF-X05", "X-05 synthetic definition", ResultsSheetWriter.SpecialEarnedHeader),
+                    FormulaExpressions.SpecialEarned([], Ref(config.SpecialPointsCell, true), rounding),
+                    0m),
+                Expected(
+                    finalRaw,
+                    new FormulaIdentity("Definition", "DEF-X05", "X-05 synthetic definition", ResultsSheetWriter.FinalRawHeader),
+                    FormulaExpressions.FinalRaw(
+                        Ref(config.AllocationValidCell, true),
+                        Ref(config.BasePointsCell, true),
+                        [Ref(questionEarned)],
+                        Ref(specialEarned),
+                        [Ref(similarityPenalty)],
+                        rounding),
+                    99.4m),
+                Expected(
+                    finalScore,
+                    new FormulaIdentity("Definition", "DEF-X05", "X-05 synthetic definition", ResultsSheetWriter.FinalScoreHeader),
+                    FormulaExpressions.FinalScore(Ref(finalRaw)),
+                    99.4m),
             ];
         }
 

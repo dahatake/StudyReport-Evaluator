@@ -91,6 +91,156 @@ public sealed class WeightedScoreCalculator
         return Round(scaledWeightedScoreTotal / scaledWeightTotal, roundingDigits);
     }
 
+    public decimal? QuestionRate(bool answerPresent, decimal? questionNormalized)
+    {
+        if (!answerPresent)
+        {
+            return 0m;
+        }
+
+        return questionNormalized is decimal normalized && normalized is >= 0m and <= 100m
+            ? normalized / 100m
+            : null;
+    }
+
+    public decimal? QuestionEarned(decimal? questionRate, decimal questionPoints, int roundingDigits)
+    {
+        ValidateRoundingDigits(roundingDigits);
+        if (questionRate is not decimal rate
+            || rate is < 0m or > 1m
+            || questionPoints is < 0m or > 100m)
+        {
+            return null;
+        }
+
+        return TryRoundProduct(rate, questionPoints, roundingDigits);
+    }
+
+    public decimal? SpecialQuestionRate(IEnumerable<decimal?> scores, int roundingDigits)
+    {
+        ArgumentNullException.ThrowIfNull(scores);
+        ValidateRoundingDigits(roundingDigits);
+        ImmutableArray<decimal?> values = scores.ToImmutableArray();
+        if (values.IsEmpty
+            || values.Any(value => value is null or < 0m or > 1m))
+        {
+            return null;
+        }
+
+        try
+        {
+            return Round(values.Sum(value => value!.Value) / values.Length, roundingDigits);
+        }
+        catch (OverflowException)
+        {
+            return null;
+        }
+    }
+
+    public decimal? SpecialEarned(
+        decimal specialPoints,
+        IEnumerable<decimal?> specialQuestionRates,
+        int roundingDigits)
+    {
+        ArgumentNullException.ThrowIfNull(specialQuestionRates);
+        ValidateRoundingDigits(roundingDigits);
+        if (specialPoints is < 0m or > 100m)
+        {
+            return null;
+        }
+
+        if (specialPoints == 0m)
+        {
+            return 0m;
+        }
+
+        ImmutableArray<decimal?> rates = specialQuestionRates.ToImmutableArray();
+        if (rates.IsEmpty || rates.Any(rate => rate is null or < 0m or > 1m))
+        {
+            return null;
+        }
+
+        try
+        {
+            decimal average = rates.Sum(rate => rate!.Value) / rates.Length;
+            return Round(specialPoints * average, roundingDigits);
+        }
+        catch (OverflowException)
+        {
+            return null;
+        }
+    }
+
+    public decimal? SimilarityPenalty(
+        decimal questionPoints,
+        decimal? similarity,
+        decimal penaltyWeight,
+        int roundingDigits)
+    {
+        ValidateRoundingDigits(roundingDigits);
+        if (questionPoints is < 0m or > 100m
+            || similarity is not decimal score
+            || score is < 0m or > 1m
+            || penaltyWeight is < 0m or > 1m)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Round(questionPoints * score * penaltyWeight, roundingDigits);
+        }
+        catch (OverflowException)
+        {
+            return null;
+        }
+    }
+
+    public decimal? FinalRaw(
+        decimal basePoints,
+        IEnumerable<decimal?> questionEarned,
+        decimal? specialEarned,
+        IEnumerable<decimal?> similarityPenalties,
+        int roundingDigits)
+    {
+        ArgumentNullException.ThrowIfNull(questionEarned);
+        ArgumentNullException.ThrowIfNull(similarityPenalties);
+        ValidateRoundingDigits(roundingDigits);
+        ImmutableArray<decimal?> questions = questionEarned.ToImmutableArray();
+        ImmutableArray<decimal?> penalties = similarityPenalties.ToImmutableArray();
+        if (basePoints is < 0m or > 100m
+            || questions.IsEmpty
+            || questions.Any(value => value is null)
+            || specialEarned is null
+            || penalties.Length != questions.Length
+            || penalties.Any(value => value is null))
+        {
+            return null;
+        }
+
+        try
+        {
+            decimal value = checked(
+                basePoints
+                + questions.Sum(item => item!.Value)
+                + specialEarned.Value
+                - penalties.Sum(item => item!.Value));
+            return Round(value, roundingDigits);
+        }
+        catch (OverflowException)
+        {
+            return null;
+        }
+    }
+
+    public static decimal? FinalScore(decimal? finalRaw) => finalRaw switch
+    {
+        null => null,
+        < 0m => 0m,
+        > 100m => 100m,
+        _ => finalRaw,
+    };
+
     public decimal Round(decimal value, int roundingDigits)
     {
         ValidateRoundingDigits(roundingDigits);
@@ -139,6 +289,18 @@ public sealed class WeightedScoreCalculator
         if (roundingDigits is < 0 or > 6)
         {
             throw new ArgumentOutOfRangeException(nameof(roundingDigits), roundingDigits, "Rounding digits must be between 0 and 6.");
+        }
+    }
+
+    private decimal? TryRoundProduct(decimal left, decimal right, int roundingDigits)
+    {
+        try
+        {
+            return Round(left * right, roundingDigits);
+        }
+        catch (OverflowException)
+        {
+            return null;
         }
     }
 }

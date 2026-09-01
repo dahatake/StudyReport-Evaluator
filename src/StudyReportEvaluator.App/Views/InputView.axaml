@@ -119,10 +119,10 @@
           <StackPanel Spacing="3">
             <TextBlock Text="WORKBOOK" Classes="kicker" />
             <TextBlock Text="標準 .xlsx を読み込む" Classes="heading" />
-            <TextBlock Text="native dialog に依存せず、path を指定して同じ loader を test できます。" Classes="muted" TextWrapping="Wrap" />
+            <TextBlock Text="native picker または直接 path から選び、同じ read-only loader で検証します。" Classes="muted" TextWrapping="Wrap" />
           </StackPanel>
 
-          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
             <StackPanel Spacing="5">
               <TextBlock Text="ファイル path（標準 .xlsx）" Classes="label" />
               <TextBox
@@ -134,16 +134,33 @@
                   AutomationProperties.Name="入力する標準 xlsx ファイル path" />
             </StackPanel>
             <Button
-                x:Name="LoadFileButton"
+              x:Name="PickFileButton"
                 Grid.Column="1"
+              Content="ファイルを選択"
+              Click="HandlePickFileClick"
+              VerticalAlignment="Bottom"
+              TabIndex="1"
+              AutomationProperties.AutomationId="PickInputWorkbook"
+              AutomationProperties.Name="native picker で標準 xlsx ファイルを選択" />
+            <Button
+              x:Name="LoadFileButton"
+              Grid.Column="2"
                 Classes="primary"
                 Content="read-only で読込"
                 Command="{Binding LoadFileCommand}"
                 VerticalAlignment="Bottom"
-                TabIndex="1"
+              TabIndex="2"
                 AutomationProperties.AutomationId="LoadInputWorkbook"
                 AutomationProperties.Name="入力 Excel を read-only で読み込む" />
           </Grid>
+
+            <TextBlock
+              x:Name="PickerStatusMessage"
+              Text=""
+              IsVisible="False"
+              Foreground="{DynamicResource TechnicalTextBrush}"
+              TextWrapping="Wrap"
+              AutomationProperties.AutomationId="InputPickerStatus" />
 
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
             <StackPanel Spacing="2">
@@ -169,7 +186,7 @@
                   x:Name="WorksheetComboBox"
                   ItemsSource="{Binding Worksheets}"
                   SelectedItem="{Binding SelectedWorksheetChoice, Mode=TwoWay}"
-                  TabIndex="2"
+                  TabIndex="3"
                   AutomationProperties.AutomationId="InputWorksheet"
                   AutomationProperties.Name="回答 sheet">
                 <ComboBox.ItemTemplate>
@@ -182,18 +199,20 @@
 
             <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
               <StackPanel Grid.Column="0" Spacing="5">
-                <TextBlock Text="見出し行" Classes="label" />
-                <TextBox
-                    Text="{Binding HeaderRow, Mode=TwoWay}"
-                    TabIndex="3"
+                <TextBlock Text="質問文の行（1 または 2）" Classes="label" />
+                <ComboBox
+                  x:Name="HeaderRowComboBox"
+                  ItemsSource="{Binding HeaderRowOptions}"
+                  SelectedItem="{Binding HeaderRow, Mode=TwoWay}"
+                  TabIndex="4"
                     AutomationProperties.AutomationId="InputHeaderRow"
-                    AutomationProperties.Name="見出し行番号" />
+                  AutomationProperties.Name="質問文の行 1 または 2" />
               </StackPanel>
               <StackPanel Grid.Column="1" Spacing="5">
                 <TextBlock Text="回答開始行" Classes="label" />
                 <TextBox
                     Text="{Binding FirstDataRow, Mode=TwoWay}"
-                    TabIndex="4"
+                    TabIndex="5"
                     AutomationProperties.AutomationId="InputFirstDataRow"
                     AutomationProperties.Name="回答開始行番号" />
               </StackPanel>
@@ -201,7 +220,7 @@
                 <TextBlock Text="回答終了行" Classes="label" />
                 <TextBox
                     Text="{Binding LastDataRow, Mode=TwoWay}"
-                    TabIndex="5"
+                    TabIndex="6"
                     AutomationProperties.AutomationId="InputLastDataRow"
                     AutomationProperties.Name="回答終了行番号" />
               </StackPanel>
@@ -211,7 +230,7 @@
                 Content="見出し行を再読込"
                 Command="{Binding RefreshHeaderCommand}"
                 HorizontalAlignment="Left"
-                TabIndex="6"
+                TabIndex="7"
                 AutomationProperties.AutomationId="RefreshInputHeader"
                 AutomationProperties.Name="指定した見出し行で workbook metadata を再読込" />
           </StackPanel>

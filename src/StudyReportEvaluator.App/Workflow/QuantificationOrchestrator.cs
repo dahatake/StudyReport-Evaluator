@@ -109,6 +109,14 @@ public sealed record QuantificationRunRequest
 
     public int MaxConcurrency { get; init; } = EvaluationSchedulerOptions.DefaultMaxConcurrency;
 
+    public CopilotRuntimeIdentity? RuntimeIdentity { get; init; }
+
+    public string? OutputDirectory { get; init; }
+
+    public string? ResumePartialPath { get; init; }
+
+    public bool UseDurableWorkflow { get; init; }
+
     public override string ToString() =>
         $"{nameof(QuantificationRunRequest)} {{ MaxConcurrency = {MaxConcurrency.ToString(CultureInfo.InvariantCulture)}, Content = <redacted> }}";
 }

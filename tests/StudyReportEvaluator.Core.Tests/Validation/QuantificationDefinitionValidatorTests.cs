@@ -137,7 +137,7 @@ public sealed class QuantificationDefinitionValidatorTests
     }
 
     [Fact]
-    public void Equal_reversed_ranges_and_nonpositive_weights_are_rejected_at_each_identity()
+    public void Equal_reversed_ranges_negative_points_and_nonpositive_internal_weights_are_rejected()
     {
         QuantificationDefinition source = C02TestDefinitions.CreateValid();
         QuestionDefinition question = source.Questions[0];
@@ -148,7 +148,7 @@ public sealed class QuantificationDefinitionValidatorTests
             [
                 question with
                 {
-                    Weight = 0m,
+                    Points = -1m,
                     Evaluators =
                     [
                         evaluator with
@@ -171,9 +171,9 @@ public sealed class QuantificationDefinitionValidatorTests
 
         DefinitionValidationResult result = _validator.Validate(definition);
 
-        Assert.Equal(3, result.Errors.Count(error => error.Code == "WEIGHT_MUST_BE_POSITIVE"));
+        Assert.Equal(2, result.Errors.Count(error => error.Code == "WEIGHT_MUST_BE_POSITIVE"));
         Assert.Equal(2, result.Errors.Count(error => error.Code == "SCORE_RANGE_INVALID"));
-        Assert.Contains(result.Errors, error => error.NodeId == "Q1" && error.Field == "Weight");
+        Assert.Contains(result.Errors, error => error.Code == "QUESTION_POINTS_OUT_OF_RANGE" && error.NodeId == "Q1" && error.Field == "Points");
         Assert.Contains(result.Errors, error => error.NodeId == "E1" && error.Field == "Range");
         Assert.Contains(result.Errors, error => error.NodeId == "C1" && error.Field == "Range");
     }
@@ -219,6 +219,141 @@ public sealed class QuantificationDefinitionValidatorTests
         DefinitionValidationError error = Assert.Single(result.Errors, item => item.Code == "ROUNDING_OUT_OF_RANGE");
         Assert.Equal("RoundingDigits", error.Field);
         Assert.Equal(roundingDigits.ToString(System.Globalization.CultureInfo.InvariantCulture), error.SafeOffendingValue);
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
+    [InlineData(0, false)]
+    [InlineData(3, false)]
+    public void Question_text_row_is_limited_to_one_or_two(int headerRow, bool expectedValid)
+    {
+        QuantificationDefinition definition = C02TestDefinitions.CreateValid() with
+        {
+            HeaderRow = headerRow,
+            FirstDataRow = Math.Max(2, headerRow + 1),
+        };
+
+        DefinitionValidationResult result = _validator.Validate(definition);
+
+        Assert.Equal(expectedValid, result.IsValid);
+        if (!expectedValid)
+        {
+            Assert.Contains(result.Errors, error => error.Code == "QUESTION_TEXT_ROW_INVALID");
+        }
+    }
+
+    [Theory]
+    [InlineData("BasePoints", "-0.1", "BASE_POINTS_OUT_OF_RANGE")]
+    [InlineData("BasePoints", "100.1", "BASE_POINTS_OUT_OF_RANGE")]
+    [InlineData("SpecialPoints", "-0.1", "SPECIAL_POINTS_OUT_OF_RANGE")]
+    [InlineData("SpecialPoints", "100.1", "SPECIAL_POINTS_OUT_OF_RANGE")]
+    [InlineData("SimilarityPenaltyWeight", "-0.1", "SIMILARITY_WEIGHT_OUT_OF_RANGE")]
+    [InlineData("SimilarityPenaltyWeight", "1.1", "SIMILARITY_WEIGHT_OUT_OF_RANGE")]
+    public void Root_allocation_values_enforce_their_inclusive_ranges(
+        string field,
+        string valueText,
+        string expectedCode)
+    {
+        decimal value = decimal.Parse(valueText, System.Globalization.CultureInfo.InvariantCulture);
+        QuantificationDefinition source = C02TestDefinitions.CreateValid();
+        QuantificationDefinition definition = field switch
+        {
+            "BasePoints" => source with { BasePoints = value },
+            "SpecialPoints" => source with { SpecialPoints = value },
+            "SimilarityPenaltyWeight" => source with { SimilarityPenaltyWeight = value },
+            _ => throw new InvalidOperationException(),
+        };
+
+        DefinitionValidationResult result = _validator.Validate(definition);
+
+        Assert.Contains(result.Errors, error => error.Code == expectedCode && error.Field == field);
+    }
+
+    [Fact]
+    public void Allocation_must_equal_exactly_100_and_zero_question_points_are_allowed()
+    {
+        QuantificationDefinition source = C02TestDefinitions.CreateValid();
+        DefinitionValidationResult invalid = _validator.Validate(source with
+        {
+            Questions = [source.Questions[0] with { Points = 39.999999m }, source.Questions[1]],
+        });
+        DefinitionValidationResult validZero = _validator.Validate(source with
+        {
+            BasePoints = 100m,
+            Questions = [source.Questions[0] with { Points = 0m }, source.Questions[1]],
+        });
+
+        DefinitionValidationError error = Assert.Single(
+            invalid.Errors,
+            item => item.Code == "ALLOCATION_TOTAL_INVALID");
+        Assert.Equal("99.999999", error.SafeOffendingValue);
+        Assert.True(validZero.IsValid);
+    }
+
+    [Fact]
+    public void Positive_special_budget_requires_an_enabled_special_item()
+    {
+        QuantificationDefinition source = C02TestDefinitions.CreateValid();
+        QuantificationDefinition missing = source with
+        {
+            SpecialPoints = 10m,
+            Questions = [source.Questions[0] with { Points = 30m }, source.Questions[1]],
+        };
+        SpecialEvaluationDefinition special = CreateValidSpecial();
+        QuantificationDefinition present = missing with
+        {
+            Questions = [missing.Questions[0] with { SpecialEvaluations = [special] }, missing.Questions[1]],
+        };
+
+        DefinitionValidationResult missingResult = _validator.Validate(missing);
+        DefinitionValidationResult presentResult = _validator.Validate(present);
+
+        Assert.Contains(missingResult.Errors, error => error.Code == "SPECIAL_ITEMS_REQUIRED");
+        Assert.True(presentResult.IsValid);
+    }
+
+    [Fact]
+    public void Special_definition_validates_identity_columns_and_answer_placeholder_without_requiring_criteria()
+    {
+        QuantificationDefinition source = C02TestDefinitions.CreateValid();
+        SpecialEvaluationDefinition valid = CreateValidSpecial();
+        DefinitionValidationResult validResult = _validator.Validate(source with
+        {
+            SpecialPoints = 10m,
+            Questions =
+            [
+                source.Questions[0] with { Points = 30m, SpecialEvaluations = [valid] },
+                source.Questions[1],
+            ],
+        });
+        DefinitionValidationResult invalidResult = _validator.Validate(source with
+        {
+            Questions =
+            [
+                source.Questions[0] with
+                {
+                    SpecialEvaluations =
+                    [
+                        valid with
+                        {
+                            Id = source.Questions[0].Id,
+                            PrimarySourceColumn = "XFE",
+                            SupportingSourceColumns = ["G", "g", "XFE"],
+                            PromptTemplate = "{未知}",
+                        },
+                    ],
+                },
+                source.Questions[1],
+            ],
+        });
+
+        Assert.True(validResult.IsValid);
+        Assert.Contains(invalidResult.Errors, error => error.Code == "DUPLICATE_ID" && error.NodeKind == "SpecialEvaluation");
+        Assert.Contains(invalidResult.Errors, error => error.Code == "INVALID_SOURCE_COLUMN" && error.NodeKind == "SpecialEvaluation");
+        Assert.Contains(invalidResult.Errors, error => error.Code == "DUPLICATE_SUPPORTING_COLUMN" && error.NodeKind == "SpecialEvaluation");
+        Assert.Contains(invalidResult.Errors, error => error.Code == "PRIMARY_COLUMN_REUSED" && error.NodeKind == "SpecialEvaluation");
+        Assert.Contains(invalidResult.Errors, error => error.Code == "UNKNOWN_PLACEHOLDER" && error.NodeKind == "SpecialEvaluation");
     }
 
     [Theory]
@@ -368,7 +503,7 @@ public sealed class QuantificationDefinitionValidatorTests
                 source.Questions[0] with
                 {
                     QuestionText = questionCanary,
-                    Weight = 0m,
+                    Points = -1m,
                     Evaluators =
                     [
                         source.Questions[0].Evaluators[1] with
@@ -387,6 +522,15 @@ public sealed class QuantificationDefinitionValidatorTests
         Assert.DoesNotContain(questionCanary, renderedErrors, StringComparison.Ordinal);
         Assert.DoesNotContain(promptCanary, renderedErrors, StringComparison.Ordinal);
     }
+
+    private static SpecialEvaluationDefinition CreateValidSpecial() => new()
+    {
+        Id = "S1",
+        DisplayName = "Student prompt quality",
+        PrimarySourceColumn = "G",
+        SupportingSourceColumns = ["K"],
+        PromptTemplate = "Evaluate {回答}",
+    };
 }
 
 internal static class C02TestDefinitions

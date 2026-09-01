@@ -8,6 +8,7 @@
 |---|---|---|
 | 初めて利用する教員・採点者 | [はじめに](getting-started.md) | `.xlsx`の読込から別workbook出力までを順に実行する |
 | 評価方法を設計する人 | [機能リファレンス](features.md)、[Custom evaluatorガイド](custom-evaluator-guide.md) | Knowledge / Custom、range、weight、blank、overrideを理解する |
+| GitHub Copilotから起動したい教員・採点者 | [GitHub CopilotからPromptで起動する](prompt-launch.md) | copy-paste用の起動依頼、評価Prompt、sample mapping、pilot／resume手順を使う |
 | 情報管理・運用担当 | [データとprivacy](privacy-and-data-handling.md) | Copilotへ送る情報とoutput workbookの機密性を確認する |
 | 問題を解決したい利用者 | [トラブルシューティング](troubleshooting.md) | file、Prompt、認証、run、outputの技術エラーを切り分ける |
 | 要求所有者・QA | [要求定義書](requirements-definition.md)、[実装状態](../docs-dev/implementation-status.md) | frozen規範baselineとcurrent conformanceを分けて確認する |

@@ -1,232 +1,128 @@
-# Requirement traceability — final required evidence
+# Requirement traceability — v4.0 implementation baseline
 
 | 項目 | 値 |
 |---|---|
-| Task | E-TR |
-| Requirement baseline | `docs/requirements-definition.md` v3.0 |
-| Plan | `work/20260831-implementation-plan.md` v4.0 |
-| Scope ADR | ADR-0011 |
-| Exact path map | 37 task/gate rows |
-| Acceptance criteria tracked | 15 |
-| Test requirements tracked | 15 |
-| Mandatory requirement surfaces tracked | 18 |
-| Initial platform | Windows 11 x64 |
-| Required runtime input | standard response `.xlsx` 1 file |
-| Production projects / test projects | 2 / 2 |
-| Current implementation evidence | **GATE_ACCEPTANCE_RERUN_PASS** |
-| Current final gate | **PASS for evaluation HEAD `3f4227e` in generated evidence** |
-| Historical final gate | **PASS recorded for HEAD `62581a3` before post-gate gap discovery** |
-| Post-gate conformance audit | `IMPL-GAP-001` / `IMPL-GAP-002` closed at `69e4b99` |
-| Supersedes | B-04の実装前 `PLANNED` / `PENDING_GATE` progress snapshot |
-| Record date | 2026-09-01 |
+| Requirement | `docs/requirements-definition.md` v4.0 |
+| Decision | ADR-0012 |
+| Detailed design | `docs-dev/detailed-design.md` |
+| Plan | `work/20260901-v4-implementation-plan.md` |
+| Baseline validation | Release 485/485 PASS at HEAD `b7b0c0ac91148c42c4aa61e04f1dab4efbb0fc98` |
+| Current status | IMPLEMENTATION_IN_PROGRESS |
 
-本書はB-04で割り当てたownerを変更せず、実装前statusを完了したtask、required test、gate、commitへ置換する。B-04時点のmappingはGATE-0のidentity anchorとして履歴上有効である。E-TR後に生成されたGATE-ACCEPTANCEと、その後の文書・実装conformance監査を本追補へ反映する。
+この表の`PLANNED`は未実装をPASSと称しない。task完了後にproduction symbol、direct test、gate identityへ更新する。旧v3 traceabilityはGit履歴とADR-0011に保持する。
 
 ## Status vocabulary
 
 | Status | Meaning |
 |---|---|
-| `PASS_REQUIRED` | 実装が存在し、required deterministic testと直接phase gateがPASSしている。 |
-| `PASS_REQUIRED_OPTIONAL_NOT_RUN` | Required fake/oracle testはPASS。関連するoptional advisory smokeは明示的に`NOT_RUN`で、required PASSへ算入していない。 |
-| `PENDING_FINAL_GATE` | E-TRまでのrequired evidenceは揃ったが、後続のGATE-ACCEPTANCE自体はまだ実行していない。 |
-| `PASS_RECORDED_POST_GATE_GAP_OPEN` | Gate-time required checksはPASSしたが、後続監査で未解決のrequirement conformance gapを確認した。新しいfinal acceptanceにはgap closureと再評価が必要。 |
-| `CLOSED_PENDING_NEW_ACCEPTANCE` | post-gate gapのcode/test closureと独立レビューは完了。文書同期と全required rerun後の新gate recordを待つ。 |
-| `PROHIBITED_BY_CURRENT_SCOPE` | 現要求と矛盾する旧behaviorであり、negative testで不在を確認する。 |
-| `NOT_REQUIRED` | 初版scope外。提供、承認、検証、普遍的な不要性を意味しない。 |
-
-`PASS_REQUIRED`はAIの教育的妥当性、法的適合性、公平性、または未実行のlive service品質を保証しない。各gateのsolution test件数は、その時点の累積snapshotであり、相互に加算しない。
-
-`PENDING_FINAL_GATE`はE-TR commit時点のhistorical statusである。現在はgenerated GATE-ACCEPTANCE recordが存在するが、post-gate gapを未解決のまま新しいrelease acceptanceへ流用しない。
-
-## Evidence integrity and storage
-
-- 実装とtestのprimary identityはGit commitで固定する。
-- `artifacts/test/gate-*.json`、`artifacts/test/reviews/*.json`、performance JSON、package ZIP / sidecarはsession-localのgenerated ignored evidenceである。`git ls-files -- artifacts`は0件であり、commit済みartifactとは表記しない。
-- Generated evidenceはsample回答本文、Prompt、AI reason/evidence、token、credentialを含めず、review/gate JSONは`content_data_included: false`を記録する。
-- E-02 task reviewは3回測定の中央値3.279264秒、閾値30秒、AI待機除外でPASSを記録した。`performance-windows-x64.json`はrequired performance testの再実行ごとに再測定され得るため、固定baselineではない。同JSONは各測定のUTC時刻、OS / process architecture、logical processor数、.NET runtime、3件のraw測定値を自己記録する。GATE-ACCEPTANCEはその実行時に生成された値を読み、30秒以下であることを評価する。
-- Required workbook pathはExcel、Office、LibreOffice、COM automationを使用しない。external recalculationはoptional advisoryとしてだけ扱う。
-
-## Task and gate evidence ledger
-
-### Baseline and foundation
-
-| Task / gate | Result | Commit / evaluation identity | Required evidence |
-|---|---|---|---|
-| B-01 | PASS | `adc6ad12a3c80b4a92c9453d8b7a58e2daeb346f` | requirement v3.0、plan v4.0 |
-| B-02 | PASS | `502b48898411ca247543143773be8a3ee28ea7e5` | ADR-0011、read-only sample profile |
-| B-03 | PASS | `da8ced2f3ff78f7d3c1d7ed0c95c8de359bcbaab` | baseline、37-row exact path map |
-| B-04 | PASS at baseline | `dfeb25408756c8626f1d2cab0995bed107167415` | planned AC/TR/surface mapping; progress status superseded by E-TR |
-| GATE-0 | PASS | record `25e128ba5284784964243535f498af8f84e8e326`; evaluation HEAD `dfeb25408756c8626f1d2cab0995bed107167415` | 8 gate conditions、production source count 0、review blocker/high 0 |
-| F-01 | PASS | `fe0976924c13ce44f19fd413a53c79e7a3ca001c` | .NET 10、deterministic、warnings-as-errors、locked restore |
-| F-02 | PASS | `6314453d08f1f883af37b1f3782d1a4ba8b0f7c1`; compatibility `641dd426763b65a7e9cb795d526b77a8f8290b3d` | exact 2 production + 2 test topology、Avalonia bootstrap |
-| F-03 / GATE-1 | PASS | `f36db24ff314b6c8625036a125823e30b2decadf` | 8/8 tests、locked restore、Release build、architecture/supply-chain、review promotion-safe |
-
-### Core, Excel, AI, and application
-
-| Phase | Result | Task commits | Gate evidence snapshot |
-|---|---|---|---|
-| C-01〜C-06 | PASS | `1c736346d75a064fd30af8c41f1918c89e98c01f`; `7e895599919c12a3ec6ab187fb304373c2449547`; `be2faf19d54284e5b730b48c34257dfd0497d65b`; `3a5edf27428bf9aefeaf843e798ca61a692e83d4`; `0ffc77c7f45f8bf8f0e37f885f66b61e89d224e3`; `e72ce21aeb8fedbc89c11cb69c3e975e954be03d` | GATE-CORE PASS、122/122、failed 0、skipped 0、review unresolved blocker/high 0 |
-| X-01〜X-05 | PASS | `9de8f61e32e6d84ae2215a64fb384546124275ac`; `6dbb82cb189f030761ef09b38fa5c4b01aebf63c`; `d2c635382a28b678a2f690f08dc13037dae47cf1`; `9255f5b76d5c9f7e122350f2e75bd674c6ea394c`; `e0962611e3c0fe75123e80dacd40c12997b6cf61` | GATE-EXCEL PASS、344/344、failed 0、skipped 0、sample/input/formula/atomic evidence、review promotion-safe |
-| A-01〜A-03 | PASS | `bf13ee67929878172b80789397f1b524a6f91d09`; `37a89b1b937faeaa7b325ceda1a7f466a5e34384`; `56569e8f2ec95e10d2f8d4f67f7873bf8ed49cb7` | GATE-AI PASS、294/294、failed 0、skipped 0、fake auth/schema/tool/retry/timeout/cleanup、review promotion-safe; live=`NOT_RUN` |
-| U-01〜U-04 | PASS | `aabab47aca4cc976644a8a8f8da7aa5467cf6122`; `2a59d263cd7df5203a9d1390daedccd98869718e`; `c80772248110f2a8ca0eef09c905d9360464c4fd` + `414b04d40b53786ceeeca23d540e4247f72fc8bd`; `e955cca533bdc98a543465b4895dbdb6ca22fcce` + `e3f328a574d107af8cbde0da362d7446806db363` + `9ef26a20501c289b1a10f544c3f341983d6dae8f` | GATE-APP PASS、417/417、warnings 0、failed 0、skipped 0、4-step/warning/keyboard/200%/cancel/snapshot evidence、review promotion-safe |
-
-### Acceptance-phase tasks before E-TR
-
-| Task | Result | Commit | Required evidence |
-|---|---|---|---|
-| E-01 | PASS | `90a512e7410ad72d7e1254f4173779afed6dd256` | fixed-seed 531-row synthetic journey; task 1/1; solution 418/418; review promotion-safe |
-| X-02 follow-up | PASS | `66c727da10dfeca8c5c6ef9fe20973909747b287` | real sampleのPrompt-companion suggestionをsemanticに補完 |
-| E-02 | PASS | `28802b5d42ecf331d07990093e3c2f15c481a384` | target 20/20; real sample identity/input unchanged/content emitted false; Windows local/performance/failure evidence; review promotion-safe |
-| P-01 | PASS | `3c43105536c064e2f74daf8a2bc668548bc53b92` | package 3/3; solution 443/443; self-contained unsigned ZIP + SHA-256; review evidenced defects 0 |
-| D-01 | PASS | `10576398fb02c54d01f2811b87222a76ea43c039` | documentation 9/9; solution 452/452; generated review record promotion-safe; unsupported screenshot/quality/signing/platform claims absent |
-| E-TR | PASS | `62581a3081f94ee9da7ec0585c17046cfe1223df` | final AC/TR/surface mapping committed |
-| GATE-ACCEPTANCE | PASS at gate time | generated `artifacts/test/gate-acceptance.json`; evaluation HEAD `62581a3081f94ee9da7ec0585c17046cfe1223df` | 452/452、required not-run 0、independent review promotion-safe |
-| Post-gate documentation/conformance audit | PASS_RECORDED_POST_GATE_GAP_OPEN | [`implementation-status.md`](implementation-status.md) | IMPL-GAP-001 / 002を新規確認。旧gate artifactはhistoryとして不変 |
-| Documentation refresh validation | PASS | `71e9d61`、2026-09-01 | 文書契約test 2件とvisual documentation test 1件をpost-gate追加後、Release build、solution 455/455、failed 0、skipped 0。new gateではない |
-| IMPL-GAP-001 / 002 closure | PASS_REQUIRED | `69e4b992711c243fe7c70b0defff5e6abf03865c` | Prompt fail-fast、shared workbook/formula dry-run、actual-row request / model / attempt admission、numeric usage、package docs。全非文書test 473/473 |
-| GATE-ACCEPTANCE rerun | PASS | generated `artifacts/test/gate-acceptance-3f4227e.json`; evaluation HEAD `3f4227e15d725d2a010b4c6a9a94eb78b20b8573` | clean worktree、locked restore、Release build、solution 485/485、failed 0、skipped 0、sample unchanged、performance PASS、package PASS、independent review promotion-safe |
+| `PLANNED` | owner/file/testを割当済み。実装またはpassing evidenceは未確認 |
+| `PASS_REQUIRED` | production behaviorとdirect deterministic testが成功 |
+| `PASS_EXTERNAL` | credentialed／platform external testを実行して成功 |
+| `NOT_RUN_EXTERNAL_PREREQUISITE` | source/pipelineは存在するがrequired credential／runnerがなく実行していない |
+| `FAILED` | required verificationが失敗 |
+| `BLOCKED_REVIEW` | 再現したblocker/high review findingが未解決 |
+| `NOT_REQUIRED` | v4 scope外。不要性を一般化しない |
 
 ## Acceptance criteria mapping
 
-| Requirement | Production / delivery owners | Passing required test and evidence owners | Direct gate | Current result |
+| AC | Requirement surface | Production task | Required test owner | Status |
 |---|---|---|---|---|
-| AC-001 — one standard `.xlsx`; immutable input; separate output | X-01、X-03、X-05、U-03、U-04 | `FileFormatClassifierTests`; `InputSnapshotServiceTests`; `WorkingPackageTests`; `AtomicOutputCommitterFaultTests`; `SyntheticQuantificationJourneyTests`; `SampleWorkbookStructuralTests` | GATE-EXCEL、GATE-APP、E-01/E-02 | PASS_REQUIRED |
-| AC-002 — sample `Original!A1:L531` and F/G/H/I/J/K/L role suggestions | B-02、X-01、X-02、U-03 | `WorkbookMetadataReaderTests`; `ColumnMappingSuggesterTests`; `InputViewTests`; `SampleWorkbookStructuralTests` verifies exact identity、3 dimensions、F〜K candidates、A〜E/L unselected、J→K support | GATE-EXCEL、E-02 | PASS_REQUIRED |
-| AC-003 — dynamic question add/copy/reorder/disable/delete | C-01、C-02、U-03 | `DefinitionCollectionTests`; `QuantificationDefinitionValidatorTests`; `QuantificationDesignViewTests.Dynamic_question_evaluator_and_criterion_operations_preserve_stable_ids_and_snapshot_isolation` | GATE-CORE、GATE-APP | PASS_REQUIRED |
-| AC-004 — dynamic Knowledge/Custom evaluators、criteria、range、weight | C-01〜C-03、U-03 | `DefinitionCollectionTests`; `SyntheticSpecificationContractTests` 27-shape matrix; `QuantificationDesignViewTests` dynamic/type/range/weight/large-definition tests | GATE-CORE、GATE-APP | PASS_REQUIRED |
-| AC-005 — Knowledge semantic inclusion, not keyword count | C-03、A-02、U-03 | `BuiltInPromptTemplatesTests.Knowledge_template_requires_semantic_explanation_relation_and_application_not_keyword_presence`; `SafeEvaluationPayloadBuilderTests`; `EvaluationSchemaFactoryTests`; `QuantificationDesignViewTests.Knowledge_prompt_is_immutable_semantic_coverage_and_evaluator_types_are_closed` | GATE-CORE、GATE-AI、GATE-APP | PASS_REQUIRED — app-owned semantic instruction/schemaを検証。live AI品質や教育的妥当性は非保証 |
-| AC-006 — Custom Prompt quantifies arbitrary selected primary including student Prompt | C-01、C-03、X-02、A-02、U-03 | `PromptTemplateRendererTests`; `SafeEvaluationPayloadBuilderTests`; `ColumnMappingSuggesterTests`; `SubmitQuantificationToolTests`; `QuantificationDesignViewTests`; E-01 uses J as Custom primary and K as support | GATE-CORE、GATE-EXCEL、GATE-AI、GATE-APP、E-01 | PASS_REQUIRED |
-| AC-007 — AI returns criterion raw only, no aggregate | C-04、A-02、A-03、X-04 | `BuiltInPromptTemplatesTests.App_owned_contract_forbids_aggregate_scores_and_requires_one_tool_submission`; `QuantificationResultValidatorTests`; `EvaluationSchemaFactoryTests`; `SubmitQuantificationToolTests`; `ResultsSheetWriterTests` | GATE-CORE、GATE-AI、GATE-EXCEL | PASS_REQUIRED |
-| AC-008 — app-set 3-level weights; Config-referenced 0〜100 formulas | C-01、C-05、X-03、X-04、U-03、U-04 | `WeightedScoreCalculatorTests`; `FormulaSerializerTests`; `FormulaPreflightValidatorTests`; `ConfigAndRunSheetWriterTests`; `ResultsSheetWriterTests`; `QuantificationDesignViewTests.Three_level_weights_and_optional_ranges_show_effective_values_and_block_invalid_snapshot`; E-01 reopen/cached assertions | GATE-CORE、GATE-EXCEL、GATE-APP、E-01 | PASS_REQUIRED |
-| AC-009 — valid override wins for nonempty primary; blank override uses valid AI | C-05、X-04、U-01、U-04 | `WeightedScoreCalculatorTests.Valid_override_wins_even_when_ai_is_invalid_or_missing`; invalid-override no-fallback test; `ResultsSheetWriterTests`; `QuantificationOrchestratorTests` override/snapshot tests; `ResultsOutputViewTests`; E-01 | GATE-CORE、GATE-EXCEL、GATE-APP、E-01 | PASS_REQUIRED |
-| AC-010 — Config/Results/Run sheets and atomic separate output | X-03〜X-05、U-04 | `ConfigAndRunSheetWriterTests`; `ResultsSheetWriterTests`; `OutputPackageValidatorTests`; `AppOwnedSheetNameResolverTests`; `AtomicOutputCommitterFaultTests`; E-01 full output/reopen/original-preservation test | GATE-EXCEL、GATE-APP、E-01/E-02 | PASS_REQUIRED |
-| AC-011 — empty/failure/cancel remain blank unless valid nonempty-primary override | C-04、C-05、A-03、X-04、U-01、U-04 | `WeightedScoreCalculatorTests.Empty_primary_is_unscorable_and_override_cannot_create_a_score`; missing-never-zero test; `EphemeralEvaluationRunnerTests`; `ResultsSheetWriterTests`; `QuantificationOrchestratorTests.Empty_primary_has_EMPTY_blank_contract_and_cannot_receive_an_override`; cancel-partial test; E-01 blank reopen assertions | GATE-CORE、GATE-AI、GATE-EXCEL、GATE-APP、E-01 | PASS_REQUIRED |
-| AC-012 — persistent non-modal warning is display-only and nonblocking | U-02〜U-04 | `EthicsWarningTests`; `MainWindowTests`; `QuantificationDesignViewTests.Design_contract_has_no_warning_acknowledgement_state`; `PrimaryJourneyAccessibilityTests`; GATE-APP `warning_visible_nonblocking_without_interaction` | GATE-APP | PASS_REQUIRED |
-| AC-013 — selected same-row sources only; no body/token logging | C-03、C-04、A-02、A-03、U-01 | `SafeEvaluationPayloadBuilderTests`; `QuantificationResultValidatorTests`; `SubmitQuantificationToolTests`; `CapabilityBoundaryTests`; `SafeLoggerCanaryTests`; `QuantificationOrchestratorTests` redaction/snapshot tests; `HostileInputAndFailureTests` | GATE-CORE、GATE-AI、GATE-APP、E-02 | PASS_REQUIRED |
-| AC-014 — existing Copilot CLI login; no app client ID/secret/policy | A-01、U-04 | `CopilotClientFactoryTests`; `CopilotAuthenticationServiceTests`; `CapabilityBoundaryTests`; `ExecutionViewTests`; required fake/runtime contract PASS | GATE-AI、GATE-APP | PASS_REQUIRED_OPTIONAL_NOT_RUN — authenticated live smoke is `NOT_RUN` |
-| AC-015 — Windows x64 build/tests/E2E/self-contained package | F-01〜F-03、E-01、E-02、P-01、D-01 | `DependencyRulesTests`; `PackageLockTests`; `WindowsLocalApplicationTests`; `WindowsX64PerformanceEvidenceTests`; `WindowsPublishPackageTests`; `DocumentationContractTests`; gate-time solution 452/452 | GATE-1、GATE-APP、E-01/E-02、P-01/D-01、GATE-ACCEPTANCE | PASS_REQUIRED at gate time; post-gate gaps are tracked separately |
-
-## Mandatory requirement surfaces
-
-次表はgate-time evidenceを保持し、post-gate auditで判明したintegration timing差分にはclosure commit `69e4b99`のrun-admission evidenceを追記する。
-
-| Requirement surface | Passing verification | Result |
-|---|---|---|
-| Standard `.xlsx` classification and read-only snapshot | `FileFormatClassifierTests`; `InputSnapshotServiceTests`; `SampleWorkbookStructuralTests` | PASS_REQUIRED |
-| Arbitrary sheet/header/data rows and primary/support mapping | `QuantificationDefinitionTests`; `ColumnMappingSuggesterTests`; `ColumnMappingValidatorTests`; `InputViewTests`; E-01/E-02 | PASS_REQUIRED |
-| Ordered dynamic hierarchy and enabled minima | `DefinitionCollectionTests`; `QuantificationDefinitionValidatorTests`; `QuantificationDesignViewTests` | PASS_REQUIRED |
-| Immutable canonical run snapshot and draft isolation | `QuantificationSnapshotTests`; `CanonicalDefinitionSerializerTests`; `QuantificationOrchestratorTests.Mid_run_draft_replacement_cannot_change_current_payload_validation_override_or_formula_layout_contract` | PASS_REQUIRED |
-| Knowledge app-owned semantic instruction | `BuiltInPromptTemplatesTests`; `SafeEvaluationPayloadBuilderTests`; `QuantificationDesignViewTests` | PASS_REQUIRED |
-| Custom Prompt six placeholders and opaque insertion | `PromptTemplateRendererTests`; `QuantificationDefinitionValidatorTests`; `SafeEvaluationPayloadBuilderTests`; `QuantificationDesignViewTests`; `ExecutionViewTests`; `QuantificationOrchestratorTests` | PASS_REQUIRED — Design、Execution、snapshot creationで同一検証。invalid時input / row / runner 0 |
-| Closed AI criterion result and same-row evidence binding | `QuantificationResultValidatorTests`; `EvaluationSchemaFactoryTests`; `SubmitQuantificationToolTests` | PASS_REQUIRED |
-| Three-level weights and rounded-child aggregate | `WeightedScoreCalculatorTests`; `FormulaSerializerTests`; `ResultsSheetWriterTests`; E-01 | PASS_REQUIRED |
-| Scorable/blank/override semantics | `WeightedScoreCalculatorTests`; `ResultsSheetWriterTests`; `QuantificationOrchestratorTests`; `ResultsOutputViewTests` | PASS_REQUIRED |
-| Formula allowlist/ref/DAG/length/function/column preflight | `FormulaSerializerTests`; `FormulaPreflightValidatorTests`; `WorkbookExecutionPreflightTests`; `ConfigAndRunSheetWriterTests`; `OutputPackageValidatorTests` | PASS_REQUIRED at run admission and export — same layout / AST / validator |
-| Cached preview and Office-independent required tests | `FormulaCellWriterTests`; `ResultsSheetWriterTests`; `OutputPackageValidatorTests`; E-01/P-01 | PASS_REQUIRED_OPTIONAL_NOT_RUN — external recalculation is `NOT_RUN` |
-| Unique Config/Results/Run sheets and preserved originals | `AppOwnedSheetNameResolverTests`; `ConfigAndRunSheetWriterTests`; `ResultsSheetWriterTests`; E-01 | PASS_REQUIRED |
-| Target-local temp、reopen validation、input recheck、atomic rename | `WorkingPackageTests`; `OutputPackageValidatorTests`; `AtomicOutputCommitterFaultTests`; E-01/E-02 | PASS_REQUIRED |
-| Existing CLI auth、ephemeral session、timeout/retry/cancel/cleanup | `CopilotClientFactoryTests`; `CopilotAuthenticationServiceTests`; `EphemeralEvaluationRunnerTests`; `RetryAndCleanupCoordinatorTests`; `EvaluationSchedulerTests`; `QuantificationOrchestratorTests` | PASS_REQUIRED_OPTIONAL_NOT_RUN — live smoke is `NOT_RUN` |
-| Selected-source capability and no-content logging | `SafeEvaluationPayloadBuilderTests`; `QuantificationResultValidatorTests`; `CapabilityBoundaryTests`; `SafeLoggerCanaryTests`; `HostileInputAndFailureTests` | PASS_REQUIRED |
-| Persistent warning with zero processing dependency | `EthicsWarningTests`; `MainWindowTests`; `PrimaryJourneyAccessibilityTests`; GATE-APP negative checks | PASS_REQUIRED |
-| Four-step keyboard/focus/200% UI and dynamic editor | `MainWindowTests`; `InputViewTests`; `QuantificationDesignViewTests`; `ExecutionViewTests`; `ResultsOutputViewTests`; `PrimaryJourneyAccessibilityTests` | PASS_REQUIRED |
-| Limits、Windows E2E、publish/package、documentation | boundary/unit tests; `SyntheticSpecificationContractTests`; `EvaluationRequestCapacityValidatorTests`; `WorkbookExecutionPreflightTests`; E-01/E-02; `WindowsPublishPackageTests`; `DocumentationContractTests` | PASS_REQUIRED — pre-run request 65,536 scalars、model 80%、attempt 20,000、Excel/formula capacityを含む |
+| AC-001 | picker/path、immutable input、separate output | X-01/U-01/X-04 | input/path/atomic tests | PLANNED |
+| AC-002 | question row 1/2、sheet/rows/normal/special mapping | X-01/U-01/U-02 | metadata/mapping/UI tests | PLANNED |
+| AC-003 | repository sample F/I + G/J/K candidate、input identity | X-01 | sample structural test | PLANNED |
+| AC-004 | base 60、special 0、similarity weight 0.1 | C-01/U-02 | domain/design tests | PLANNED |
+| AC-005 | equal initial question points、explicit equalize、manual preservation | C-02/U-02 | allocation/UI tests | PLANNED |
+| AC-006 | exact allocation total 100 | C-02/C-04/X-02 | validator/formula tests | PLANNED |
+| AC-007 | dynamic Knowledge/Custom criterion raw only | C-05/A-03 | Core/Copilot tests | PLANNED |
+| AC-008 | special item and equal averages | C-01/C-03/A-03/X-03 | domain/result/formula tests | PLANNED |
+| AC-009 | one `auto` reference/question/run and References sheet | A-02/X-02/W-02 | reference/writer/resume tests | PLANNED |
+| AC-010 | 0〜1 similarity and per-question penalty | A-04/C-03/X-03 | similarity/scoring/formula tests | PLANNED |
+| AC-011 | Excel-owned earned/special/penalty/raw/clamped final | C-03/C-04/X-03 | hand oracle/writer/reopen tests | PLANNED |
+| AC-012 | empty-zero、technical-blank | C-03/A-02..04/X-03 | operation/formula/E2E tests | PLANNED |
+| AC-013 | result naming、four final sheets、atomic commit | X-02/X-03/X-04 | writer/path/fault tests | PLANNED |
+| AC-014 | partial create and durable reference/row checkpoints | W-01/W-02 | checkpoint/workflow tests | PLANNED |
+| AC-015 | closed resume validation and completed-row skip | W-01/W-02 | mismatch/skip tests | PLANNED |
+| AC-016 | stage/progress/completion/path/count display | U-03 | execution/results UI tests | PLANNED |
+| AC-017 | exact warning text and nonblocking | U-04 | warning/accessibility tests | PLANNED |
+| AC-018 | `--input`, repeated `--prompt`, explicit apply, no auto-run | L-01/U-02 | parser/startup/UI tests | PLANNED |
+| AC-019 | selected same-row payload and no-content logs | C-05/A-02..04/W-01 | capability/logger/canary tests | PLANNED |
+| AC-020 | Windows self-contained package/install | P-01 | packaging/install smoke | PLANNED |
+| AC-021 | macOS arm64/x64 bundle and signed/notary pipeline | P-02/P-03 | contract + external runner | PLANNED |
+| AC-022 | user/dev docs and current screenshots | D-01..05 | documentation/screenshot tests | PLANNED |
 
 ## Test requirement mapping
 
-| Requirement test | Required test/evidence | Result |
-|---|---|---|
-| TR-01 sample identity/sheet/dimension/header-role suggestions | B-02 profile; `WorkbookMetadataReaderTests`; `ColumnMappingSuggesterTests`; `SampleWorkbookStructuralTests` | PASS_REQUIRED |
-| TR-02 dynamic 1/2/10 questions、1/2/5 evaluators、1/4/20 criteria | `SyntheticSpecificationContractTests.Definition_matrix_builds_all_27_dynamic_shapes_as_valid_deterministic_snapshots`; definition/UI collection and enabled-minimum tests | PASS_REQUIRED |
-| TR-03 Knowledge points/semantic instruction/schema | `BuiltInPromptTemplatesTests`; `SafeEvaluationPayloadBuilderTests`; `EvaluationSchemaFactoryTests`; design UI tests | PASS_REQUIRED |
-| TR-04 Custom arbitrary primary/Prompt/brace/supporting | `PromptTemplateRendererTests`; `QuantificationDefinitionValidatorTests`; `SafeEvaluationPayloadBuilderTests`; `QuantificationOrchestratorTests`; mapping tests; E-01 J/K path | PASS_REQUIRED — invalid Promptはinput capture / row read / runner前に拒否 |
-| TR-05 range/weight/override/blank/midpoint hand calculation | `WeightedScoreCalculatorTests`; `SyntheticSpecificationContractTests.Result_oracles_match_the_independent_hand_calculation_contract`; writer/orchestrator override tests | PASS_REQUIRED |
-| TR-06 criterion→evaluator→question→overall formula/cached/blank | `FormulaSerializerTests`; `FormulaCellWriterTests`; `ResultsSheetWriterTests`; `OutputPackageValidatorTests`; E-01 reopen/cached oracle | PASS_REQUIRED |
-| TR-07 empty/invalid AI/auth/network/cancel/input/output failures | definition/result validators; Copilot auth/runner/retry tests; orchestrator cancellation/input-drift tests; atomic/output validation tests; `HostileInputAndFailureTests` | PASS_REQUIRED |
-| TR-08 formula injection/external/cycle/formula/cell limits | `FormulaSerializerTests`; `FormulaPreflightValidatorTests`; `WorkbookExecutionPreflightTests`; `UntrustedStringCellWriterTests`; `FileFormatClassifierTests`; `OutputPackageValidatorTests`; `HostileInputAndFailureTests` | PASS_REQUIRED at run admission and writer/export |
-| TR-09 input identity/copy preservation/atomic faults | `InputSnapshotServiceTests`; `WorkingPackageTests`; `AtomicOutputCommitterFaultTests`; E-01/E-02 | PASS_REQUIRED |
-| TR-10 selected source/evidence/row isolation/no-content/capability | `SafeEvaluationPayloadBuilderTests`; `QuantificationResultValidatorTests`; `SubmitQuantificationToolTests`; `CapabilityBoundaryTests`; `SafeLoggerCanaryTests`; hostile E2E | PASS_REQUIRED |
-| TR-11 warning visible and nonblocking | `EthicsWarningTests`; `MainWindowTests`; `PrimaryJourneyAccessibilityTests`; GATE-APP required check | PASS_REQUIRED |
-| TR-12 existing login/timeout/Office independence/optional smoke | auth/factory/runner/retry tests; formula/cached reopen tests; Windows local/package tests | PASS_REQUIRED_OPTIONAL_NOT_RUN — live and external smoke remain separate `NOT_RUN` |
-| TR-13 four-step keyboard/focus/200% UI | `MainWindowTests`; five view test surfaces; `PrimaryJourneyAccessibilityTests` | PASS_REQUIRED |
-| TR-14 fixed-seed sample-like 531-row synthetic E2E | C-06 synthetic fixtures; `SyntheticQuantificationJourneyTests.Fixed_seed_531_row_workbook_completes_the_local_atomic_quantification_journey` | PASS_REQUIRED |
-| TR-15 Windows x64 publish/package/documentation | `WindowsLocalApplicationTests`; `WindowsX64PerformanceEvidenceTests`; `WindowsPublishPackageTests`; `DocumentationContractTests` | PASS_REQUIRED |
-
-## Post-gate conformance audit
-
-Gate-time artifactの生成後、current documentationとproduction call pathを再照合し、次の2件を確認した。
-
-| Gap | Requirement surface | Production evidence | Current result |
+| TR | Requirement | Required evidence owner | Status |
 |---|---|---|---|
-| `IMPL-GAP-001` | Custom Prompt syntaxはrun開始前に拒否 | Core validatorをDesign / Execution / snapshotへ共有。invalid時input capture、row read、runner call 0 | CLOSED at `69e4b99` |
-| `IMPL-GAP-002` | Results column / formula / request capacityはrun前に拒否 | shared dry-run layout / formula AST、actual-row Prompt/schema、SDK model 80%、最大20,000 attemptsをAI dispatch前に検査 | CLOSED at `69e4b99` |
+| TR-01 | Forms synthetic row 1/2 | X-01 tests | PLANNED |
+| TR-02 | sample structure/identity | X-01 E2E | PLANNED |
+| TR-03 | picker and format | U-01/input tests | PLANNED |
+| TR-04 | allocation | C-02/U-02 | PLANNED |
+| TR-05 | definition validation | C-02 | PLANNED |
+| TR-06 | normal/special Prompt/schema | C-05/A-03 | PLANNED |
+| TR-07 | reference once/auto/resume | A-02/W-02 | PLANNED |
+| TR-08 | score boundaries/empty/failure | C-03/A-03/A-04 | PLANNED |
+| TR-09 | independent score oracle | C-03 | PLANNED |
+| TR-10 | formula/ref/DAG/cached | C-04/X-03 | PLANNED |
+| TR-11 | final sheet set/preservation | X-02/X-03 | PLANNED |
+| TR-12 | path naming/atomic | X-04 | PLANNED |
+| TR-13 | checkpoint save/fault | W-01 | PLANNED |
+| TR-14 | resume mismatch/skip | W-02 | PLANNED |
+| TR-15 | AI failure/retry/cancel | A-02..04/W-02 | PLANNED |
+| TR-16 | selected-row/literal/no-content | C-05/A-02..04/X-03 | PLANNED |
+| TR-17 | 4-step UI/warning/progress/accessibility | U-01..04 | PLANNED |
+| TR-18 | launch options/Prompt/no auto-run | L-01/U-02 | PLANNED |
+| TR-19 | Windows delivery | P-01 | PLANNED |
+| TR-20 | macOS deterministic delivery | P-02 | PLANNED |
+| TR-21 | macOS credentialed release | P-03 external | PLANNED |
+| TR-22 | docs/screenshots | D-01..04 | PLANNED |
+| TR-23 | fixed-seed new/resume E2E | E-01/E-02 | PLANNED |
+| TR-24 | optional live/recalculation | E-03 advisory | PLANNED |
 
-正確なcall path、impact、closure conditionは[`implementation-status.md`](implementation-status.md)を正本とする。この追補は過去のgenerated gate artifactを書き換えず、post-gate findingとして時間順に追加する。
+## Mandatory safety surfaces
 
-影響するtraceability interpretation:
-
-- AC-004 / TR-04はPrompt renderer、Core definition、Execution、orchestrator fail-fastへ接続した。
-- AC-008 / TR-06 / TR-08はformula writerと同じlayout / AST / validatorをrun admissionへ接続した。
-- 両gapのcode/test closureと独立レビューは完了。新しいrelease acceptanceを主張する前に、文書同期後の全required rerunと新generated recordを必要とする。
-
-## Optional advisory evidence — never a required substitute
-
-| Optional evidence | Status | Required evidence that independently passed | Disposition |
+| Surface | Owner | Required negative evidence | Status |
 |---|---|---|---|
-| Authenticated live Copilot smoke | `PASS` — fixed synthetic payload、`content_data_included=false` | A-01〜A-03 fake authentication、schema、single-tool、retry、timeout、cancel、cleanup、capability tests | Visible advisory only; no real-data quality、education、fairness claim |
-| Microsoft Excel recalculation | `PASS` — fixed synthetic workbook、EffectiveRaw 5 / 4 aggregate levels 50 | Core hand oracle、closed formula AST、cached values、Open XML reopen validation、calculation properties | Visible advisory only; no all-workbook / all-environment claim |
+| Input never modified | X-01/X-04/W-01 | success/failure/cancel/resume hash unchanged | PLANNED |
+| Empty is 0, failure is blank | C-03/X-03 | no runner for empty; no failure-to-zero | PLANNED |
+| Allocation exact 100 | C-02/X-02/X-03 | mismatch run blocked and formula blank | PLANNED |
+| Reference once/question/run | A-02/W-02 | no duplicate across resume | PLANNED |
+| `auto` no fallback | A-01/A-02/A-04 | auto absent causes preflight error | PLANNED |
+| Closed AI tools | A-02..04 | unknown/missing/duplicate/range/evidence rejected | PLANNED |
+| Selected same row only | C-05/A-02..04 | other row/column/path absent | PLANNED |
+| No content logs | all runtime | canary text absent | PLANNED |
+| Formula allowlist/ref/DAG | C-04/X-03 | raw/external/cycle/limits rejected | PLANNED |
+| Literal untrusted strings | X-02/X-03/W-01 | formula markers remain strings | PLANNED |
+| Atomic partial update | W-01 | old partial survives every pre-replace fault | PLANNED |
+| Closed resume identity | W-01/W-02 | each mismatch rejects without write | PLANNED |
+| Atomic final output | X-04 | valid final or no final | PLANNED |
+| Warning no dependency | U-04 | zero acknowledgement/gate state | PLANNED |
+| No CLI auto-run | L-01 | runner/session call count 0 after startup | PLANNED |
+| Bundled CLI pinning | A-01/P-01/P-02 | PATH fallback and hash mismatch rejected | PLANNED |
+| Platform claims | P-01..03/D-01..05 | no unverified macOS/signing PASS | PLANNED |
 
-optional `PASS`もrequired gateを決定しない。GATE-AIとGATE-EXCELのrequired PASSはそれぞれfake runtimeとformula/cached oracleだけで独立に決定する。
+## Review protocol
 
-## Prohibited or non-required former behavior
+各task review recordは少なくとも次を記録する。
 
-| Former surface | Current disposition | Required enforcement evidence |
-|---|---|---|
-| AI candidate waits for mandatory human adoption before calculation | PROHIBITED_BY_CURRENT_SCOPE | scoring/writer/results tests require valid AI direct use when override blank |
-| Ethics consent/checkbox/approval/role/expiry gate | PROHIBITED_BY_CURRENT_SCOPE | `EthicsWarningTests`; design/result contract tests; GATE-APP warning-gate count 0 |
-| Send-preview confirmation required before AI dispatch | PROHIBITED_BY_CURRENT_SCOPE | orchestrator/execution journey has no confirmation dependency |
-| Fixed two-question/fixed report-vs-Prompt candidate model | PROHIBITED_BY_CURRENT_SCOPE | 27-shape fixture matrix and dynamic UI operations |
-| Invalid nonempty override silently falls back to AI | PROHIBITED_BY_CURRENT_SCOPE | calculator/writer invalid-override tests require blank |
-| Empty primary can be scored by override | PROHIBITED_BY_CURRENT_SCOPE | calculator/orchestrator/writer Scorable tests |
-| Excel/Office/LibreOffice/COM required runtime/test | PROHIBITED_BY_CURRENT_SCOPE | dependency tests、Open XML required path、Windows launch/package tests |
-| Managed OAuth app/org policy/legal/education approval | NOT_REQUIRED | no initial owner or credential input surface |
-| macOS/Linux/Arm64/signing/notarization | NOT_REQUIRED | Windows x64 unsigned package and documentation negative contracts |
-| Repeated stochastic evaluation/majority/median | NOT_REQUIRED | one evaluation per row × question × evaluator contract |
+- reviewed task IDとfile list
+- target test/build result
+- finding severity、reproduction、disposition
+- rejected findingの明確な根拠
+- applied fixとfollow-up result
+- content data included = false
 
-## Unsupported-claim audit
+レビュー本文へ学生回答、Prompt、reference、AI reason/evidenceを含めない。
 
-Required documentation and delivery evidence make none of the following claims:
+## Final gate prerequisites
 
-- signed ZIP、installer、notarization;
-- macOS、Linux、Windows Arm64 support;
-- authenticated live Copilot smoke PASS;
-- external Excel/LibreOffice recalculation PASS;
-- AI score quality、educational validity、fairness、institutional policy、legal compliance guarantees;
-- screenshots that were not captured;
-- package/gate artifacts being committed to Git.
-
-The package is explicitly unsigned。The supported initial platform is Windows 11 x64 only。The absence of an unsupported claim does not certify the omitted capability。
-
-## Gate chain and current disposition
-
-```mermaid
-flowchart LR
-    G0[GATE-0 PASS] --> G1[GATE-1 PASS]
-    G1 --> GC[GATE-CORE PASS]
-    GC --> GX[GATE-EXCEL PASS]
-    GC --> GA[GATE-AI PASS]
-    GX --> GU[GATE-APP PASS]
-    GA --> GU
-    GU --> ET[E-01 / E-02 / P-01 / D-01 / E-TR]
-    ET --> GE[GATE-ACCEPTANCE PASS at 62581a3]
-    GE --> PA[Post-gate audit\nIMPL-GAP-001 / 002 found]
-    PA --> CL[Gap closure 69e4b99\nCLOSED]
-    CL --> RV[Required rerun\n485 / 485 PASS]
-    RV --> NG[New GATE-ACCEPTANCE\nPASS at 3f4227e]
-```
-
-- AC-001〜015、18 mandatory surfaces、TR-01〜15はすべてpassing required evidenceへ接続した。
-- FoundationからD-01までのtask reviewはunresolved blocker/high 0でpromotion-safeとなった。Reviewの推測や再現しない指摘はdefectへ数えず、再現したfindingだけを修正後のrequired testで閉じた。
-- D-01完了時のRelease solution testは452/452、failed 0、skipped 0だった。この値は過去gate件数との合計ではない。
-- Optional live Copilot smokeとMicrosoft Excel recalculation smokeは固定合成データで`PASS`したが、required PASSへ昇格していない。
-- GATE-ACCEPTANCEはHEAD `62581a3`へPASSを記録した。artifactはgenerated ignored evidenceであり、commit済み証明ではない。
-- post-gate auditで確認したIMPL-GAP-001 / 002は`69e4b99`でclosedした。旧PASSは履歴として保持し、評価HEAD `3f4227e`の新GATE-ACCEPTANCEを別recordで`PASS`した。
+1. AC-001〜022が`PASS_REQUIRED`または明示的なexternal statusへ更新済み。
+2. TR-01〜24がpassing required evidenceへ接続済み。
+3. 全required test、Release build、package testがPASS。
+4. sample input identity不変。
+5. unresolved reproducible blocker/high finding 0。
+6. Windows package/install smoke PASS。
+7. macOS deterministic package/launch test PASS on macOS runner。
+8. signing/notaryはcredentialed runならPASS、未実行なら`NOT_RUN_EXTERNAL_PREREQUISITE`。未実行をPASSとしない。
+9. optional live Copilot／spreadsheet recalculationをrequired evidenceへ算入しない。
+10. docsとscreenshotsがcurrent UIへ同期。

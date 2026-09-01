@@ -142,7 +142,7 @@ public sealed class EphemeralEvaluationRunner
     private static string CreateSessionId() =>
         $"{SessionIdPrefix}{Guid.NewGuid():N}";
 
-    private static void ValidateModelId(string modelId)
+    internal static void ValidateModelId(string modelId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modelId);
         if (modelId.Length > 256

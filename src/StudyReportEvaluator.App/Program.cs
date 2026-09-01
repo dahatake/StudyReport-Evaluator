@@ -1,15 +1,30 @@
 using Avalonia;
+using StudyReportEvaluator.App.Composition;
+using StudyReportEvaluator.App.Launch;
 
 namespace StudyReportEvaluator.App;
 
-internal static class Program
+public static class Program
 {
     [STAThread]
-    public static void Main(string[] args) =>
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    public static int Main(string[] args)
+    {
+        LaunchStartupState startup = LaunchStartupState.Create(args);
+        return BuildAvaloniaApp(startup).StartWithClassicDesktopLifetime([]);
+    }
 
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .LogToTrace();
+
+    public static AppBuilder BuildAvaloniaApp(LaunchStartupState startup)
+    {
+        ArgumentNullException.ThrowIfNull(startup);
+        return AppBuilder.Configure(() => new App(
+            ServiceRegistration.FromStartup(startup),
+                startup.Error))
+            .UsePlatformDetect()
+            .LogToTrace();
+    }
 }

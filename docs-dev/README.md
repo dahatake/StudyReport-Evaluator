@@ -8,21 +8,23 @@
 |---|---|---|
 | [実装状態](implementation-status.md) | 開発、QA、リリース | 現在の実装済みsurface、生成gate、post-gate gap closure |
 | [アーキテクチャ](architecture.md) | 開発、アーキテクト | dependency、run、Copilot、UI、output data flow |
+| [詳細設計書](detailed-design.md) | 開発、アーキテクト、QA | v4 domain、AI operation、formula、checkpoint、UI、platform設計 |
 | [Excel / formula契約](excel-contract.md) | 開発、Excel監査、QA | sheet、formula、blank、preflight、atomic commit |
 | [Traceability](traceability.md) | QA、リリース | AC / TR / implementation / test / gate対応 |
-| [要求定義書](../docs/requirements-definition.md) | 要求所有者、QA | GATE-0でexact-byte固定したv3.0規範baseline。current statusではない |
-| [ADR-0011](adr/0011-dynamic-quantification-excel-formulas.md) | アーキテクト | 現行scope decision |
+| [要求定義書](../docs/requirements-definition.md) | 要求所有者、QA | v4.0規範baseline |
+| [ADR-0012](adr/0012-point-allocation-similarity-resume-portability.md) | アーキテクト | 現行scope decision |
 | [Screenshot manifest](../images/README.md) | UI開発、QA、利用者支援 | 7枚のproduction view renderと合成fixture provenance |
 
 ## 履歴文書
 
-ADR-0011は、ADR-0001〜0010と旧baseline／preflightを履歴として保持し、現行GATE-0や機能契約へ使用しないと定めています。[ADR-0011のsupersession](adr/0011-dynamic-quantification-excel-formulas.md#supersession-semantics)
+ADR-0012はADR-0011のv3評価／配布契約をsupersedeし、入力不変、closed AI result、Excel formula ownership、2-project構成等をcarry forwardします。ADR-0001〜0011と旧baseline／preflightは履歴として保持します。
 
 ```mermaid
 flowchart LR
     V1[requirements v1.x\nADR-0001..0009] -->|historical| V2[requirements v2.0\nADR-0010]
     V2 -->|superseded evaluation model| V3[requirements v3.0\nADR-0011]
-    V3 --> IMPL[current source + deterministic tests]
+    V3 -->|superseded score / workflow / platform| V4[requirements v4.0\nADR-0012]
+    V4 --> IMPL[current source + deterministic tests]
     IMPL --> GATE[generated gate evidence]
     GATE --> AUDIT[post-gate conformance audit\n2 gaps found]
     AUDIT --> CLOSE[commit 69e4b99\n2 gaps closed]
@@ -31,7 +33,7 @@ flowchart LR
 
 次の文書は設計経緯・当時の証拠としてのみ参照します。
 
-- `adr/0001-*`〜`adr/0010-*`
+- `adr/0001-*`〜`adr/0011-*`
 - `preflight/document-pipeline.md`
 - `preflight/fixture-plan.md`
 - `preflight/governance-inputs.md`
@@ -51,7 +53,7 @@ flowchart LR
 
 1. current production source
 2. current deterministic tests
-3. current requirements v3.0 / ADR-0011
+3. current requirements v4.0 / ADR-0012 / detailed design
 4. generated ignored gate・performance・package evidence
 5. historical ADR・preflight
 

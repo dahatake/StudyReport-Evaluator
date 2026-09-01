@@ -21,8 +21,8 @@ public sealed class WorkbookExecutionPreflightTests
 
         Assert.True(result.IsValid, string.Join(',', result.Errors.Select(error => error.Code)));
         Assert.Empty(result.Errors);
-        Assert.Equal(13, result.ResultsColumnCount);
-        Assert.Equal(5, result.RepresentativeFormulaCount);
+        Assert.Equal(24, result.ResultsColumnCount);
+        Assert.Equal(11, result.RepresentativeFormulaCount);
         Assert.True(result.ConfigRowCount >= 7);
         Assert.Contains("<redacted>", result.ToString(), StringComparison.Ordinal);
     }
@@ -42,7 +42,7 @@ public sealed class WorkbookExecutionPreflightTests
             result.Errors,
             item => item.Code == "COLUMN_LIMIT_EXCEEDED");
         Assert.False(result.IsValid);
-        Assert.Equal((criterionCount * 10 + 3).ToString(CultureInfo.InvariantCulture), error.ActualDimension);
+        Assert.Equal((criterionCount * 10 + 14).ToString(CultureInfo.InvariantCulture), error.ActualDimension);
         Assert.Equal("16384", error.Limit);
         Assert.Equal("ResultsColumns", error.Field);
     }

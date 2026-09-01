@@ -64,6 +64,58 @@
 
       <Border Classes="card">
         <StackPanel Spacing="8">
+          <TextBlock Text="IMPORTED PROMPTS" Classes="heading" />
+          <TextBlock
+              Text="command lineの指定順を保持します。選択したtargetへ明示適用するまでdraftやAI処理は変更しません。"
+              Classes="muted"
+              TextWrapping="Wrap" />
+          <ListBox
+              x:Name="ImportedPromptList"
+              ItemsSource="{Binding ImportedPrompts}"
+              SelectedItem="{Binding SelectedImportedPrompt, Mode=TwoWay}"
+              Height="100"
+              AutomationProperties.AutomationId="ImportedPrompts"
+              AutomationProperties.Name="command lineから読み込んだPrompt一覧">
+            <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="viewModels:ImportedPromptViewModel">
+                <TextBlock Text="{Binding DisplayName}" Margin="8,4" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <TextBox
+              x:Name="ImportedPromptPreview"
+              Text="{Binding ImportedPromptPreview}"
+              IsReadOnly="True"
+              AcceptsReturn="True"
+              Height="120"
+              AutomationProperties.AutomationId="ImportedPromptPreview"
+              AutomationProperties.Name="選択したimported Prompt本文preview" />
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <ComboBox
+                ItemsSource="{Binding AvailablePromptTargets}"
+                SelectedItem="{Binding SelectedPromptTargetChoice, Mode=TwoWay}"
+                AutomationProperties.AutomationId="ImportedPromptTarget"
+                AutomationProperties.Name="Promptを適用するtarget">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="viewModels:ImportedPromptTargetChoice">
+                  <TextBlock Text="{Binding DisplayName}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <Button
+                x:Name="ApplyImportedPromptButton"
+                Grid.Column="1"
+                Content="Promptを適用"
+                Command="{Binding ApplyImportedPromptCommand}"
+                AutomationProperties.AutomationId="ApplyImportedPrompt"
+                AutomationProperties.Name="選択Promptを選択targetへcopy" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <Border Classes="card">
+        <StackPanel Spacing="8">
           <TextBlock Text="定義情報" Classes="heading" />
           <TextBlock Text="定義名" Classes="label" />
           <TextBox x:Name="DefinitionNameTextBox" Text="{Binding DefinitionName, Mode=TwoWay}" AutomationProperties.AutomationId="DesignDefinitionName" />
@@ -71,6 +123,47 @@
           <TextBox Text="{Binding Revision, Mode=TwoWay}" />
           <TextBlock Text="丸め桁数（0～6）" Classes="label" />
           <TextBox Text="{Binding RoundingDigits, Mode=TwoWay}" />
+          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+            <StackPanel Grid.Column="0" Spacing="5">
+              <TextBlock Text="Base points" Classes="label" />
+              <TextBox
+                  x:Name="BasePointsTextBox"
+                  Text="{Binding BasePoints, Mode=TwoWay}"
+                  AutomationProperties.AutomationId="DesignBasePoints"
+                  AutomationProperties.Name="基礎配点 Base points" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="5">
+              <TextBlock Text="Special points" Classes="label" />
+              <TextBox
+                  x:Name="SpecialPointsTextBox"
+                  Text="{Binding SpecialPoints, Mode=TwoWay}"
+                  AutomationProperties.AutomationId="DesignSpecialPoints"
+                  AutomationProperties.Name="固有評価の総配点 Special points" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Spacing="5">
+              <TextBlock Text="類似度減点係数（0～1）" Classes="label" />
+              <TextBox
+                  x:Name="SimilarityPenaltyWeightTextBox"
+                  Text="{Binding SimilarityPenaltyWeight, Mode=TwoWay}"
+                  AutomationProperties.AutomationId="DesignSimilarityPenaltyWeight"
+                  AutomationProperties.Name="類似度減点係数" />
+            </StackPanel>
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <TextBlock
+                x:Name="AllocationSummaryText"
+                Text="{Binding AllocationSummary}"
+                VerticalAlignment="Center"
+                FontWeight="SemiBold"
+                AutomationProperties.AutomationId="DesignAllocationSummary" />
+            <Button
+                x:Name="EqualizeQuestionPointsButton"
+                Grid.Column="1"
+                Content="設問配点を均等化"
+                Command="{Binding EqualizeQuestionPointsCommand}"
+                AutomationProperties.AutomationId="EqualizeQuestionPoints"
+                AutomationProperties.Name="残り配点を有効な設問へ均等配分" />
+          </Grid>
           <TextBlock Text="{Binding SourceSummary}" Classes="muted" />
           <TextBlock Text="{Binding HierarchySummary}" Classes="muted" />
         </StackPanel>
@@ -118,13 +211,88 @@
                 <TextBox Text="{Binding DisplayName, Mode=TwoWay}" AutomationProperties.AutomationId="{Binding NameAutomationId}" />
                 <TextBlock Text="設問 text" Classes="label" />
                 <TextBox Text="{Binding QuestionText, Mode=TwoWay}" />
-                <TextBlock Text="質問 weight" Classes="label" />
-                <TextBox Text="{Binding Weight, Mode=TwoWay}" AutomationProperties.AutomationId="{Binding WeightAutomationId}" />
+                <TextBlock Text="質問配点（絶対点）" Classes="label" />
+                <TextBox Text="{Binding Points, Mode=TwoWay}" AutomationProperties.AutomationId="{Binding WeightAutomationId}" />
                 <TextBlock Text="主回答列" Classes="label" />
                 <TextBlock Text="{Binding PrimarySourceColumn}" />
                 <TextBlock Text="補助列" Classes="label" />
                 <TextBlock Text="{Binding SupportingColumnsText}" />
                 <TextBlock Text="{Binding ValidationText}" IsVisible="{Binding HasErrors}" Foreground="{DynamicResource TechnicalTextBrush}" />
+
+                <TextBlock Text="固有評価 navigator" Classes="heading" />
+                <Button
+                    Content="固有評価を追加"
+                    Command="{Binding AddSpecialEvaluationCommand}"
+                    HorizontalAlignment="Left"
+                    AutomationProperties.Name="この質問へ固有評価を追加" />
+                <ListBox
+                    Classes="navigator"
+                    ItemsSource="{Binding SpecialEvaluations}"
+                    SelectedItem="{Binding SelectedSpecialEvaluation, Mode=TwoWay}"
+                    Height="100"
+                    AutomationProperties.Name="この質問の固有評価一覧">
+                  <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:SpecialEvaluationDesignItemViewModel">
+                      <StackPanel Margin="8,4" Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="{Binding DisplayName}" Width="340" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding PrimarySourceColumn, StringFormat='主対象 {0}'}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+
+                <ContentControl Content="{Binding SelectedSpecialEvaluation}">
+                  <ContentControl.ContentTemplate>
+                    <DataTemplate x:DataType="viewModels:SpecialEvaluationDesignItemViewModel">
+                      <Border Classes="editor" AutomationProperties.AutomationId="{Binding CardAutomationId}">
+                        <StackPanel Spacing="8">
+                          <TextBlock Text="選択した固有評価" Classes="heading" />
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <CheckBox IsChecked="{Binding Enabled, Mode=TwoWay}" Content="有効" />
+                            <Button Content="複製" Command="{Binding DuplicateCommand}" />
+                            <Button Content="上へ" Command="{Binding MoveUpCommand}" />
+                            <Button Content="下へ" Command="{Binding MoveDownCommand}" />
+                            <Button Content="削除" Command="{Binding DeleteCommand}" />
+                          </StackPanel>
+                          <TextBlock Text="固有評価名" Classes="label" />
+                          <TextBox Text="{Binding DisplayName, Mode=TwoWay}" />
+                          <TextBlock Text="主対象列" Classes="label" />
+                          <ComboBox
+                              ItemsSource="{Binding AvailableColumnNames}"
+                              SelectedItem="{Binding PrimarySourceColumn, Mode=TwoWay}"
+                              AutomationProperties.Name="固有評価の主対象列" />
+                          <TextBlock Text="補助列（0件以上）" Classes="label" />
+                          <ListBox
+                              ItemsSource="{Binding SupportingColumns}"
+                              Height="110"
+                              AutomationProperties.Name="固有評価の補助列">
+                            <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
+                              <DataTemplate x:DataType="viewModels:SpecialSupportingColumnSelectionViewModel">
+                                <CheckBox
+                                    Content="{Binding ColumnName}"
+                                    IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                    IsEnabled="{Binding CanSelect}" />
+                              </DataTemplate>
+                            </ListBox.ItemTemplate>
+                          </ListBox>
+                          <Border Classes="prompt">
+                            <StackPanel Spacing="6">
+                              <TextBlock Text="固有評価 Prompt（回答 placeholder 必須）" FontWeight="Bold" />
+                              <TextBox
+                                  Text="{Binding PromptTemplate, Mode=TwoWay}"
+                                  AcceptsReturn="True"
+                                  Height="120"
+                                  AutomationProperties.AutomationId="{Binding PromptAutomationId}" />
+                            </StackPanel>
+                          </Border>
+                          <TextBlock Text="{Binding ValidationText}" IsVisible="{Binding HasErrors}" Foreground="{DynamicResource TechnicalTextBrush}" />
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ContentControl.ContentTemplate>
+                </ContentControl>
 
                 <TextBlock Text="評価方法 navigator" Classes="heading" />
                 <StackPanel Orientation="Horizontal" Spacing="6">

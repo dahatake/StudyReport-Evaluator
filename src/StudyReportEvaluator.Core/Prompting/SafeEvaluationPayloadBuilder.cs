@@ -86,6 +86,126 @@ public sealed class SafeEvaluationPayloadBuilder
             criteria);
     }
 
+    public SafeReferenceAnswerPayload BuildReferenceAnswer(
+        QuantificationSnapshot snapshot,
+        string questionId)
+    {
+        QuestionDefinition question = FindEnabledQuestion(snapshot, questionId);
+        string prompt = BuiltInPromptTemplates.ReferenceAnswerTemplate.Replace(
+            "{設問}",
+            question.QuestionText,
+            StringComparison.Ordinal);
+        return new SafeReferenceAnswerPayload(question.Id, prompt);
+    }
+
+    public SafeSpecialEvaluationPayload BuildSpecialEvaluation(
+        QuantificationSnapshot snapshot,
+        string questionId,
+        string specialEvaluationId,
+        IReadOnlyDictionary<string, string?> sameRowCells)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(specialEvaluationId);
+        ArgumentNullException.ThrowIfNull(sameRowCells);
+        QuestionDefinition question = FindEnabledQuestion(snapshot, questionId);
+        SpecialEvaluationDefinition special = question.SpecialEvaluations.SingleOrDefault(
+            item => string.Equals(item.Id, specialEvaluationId, StringComparison.Ordinal))
+            ?? throw new PromptConfigurationException(
+                "SPECIAL_EVALUATION_NOT_FOUND",
+                "The selected special evaluation does not exist under the selected question.");
+        if (!special.Enabled)
+        {
+            throw new PromptConfigurationException(
+                "SPECIAL_EVALUATION_DISABLED",
+                "A disabled special evaluation cannot be dispatched.");
+        }
+
+        string primaryValue = ReadSelectedCell(sameRowCells, special.PrimarySourceColumn);
+        if (string.IsNullOrWhiteSpace(primaryValue))
+        {
+            throw new PromptConfigurationException(
+                "EMPTY_SPECIAL_PRIMARY",
+                "An empty special-evaluation primary value must not be dispatched.");
+        }
+
+        EvaluationSourceCell primary = new(
+            EvaluationSourceKind.PrimaryAnswer,
+            special.PrimarySourceColumn,
+            primaryValue);
+        ImmutableArray<EvaluationSourceCell> supporting = special.SupportingSourceColumns
+            .Select(column => new EvaluationSourceCell(
+                EvaluationSourceKind.SupportingColumn,
+                column,
+                ReadSelectedCell(sameRowCells, column)))
+            .ToImmutableArray();
+        PromptRenderContext context = new(
+            question.QuestionText,
+            primary.Value,
+            FormatSupportingInformation(supporting),
+            string.Empty,
+            "0",
+            "1");
+        string rendered = _renderer.RenderSpecial(special.PromptTemplate, context);
+        StringBuilder prompt = new(rendered.Length + 768);
+        prompt.AppendLine(rendered.TrimEnd());
+        prompt.AppendLine();
+        prompt.AppendLine(BuiltInPromptTemplates.SpecialOutputInstruction.Trim());
+        prompt.Append("ExpectedSpecialEvaluationId: ").AppendLine(special.Id);
+        prompt.Append("PrimarySourceColumnId: ").AppendLine(primary.SourceColumnId);
+        prompt.Append("AllowedSupportingSourceColumnIds: ")
+            .AppendLine(supporting.IsEmpty ? "(none)" : string.Join(",", supporting.Select(item => item.SourceColumnId)));
+        return new SafeSpecialEvaluationPayload(
+            question.Id,
+            special.Id,
+            prompt.ToString().TrimEnd(),
+            primary,
+            supporting);
+    }
+
+    public SafeSimilarityPayload BuildSimilarity(
+        QuantificationSnapshot snapshot,
+        string questionId,
+        string studentAnswer,
+        string referenceAnswer)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(studentAnswer);
+        ArgumentException.ThrowIfNullOrWhiteSpace(referenceAnswer);
+        QuestionDefinition question = FindEnabledQuestion(snapshot, questionId);
+        StringBuilder prompt = new(
+            question.QuestionText.Length + studentAnswer.Length + referenceAnswer.Length + 768);
+        prompt.AppendLine(BuiltInPromptTemplates.SimilarityInstruction.Trim());
+        prompt.AppendLine().AppendLine("### 設問").AppendLine(question.QuestionText);
+        prompt.AppendLine().AppendLine("### 学生回答").AppendLine(studentAnswer);
+        prompt.AppendLine().AppendLine("### 比較用LLM生成回答").AppendLine(referenceAnswer);
+        prompt.AppendLine().AppendLine(BuiltInPromptTemplates.SimilarityOutputInstruction.Trim());
+        prompt.Append("ExpectedQuestionId: ").Append(question.Id);
+        return new SafeSimilarityPayload(
+            question.Id,
+            prompt.ToString(),
+            studentAnswer,
+            referenceAnswer);
+    }
+
+    private static QuestionDefinition FindEnabledQuestion(
+        QuantificationSnapshot snapshot,
+        string questionId)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentException.ThrowIfNullOrWhiteSpace(questionId);
+        QuestionDefinition question = snapshot.Definition.Questions.SingleOrDefault(
+            item => string.Equals(item.Id, questionId, StringComparison.Ordinal))
+            ?? throw new PromptConfigurationException(
+                "QUESTION_NOT_FOUND",
+                "The selected question does not exist in the run snapshot.");
+        if (!question.Enabled)
+        {
+            throw new PromptConfigurationException(
+                "QUESTION_DISABLED",
+                "A disabled question cannot be dispatched.");
+        }
+
+        return question;
+    }
+
     private static string ReadSelectedCell(IReadOnlyDictionary<string, string?> sameRowCells, string selectedColumn)
     {
         if (sameRowCells.TryGetValue(selectedColumn, out string? exactValue))

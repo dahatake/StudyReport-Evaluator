@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using DocumentFormat.OpenXml;
@@ -15,6 +16,11 @@ public sealed class ConfigCellAddressMap
     internal ConfigCellAddressMap(
         string sheetName,
         FormulaCellAddress roundingDigitsCell,
+        FormulaCellAddress basePointsCell,
+        FormulaCellAddress specialPointsCell,
+        FormulaCellAddress similarityPenaltyWeightCell,
+        FormulaCellAddress allocationTotalCell,
+        FormulaCellAddress allocationValidCell,
         IDictionary<string, FormulaCellAddress> questionWeightCells,
         IDictionary<string, FormulaCellAddress> evaluatorWeightCells,
         IDictionary<string, FormulaCellAddress> evaluatorMinimumCells,
@@ -22,11 +28,17 @@ public sealed class ConfigCellAddressMap
         IDictionary<string, FormulaCellAddress> criterionWeightCells,
         IDictionary<string, FormulaCellAddress> criterionMinimumCells,
         IDictionary<string, FormulaCellAddress> criterionMaximumCells,
-        IEnumerable<FormulaCellAddress> verifiedCells)
+        IEnumerable<FormulaCellAddress> verifiedCells,
+        IEnumerable<WrittenFormulaCell> formulaCells)
     {
         SheetName = sheetName;
         RoundingDigitsCell = roundingDigitsCell;
-        QuestionWeightCells = Copy(questionWeightCells);
+        BasePointsCell = basePointsCell;
+        SpecialPointsCell = specialPointsCell;
+        SimilarityPenaltyWeightCell = similarityPenaltyWeightCell;
+        AllocationTotalCell = allocationTotalCell;
+        AllocationValidCell = allocationValidCell;
+        QuestionPointsCells = Copy(questionWeightCells);
         EvaluatorWeightCells = Copy(evaluatorWeightCells);
         EvaluatorMinimumCells = Copy(evaluatorMinimumCells);
         EvaluatorMaximumCells = Copy(evaluatorMaximumCells);
@@ -34,13 +46,24 @@ public sealed class ConfigCellAddressMap
         CriterionMinimumCells = Copy(criterionMinimumCells);
         CriterionMaximumCells = Copy(criterionMaximumCells);
         VerifiedCells = Array.AsReadOnly(verifiedCells.ToArray());
+        FormulaCells = formulaCells.ToImmutableArray();
     }
 
     public string SheetName { get; }
 
     public FormulaCellAddress RoundingDigitsCell { get; }
 
-    public IReadOnlyDictionary<string, FormulaCellAddress> QuestionWeightCells { get; }
+    public FormulaCellAddress BasePointsCell { get; }
+
+    public FormulaCellAddress SpecialPointsCell { get; }
+
+    public FormulaCellAddress SimilarityPenaltyWeightCell { get; }
+
+    public FormulaCellAddress AllocationTotalCell { get; }
+
+    public FormulaCellAddress AllocationValidCell { get; }
+
+    public IReadOnlyDictionary<string, FormulaCellAddress> QuestionPointsCells { get; }
 
     public IReadOnlyDictionary<string, FormulaCellAddress> EvaluatorWeightCells { get; }
 
@@ -55,6 +78,8 @@ public sealed class ConfigCellAddressMap
     public IReadOnlyDictionary<string, FormulaCellAddress> CriterionMaximumCells { get; }
 
     public IReadOnlyList<FormulaCellAddress> VerifiedCells { get; }
+
+    public ImmutableArray<WrittenFormulaCell> FormulaCells { get; }
 
     public override string ToString() =>
         $"{nameof(ConfigCellAddressMap)} {{ VerifiedCellCount = {VerifiedCells.Count}, Content = <redacted> }}";
@@ -96,6 +121,16 @@ public sealed class ConfigSheetWriter
     private const string DefinitionSha256Column = "W";
     private const string ChunkIndexColumn = "X";
     private const string SnapshotChunkColumn = "Y";
+    private const string BasePointsColumn = "Z";
+    private const string SpecialPointsColumn = "AA";
+    private const string SimilarityPenaltyWeightColumn = "AB";
+    private const string QuestionPointsColumn = "AC";
+    private const string AllocationTotalColumn = "AD";
+    private const string AllocationValidColumn = "AE";
+    private const string SpecialPrimarySourceColumn = "AF";
+    private const string SpecialSupportingSourceColumn = "AG";
+
+    private readonly FormulaCellWriter formulaCellWriter = new();
 
     public ConfigCellAddressMap Write(
         SpreadsheetDocument document,
@@ -128,7 +163,8 @@ public sealed class ConfigSheetWriter
 
         QuantificationDefinition definition = snapshot.Definition;
         uint definitionRowNumber = rowNumber++;
-        sheetData.Append(CreateDefinitionRow(definitionRowNumber, definition, snapshot));
+        Row definitionRow = CreateDefinitionRow(definitionRowNumber, definition, snapshot);
+        sheetData.Append(definitionRow);
 
         foreach ((int index, string chunk) in Chunk(snapshot.CanonicalJson).Select((value, index) => (index, value)))
         {
@@ -142,7 +178,7 @@ public sealed class ConfigSheetWriter
             rowNumber++;
         }
 
-        Dictionary<string, FormulaCellAddress> questionWeights = new(StringComparer.Ordinal);
+        Dictionary<string, FormulaCellAddress> questionPoints = new(StringComparer.Ordinal);
         Dictionary<string, FormulaCellAddress> evaluatorWeights = new(StringComparer.Ordinal);
         Dictionary<string, FormulaCellAddress> evaluatorMinimums = new(StringComparer.Ordinal);
         Dictionary<string, FormulaCellAddress> evaluatorMaximums = new(StringComparer.Ordinal);
@@ -152,6 +188,11 @@ public sealed class ConfigSheetWriter
         List<FormulaCellAddress> verifiedCells =
         [
             Address(sheetName, RoundingDigitsColumn, definitionRowNumber),
+            Address(sheetName, BasePointsColumn, definitionRowNumber),
+            Address(sheetName, SpecialPointsColumn, definitionRowNumber),
+            Address(sheetName, SimilarityPenaltyWeightColumn, definitionRowNumber),
+            Address(sheetName, AllocationTotalColumn, definitionRowNumber),
+            Address(sheetName, AllocationValidColumn, definitionRowNumber),
         ];
 
         for (int questionIndex = 0; questionIndex < definition.Questions.Length; questionIndex++)
@@ -168,12 +209,12 @@ public sealed class ConfigSheetWriter
             AppendInline(questionRow, ContentTextColumn, questionRowNumber, question.QuestionText);
             AppendInline(questionRow, PrimarySourceColumnColumn, questionRowNumber, question.PrimarySourceColumn);
             AppendBoolean(questionRow, EnabledColumn, questionRowNumber, question.Enabled);
-            AppendNumber(questionRow, RawWeightColumn, questionRowNumber, question.Weight);
+            AppendNumber(questionRow, QuestionPointsColumn, questionRowNumber, question.Points);
             sheetData.Append(questionRow);
 
-            FormulaCellAddress questionWeight = Address(sheetName, RawWeightColumn, questionRowNumber);
-            questionWeights.Add(question.Id, questionWeight);
-            verifiedCells.Add(questionWeight);
+            FormulaCellAddress questionPoint = Address(sheetName, QuestionPointsColumn, questionRowNumber);
+            questionPoints.Add(question.Id, questionPoint);
+            verifiedCells.Add(questionPoint);
 
             for (int supportingIndex = 0; supportingIndex < question.SupportingSourceColumns.Length; supportingIndex++)
             {
@@ -258,6 +299,60 @@ public sealed class ConfigSheetWriter
                     verifiedCells.Add(criterionMaximum);
                 }
             }
+
+            for (int specialIndex = 0; specialIndex < question.SpecialEvaluations.Length; specialIndex++)
+            {
+                SpecialEvaluationDefinition special = question.SpecialEvaluations[specialIndex];
+                string specialPath = $"{questionPath}.specialEvaluations[{specialIndex.ToString(CultureInfo.InvariantCulture)}]";
+                uint specialRowNumber = rowNumber++;
+                Row specialRow = NewRow(specialRowNumber);
+                AppendInline(specialRow, RecordTypeColumn, specialRowNumber, "SPECIAL_EVALUATION");
+                AppendInline(specialRow, PathColumn, specialRowNumber, specialPath);
+                AppendInline(specialRow, NodeIdColumn, specialRowNumber, special.Id);
+                AppendInline(specialRow, ParentNodeIdColumn, specialRowNumber, question.Id);
+                AppendInline(specialRow, DisplayNameColumn, specialRowNumber, special.DisplayName);
+                AppendInline(specialRow, PromptTemplateColumn, specialRowNumber, special.PromptTemplate);
+                AppendBoolean(specialRow, EnabledColumn, specialRowNumber, special.Enabled);
+                AppendInline(specialRow, SpecialPrimarySourceColumn, specialRowNumber, special.PrimarySourceColumn);
+                sheetData.Append(specialRow);
+
+                for (int supportingIndex = 0; supportingIndex < special.SupportingSourceColumns.Length; supportingIndex++)
+                {
+                    uint supportingRowNumber = rowNumber++;
+                    Row supportingRow = NewRow(supportingRowNumber);
+                    AppendInline(supportingRow, RecordTypeColumn, supportingRowNumber, "SPECIAL_SUPPORTING_SOURCE");
+                    AppendInline(
+                        supportingRow,
+                        PathColumn,
+                        supportingRowNumber,
+                        $"{specialPath}.supportingSourceColumns[{supportingIndex.ToString(CultureInfo.InvariantCulture)}]");
+                    AppendInline(supportingRow, ParentNodeIdColumn, supportingRowNumber, special.Id);
+                    AppendInline(
+                        supportingRow,
+                        SpecialSupportingSourceColumn,
+                        supportingRowNumber,
+                        special.SupportingSourceColumns[supportingIndex]);
+                    AppendNumber(supportingRow, ChunkIndexColumn, supportingRowNumber, supportingIndex + 1);
+                    sheetData.Append(supportingRow);
+                }
+            }
+        }
+
+        FormulaCellAddress allocationTotal = Address(sheetName, AllocationTotalColumn, definitionRowNumber);
+        FormulaCellAddress allocationValid = Address(sheetName, AllocationValidColumn, definitionRowNumber);
+        ImmutableArray<WrittenFormulaCell> formulaCells = CreateAllocationFormulaCells(
+            definition,
+            sheetName,
+            definitionRowNumber,
+            allocationTotal,
+            allocationValid,
+            questionPoints);
+        foreach (WrittenFormulaCell formulaCell in formulaCells)
+        {
+            formulaCellWriter.Write(
+                definitionRow,
+                formulaCell.Definition,
+                formulaCell.CachedValue);
         }
 
         Worksheet worksheet = new(sheetData);
@@ -265,14 +360,20 @@ public sealed class ConfigSheetWriter
         return new ConfigCellAddressMap(
             sheetName,
             Address(sheetName, RoundingDigitsColumn, definitionRowNumber),
-            questionWeights,
+            Address(sheetName, BasePointsColumn, definitionRowNumber),
+            Address(sheetName, SpecialPointsColumn, definitionRowNumber),
+            Address(sheetName, SimilarityPenaltyWeightColumn, definitionRowNumber),
+            allocationTotal,
+            allocationValid,
+            questionPoints,
             evaluatorWeights,
             evaluatorMinimums,
             evaluatorMaximums,
             criterionWeights,
             criterionMinimums,
             criterionMaximums,
-            verifiedCells);
+            verifiedCells,
+            formulaCells);
     }
 
     public long CalculateRequiredRowCount(QuantificationSnapshot snapshot)
@@ -290,6 +391,11 @@ public sealed class ConfigSheetWriter
             foreach (EvaluatorDefinition evaluator in question.Evaluators)
             {
                 rows = checked(rows + 1L + evaluator.Criteria.Length);
+            }
+
+            foreach (SpecialEvaluationDefinition special in question.SpecialEvaluations)
+            {
+                rows = checked(rows + 1L + special.SupportingSourceColumns.Length);
             }
         }
 
@@ -327,7 +433,7 @@ public sealed class ConfigSheetWriter
             TakeRow(ref rowNumber);
         }
 
-        Dictionary<string, FormulaCellAddress> questionWeights = new(StringComparer.Ordinal);
+        Dictionary<string, FormulaCellAddress> questionPoints = new(StringComparer.Ordinal);
         Dictionary<string, FormulaCellAddress> evaluatorWeights = new(StringComparer.Ordinal);
         Dictionary<string, FormulaCellAddress> evaluatorMinimums = new(StringComparer.Ordinal);
         Dictionary<string, FormulaCellAddress> evaluatorMaximums = new(StringComparer.Ordinal);
@@ -337,14 +443,19 @@ public sealed class ConfigSheetWriter
         List<FormulaCellAddress> verifiedCells =
         [
             Address(sheetName, RoundingDigitsColumn, definitionRowNumber),
+            Address(sheetName, BasePointsColumn, definitionRowNumber),
+            Address(sheetName, SpecialPointsColumn, definitionRowNumber),
+            Address(sheetName, SimilarityPenaltyWeightColumn, definitionRowNumber),
+            Address(sheetName, AllocationTotalColumn, definitionRowNumber),
+            Address(sheetName, AllocationValidColumn, definitionRowNumber),
         ];
 
         foreach (QuestionDefinition question in snapshot.Definition.Questions)
         {
             uint questionRowNumber = TakeRow(ref rowNumber);
-            FormulaCellAddress questionWeight = Address(sheetName, RawWeightColumn, questionRowNumber);
-            questionWeights.Add(question.Id, questionWeight);
-            verifiedCells.Add(questionWeight);
+            FormulaCellAddress questionPoint = Address(sheetName, QuestionPointsColumn, questionRowNumber);
+            questionPoints.Add(question.Id, questionPoint);
+            verifiedCells.Add(questionPoint);
 
             foreach (string column in question.SupportingSourceColumns)
             {
@@ -379,20 +490,71 @@ public sealed class ConfigSheetWriter
                     verifiedCells.Add(criterionMaximum);
                 }
             }
+
+            foreach (SpecialEvaluationDefinition special in question.SpecialEvaluations)
+            {
+                TakeRow(ref rowNumber);
+                foreach (string column in special.SupportingSourceColumns)
+                {
+                    _ = column;
+                    TakeRow(ref rowNumber);
+                }
+            }
         }
 
+        FormulaCellAddress allocationTotal = Address(sheetName, AllocationTotalColumn, definitionRowNumber);
+        FormulaCellAddress allocationValid = Address(sheetName, AllocationValidColumn, definitionRowNumber);
+        ImmutableArray<WrittenFormulaCell> formulaCells = CreateAllocationFormulaCells(
+            snapshot.Definition,
+            sheetName,
+            definitionRowNumber,
+            allocationTotal,
+            allocationValid,
+            questionPoints);
         return new ConfigCellAddressMap(
             sheetName,
             Address(sheetName, RoundingDigitsColumn, definitionRowNumber),
-            questionWeights,
+            Address(sheetName, BasePointsColumn, definitionRowNumber),
+            Address(sheetName, SpecialPointsColumn, definitionRowNumber),
+            Address(sheetName, SimilarityPenaltyWeightColumn, definitionRowNumber),
+            allocationTotal,
+            allocationValid,
+            questionPoints,
             evaluatorWeights,
             evaluatorMinimums,
             evaluatorMaximums,
             criterionWeights,
             criterionMinimums,
             criterionMaximums,
-            verifiedCells);
+            verifiedCells,
+            formulaCells);
     }
+
+    private static ImmutableArray<WrittenFormulaCell> CreateAllocationFormulaCells(
+        QuantificationDefinition definition,
+        string sheetName,
+        uint definitionRowNumber,
+        FormulaCellAddress allocationTotal,
+        FormulaCellAddress allocationValid,
+        IReadOnlyDictionary<string, FormulaCellAddress> questionPoints) =>
+        [
+            new WrittenFormulaCell(
+                new FormulaCellDefinition(
+                    allocationTotal,
+                    new FormulaIdentity("Definition", definition.Id, definition.Name, "AllocationTotal"),
+                    FormulaExpressions.AllocationTotal(
+                        Ref(Address(sheetName, BasePointsColumn, definitionRowNumber), absolute: true),
+                        Ref(Address(sheetName, SpecialPointsColumn, definitionRowNumber), absolute: true),
+                        definition.Questions.Where(question => question.Enabled)
+                            .Select(question => Ref(questionPoints[question.Id], absolute: true)))),
+                100m),
+            new WrittenFormulaCell(
+                new FormulaCellDefinition(
+                    allocationValid,
+                    new FormulaIdentity("Definition", definition.Id, definition.Name, "AllocationValid"),
+                    FormulaExpressions.AllocationValid(Ref(allocationTotal, absolute: true))),
+                1m),
+        ];
 
     private static Row CreateHeaderRow(uint rowNumber)
     {
@@ -424,6 +586,14 @@ public sealed class ConfigSheetWriter
             (DefinitionSha256Column, "DefinitionSha256"),
             (ChunkIndexColumn, "ChunkIndex"),
             (SnapshotChunkColumn, "SnapshotChunk"),
+            (BasePointsColumn, "BasePoints"),
+            (SpecialPointsColumn, "SpecialPoints"),
+            (SimilarityPenaltyWeightColumn, "SimilarityPenaltyWeight"),
+            (QuestionPointsColumn, "QuestionPoints"),
+            (AllocationTotalColumn, "AllocationTotal"),
+            (AllocationValidColumn, "AllocationValid"),
+            (SpecialPrimarySourceColumn, "SpecialPrimarySourceColumn"),
+            (SpecialSupportingSourceColumn, "SpecialSupportingSourceColumn"),
         ];
         foreach ((string column, string heading) in headings)
         {
@@ -449,6 +619,9 @@ public sealed class ConfigSheetWriter
         AppendNumber(row, FirstDataRowColumn, rowNumber, definition.FirstDataRow);
         AppendNumber(row, LastDataRowColumn, rowNumber, definition.LastDataRow);
         AppendNumber(row, RoundingDigitsColumn, rowNumber, definition.RoundingDigits);
+        AppendNumber(row, BasePointsColumn, rowNumber, definition.BasePoints);
+        AppendNumber(row, SpecialPointsColumn, rowNumber, definition.SpecialPoints);
+        AppendNumber(row, SimilarityPenaltyWeightColumn, rowNumber, definition.SimilarityPenaltyWeight);
         AppendInline(row, SchemaVersionColumn, rowNumber, CanonicalDefinitionSerializer.SchemaVersion);
         AppendInline(row, DefinitionSha256Column, rowNumber, snapshot.Sha256);
         return row;
@@ -477,6 +650,9 @@ public sealed class ConfigSheetWriter
 
     private static FormulaCellAddress Address(string sheetName, string columnName, uint rowNumber) =>
         new(sheetName, columnName, checked((int)rowNumber));
+
+    private static FormulaCellReference Ref(FormulaCellAddress address, bool absolute = false) =>
+        new(address, absolute, absolute);
 
     private static string GetEvaluatorTypeName(EvaluatorType type) => type switch
     {

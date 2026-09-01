@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Prompting;
+using StudyReportEvaluator.Core.Scoring;
 
 namespace StudyReportEvaluator.Core.Validation;
 
@@ -53,6 +54,7 @@ public sealed class QuantificationDefinitionValidator
         "1");
 
     private readonly PromptTemplateRenderer promptRenderer = new();
+    private readonly ScoringAllocationCalculator allocationCalculator = new();
 
     public DefinitionValidationResult Validate(QuantificationDefinition definition)
     {
@@ -67,6 +69,7 @@ public sealed class QuantificationDefinitionValidator
         ValidateRequiredText(errors, "$", "Definition", definition.Id, definition.Name, "SourceSheet", definition.SourceSheet, body: false);
         RegisterId(errors, knownIds, "$", "Definition", definition.Id, definition.Name);
         ValidateRows(definition, errors);
+        ValidateRootAllocationValues(definition, errors);
 
         if (definition.RoundingDigits is < 0 or > 6)
         {
@@ -96,6 +99,8 @@ public sealed class QuantificationDefinitionValidator
             ValidateQuestion(question, questionPath, errors, knownIds);
         }
 
+        ValidateAllocation(definition, questions, errors);
+
         return new DefinitionValidationResult(errors.ToImmutable());
     }
 
@@ -110,7 +115,11 @@ public sealed class QuantificationDefinitionValidator
         ValidateRequiredText(errors, path, "Question", question.Id, question.DisplayName, "QuestionText", question.QuestionText, body: true);
         ValidateRequiredText(errors, path, "Question", question.Id, question.DisplayName, "PrimarySourceColumn", question.PrimarySourceColumn, body: false);
         RegisterId(errors, knownIds, path, "Question", question.Id, question.DisplayName);
-        ValidateWeight(errors, path, "Question", question.Id, question.DisplayName, question.Weight);
+        if (question.Points < 0m)
+        {
+            Add(errors, "QUESTION_POINTS_OUT_OF_RANGE", path, "Question", question.Id, question.DisplayName, "Points", Invariant(question.Points));
+        }
+
         ValidateColumns(question, path, errors);
 
         ImmutableArray<EvaluatorDefinition> evaluators = DefinitionCollectionOperations.Normalize(question.Evaluators);
@@ -130,6 +139,69 @@ public sealed class QuantificationDefinitionValidator
             }
 
             ValidateEvaluator(evaluator, evaluatorPath, errors, knownIds);
+        }
+
+        ImmutableArray<SpecialEvaluationDefinition> specialEvaluations =
+            DefinitionCollectionOperations.Normalize(question.SpecialEvaluations);
+        for (int specialIndex = 0; specialIndex < specialEvaluations.Length; specialIndex++)
+        {
+            string specialPath = $"{path}.specialEvaluations[{specialIndex.ToString(CultureInfo.InvariantCulture)}]";
+            SpecialEvaluationDefinition? specialEvaluation = specialEvaluations[specialIndex];
+            if (specialEvaluation is null)
+            {
+                Add(errors, "NULL_NODE", specialPath, "SpecialEvaluation", "<null>", "<null>", "SpecialEvaluation", "<null>");
+                continue;
+            }
+
+            ValidateSpecialEvaluation(specialEvaluation, specialPath, errors, knownIds);
+        }
+    }
+
+    private void ValidateSpecialEvaluation(
+        SpecialEvaluationDefinition specialEvaluation,
+        string path,
+        ImmutableArray<DefinitionValidationError>.Builder errors,
+        Dictionary<string, string> knownIds)
+    {
+        ValidateRequiredText(errors, path, "SpecialEvaluation", specialEvaluation.Id, specialEvaluation.DisplayName, "Id", specialEvaluation.Id, body: false);
+        ValidateRequiredText(errors, path, "SpecialEvaluation", specialEvaluation.Id, specialEvaluation.DisplayName, "DisplayName", specialEvaluation.DisplayName, body: false);
+        ValidateRequiredText(errors, path, "SpecialEvaluation", specialEvaluation.Id, specialEvaluation.DisplayName, "PrimarySourceColumn", specialEvaluation.PrimarySourceColumn, body: false);
+        ValidateRequiredText(errors, path, "SpecialEvaluation", specialEvaluation.Id, specialEvaluation.DisplayName, "PromptTemplate", specialEvaluation.PromptTemplate, body: true);
+        RegisterId(errors, knownIds, path, "SpecialEvaluation", specialEvaluation.Id, specialEvaluation.DisplayName);
+        ValidateSourceColumns(
+            path,
+            "SpecialEvaluation",
+            specialEvaluation.Id,
+            specialEvaluation.DisplayName,
+            specialEvaluation.PrimarySourceColumn,
+            specialEvaluation.SupportingSourceColumns,
+            errors);
+
+        if (string.IsNullOrWhiteSpace(specialEvaluation.PromptTemplate)
+            || specialEvaluation.PromptTemplate.Length > MaximumCellCharacters)
+        {
+            return;
+        }
+
+        try
+        {
+            _ = promptRenderer.RenderSpecial(
+                specialEvaluation.PromptTemplate,
+                PromptValidationContext);
+        }
+        catch (PromptConfigurationException exception)
+        {
+            Add(
+                errors,
+                exception.Code,
+                path,
+                "SpecialEvaluation",
+                specialEvaluation.Id,
+                specialEvaluation.DisplayName,
+                "PromptTemplate",
+                exception.Position is int position
+                    ? $"position={position.ToString(CultureInfo.InvariantCulture)}"
+                    : SafeLength(specialEvaluation.PromptTemplate));
         }
     }
 
@@ -295,6 +367,11 @@ public sealed class QuantificationDefinitionValidator
         ValidateExcelRow(errors, definition, "FirstDataRow", definition.FirstDataRow);
         ValidateExcelRow(errors, definition, "LastDataRow", definition.LastDataRow);
 
+        if (definition.HeaderRow is not (1 or 2))
+        {
+            Add(errors, "QUESTION_TEXT_ROW_INVALID", "$", "Definition", definition.Id, definition.Name, "HeaderRow", Invariant(definition.HeaderRow));
+        }
+
         bool rowsInExcelRange = IsExcelRow(definition.HeaderRow)
             && IsExcelRow(definition.FirstDataRow)
             && IsExcelRow(definition.LastDataRow);
@@ -338,40 +415,122 @@ public sealed class QuantificationDefinitionValidator
     private static void ValidateColumns(
         QuestionDefinition question,
         string path,
+        ImmutableArray<DefinitionValidationError>.Builder errors) =>
+        ValidateSourceColumns(
+            path,
+            "Question",
+            question.Id,
+            question.DisplayName,
+            question.PrimarySourceColumn,
+            question.SupportingSourceColumns,
+            errors);
+
+    private static void ValidateSourceColumns(
+        string path,
+        string nodeKind,
+        string nodeId,
+        string displayName,
+        string primarySourceColumn,
+        ImmutableArray<string> sourceSupportingColumns,
         ImmutableArray<DefinitionValidationError>.Builder errors)
     {
-        if (!string.IsNullOrWhiteSpace(question.PrimarySourceColumn)
-            && !TryGetExcelColumnNumber(question.PrimarySourceColumn, out _))
+        if (!string.IsNullOrWhiteSpace(primarySourceColumn)
+            && !TryGetExcelColumnNumber(primarySourceColumn, out _))
         {
-            Add(errors, "INVALID_SOURCE_COLUMN", path, "Question", question.Id, question.DisplayName, "PrimarySourceColumn", SafeScalar(question.PrimarySourceColumn));
+            Add(errors, "INVALID_SOURCE_COLUMN", path, nodeKind, nodeId, displayName, "PrimarySourceColumn", SafeScalar(primarySourceColumn));
         }
 
         HashSet<string> supportingColumns = new(StringComparer.OrdinalIgnoreCase);
-        ImmutableArray<string> columns = DefinitionCollectionOperations.Normalize(question.SupportingSourceColumns);
+        ImmutableArray<string> columns = DefinitionCollectionOperations.Normalize(sourceSupportingColumns);
         for (int index = 0; index < columns.Length; index++)
         {
             string field = $"SupportingSourceColumns[{index.ToString(CultureInfo.InvariantCulture)}]";
             string? column = columns[index];
             if (string.IsNullOrWhiteSpace(column))
             {
-                Add(errors, "SOURCE_COLUMN_REQUIRED", path, "Question", question.Id, question.DisplayName, field, "<blank>");
+                Add(errors, "SOURCE_COLUMN_REQUIRED", path, nodeKind, nodeId, displayName, field, "<blank>");
                 continue;
             }
 
             if (!TryGetExcelColumnNumber(column, out _))
             {
-                Add(errors, "INVALID_SOURCE_COLUMN", path, "Question", question.Id, question.DisplayName, field, SafeScalar(column));
+                Add(errors, "INVALID_SOURCE_COLUMN", path, nodeKind, nodeId, displayName, field, SafeScalar(column));
             }
 
             if (!supportingColumns.Add(column))
             {
-                Add(errors, "DUPLICATE_SUPPORTING_COLUMN", path, "Question", question.Id, question.DisplayName, field, SafeScalar(column));
+                Add(errors, "DUPLICATE_SUPPORTING_COLUMN", path, nodeKind, nodeId, displayName, field, SafeScalar(column));
             }
 
-            if (string.Equals(question.PrimarySourceColumn, column, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(primarySourceColumn, column, StringComparison.OrdinalIgnoreCase))
             {
-                Add(errors, "PRIMARY_COLUMN_REUSED", path, "Question", question.Id, question.DisplayName, field, SafeScalar(column));
+                Add(errors, "PRIMARY_COLUMN_REUSED", path, nodeKind, nodeId, displayName, field, SafeScalar(column));
             }
+        }
+    }
+
+    private void ValidateAllocation(
+        QuantificationDefinition definition,
+        ImmutableArray<QuestionDefinition> questions,
+        ImmutableArray<DefinitionValidationError>.Builder errors)
+    {
+        decimal[] enabledPoints = questions
+            .Where(question => question is not null && question.Enabled)
+            .Select(question => question.Points)
+            .ToArray();
+        if (enabledPoints.Length == 0)
+        {
+            return;
+        }
+
+        ScoringAllocationValidationResult allocation = allocationCalculator.Validate(
+            definition.BasePoints,
+            definition.SpecialPoints,
+            enabledPoints);
+        if (!allocation.IsValid)
+        {
+            Add(
+                errors,
+                "ALLOCATION_TOTAL_INVALID",
+                "$",
+                "Definition",
+                definition.Id,
+                definition.Name,
+                "AllocationTotal",
+                allocation.Total is decimal total ? Invariant(total) : "invalid");
+        }
+
+        bool hasEnabledSpecial = questions
+            .Where(question => question is not null && question.Enabled)
+            .SelectMany(question => DefinitionCollectionOperations.Normalize(question.SpecialEvaluations))
+            .Any(special => special is not null && special.Enabled);
+        if (definition.SpecialPoints > 0m && !hasEnabledSpecial)
+        {
+            Add(errors, "SPECIAL_ITEMS_REQUIRED", "$", "Definition", definition.Id, definition.Name, "SpecialEvaluations.Enabled", "0");
+        }
+    }
+
+    private static void ValidateRootAllocationValues(
+        QuantificationDefinition definition,
+        ImmutableArray<DefinitionValidationError>.Builder errors)
+    {
+        ValidateInclusiveRange(errors, definition, "BASE_POINTS_OUT_OF_RANGE", "BasePoints", definition.BasePoints, 0m, 100m);
+        ValidateInclusiveRange(errors, definition, "SPECIAL_POINTS_OUT_OF_RANGE", "SpecialPoints", definition.SpecialPoints, 0m, 100m);
+        ValidateInclusiveRange(errors, definition, "SIMILARITY_WEIGHT_OUT_OF_RANGE", "SimilarityPenaltyWeight", definition.SimilarityPenaltyWeight, 0m, 1m);
+    }
+
+    private static void ValidateInclusiveRange(
+        ImmutableArray<DefinitionValidationError>.Builder errors,
+        QuantificationDefinition definition,
+        string code,
+        string field,
+        decimal value,
+        decimal minimum,
+        decimal maximum)
+    {
+        if (value < minimum || value > maximum)
+        {
+            Add(errors, code, "$", "Definition", definition.Id, definition.Name, field, Invariant(value));
         }
     }
 

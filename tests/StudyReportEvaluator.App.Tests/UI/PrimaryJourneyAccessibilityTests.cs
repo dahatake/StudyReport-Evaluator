@@ -49,6 +49,8 @@ public sealed class PrimaryJourneyAccessibilityTests
             Button auth = Required<Button>(view, "CheckAuthenticationButton");
             ComboBox model = Required<ComboBox>(view, "ModelComboBox");
             ComboBox concurrency = Required<ComboBox>(view, "ConcurrencyComboBox");
+            CheckBox resumeMode = Required<CheckBox>(view, "ResumeModeCheckBox");
+            TextBox outputDirectory = Required<TextBox>(view, "OutputDirectoryTextBox");
             Button start = Required<Button>(view, "StartRunButton");
             Button cancel = Required<Button>(view, "CancelRunButton");
             ProgressBar progress = Required<ProgressBar>(view, "RunProgressBar");
@@ -61,16 +63,20 @@ public sealed class PrimaryJourneyAccessibilityTests
             Assert.Equal("CheckCopilotAuthentication", AutomationProperties.GetAutomationId(auth));
             Assert.Equal("ExecutionModel", AutomationProperties.GetAutomationId(model));
             Assert.Equal("ExecutionConcurrency", AutomationProperties.GetAutomationId(concurrency));
+            Assert.Equal("ExecutionResumeMode", AutomationProperties.GetAutomationId(resumeMode));
+            Assert.Equal("ExecutionOutputDirectory", AutomationProperties.GetAutomationId(outputDirectory));
             Assert.Equal("StartQuantification", AutomationProperties.GetAutomationId(start));
             Assert.Equal("CancelQuantification", AutomationProperties.GetAutomationId(cancel));
             Assert.Equal("ExecutionProgress", AutomationProperties.GetAutomationId(progress));
             Assert.Equal("ExecutionValidationSummary", AutomationProperties.GetAutomationId(validation));
             Assert.All(
-                new Control[] { auth, model, concurrency, start, cancel, progress },
+                new Control[] { auth, model, concurrency, resumeMode, outputDirectory, start, cancel, progress },
                 control => Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(control))));
             Assert.Same(auth, window.FocusManager?.GetFocusedElement());
             Assert.True(auth.MinHeight >= 44d);
             Assert.True(start.MinHeight >= 44d);
+            Assert.True(resumeMode.MinHeight >= 44d);
+            Assert.True(outputDirectory.MinHeight >= 44d);
             Assert.True(start.IsEffectivelyEnabled);
             Assert.False(cancel.IsEffectivelyEnabled);
             Assert.Null(view.FindControl<Border>("EthicsWarningBanner"));
@@ -113,6 +119,7 @@ public sealed class PrimaryJourneyAccessibilityTests
 
             ScrollViewer scroll = Required<ScrollViewer>(view, "ResultsOutputScrollViewer");
             ListBox results = Required<ListBox>(view, "ResultsList");
+            ListBox rowScores = Required<ListBox>(view, "RowScoreList");
             TextBox outputPath = Required<TextBox>(view, "OutputPathTextBox");
             Button export = Required<Button>(view, "ExportButton");
             Button cancel = Required<Button>(view, "CancelExportButton");
@@ -126,6 +133,7 @@ public sealed class PrimaryJourneyAccessibilityTests
             Assert.Equal(ScrollBarVisibility.Auto, scroll.HorizontalScrollBarVisibility);
             Assert.Equal(ScrollBarVisibility.Auto, scroll.VerticalScrollBarVisibility);
             Assert.Equal("ResultsReviewList", AutomationProperties.GetAutomationId(results));
+            Assert.Equal("ResultsRowScores", AutomationProperties.GetAutomationId(rowScores));
             Assert.Equal("ResultsOutputPath", AutomationProperties.GetAutomationId(outputPath));
             Assert.Equal("ExportQuantifiedWorkbook", AutomationProperties.GetAutomationId(export));
             Assert.Equal("CancelWorkbookOutput", AutomationProperties.GetAutomationId(cancel));

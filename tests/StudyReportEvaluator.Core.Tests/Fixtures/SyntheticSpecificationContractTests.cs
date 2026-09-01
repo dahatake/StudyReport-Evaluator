@@ -184,6 +184,10 @@ public sealed class SyntheticSpecificationContractTests
 
     private static QuantificationDefinition BuildDefinition(int questions, int evaluators, int criteria)
     {
+        ImmutableArray<decimal> questionPoints = new ScoringAllocationCalculator().Equalize(
+            60m,
+            0m,
+            questions);
         ImmutableArray<QuestionDefinition>.Builder questionBuilder = ImmutableArray.CreateBuilder<QuestionDefinition>(questions);
         for (int questionIndex = 1; questionIndex <= questions; questionIndex++)
         {
@@ -224,7 +228,7 @@ public sealed class SyntheticSpecificationContractTests
                 QuestionText = "Fixed synthetic question",
                 PrimarySourceColumn = "F",
                 SupportingSourceColumns = ["K", "L"],
-                Weight = questionIndex,
+                Points = questionPoints[questionIndex - 1],
                 Evaluators = evaluatorBuilder.MoveToImmutable(),
             });
         }
@@ -265,8 +269,14 @@ public sealed class SyntheticSpecificationContractTests
             {
                 Questions = [question with { Evaluators = [evaluator with { Range = new ScoreRange(5m, 1m) }] }],
             },
-            "zeroWeight" => source with { Questions = [question with { Weight = 0m }] },
-            "negativeWeight" => source with { Questions = [question with { Weight = -1m }] },
+            "zeroWeight" => source with
+            {
+                Questions = [question with { Evaluators = [evaluator with { Weight = 0m }] }],
+            },
+            "negativeWeight" => source with
+            {
+                Questions = [question with { Evaluators = [evaluator with { Weight = -1m }] }],
+            },
             "noEnabledQuestion" => source with { Questions = [question with { Enabled = false }] },
             "noEnabledEvaluator" => source with
             {

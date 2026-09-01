@@ -100,6 +100,7 @@ public sealed class RunSheetWriter
         AppendNumberRecord(sheetData, ref rowNumber, "CacheReadTokenCount", metadata.CacheReadTokenCount);
         AppendNumberRecord(sheetData, ref rowNumber, "CacheWriteTokenCount", metadata.CacheWriteTokenCount);
         AppendInlineRecord(sheetData, ref rowNumber, "ConfigSheetName", metadata.SheetNames.ConfigSheetName);
+        AppendInlineRecord(sheetData, ref rowNumber, "ReferencesSheetName", metadata.SheetNames.ReferencesSheetName);
         AppendInlineRecord(sheetData, ref rowNumber, "ResultsSheetName", metadata.SheetNames.ResultsSheetName);
         AppendInlineRecord(sheetData, ref rowNumber, "RunSheetName", metadata.SheetNames.RunSheetName);
 

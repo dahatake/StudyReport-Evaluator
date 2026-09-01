@@ -101,6 +101,7 @@ public sealed class OutputPackageValidationPlan
         string[] boundNames =
         [
             sheetNames.ConfigSheetName,
+            sheetNames.ReferencesSheetName,
             sheetNames.ResultsSheetName,
             sheetNames.RunSheetName,
         ];
@@ -482,7 +483,17 @@ public sealed class OutputPackageValidator : IOutputPackageValidator
 
         if (boundWorksheets.TryGetValue(plan.SheetNames.ConfigSheetName, out WorksheetPart? configPart))
         {
-            ValidateFormulaFreeSheet(configPart.Worksheet!, "Config", errors);
+            ValidateExpectedFormulas(
+                configPart.Worksheet!,
+                plan.SheetNames.ConfigSheetName,
+                plan,
+                errors,
+                cancellationToken);
+        }
+
+        if (boundWorksheets.TryGetValue(plan.SheetNames.ReferencesSheetName, out WorksheetPart? referencesPart))
+        {
+            ValidateFormulaFreeSheet(referencesPart.Worksheet!, "References", errors);
         }
 
         if (boundWorksheets.TryGetValue(plan.SheetNames.RunSheetName, out WorksheetPart? runPart))
@@ -493,7 +504,12 @@ public sealed class OutputPackageValidator : IOutputPackageValidator
 
         if (boundWorksheets.TryGetValue(plan.SheetNames.ResultsSheetName, out WorksheetPart? resultsPart))
         {
-            ValidateResultsFormulas(resultsPart.Worksheet!, plan, errors, cancellationToken);
+            ValidateExpectedFormulas(
+                resultsPart.Worksheet!,
+                plan.SheetNames.ResultsSheetName,
+                plan,
+                errors,
+                cancellationToken);
         }
 
         return new OutputPackageValidationResult(errors);
@@ -583,7 +599,7 @@ public sealed class OutputPackageValidator : IOutputPackageValidator
         CancellationToken cancellationToken)
     {
         Sheet[] actual = sheets.Elements<Sheet>().ToArray();
-        int expectedCount = plan.PreservedWorksheets.Length + 3;
+        int expectedCount = plan.PreservedWorksheets.Length + 4;
         if (actual.Length != expectedCount)
         {
             Add(
@@ -763,12 +779,10 @@ public sealed class OutputPackageValidator : IOutputPackageValidator
         foreach (ExpectedFormulaCell expected in plan.ExpectedFormulaCells)
         {
             FormulaCellDefinition definition = expected.Definition;
-            if (!string.Equals(
-                definition.Target.SheetName,
-                plan.SheetNames.ResultsSheetName,
-                StringComparison.Ordinal))
+            if (!string.Equals(definition.Target.SheetName, plan.SheetNames.ConfigSheetName, StringComparison.Ordinal)
+                && !string.Equals(definition.Target.SheetName, plan.SheetNames.ResultsSheetName, StringComparison.Ordinal))
             {
-                Add(errors, "FORMULA_TARGET_SHEET_INVALID", definition.Identity, "mismatch", "bound Results sheet");
+                Add(errors, "FORMULA_TARGET_SHEET_INVALID", definition.Identity, "mismatch", "bound Config/Results sheet");
             }
 
             foreach (FormulaCellAddress reference in OutputPackageValidationPlan.EnumerateCellReferences(definition.Expression))
@@ -827,6 +841,7 @@ public sealed class OutputPackageValidator : IOutputPackageValidator
         Dictionary<string, string> expected = new(StringComparer.Ordinal)
         {
             ["ConfigSheetName"] = sheetNames.ConfigSheetName,
+            ["ReferencesSheetName"] = sheetNames.ReferencesSheetName,
             ["ResultsSheetName"] = sheetNames.ResultsSheetName,
             ["RunSheetName"] = sheetNames.RunSheetName,
         };
@@ -864,14 +879,18 @@ public sealed class OutputPackageValidator : IOutputPackageValidator
         }
     }
 
-    private void ValidateResultsFormulas(
+    private void ValidateExpectedFormulas(
         Worksheet worksheet,
+        string sheetName,
         OutputPackageValidationPlan plan,
         List<OutputPackageValidationError> errors,
         CancellationToken cancellationToken)
     {
         Dictionary<FormulaCellAddress, ExpectedFormulaCell> expectedByTarget = [];
-        foreach (ExpectedFormulaCell expected in plan.ExpectedFormulaCells)
+        foreach (ExpectedFormulaCell expected in plan.ExpectedFormulaCells.Where(expected => string.Equals(
+                     expected.Definition.Target.SheetName,
+                     sheetName,
+                     StringComparison.Ordinal)))
         {
             FormulaCellAddress target = OutputPackageValidationPlan.Normalize(expected.Definition.Target);
             if (!expectedByTarget.TryAdd(target, expected))
@@ -890,7 +909,7 @@ public sealed class OutputPackageValidator : IOutputPackageValidator
                 continue;
             }
 
-            FormulaCellAddress target = new(plan.SheetNames.ResultsSheetName, columnName, rowNumber);
+            FormulaCellAddress target = new(sheetName, columnName, rowNumber);
             target = OutputPackageValidationPlan.Normalize(target);
             if (!expectedByTarget.TryGetValue(target, out ExpectedFormulaCell? expected))
             {

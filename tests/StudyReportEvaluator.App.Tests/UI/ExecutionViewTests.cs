@@ -32,16 +32,28 @@ public sealed class ExecutionViewTests
                 identity));
         RecordingRunBoundary runner = new((request, progress, _) =>
         {
-            progress?.Invoke(new EvaluationProgress(2, 1, 1, EvaluationProgressStatus.Running));
+            progress?.Invoke(new EvaluationProgress(
+                5,
+                3,
+                1,
+                EvaluationProgressStatus.Running,
+                DurableEvaluationStage.EvaluatingRows,
+                referenceCompleted: 1,
+                referenceTotal: 1,
+                rowCompleted: 1,
+                rowTotal: 2,
+                detailStatusCode: "EVALUATING_ROW",
+                finalPath: "C:\\PRIVATE\\result\\eval.xlsx",
+                partialPath: "C:\\PRIVATE\\result\\eval.partial.xlsx"));
             return Task.FromResult(partial);
         });
         ExecutionViewModel viewModel = new(authentication, runner);
         string inputPath = Path.Combine(Path.GetTempPath(), "PRIVATE-U04-INPUT-CANARY.xlsx");
         viewModel.Configure(definition, metadata, inputPath);
 
-        Assert.Equal(2, viewModel.PlannedEvaluationCount);
-        Assert.Equal(6, viewModel.WorstCaseAttemptCount);
-        Assert.Contains("最大 6 attempts", viewModel.PlanSummary, StringComparison.Ordinal);
+        Assert.Equal(5, viewModel.PlannedEvaluationCount);
+        Assert.Equal(15, viewModel.WorstCaseAttemptCount);
+        Assert.Contains("最大 15 attempts", viewModel.PlanSummary, StringComparison.Ordinal);
         Assert.False(viewModel.CanStart);
         Assert.Contains(viewModel.TechnicalErrors, error => error.Code == "AUTH_CHECK_REQUIRED");
 
@@ -67,6 +79,10 @@ public sealed class ExecutionViewTests
         Assert.Equal(64_000, request.MaximumPromptTokens);
         Assert.Equal(128_000, request.MaximumContextWindowTokens);
         Assert.Equal(3, request.MaxConcurrency);
+        Assert.True(request.UseDurableWorkflow);
+        Assert.Same(identity, request.RuntimeIdentity);
+        Assert.EndsWith("result", request.OutputDirectory, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(request.ResumePartialPath);
         Assert.NotSame(definition, request.DraftDefinition);
         Assert.Equal(partial.DefinitionSha256, viewModel.LastRunContext?.Summary.DefinitionSha256);
         Assert.Same(viewModel.LastRunContext, notifiedContext);
@@ -75,6 +91,11 @@ public sealed class ExecutionViewTests
         Assert.Equal(2, viewModel.ProgressTotal);
         Assert.Equal(1, viewModel.ProgressCompleted);
         Assert.Equal(0, viewModel.ProgressInFlight);
+        Assert.Equal(1, viewModel.ReferenceCompleted);
+        Assert.Equal(1, viewModel.ReferenceTotal);
+        Assert.Equal(1, viewModel.RowCompleted);
+        Assert.Equal(2, viewModel.RowTotal);
+        Assert.Contains("eval.partial.xlsx", viewModel.OutputIdentityText, StringComparison.Ordinal);
         Assert.True(viewModel.LastRunContext?.Summary.IsPartial);
         Assert.Contains("部分結果", viewModel.RunStatusText, StringComparison.Ordinal);
         Assert.DoesNotContain(viewModel.TechnicalErrors, error => error.Code == "RUN_FAILED");
@@ -119,6 +140,50 @@ public sealed class ExecutionViewTests
         Assert.True(viewModel.LastRunContext?.Summary.IsExportReady);
         Assert.Equal(1, viewModel.ProgressCompleted);
         Assert.Contains("部分結果", viewModel.RunStatusText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task New_and_resume_modes_bind_output_directory_or_existing_partial_exclusively()
+    {
+        QuantificationDefinition definition = U04TestSupport.Definition(2, 2);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RunSummary summary = await U04TestSupport.CreateSummaryAsync(definition, metadata);
+        RecordingRunBoundary runner = new((_, _, _) => Task.FromResult(summary));
+        ExecutionViewModel viewModel = U04TestSupport.ConfiguredExecutionViewModel(
+            definition,
+            metadata,
+            runner);
+        await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(viewModel.IsResumeMode);
+        Assert.EndsWith("result", viewModel.OutputDirectory, StringComparison.OrdinalIgnoreCase);
+        Assert.True(viewModel.CanStart);
+
+        viewModel.IsResumeMode = true;
+        viewModel.ResumePartialPath = Path.Combine(Path.GetTempPath(), "missing.partial.xlsx");
+        Assert.False(viewModel.CanStart);
+        Assert.Contains(viewModel.TechnicalErrors, error => error.Code == "RESUME_PARTIAL_REQUIRED");
+
+        string directory = Path.Combine(Path.GetTempPath(), "StudyReportEvaluator-U03-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string partialPath = Path.Combine(directory, "eval.partial.xlsx");
+        await File.WriteAllBytesAsync(partialPath, [1], TestContext.Current.CancellationToken);
+        try
+        {
+            viewModel.ResumePartialPath = partialPath;
+            Assert.True(viewModel.CanStart);
+
+            await viewModel.StartAsync(TestContext.Current.CancellationToken);
+
+            QuantificationRunRequest request = Assert.IsType<QuantificationRunRequest>(runner.LastRequest);
+            Assert.True(request.UseDurableWorkflow);
+            Assert.Equal(partialPath, request.ResumePartialPath);
+            Assert.Null(request.OutputDirectory);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Theory]
@@ -262,7 +327,7 @@ public sealed class ExecutionViewTests
     [Fact]
     public void Worst_case_retry_budget_over_twenty_thousand_blocks_start()
     {
-        QuantificationDefinition definition = U04TestSupport.Definition(2, 6_668);
+        QuantificationDefinition definition = U04TestSupport.Definition(2, 3_334);
         WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
         RecordingRunBoundary runner = new((_, _, _) => throw new InvalidOperationException("must not run"));
         ExecutionViewModel viewModel = new(

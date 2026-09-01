@@ -6,6 +6,7 @@ using System.Windows.Input;
 using DocumentFormat.OpenXml.Packaging;
 using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Workflow;
+using StudyReportEvaluator.App.Workbooks.Checkpoint;
 using StudyReportEvaluator.App.Workbooks.Validation;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
@@ -106,6 +107,52 @@ public sealed class ResultsOutputResult
 
     public override string ToString() =>
         $"{nameof(ResultsOutputResult)} {{ Code = {Code}, CauseCode = {CauseCode ?? "<none>"}, Content = <redacted> }}";
+}
+
+public sealed class ResultsRowScoreViewModel
+{
+    internal ResultsRowScoreViewModel(
+        int sourceRowNumber,
+        string questionEarnedText,
+        decimal? specialEarned,
+        decimal? similarityPenalty,
+        decimal? finalRaw,
+        decimal? finalScore)
+    {
+        SourceRowNumber = sourceRowNumber;
+        QuestionEarnedText = questionEarnedText;
+        SpecialEarned = specialEarned;
+        SimilarityPenalty = similarityPenalty;
+        FinalRaw = finalRaw;
+        FinalScore = finalScore;
+    }
+
+    public int SourceRowNumber { get; }
+
+    public string QuestionEarnedText { get; }
+
+    public decimal? SpecialEarned { get; }
+
+    public decimal? SimilarityPenalty { get; }
+
+    public decimal? FinalRaw { get; }
+
+    public decimal? FinalScore { get; }
+
+    public string SpecialEarnedText => Format(SpecialEarned);
+
+    public string SimilarityPenaltyText => Format(SimilarityPenalty);
+
+    public string FinalRawText => Format(FinalRaw);
+
+    public string FinalScoreText => Format(FinalScore);
+
+    public override string ToString() =>
+        $"{nameof(ResultsRowScoreViewModel)} {{ SourceRowNumber = {SourceRowNumber.ToString(CultureInfo.InvariantCulture)}, Content = <redacted> }}";
+
+    private static string Format(decimal? value) => value is decimal number
+        ? number.ToString("G29", CultureInfo.InvariantCulture)
+        : "—";
 }
 
 public interface IResultsOutputBoundary
@@ -224,14 +271,20 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
                 request.OutputPath);
             cancellationToken.ThrowIfCancellationRequested();
             AppOwnedSheetNames sheetNames;
+            ConfigCellAddressMap config;
             ResultsSheetWriteResult results;
             using (SpreadsheetDocument document = package.OpenForEditing())
             {
                 sheetNames = new AppOwnedSheetNameResolver().Resolve(document);
-                ConfigCellAddressMap config = new ConfigSheetWriter().Write(
+                config = new ConfigSheetWriter().Write(
                     document,
                     preparation.Snapshot,
                     sheetNames);
+                new ReferenceAnswersSheetWriter().Write(
+                    document,
+                    preparation.Snapshot,
+                    sheetNames,
+                    CreateReferenceRows(summary));
                 results = new ResultsSheetWriter().Write(
                     document,
                     preparation.Snapshot,
@@ -245,7 +298,8 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            ImmutableArray<ExpectedFormulaCell> expectedFormulas = results.FormulaCells
+            ImmutableArray<ExpectedFormulaCell> expectedFormulas = config.FormulaCells
+                .Concat(results.FormulaCells)
                 .Select(item => new ExpectedFormulaCell(item.Definition, item.CachedValue))
                 .ToImmutableArray();
             OutputPackageValidationPlan validationPlan = OutputPackageValidationPlan.Capture(
@@ -279,6 +333,7 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
         AppOwnedSheetNames sheetNames)
     {
         RunSummary summary = context.Summary;
+        EvaluationTokenUsage usage = summary.OperationTokenUsage;
         return new RunSheetMetadata
         {
             InputIdentity = summary.InputSnapshot,
@@ -290,17 +345,35 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
             ModelIdentity = context.ModelId,
             StartedAtUtc = summary.StartedAtUtc,
             EndedAtUtc = summary.EndedAtUtc,
-            PlannedEvaluationCount = summary.PlannedEvaluationCount,
-            CompletedEvaluationCount = summary.CompletedEvaluationCount,
-            ErrorCount = summary.FailureCount,
-            UsageObservedUnitCount = summary.UsageObservedUnitCount,
-            InputTokenCount = summary.TokenUsage.InputTokens,
-            OutputTokenCount = summary.TokenUsage.OutputTokens,
-            ReasoningTokenCount = summary.TokenUsage.ReasoningTokens,
-            CacheReadTokenCount = summary.TokenUsage.CacheReadTokens,
-            CacheWriteTokenCount = summary.TokenUsage.CacheWriteTokens,
+            PlannedEvaluationCount = summary.PlannedOperationCount,
+            CompletedEvaluationCount = summary.CompletedOperationCount,
+            ErrorCount = summary.OperationFailureCount,
+            UsageObservedUnitCount = summary.OperationUsageObservedCount,
+            InputTokenCount = usage.InputTokens,
+            OutputTokenCount = usage.OutputTokens,
+            ReasoningTokenCount = usage.ReasoningTokens,
+            CacheReadTokenCount = usage.CacheReadTokens,
+            CacheWriteTokenCount = usage.CacheWriteTokens,
             SheetNames = sheetNames,
         };
+    }
+
+    private static IEnumerable<ReferenceAnswerSheetRow> CreateReferenceRows(RunSummary summary)
+    {
+        Dictionary<string, CheckpointReference> references = summary.References
+            .ToDictionary(reference => reference.QuestionId, StringComparer.Ordinal);
+        foreach (QuestionDefinition question in summary.Snapshot.Definition.Questions.Where(question => question.Enabled))
+        {
+            references.TryGetValue(question.Id, out CheckpointReference? reference);
+            yield return new ReferenceAnswerSheetRow
+            {
+                QuestionId = question.Id,
+                ModelId = "auto",
+                Answer = reference?.Answer,
+                StatusCode = reference?.StatusCode ?? ResultsStatusCodes.AiRuntimeFailed,
+                GeneratedAtUtc = reference?.GeneratedAtUtc ?? summary.EndedAtUtc,
+            };
+        }
     }
 
     private static string ApplicationIdentity()
@@ -494,6 +567,7 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
     private readonly IResultsOutputBoundary outputBoundary;
     private readonly WeightedScoreCalculator scoreCalculator = new();
     private readonly ObservableCollection<ResultsCriterionViewModel> resultItems = [];
+    private readonly ObservableCollection<ResultsRowScoreViewModel> rowScoreItems = [];
     private readonly ViewModelCommand exportCommand;
     private readonly ViewModelCommand cancelExportCommand;
     private ExecutionRunContext? context;
@@ -519,6 +593,7 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         this.outputBoundary = outputBoundary
             ?? throw new ArgumentNullException(nameof(outputBoundary));
         Results = new ReadOnlyObservableCollection<ResultsCriterionViewModel>(resultItems);
+        RowScores = new ReadOnlyObservableCollection<ResultsRowScoreViewModel>(rowScoreItems);
         exportCommand = new ViewModelCommand(
             _ => _ = ExportAsync(),
             _ => CanExport);
@@ -533,30 +608,52 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
 
     public ReadOnlyObservableCollection<ResultsCriterionViewModel> Results { get; }
 
+    public ReadOnlyObservableCollection<ResultsRowScoreViewModel> RowScores { get; }
+
     public bool IsLoaded => context is not null;
 
     public bool IsPartial => context?.Summary.IsPartial == true;
 
+    public bool IsAutomaticOutput => context?.Summary.IsDurable == true;
+
+    public string FinalPath => context?.Summary.FinalPath ?? string.Empty;
+
+    public string PartialPath => context?.Summary.PartialPath ?? string.Empty;
+
+    public bool PartialCleanupFailed => context?.Summary.PartialCleanupFailed == true;
+
+    public string DurableOutputText => context?.Summary switch
+    {
+        null => "run結果はありません。",
+        { IsDurable: false } => "legacy manual export modeです。",
+        { FinalPath: not null, PartialCleanupFailed: true } =>
+            $"final: {FinalPath}{Environment.NewLine}partial cleanup warning: {PartialPath}",
+        { FinalPath: not null } => $"final: {FinalPath}",
+        _ => $"partial: {PartialPath}",
+    };
+
     public bool IsInputUnchanged => context?.Summary.IsExportReady == true;
 
-    public int PlannedEvaluationCount => context?.Summary.PlannedEvaluationCount ?? 0;
+    public int PlannedEvaluationCount => context?.Summary.PlannedOperationCount ?? 0;
 
-    public int CompletedEvaluationCount => context?.Summary.CompletedEvaluationCount ?? 0;
+    public int CompletedEvaluationCount => context?.Summary.CompletedOperationCount ?? 0;
 
-    public int FailureCount => context?.Summary.FailureCount ?? 0;
+    public int FailureCount => context?.Summary.OperationFailureCount ?? 0;
 
-    public int CancelledCount => context?.Summary.CancelledCount ?? 0;
+    public int CancelledCount => context?.Summary.OperationCancelledCount ?? 0;
 
     public string RunSummaryText => context is null
         ? "完了または cancel 済みの run はありません。"
         : $"{CompletedEvaluationCount.ToString("N0", CultureInfo.InvariantCulture)} / {PlannedEvaluationCount.ToString("N0", CultureInfo.InvariantCulture)} 完了 · error {FailureCount.ToString("N0", CultureInfo.InvariantCulture)} · cancelled {CancelledCount.ToString("N0", CultureInfo.InvariantCulture)}";
 
     public string PartialResultText => IsPartial
-        ? "部分結果です。完了済み unit だけを保持し、未完了値は空欄のまま出力できます。"
-        : "全評価 unit の実行が終了しています。";
+        ? "部分結果です。完了済み学生行だけをpartial checkpointへ保存しています。"
+        : "全operationの実行とfinalizationが終了しています。";
 
     public string InputStateText => IsInputUnchanged
-        ? "run 終了時の exact hash / size / mtime は一致しています。final commit 直前にも再確認します。"
+        ? IsAutomaticOutput
+            ? "run終了時とfinal commit直前のexact hash / size / mtimeを確認しました。"
+            : "run 終了時の exact hash / size / mtime は一致しています。final commit 直前にも再確認します。"
         : "run 終了時に入力変更を検出しました。出力は停止されています。";
 
     public string OutputPath
@@ -648,6 +745,18 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
     {
         get
         {
+            if (IsAutomaticOutput
+                && !IsExporting
+                && !IsExportCancelling
+                && string.Equals(LastExportCode, ResultsOutputStatusCodes.Ready, StringComparison.Ordinal))
+            {
+                return context?.Summary.FinalPath is not null
+                    ? PartialCleanupFailed
+                        ? "final workbookは有効です。partial cleanup warningを確認してください。"
+                        : "検証済みfinal workbookを自動commitしました。"
+                    : "final workbookは作成されていません。partial checkpointを確認してください。";
+            }
+
             if (IsExportCancelling)
             {
                 return "cancel を受け付けました。atomic rename の安全点を待っています。";
@@ -699,11 +808,19 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         IsExportCancelling = false;
         LastExportCode = ResultsOutputStatusCodes.Ready;
         resultItems.Clear();
+        rowScoreItems.Clear();
         BuildResultItems(runContext.Summary);
-        outputPath = CreateDefaultOutputPath(runContext);
+        outputPath = runContext.Summary.IsDurable
+            ? runContext.Summary.FinalPath ?? runContext.Summary.PartialPath ?? string.Empty
+            : CreateDefaultOutputPath(runContext);
         OnPropertiesChanged(
             nameof(IsLoaded),
             nameof(IsPartial),
+            nameof(IsAutomaticOutput),
+            nameof(FinalPath),
+            nameof(PartialPath),
+            nameof(PartialCleanupFailed),
+            nameof(DurableOutputText),
             nameof(IsInputUnchanged),
             nameof(PlannedEvaluationCount),
             nameof(CompletedEvaluationCount),
@@ -712,7 +829,9 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
             nameof(RunSummaryText),
             nameof(PartialResultText),
             nameof(InputStateText),
-            nameof(OutputPath));
+            nameof(OutputPath),
+            nameof(ExportStatusText),
+            nameof(CanExport));
         RevalidateOverridesAndPreview();
         RefreshPathAssessment();
     }
@@ -874,7 +993,12 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
             return;
         }
 
-        QuantificationDefinition definition = context.Summary.Snapshot.Definition;
+        RunSummary summary = context.Summary;
+        QuantificationDefinition definition = summary.Snapshot.Definition;
+        RunOutputPreparation output = summary.PrepareOutput(CreateOverrides());
+        Dictionary<int, ResultsSheetRowInput> outputRows = output.Rows.ToDictionary(
+            row => row.SourceRowNumber);
+        rowScoreItems.Clear();
         foreach (IGrouping<int, ResultsCriterionViewModel> sourceRow in resultItems.GroupBy(item => item.SourceRowNumber))
         {
             Dictionary<ResultKey, ResultsCriterionViewModel> rowItems = sourceRow.ToDictionary(Key);
@@ -920,13 +1044,82 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
                     definition.RoundingDigits);
             }
 
-            decimal? overall = scoreCalculator.Aggregate(
+                    decimal? legacyOverall = scoreCalculator.Aggregate(
                 definition.Questions
                     .Where(item => item.Enabled)
                     .Select(question => new WeightedScoreInput(
                         questionScores[question.Id],
-                        question.Weight)),
+                        question.Points)),
                 definition.RoundingDigits);
+            decimal? finalScore = null;
+            if (outputRows.TryGetValue(sourceRow.Key, out ResultsSheetRowInput? outputRow))
+            {
+                List<(string QuestionId, decimal? Earned)> questionEarned = [];
+                List<decimal?> similarityPenalties = [];
+                List<decimal?> specialQuestionRates = [];
+                foreach (QuestionDefinition question in definition.Questions.Where(item => item.Enabled))
+                {
+                    QuestionResultInput questionInput = outputRow.Questions.Single(item =>
+                        string.Equals(item.QuestionId, question.Id, StringComparison.Ordinal));
+                    decimal? rate = scoreCalculator.QuestionRate(
+                        questionInput.Scorable,
+                        questionScores[question.Id]);
+                    decimal? earned = scoreCalculator.QuestionEarned(
+                        rate,
+                        question.Points,
+                        definition.RoundingDigits);
+                    questionEarned.Add((question.Id, earned));
+
+                    decimal? similarity = questionInput.Similarity?.AiRaw
+                        ?? (questionInput.Scorable ? null : 0m);
+                    similarityPenalties.Add(scoreCalculator.SimilarityPenalty(
+                        question.Points,
+                        similarity,
+                        definition.SimilarityPenaltyWeight,
+                        definition.RoundingDigits));
+
+                    SpecialEvaluationDefinition[] enabledSpecials = question.SpecialEvaluations
+                        .Where(special => special.Enabled)
+                        .ToArray();
+                    if (definition.SpecialPoints > 0m && enabledSpecials.Length > 0)
+                    {
+                        specialQuestionRates.Add(scoreCalculator.SpecialQuestionRate(
+                            enabledSpecials.Select(special => questionInput.SpecialResults
+                                .SingleOrDefault(result => string.Equals(
+                                    result.SpecialEvaluationId,
+                                    special.Id,
+                                    StringComparison.Ordinal))?.AiRaw),
+                            definition.RoundingDigits));
+                    }
+                }
+
+                decimal? specialEarned = scoreCalculator.SpecialEarned(
+                    definition.SpecialPoints,
+                    specialQuestionRates,
+                    definition.RoundingDigits);
+                decimal? finalRaw = scoreCalculator.FinalRaw(
+                    definition.BasePoints,
+                    questionEarned.Select(item => item.Earned),
+                    specialEarned,
+                    similarityPenalties,
+                    definition.RoundingDigits);
+                finalScore = WeightedScoreCalculator.FinalScore(finalRaw);
+                decimal? totalPenalty = similarityPenalties.Any(value => value is null)
+                    ? null
+                    : similarityPenalties.Sum(value => value!.Value);
+                rowScoreItems.Add(new ResultsRowScoreViewModel(
+                    sourceRow.Key,
+                    string.Join(
+                        " · ",
+                        questionEarned.Select(item =>
+                            $"{item.QuestionId}: {(item.Earned?.ToString("G29", CultureInfo.InvariantCulture) ?? "—")}")),
+                    specialEarned,
+                    totalPenalty,
+                    finalRaw,
+                    finalScore));
+            }
+
+            decimal? overall = summary.IsDurable ? finalScore : legacyOverall;
             foreach (ResultsCriterionViewModel item in sourceRow)
             {
                 item.SetPreview(

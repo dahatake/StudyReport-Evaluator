@@ -155,4 +155,113 @@ public sealed class SafeEvaluationPayloadBuilderTests
         Assert.Single(payload.ExpectedCriteria);
         Assert.DoesNotContain(disabledCanary, payload.RenderedPrompt, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Reference_payload_contains_only_the_question_and_closed_reference_contract()
+    {
+        const string questionCanary = "QUESTION {回答} CANARY";
+        const string answerCanary = "STUDENT-ANSWER-MUST-NOT-APPEAR";
+        QuantificationDefinition source = C02TestDefinitions.CreateValid();
+        QuantificationSnapshot snapshot = QuantificationSnapshot.Create(source with
+        {
+            Questions =
+            [
+                source.Questions[0] with { QuestionText = questionCanary },
+                source.Questions[1],
+            ],
+        });
+
+        SafeReferenceAnswerPayload payload = _builder.BuildReferenceAnswer(snapshot, "Q1");
+
+        Assert.Contains(questionCanary, payload.RenderedPrompt, StringComparison.Ordinal);
+        Assert.Contains("submit_reference_answer", payload.RenderedPrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain(answerCanary, payload.RenderedPrompt, StringComparison.Ordinal);
+        Assert.Equal(1, Count(payload.RenderedPrompt, questionCanary));
+        Assert.DoesNotContain(questionCanary, payload.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Similarity_payload_keeps_student_and_reference_values_opaque_and_forbids_misconduct_judgment()
+    {
+        const string student = "STUDENT {設問} {{opaque}}";
+        const string reference = "REFERENCE {回答} } opaque";
+        QuantificationSnapshot snapshot = QuantificationSnapshot.Create(C02TestDefinitions.CreateValid());
+
+        SafeSimilarityPayload payload = _builder.BuildSimilarity(snapshot, "Q1", student, reference);
+
+        Assert.Equal(student, payload.StudentAnswer);
+        Assert.Equal(reference, payload.ReferenceAnswer);
+        Assert.Equal(1, Count(payload.RenderedPrompt, student));
+        Assert.Equal(1, Count(payload.RenderedPrompt, reference));
+        Assert.Contains("submit_similarity", payload.RenderedPrompt, StringComparison.Ordinal);
+        Assert.Contains("不正行為や回答品質を判定せず", payload.RenderedPrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain(student, payload.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(reference, payload.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("", "reference")]
+    [InlineData("student", "  ")]
+    public void Similarity_payload_rejects_empty_inputs_before_dispatch(string student, string reference)
+    {
+        QuantificationSnapshot snapshot = QuantificationSnapshot.Create(C02TestDefinitions.CreateValid());
+
+        Assert.Throws<ArgumentException>(() => _builder.BuildSimilarity(snapshot, "Q1", student, reference));
+    }
+
+    [Fact]
+    public void Special_payload_uses_only_its_selected_same_row_sources_and_closed_contract()
+    {
+        const string otherColumnCanary = "OTHER-COLUMN-MUST-NOT-APPEAR";
+        QuantificationDefinition source = C02TestDefinitions.CreateValid();
+        SpecialEvaluationDefinition special = new()
+        {
+            Id = "S1",
+            DisplayName = "Prompt quality",
+            PrimarySourceColumn = "G",
+            SupportingSourceColumns = ["K"],
+            PromptTemplate = "Question={設問}; Prompt={回答}; Note={補助情報}",
+        };
+        QuantificationSnapshot snapshot = QuantificationSnapshot.Create(source with
+        {
+            SpecialPoints = 10m,
+            Questions =
+            [
+                source.Questions[0] with { Points = 30m, SpecialEvaluations = [special] },
+                source.Questions[1],
+            ],
+        });
+
+        SafeSpecialEvaluationPayload payload = _builder.BuildSpecialEvaluation(
+            snapshot,
+            "Q1",
+            "S1",
+            new Dictionary<string, string?>
+            {
+                ["G"] = "student prompt",
+                ["K"] = "student consideration",
+                ["A"] = otherColumnCanary,
+            });
+
+        Assert.Equal("G", payload.PrimarySource.SourceColumnId);
+        Assert.Equal(["K"], payload.SupportingSources.Select(item => item.SourceColumnId));
+        Assert.Contains("student prompt", payload.RenderedPrompt, StringComparison.Ordinal);
+        Assert.Contains("student consideration", payload.RenderedPrompt, StringComparison.Ordinal);
+        Assert.Contains("submit_special_quantification", payload.RenderedPrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain(otherColumnCanary, payload.RenderedPrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("student prompt", payload.ToString(), StringComparison.Ordinal);
+    }
+
+    private static int Count(string value, string fragment)
+    {
+        int count = 0;
+        int start = 0;
+        while ((start = value.IndexOf(fragment, start, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            start += fragment.Length;
+        }
+
+        return count;
+    }
 }

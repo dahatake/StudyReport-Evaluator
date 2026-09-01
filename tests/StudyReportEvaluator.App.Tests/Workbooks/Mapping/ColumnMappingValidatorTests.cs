@@ -197,6 +197,41 @@ public sealed class ColumnMappingValidatorTests
     }
 
     [Fact]
+    public void Special_primary_and_supporting_columns_are_validated_against_the_selected_worksheet()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        WorkbookMetadata metadata = reader.Read(workbook.Path);
+        QuestionDefinition question = CreateQuestion("Q-SPECIAL", "F", []) with
+        {
+            SpecialEvaluations =
+            [
+                new SpecialEvaluationDefinition
+                {
+                    Id = "S1",
+                    DisplayName = "Special",
+                    PrimarySourceColumn = "J",
+                    SupportingSourceColumns = ["K", "k", "J", "M"],
+                    PromptTemplate = "Evaluate {回答}",
+                },
+            ],
+        };
+
+        ColumnMappingValidationResult result = validator.Validate(
+            metadata,
+            CreateDefinition("Original", 1, 2, 531, question));
+
+        Assert.False(result.IsValid);
+        Assert.Null(result.Mapping);
+        Assert.Contains(result.Errors, error => error.QuestionId == "S1"
+            && error.Code == "DUPLICATE_SUPPORTING_COLUMN");
+        Assert.Contains(result.Errors, error => error.QuestionId == "S1"
+            && error.Code == "PRIMARY_COLUMN_REUSED");
+        Assert.Contains(result.Errors, error => error.QuestionId == "S1"
+            && error.Code == "SOURCE_COLUMN_NOT_FOUND"
+            && error.SafeOffendingValue == "M");
+    }
+
+    [Fact]
     public void Invalid_mapping_errors_do_not_echo_question_or_Prompt_bodies()
     {
         const string questionBodyCanary = "QUESTION-BODY-CANARY";
@@ -328,7 +363,7 @@ public sealed class ColumnMappingValidatorTests
             QuestionText = "Fixed synthetic question text",
             PrimarySourceColumn = primary,
             SupportingSourceColumns = [.. supporting],
-            Weight = 1m,
+            Points = 1m,
             Evaluators = [evaluator],
         };
     }

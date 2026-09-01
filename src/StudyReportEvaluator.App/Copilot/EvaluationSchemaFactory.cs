@@ -92,11 +92,11 @@ public sealed class EvaluationSchemaFactory
                 ExcludeResultSchema = true,
             });
 
-        return new SchemaBoundAIFunction(inner, schema);
+        return BindSchema(inner, schema);
     }
 
     public SessionConfig CreateSessionConfig(SubmitQuantificationTool collector) =>
-        CreateRestrictedSessionConfig(CreateTool(collector));
+        CreateRestrictedSessionConfig(CreateTool(collector), ToolName);
 
     public SessionConfig CreateSessionConfig(
         SafeEvaluationPayload payload,
@@ -221,7 +221,9 @@ public sealed class EvaluationSchemaFactory
         };
     }
 
-    private static SessionConfig CreateRestrictedSessionConfig(AIFunction tool) =>
+    internal static SessionConfig CreateRestrictedSessionConfig(
+        AIFunction tool,
+        string toolName) =>
         new()
         {
             EnableCitations = false,
@@ -235,7 +237,7 @@ public sealed class EvaluationSchemaFactory
             EnableSessionStore = false,
             EnableSkills = false,
             Tools = [tool],
-            AvailableTools = [ToolName],
+            AvailableTools = [toolName],
             ExcludedTools = [],
             ExcludedBuiltInAgents = [],
             EnableSessionTelemetry = false,
@@ -284,7 +286,7 @@ public sealed class EvaluationSchemaFactory
             OnMcpAuthRequest = null,
         };
 
-    private static JsonArray StringArray(IEnumerable<string> values)
+    internal static JsonArray StringArray(IEnumerable<string> values)
     {
         JsonArray array = [];
         foreach (string value in values)
@@ -294,6 +296,9 @@ public sealed class EvaluationSchemaFactory
 
         return array;
     }
+
+    internal static AIFunction BindSchema(AIFunction inner, JsonElement schema) =>
+        new SchemaBoundAIFunction(inner, schema);
 
     private sealed class SchemaBoundAIFunction(AIFunction inner, JsonElement schema) : AIFunction
     {

@@ -219,7 +219,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
         if (to == WorkflowStep.Design)
         {
-            designViewModel = new QuantificationDesignViewModel(InputViewModel.DefinitionDraft);
+            designViewModel = new QuantificationDesignViewModel(
+                InputViewModel.DefinitionDraft,
+                InputViewModel.AvailableColumnNames,
+                designViewModel.ImportedPromptSources);
         }
 
         if (to == WorkflowStep.Execution
@@ -241,8 +244,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    private void HandleRunCompleted(object? sender, ExecutionRunCompletedEventArgs e) =>
+    private void HandleRunCompleted(object? sender, ExecutionRunCompletedEventArgs e)
+    {
         resultsOutputViewModel.Load(e.Context);
+        if (navigator.CurrentStep == WorkflowStep.Execution)
+        {
+            navigator.MoveNext();
+        }
+    }
 
     private ImmutableArray<WorkflowStepPresentation> BuildStepPresentations() =>
         [

@@ -173,15 +173,29 @@ public sealed class WindowsX64PerformanceEvidenceTests
         using (WorkingPackage package = WorkingPackage.Create(workbook.Path, outputPath))
         {
             AppOwnedSheetNames sheetNames;
+            ConfigCellAddressMap config;
             ResultsSheetWriteResult results;
             DateTimeOffset runStartedAtUtc = DateTimeOffset.UtcNow;
             using (SpreadsheetDocument document = package.OpenForEditing())
             {
                 sheetNames = new AppOwnedSheetNameResolver().Resolve(document);
-                ConfigCellAddressMap config = new ConfigSheetWriter().Write(
+                config = new ConfigSheetWriter().Write(
                     document,
                     snapshot,
                     sheetNames);
+                new ReferenceAnswersSheetWriter().Write(
+                    document,
+                    snapshot,
+                    sheetNames,
+                    [
+                        new ReferenceAnswerSheetRow
+                        {
+                            QuestionId = "Q-PERFORMANCE",
+                            ModelId = "auto",
+                            StatusCode = ResultsStatusCodes.AiRuntimeFailed,
+                            GeneratedAtUtc = runStartedAtUtc,
+                        },
+                    ]);
                 results = new ResultsSheetWriter().Write(
                     document,
                     snapshot,
@@ -209,8 +223,9 @@ public sealed class WindowsX64PerformanceEvidenceTests
             }
 
             Assert.Equal(SyntheticWorkbookFactory.DataRowCount, results.DataRowCount);
-            Assert.Equal(SyntheticWorkbookFactory.DataRowCount * 5, results.FormulaCells.Length);
-            ImmutableArray<ExpectedFormulaCell> expectedFormulas = results.FormulaCells
+            Assert.Equal(SyntheticWorkbookFactory.DataRowCount * 11, results.FormulaCells.Length);
+            ImmutableArray<ExpectedFormulaCell> expectedFormulas = config.FormulaCells
+                .Concat(results.FormulaCells)
                 .Select(cell => new ExpectedFormulaCell(cell.Definition, cell.CachedValue))
                 .ToImmutableArray();
             OutputPackageValidationPlan validationPlan = OutputPackageValidationPlan.Capture(
@@ -256,6 +271,7 @@ public sealed class WindowsX64PerformanceEvidenceTests
             HeaderRow = SyntheticWorkbookFactory.HeaderRow,
             FirstDataRow = SyntheticWorkbookFactory.FirstDataRow,
             LastDataRow = SyntheticWorkbookFactory.LastDataRow,
+            BasePoints = 99m,
             RoundingDigits = 2,
             Questions =
             [
@@ -266,7 +282,7 @@ public sealed class WindowsX64PerformanceEvidenceTests
                     QuestionText = "Synthetic performance question",
                     PrimarySourceColumn = "F",
                     SupportingSourceColumns = [],
-                    Weight = 1m,
+                    Points = 1m,
                     Evaluators =
                     [
                         new EvaluatorDefinition

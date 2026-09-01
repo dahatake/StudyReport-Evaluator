@@ -17,7 +17,16 @@ public sealed class PromptTemplateRenderer
 
     public static IReadOnlySet<string> Placeholders => AllowedPlaceholders;
 
-    public string Render(string template, PromptRenderContext context)
+    public string Render(string template, PromptRenderContext context) =>
+        RenderCore(template, context, requireCriteria: true);
+
+    public string RenderSpecial(string template, PromptRenderContext context) =>
+        RenderCore(template, context, requireCriteria: false);
+
+    private static string RenderCore(
+        string template,
+        PromptRenderContext context,
+        bool requireCriteria)
     {
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(context);
@@ -94,7 +103,7 @@ public sealed class PromptTemplateRenderer
             throw new PromptConfigurationException("ANSWER_PLACEHOLDER_REQUIRED", "The Prompt template must contain the answer placeholder.");
         }
 
-        if (!usedPlaceholders.Contains("評価項目"))
+        if (requireCriteria && !usedPlaceholders.Contains("評価項目"))
         {
             throw new PromptConfigurationException("CRITERIA_PLACEHOLDER_REQUIRED", "The Prompt template must contain the evaluation-criteria placeholder.");
         }

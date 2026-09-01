@@ -8,15 +8,16 @@ public sealed class AppOwnedSheetNameResolverTests
     private readonly AppOwnedSheetNameResolver resolver = new();
 
     [Fact]
-    public void Resolve_uses_the_three_canonical_names_when_there_are_no_collisions()
+    public void Resolve_uses_the_four_canonical_names_when_there_are_no_collisions()
     {
         AppOwnedSheetNames names = resolver.Resolve(["Original", "Final"]);
 
         Assert.Equal(AppOwnedSheetNameResolver.ConfigBaseName, names.ConfigSheetName);
+        Assert.Equal(AppOwnedSheetNameResolver.ReferencesBaseName, names.ReferencesSheetName);
         Assert.Equal(AppOwnedSheetNameResolver.ResultsBaseName, names.ResultsSheetName);
         Assert.Equal(AppOwnedSheetNameResolver.RunBaseName, names.RunSheetName);
         Assert.Equal(
-            [names.ConfigSheetName, names.ResultsSheetName, names.RunSheetName],
+            [names.ConfigSheetName, names.ReferencesSheetName, names.ResultsSheetName, names.RunSheetName],
             names.AllSheetNames);
     }
 
@@ -27,6 +28,8 @@ public sealed class AppOwnedSheetNameResolverTests
         [
             "quantification_config",
             "QUANTIFICATION_CONFIG (2)",
+            "quantification_references",
+            "QUANTIFICATION_REFERENCES (2)",
             "Quantification_Results",
             "Quantification_Results (3)",
             "quantification_run",
@@ -36,9 +39,10 @@ public sealed class AppOwnedSheetNameResolverTests
         AppOwnedSheetNames names = resolver.Resolve(existing);
 
         Assert.Equal("Quantification_Config (3)", names.ConfigSheetName);
+        Assert.Equal("Quantification_References (3)", names.ReferencesSheetName);
         Assert.Equal("Quantification_Results (2)", names.ResultsSheetName);
         Assert.Equal("Quantification_Run (3)", names.RunSheetName);
-        Assert.Equal(3, names.AllSheetNames.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Equal(4, names.AllSheetNames.Distinct(StringComparer.OrdinalIgnoreCase).Count());
         Assert.All(names.AllSheetNames, name => Assert.True(AppOwnedSheetNameResolver.IsValidWorksheetName(name)));
     }
 
@@ -98,6 +102,7 @@ public sealed class AppOwnedSheetNameResolverTests
         Assert.Throws<NotSupportedException>(() => mutableView.Add("Injected"));
         Assert.Contains("<redacted>", names.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain(names.ConfigSheetName, names.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(names.ReferencesSheetName, names.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain(names.ResultsSheetName, names.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain(names.RunSheetName, names.ToString(), StringComparison.Ordinal);
     }

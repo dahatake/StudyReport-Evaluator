@@ -80,6 +80,46 @@ public sealed class ColumnMappingSuggesterTests
             Assert.Single(suggestion.Candidates, candidate => candidate.ColumnName == "M").SuggestedSupportingColumns);
     }
 
+    [Theory]
+    [InlineData(1U)]
+    [InlineData(2U)]
+    public void Forms_like_question_rows_suggest_normal_answers_and_prompt_related_special_sources(
+        uint questionTextRow)
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
+            "Form Responses 1",
+            questionTextRow,
+            lastRow: questionTextRow + 10,
+            lastColumn: 7,
+            new X02Header(1, "Timestamp"),
+            new X02Header(2, "Email Address"),
+            new X02Header(3, "Report answer 1"),
+            new X02Header(4, "Prompt used for report 1"),
+            new X02Header(5, "Report answer 2"),
+            new X02Header(6, "Prompt used for report 2"),
+            new X02Header(7, "Prompt considerations and viewpoint"));
+
+        WorksheetMappingSuggestion suggestion = Assert.IsType<WorksheetMappingSuggestion>(
+            suggester.Suggest(reader.Read(workbook.Path, questionTextRow)).SuggestedWorksheet);
+
+        Assert.Equal(questionTextRow, suggestion.HeaderRow);
+        Assert.Equal(questionTextRow + 1, suggestion.FirstDataRow);
+        Assert.Equal(["C", "D", "E", "F", "G"], suggestion.InitialTargetColumns);
+        Assert.Equal(["A", "B"], suggestion.InitiallyUnselectedColumns);
+        AssertRoles(suggestion, "C", ColumnMappingCandidateRole.PrimaryAnswer);
+        AssertRoles(
+            suggestion,
+            "D",
+            ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.StudentPromptPrimary);
+        AssertRoles(suggestion, "E", ColumnMappingCandidateRole.PrimaryAnswer);
+        ColumnMappingCandidate prompt = AssertRoles(
+            suggestion,
+            "F",
+            ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.StudentPromptPrimary);
+        Assert.Equal(["G"], prompt.SuggestedSupportingColumns);
+        AssertRoles(suggestion, "G", ColumnMappingCandidateRole.Supporting);
+    }
+
     [Fact]
     public void Student_prompt_semantics_infer_the_adjacent_unclassified_answer_at_arbitrary_columns()
     {
@@ -113,6 +153,27 @@ public sealed class ColumnMappingSuggesterTests
             lastColumn: 4,
             new X02Header(2, "Email address"),
             new X02Header(3, "Student Prompt"));
+
+        WorksheetMappingSuggestion suggestion = Assert.IsType<WorksheetMappingSuggestion>(
+            suggester.Suggest(reader.Read(workbook.Path)).SuggestedWorksheet);
+
+        Assert.DoesNotContain(suggestion.Candidates, candidate => candidate.ColumnName == "B");
+        AssertRoles(
+            suggestion,
+            "C",
+            ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.StudentPromptPrimary);
+    }
+
+    [Fact]
+    public void Submitter_name_before_a_student_prompt_is_never_inferred_as_an_answer()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
+            "Responses",
+            headerRow: 1,
+            lastRow: 4,
+            lastColumn: 4,
+            new X02Header(2, "提出者名"),
+            new X02Header(3, "学生 Prompt"));
 
         WorksheetMappingSuggestion suggestion = Assert.IsType<WorksheetMappingSuggestion>(
             suggester.Suggest(reader.Read(workbook.Path)).SuggestedWorksheet);

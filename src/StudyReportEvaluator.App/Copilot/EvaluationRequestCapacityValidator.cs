@@ -58,6 +58,7 @@ public sealed class EvaluationRequestCapacityValidator
     public const int ModelContextBudgetPercent = 80;
 
     private readonly EvaluationSchemaFactory schemaFactory = new();
+    private readonly AuxiliaryEvaluationSchemaFactory auxiliarySchemaFactory = new();
 
     public EvaluationRequestCapacityResult Validate(
         SafeEvaluationPayload payload,
@@ -65,6 +66,68 @@ public sealed class EvaluationRequestCapacityValidator
         int maximumContextWindowTokens)
     {
         ArgumentNullException.ThrowIfNull(payload);
+        return ValidateCore(
+            payload.RenderedPrompt,
+            schemaFactory.CreateSchema(payload).GetRawText(),
+            EvaluationSchemaFactory.ToolName,
+            EvaluationSchemaFactory.ToolDescription,
+            maximumPromptTokens,
+            maximumContextWindowTokens);
+    }
+
+    public EvaluationRequestCapacityResult Validate(
+        SafeReferenceAnswerPayload payload,
+        int maximumPromptTokens,
+        int maximumContextWindowTokens)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        return ValidateCore(
+            payload.RenderedPrompt,
+            auxiliarySchemaFactory.CreateReferenceSchema(payload).GetRawText(),
+            AuxiliaryEvaluationSchemaFactory.ReferenceToolName,
+            AuxiliaryEvaluationSchemaFactory.ReferenceToolDescription,
+            maximumPromptTokens,
+            maximumContextWindowTokens);
+    }
+
+    public EvaluationRequestCapacityResult Validate(
+        SafeSpecialEvaluationPayload payload,
+        int maximumPromptTokens,
+        int maximumContextWindowTokens)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        return ValidateCore(
+            payload.RenderedPrompt,
+            auxiliarySchemaFactory.CreateSpecialSchema(payload).GetRawText(),
+            AuxiliaryEvaluationSchemaFactory.SpecialToolName,
+            AuxiliaryEvaluationSchemaFactory.SpecialToolDescription,
+            maximumPromptTokens,
+            maximumContextWindowTokens);
+    }
+
+    public EvaluationRequestCapacityResult Validate(
+        SafeSimilarityPayload payload,
+        int maximumPromptTokens,
+        int maximumContextWindowTokens)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        return ValidateCore(
+            payload.RenderedPrompt,
+            auxiliarySchemaFactory.CreateSimilaritySchema(payload).GetRawText(),
+            AuxiliaryEvaluationSchemaFactory.SimilarityToolName,
+            AuxiliaryEvaluationSchemaFactory.SimilarityToolDescription,
+            maximumPromptTokens,
+            maximumContextWindowTokens);
+    }
+
+    private static EvaluationRequestCapacityResult ValidateCore(
+        string renderedPrompt,
+        string schema,
+        string toolName,
+        string toolDescription,
+        int maximumPromptTokens,
+        int maximumContextWindowTokens)
+    {
         if (maximumPromptTokens <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(maximumPromptTokens));
@@ -76,17 +139,16 @@ public sealed class EvaluationRequestCapacityValidator
         }
 
         int effectiveLimit = Math.Min(maximumPromptTokens, maximumContextWindowTokens);
-        string schema = schemaFactory.CreateSchema(payload).GetRawText();
-        long promptScalars = CountUnicodeScalars(payload.RenderedPrompt);
-        long promptBytes = Encoding.UTF8.GetByteCount(payload.RenderedPrompt);
+    long promptScalars = CountUnicodeScalars(renderedPrompt);
+    long promptBytes = Encoding.UTF8.GetByteCount(renderedPrompt);
         long schemaScalars = CountUnicodeScalars(schema);
         long schemaBytes = Encoding.UTF8.GetByteCount(schema);
         long toolContractScalars = checked(
-            CountUnicodeScalars(EvaluationSchemaFactory.ToolName)
-            + CountUnicodeScalars(EvaluationSchemaFactory.ToolDescription));
+            CountUnicodeScalars(toolName)
+            + CountUnicodeScalars(toolDescription));
         long toolContractBytes = checked(
-            Encoding.UTF8.GetByteCount(EvaluationSchemaFactory.ToolName)
-            + Encoding.UTF8.GetByteCount(EvaluationSchemaFactory.ToolDescription));
+            Encoding.UTF8.GetByteCount(toolName)
+            + Encoding.UTF8.GetByteCount(toolDescription));
         long appOwnedScalars = checked(promptScalars + schemaScalars + toolContractScalars);
         long appOwnedBytes = checked(promptBytes + schemaBytes + toolContractBytes);
         int modelContextBudget = checked((int)((long)effectiveLimit * ModelContextBudgetPercent / 100L));

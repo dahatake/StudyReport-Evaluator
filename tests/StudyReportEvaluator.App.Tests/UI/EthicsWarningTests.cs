@@ -20,7 +20,7 @@ namespace StudyReportEvaluator.App.Tests.UI;
 public sealed class EthicsWarningTests
 {
     private const string ExpectedWarning =
-        "AIによる定量値には誤りや偏りが含まれる可能性があります。利用目的に応じて結果を確認してください。";
+        "生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません";
 
     [AvaloniaFact]
     public void Warning_is_visible_on_input_and_results_without_interaction_or_navigation_blocking()

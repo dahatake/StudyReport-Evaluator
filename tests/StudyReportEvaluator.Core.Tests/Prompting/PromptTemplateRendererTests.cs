@@ -77,4 +77,26 @@ public sealed class PromptTemplateRendererTests
 
         Assert.Equal(expectedCode, exception.Code);
     }
+
+    [Fact]
+    public void Special_prompt_requires_answer_but_does_not_require_criteria()
+    {
+        string result = _renderer.RenderSpecial("Evaluate {回答} for {設問}", _context);
+
+        Assert.Equal("Evaluate ANSWER for QUESTION", result);
+        PromptConfigurationException exception = Assert.Throws<PromptConfigurationException>(
+            () => _renderer.RenderSpecial("Evaluate {設問}", _context));
+        Assert.Equal("ANSWER_PLACEHOLDER_REQUIRED", exception.Code);
+    }
+
+    [Fact]
+    public void Special_prompt_keeps_the_same_closed_placeholder_and_brace_rules()
+    {
+        Assert.Equal(
+            "{literal} ANSWER",
+            _renderer.RenderSpecial("{{literal}} {回答}", _context));
+        PromptConfigurationException exception = Assert.Throws<PromptConfigurationException>(
+            () => _renderer.RenderSpecial("{回答} {unknown}", _context));
+        Assert.Equal("UNKNOWN_PLACEHOLDER", exception.Code);
+    }
 }

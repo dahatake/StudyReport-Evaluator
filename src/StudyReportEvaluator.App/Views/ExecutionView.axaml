@@ -134,6 +134,39 @@
       </Grid>
 
       <Border Classes="card">
+        <StackPanel Spacing="10">
+          <TextBlock Text="OUTPUT / RESUME" Classes="kicker" />
+          <TextBlock Text="新規runまたはcheckpoint再開" Classes="heading" />
+          <CheckBox
+              x:Name="ResumeModeCheckBox"
+              IsChecked="{Binding IsResumeMode, Mode=TwoWay}"
+              Content="既存checkpointから再開"
+              TabIndex="3"
+              AutomationProperties.AutomationId="ExecutionResumeMode"
+              AutomationProperties.Name="新規runとcheckpoint再開を切り替え" />
+          <TextBlock Text="{Binding OutputModeText}" Classes="muted" TextWrapping="Wrap" />
+          <StackPanel IsVisible="{Binding !IsResumeMode}" Spacing="5">
+            <TextBlock Text="出力directory" Classes="label" />
+            <TextBox
+                x:Name="OutputDirectoryTextBox"
+                Text="{Binding OutputDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                TabIndex="4"
+                AutomationProperties.AutomationId="ExecutionOutputDirectory"
+                AutomationProperties.Name="finalとpartialを作成するdirectory" />
+          </StackPanel>
+          <StackPanel IsVisible="{Binding IsResumeMode}" Spacing="5">
+            <TextBlock Text="再開するpartial checkpoint" Classes="label" />
+            <TextBox
+                x:Name="ResumePartialPathTextBox"
+                Text="{Binding ResumePartialPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                TabIndex="4"
+                AutomationProperties.AutomationId="ExecutionResumePartialPath"
+                AutomationProperties.Name="再開する既存 partial xlsx path" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Classes="card">
         <StackPanel Spacing="12">
           <TextBlock Text="EVALUATION PLAN" Classes="kicker" />
           <TextBlock Text="実行単位と snapshot" Classes="heading" />
@@ -148,7 +181,7 @@
                 Classes="primary"
                 Content="定量化を開始"
                 Command="{Binding StartCommand}"
-                TabIndex="3"
+                TabIndex="5"
                 AutomationProperties.AutomationId="StartQuantification"
                 AutomationProperties.Name="現在の設計 snapshot で定量化を開始" />
             <Button
@@ -156,7 +189,7 @@
                 Classes="cancel"
                 Content="cancel"
                 Command="{Binding CancelCommand}"
-                TabIndex="4"
+                TabIndex="6"
                 AutomationProperties.AutomationId="CancelQuantification"
                 AutomationProperties.Name="新規 evaluator の送信を停止して部分結果を保持" />
           </StackPanel>
@@ -167,6 +200,7 @@
         <StackPanel Spacing="10">
           <TextBlock Text="PROGRESS" Classes="kicker" />
           <TextBlock Text="{Binding RunStatusText}" Classes="heading" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding StageText}" FontWeight="SemiBold" />
           <ProgressBar
               x:Name="RunProgressBar"
               Minimum="0"
@@ -176,6 +210,13 @@
               AutomationProperties.AutomationId="ExecutionProgress"
               AutomationProperties.Name="定量化の完了進捗" />
           <TextBlock Text="{Binding ProgressText}" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding DurableProgressText}" TextWrapping="Wrap" />
+            <TextBlock
+              Text="{Binding OutputIdentityText}"
+              Classes="muted"
+              FontSize="12"
+              TextWrapping="Wrap"
+              AutomationProperties.AutomationId="ExecutionOutputIdentity" />
         </StackPanel>
       </Border>
 

@@ -8,6 +8,17 @@ namespace StudyReportEvaluator.Core.Tests.Domain;
 public sealed class QuantificationDefinitionTests
 {
     [Fact]
+    public void Definition_has_v4_allocation_defaults()
+    {
+        QuantificationDefinition definition = TestDefinitions.Create();
+
+        Assert.Equal(60m, definition.BasePoints);
+        Assert.Equal(0m, definition.SpecialPoints);
+        Assert.Equal(0.1m, definition.SimilarityPenaltyWeight);
+        Assert.Equal(40m, definition.Questions[0].Points);
+    }
+
+    [Fact]
     public void Definition_preserves_order_arbitrary_columns_and_disabled_nodes()
     {
         QuantificationDefinition definition = TestDefinitions.Create();
@@ -33,20 +44,40 @@ public sealed class QuantificationDefinitionTests
     {
         QuantificationDefinition source = TestDefinitions.Create() with
         {
-            Questions = [TestDefinitions.Create().Questions[0]],
+            Questions =
+            [
+                TestDefinitions.Create().Questions[0] with
+                {
+                    SpecialEvaluations =
+                    [
+                        new SpecialEvaluationDefinition
+                        {
+                            Id = "S1",
+                            DisplayName = "Prompt quality",
+                            PrimarySourceColumn = "G",
+                            SupportingSourceColumns = ["K"],
+                            PromptTemplate = "{回答}",
+                        },
+                    ],
+                },
+            ],
         };
 
         QuantificationDefinition duplicate = source.DuplicateQuestion(
             0,
             "Q-COPY",
             evaluator => $"{evaluator.Id}-COPY",
-            criterion => $"{criterion.Id}-COPY");
+            criterion => $"{criterion.Id}-COPY",
+            special => $"{special.Id}-COPY");
 
         Assert.Single(source.Questions);
         Assert.Equal(2, duplicate.Questions.Length);
         Assert.Equal("Q-COPY", duplicate.Questions[1].Id);
         Assert.Equal(["E1-COPY", "E2-COPY"], duplicate.Questions[1].Evaluators.Select(evaluator => evaluator.Id));
         Assert.All(duplicate.Questions[1].Evaluators.SelectMany(evaluator => evaluator.Criteria), criterion => Assert.EndsWith("-COPY", criterion.Id, StringComparison.Ordinal));
+        Assert.Equal("S1-COPY", duplicate.Questions[1].SpecialEvaluations.Single().Id);
+        Assert.Equal(["K"], duplicate.Questions[1].SpecialEvaluations.Single().SupportingSourceColumns);
+        Assert.Equal("S1", source.Questions[0].SpecialEvaluations.Single().Id);
     }
 }
 
@@ -96,7 +127,7 @@ internal static class TestDefinitions
             QuestionText = "Create a useful prompt",
             PrimarySourceColumn = "G",
             SupportingSourceColumns = ["K", "L"],
-            Weight = 3m,
+            Points = 40m,
             Evaluators = [knowledgeEvaluator, customEvaluator],
         };
         QuestionDefinition second = first with

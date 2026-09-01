@@ -21,6 +21,7 @@ public static class ResultsStatusCodes
     public const string Cancelled = "CANCELLED";
     public const string CleanupFailed = "CLEANUP_FAILED";
     public const string AiRuntimeFailed = "AI_RUNTIME_FAILED";
+    public const string NotRunZeroBudget = "NOT_RUN_ZERO_BUDGET";
 
     private static readonly FrozenSet<string> Defined = new[]
     {
@@ -33,6 +34,7 @@ public static class ResultsStatusCodes
         Cancelled,
         CleanupFailed,
         AiRuntimeFailed,
+        NotRunZeroBudget,
     }.ToFrozenSet(StringComparer.Ordinal);
 
     public static bool IsDefined(string? value) => value is not null && Defined.Contains(value);
@@ -62,6 +64,38 @@ public sealed record EvaluatorResultInput
         $"{nameof(EvaluatorResultInput)} {{ EvaluatorId = {EvaluatorId}, OverrideCount = {(Overrides.IsDefault ? 0 : Overrides.Length)}, Content = <redacted> }}";
 }
 
+public sealed record SpecialResultInput
+{
+    public required string SpecialEvaluationId { get; init; }
+
+    public decimal? AiRaw { get; init; }
+
+    public string Reason { get; init; } = string.Empty;
+
+    public string Evidence { get; init; } = string.Empty;
+
+    public string EvidenceSource { get; init; } = string.Empty;
+
+    public string EvidenceSourceColumnId { get; init; } = string.Empty;
+
+    public required string Status { get; init; }
+
+    public override string ToString() =>
+        $"{nameof(SpecialResultInput)} {{ SpecialEvaluationId = {SpecialEvaluationId}, Status = {Status}, Content = <redacted> }}";
+}
+
+public sealed record SimilarityResultInput
+{
+    public decimal? AiRaw { get; init; }
+
+    public string Reason { get; init; } = string.Empty;
+
+    public required string Status { get; init; }
+
+    public override string ToString() =>
+        $"{nameof(SimilarityResultInput)} {{ Status = {Status}, Content = <redacted> }}";
+}
+
 public sealed record QuestionResultInput
 {
     public required string QuestionId { get; init; }
@@ -69,6 +103,10 @@ public sealed record QuestionResultInput
     public bool Scorable { get; init; }
 
     public ImmutableArray<EvaluatorResultInput> Evaluators { get; init; } = [];
+
+    public ImmutableArray<SpecialResultInput> SpecialResults { get; init; } = [];
+
+    public SimilarityResultInput? Similarity { get; init; }
 
     public override string ToString() =>
         $"{nameof(QuestionResultInput)} {{ QuestionId = {QuestionId}, Scorable = {Scorable}, EvaluatorCount = {(Evaluators.IsDefault ? 0 : Evaluators.Length)}, Content = <redacted> }}";
@@ -192,10 +230,35 @@ public sealed class ResultsSheetWriter
     public const string EvidenceSourceColumnSuffix = "Evidence_SourceColumn";
     public const string StatusSuffix = "Status";
     public const string EvaluatorScoreSuffix = "Evaluator_Score";
-    public const string QuestionScoreSuffix = "Question_Score";
-    public const string OverallScoreHeader = "Overall_Score";
+    public const string AnswerPresentSuffix = "Answer_Present";
+    public const string QuestionNormalizedSuffix = "Question_Normalized";
+    public const string QuestionRateSuffix = "Question_Rate";
+    public const string QuestionEarnedSuffix = "Question_Earned";
+    public const string SpecialAiRawSuffix = "Special_AI_Raw";
+    public const string SpecialReasonSuffix = "Special_Reason";
+    public const string SpecialEvidenceSuffix = "Special_Evidence";
+    public const string SpecialEvidenceSourceSuffix = "Special_Evidence_Source";
+    public const string SpecialEvidenceSourceColumnSuffix = "Special_Evidence_SourceColumn";
+    public const string SpecialStatusSuffix = "Special_Status";
+    public const string SpecialQuestionRateSuffix = "Special_Question_Rate";
+    public const string SimilarityAiRawSuffix = "Similarity_AI_Raw";
+    public const string SimilarityReasonSuffix = "Similarity_Reason";
+    public const string SimilarityStatusSuffix = "Similarity_Status";
+    public const string SimilarityPenaltySuffix = "Similarity_Penalty";
+    public const string BasePointsHeader = "Base_Points";
+    public const string SpecialEarnedHeader = "Special_Earned";
+    public const string FinalRawHeader = "Final_Raw";
+    public const string FinalScoreHeader = "Final_Score";
+    public const string SourceRowHeader = "SourceRow";
+
+    public const string QuestionScoreSuffix = QuestionNormalizedSuffix;
+
+    public const string OverallScoreHeader = FinalScoreHeader;
 
     private const int CriterionColumnCount = 10;
+    private const int SpecialColumnCount = 6;
+    private const int QuestionFixedColumnCount = 8;
+    private const int RowTotalColumnCount = 4;
     private const NumberStyles OverrideNumberStyles =
         NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent;
 
@@ -335,7 +398,7 @@ public sealed class ResultsSheetWriter
                 preparedRow,
                 formulasByTarget,
                 sheetNames,
-                layout.Overall,
+                layout,
                 writtenFormulaCells));
         }
 
@@ -402,7 +465,7 @@ public sealed class ResultsSheetWriter
         QuantificationDefinition definition,
         List<ResultsSheetValidationError> errors)
     {
-        long requiredColumns = 1;
+        long requiredColumns = 1 + RowTotalColumnCount;
         foreach (QuestionDefinition question in definition.Questions.Where(question => question.Enabled))
         {
             foreach (EvaluatorDefinition evaluator in question.Evaluators.Where(evaluator => evaluator.Enabled))
@@ -411,7 +474,12 @@ public sealed class ResultsSheetWriter
                 requiredColumns++;
             }
 
-            requiredColumns++;
+            long enabledSpecials = question.SpecialEvaluations.LongCount(special => special.Enabled);
+            requiredColumns += QuestionFixedColumnCount + (enabledSpecials * SpecialColumnCount);
+            if (enabledSpecials > 0)
+            {
+                requiredColumns++;
+            }
         }
 
         if (requiredColumns > FormulaPreflightValidator.MaximumExcelColumn)
@@ -427,12 +495,17 @@ public sealed class ResultsSheetWriter
                 requiredColumns.ToString(CultureInfo.InvariantCulture),
                 FormulaPreflightValidator.MaximumExcelColumn.ToString(CultureInfo.InvariantCulture));
             return new ResultsLayout(
+                Column(1, SourceRowHeader),
                 [],
-                Column(1, OverallScoreHeader),
+                Column(2, BasePointsHeader),
+                Column(3, SpecialEarnedHeader),
+                Column(4, FinalRawHeader),
+                Column(5, FinalScoreHeader),
                 checked((int)Math.Min(requiredColumns, FormulaPreflightValidator.MaximumExcelColumn)));
         }
 
         int nextColumn = 1;
+        ColumnLayout sourceRow = Column(nextColumn++, SourceRowHeader);
         ImmutableArray<QuestionLayout>.Builder questions = ImmutableArray.CreateBuilder<QuestionLayout>();
         foreach (QuestionDefinition question in definition.Questions.Where(question => question.Enabled))
         {
@@ -465,14 +538,58 @@ public sealed class ResultsSheetWriter
                     Column(nextColumn++, $"{question.Id}.{evaluator.Id}.{EvaluatorScoreSuffix}")));
             }
 
+            string questionPrefix = question.Id + ".";
+            ColumnLayout answerPresent = Column(nextColumn++, questionPrefix + AnswerPresentSuffix);
+            ColumnLayout questionNormalized = Column(nextColumn++, questionPrefix + QuestionNormalizedSuffix);
+            ColumnLayout questionRate = Column(nextColumn++, questionPrefix + QuestionRateSuffix);
+            ColumnLayout questionEarned = Column(nextColumn++, questionPrefix + QuestionEarnedSuffix);
+            ImmutableArray<SpecialLayout>.Builder specials = ImmutableArray.CreateBuilder<SpecialLayout>();
+            foreach (SpecialEvaluationDefinition special in question.SpecialEvaluations.Where(special => special.Enabled))
+            {
+                string prefix = $"{question.Id}.{special.Id}.";
+                specials.Add(new SpecialLayout(
+                    special,
+                    Column(nextColumn++, prefix + SpecialAiRawSuffix),
+                    Column(nextColumn++, prefix + SpecialReasonSuffix),
+                    Column(nextColumn++, prefix + SpecialEvidenceSuffix),
+                    Column(nextColumn++, prefix + SpecialEvidenceSourceSuffix),
+                    Column(nextColumn++, prefix + SpecialEvidenceSourceColumnSuffix),
+                    Column(nextColumn++, prefix + SpecialStatusSuffix)));
+            }
+
+            ImmutableArray<SpecialLayout> builtSpecials = specials.ToImmutable();
+            ColumnLayout? specialQuestionRate = builtSpecials.IsEmpty
+                ? null
+                : Column(nextColumn++, questionPrefix + SpecialQuestionRateSuffix);
+            SimilarityLayout similarity = new(
+                Column(nextColumn++, questionPrefix + SimilarityAiRawSuffix),
+                Column(nextColumn++, questionPrefix + SimilarityReasonSuffix),
+                Column(nextColumn++, questionPrefix + SimilarityStatusSuffix),
+                Column(nextColumn++, questionPrefix + SimilarityPenaltySuffix));
             questions.Add(new QuestionLayout(
                 question,
                 evaluators.ToImmutable(),
-                Column(nextColumn++, $"{question.Id}.{QuestionScoreSuffix}")));
+                answerPresent,
+                questionNormalized,
+                questionRate,
+                questionEarned,
+                builtSpecials,
+                specialQuestionRate,
+                similarity));
         }
 
-        ColumnLayout overall = Column(nextColumn++, OverallScoreHeader);
-        ResultsLayout layout = new(questions.ToImmutable(), overall, nextColumn - 1);
+        ColumnLayout basePoints = Column(nextColumn++, BasePointsHeader);
+        ColumnLayout specialEarned = Column(nextColumn++, SpecialEarnedHeader);
+        ColumnLayout finalRaw = Column(nextColumn++, FinalRawHeader);
+        ColumnLayout finalScore = Column(nextColumn++, FinalScoreHeader);
+        ResultsLayout layout = new(
+            sourceRow,
+            questions.ToImmutable(),
+            basePoints,
+            specialEarned,
+            finalRaw,
+            finalScore,
+            nextColumn - 1);
         foreach (ColumnLayout column in layout.AllColumns)
         {
             if (column.Header.Length > UntrustedStringCellWriter.MaximumCellCharacters)
@@ -501,9 +618,13 @@ public sealed class ResultsSheetWriter
     {
         HashSet<FormulaCellAddress> verified = configCells.VerifiedCells.ToHashSet();
         ValidateConfigAddress(configCells.RoundingDigitsCell, "Definition", "<rounding>", "<rounding>", "RoundingDigits", configCells, sheetNames, verified, errors);
+        ValidateConfigAddress(configCells.BasePointsCell, "Definition", "<base>", "<base>", "BasePoints", configCells, sheetNames, verified, errors);
+        ValidateConfigAddress(configCells.SpecialPointsCell, "Definition", "<special>", "<special>", "SpecialPoints", configCells, sheetNames, verified, errors);
+        ValidateConfigAddress(configCells.SimilarityPenaltyWeightCell, "Definition", "<similarity>", "<similarity>", "SimilarityPenaltyWeight", configCells, sheetNames, verified, errors);
+        ValidateConfigAddress(configCells.AllocationValidCell, "Definition", "<allocation>", "<allocation>", "AllocationValid", configCells, sheetNames, verified, errors);
         foreach (QuestionLayout question in layout.Questions)
         {
-            ValidateMapAddress(configCells.QuestionWeightCells, question.Definition.Id, "Question", question.Definition.Id, question.Definition.DisplayName, "Weight", configCells, sheetNames, verified, errors);
+            ValidateMapAddress(configCells.QuestionPointsCells, question.Definition.Id, "Question", question.Definition.Id, question.Definition.DisplayName, "Points", configCells, sheetNames, verified, errors);
             foreach (EvaluatorLayout evaluator in question.Evaluators)
             {
                 ValidateMapAddress(configCells.EvaluatorWeightCells, evaluator.Definition.Id, "Evaluator", evaluator.Definition.Id, evaluator.Definition.DisplayName, "Weight", configCells, sheetNames, verified, errors);
@@ -625,12 +746,107 @@ public sealed class ResultsSheetWriter
             }
 
             ValidateEvaluatorInputs(row.SourceRowNumber, question, expected, errors);
+            ValidateAuxiliaryInputs(row.SourceRowNumber, question, expected, errors);
         }
 
         foreach (QuestionLayout expected in layout.Questions.Where(expected => !byId.ContainsKey(expected.Definition.Id)))
         {
             AddError(errors, "QUESTION_RESULT_MISSING", row.SourceRowNumber, "Question", expected.Definition.Id, expected.Definition.DisplayName, "Questions", "missing");
         }
+    }
+
+    private static void ValidateAuxiliaryInputs(
+        int sourceRow,
+        QuestionResultInput input,
+        QuestionLayout layout,
+        List<ResultsSheetValidationError> errors)
+    {
+        ImmutableArray<SpecialResultInput> specialResults = input.SpecialResults.IsDefault
+            ? []
+            : input.SpecialResults;
+        Dictionary<string, SpecialResultInput> byId = new(StringComparer.Ordinal);
+        foreach (SpecialResultInput? result in specialResults)
+        {
+            if (result is null || string.IsNullOrWhiteSpace(result.SpecialEvaluationId))
+            {
+                AddError(errors, "SPECIAL_RESULT_ID_REQUIRED", sourceRow, "SpecialEvaluation", "<blank>", "<blank>", "SpecialEvaluationId", "blank");
+                continue;
+            }
+
+            if (!byId.TryAdd(result.SpecialEvaluationId, result))
+            {
+                AddError(errors, "DUPLICATE_SPECIAL_RESULT", sourceRow, "SpecialEvaluation", result.SpecialEvaluationId, result.SpecialEvaluationId, "SpecialEvaluationId", "duplicate");
+                continue;
+            }
+
+            SpecialLayout? expected = layout.Specials.SingleOrDefault(candidate => string.Equals(
+                candidate.Definition.Id,
+                result.SpecialEvaluationId,
+                StringComparison.Ordinal));
+            if (expected is null)
+            {
+                AddError(errors, "SPECIAL_RESULT_NOT_ENABLED", sourceRow, "SpecialEvaluation", result.SpecialEvaluationId, result.SpecialEvaluationId, "SpecialEvaluationId", "unexpected");
+                continue;
+            }
+
+            if (result.AiRaw is decimal raw && raw is < 0m or > 1m)
+            {
+                AddError(errors, "SPECIAL_SCORE_OUT_OF_RANGE", sourceRow, "SpecialEvaluation", expected.Definition.Id, expected.Definition.DisplayName, "AiRaw", raw.ToString("G29", CultureInfo.InvariantCulture));
+            }
+
+            ValidateAuxiliaryStrings(
+                sourceRow,
+                "SpecialEvaluation",
+                expected.Definition.Id,
+                expected.Definition.DisplayName,
+                result.Status,
+                result.Reason,
+                result.Evidence,
+                result.EvidenceSource,
+                result.EvidenceSourceColumnId,
+                errors);
+        }
+
+        SimilarityResultInput? similarity = input.Similarity;
+        if (similarity is not null)
+        {
+            if (similarity.AiRaw is decimal raw && raw is < 0m or > 1m)
+            {
+                AddError(errors, "SIMILARITY_OUT_OF_RANGE", sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.AiRaw", raw.ToString("G29", CultureInfo.InvariantCulture));
+            }
+
+            if (!ResultsStatusCodes.IsDefined(similarity.Status))
+            {
+                AddError(errors, "STATUS_INVALID", sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.Status", "unknown");
+            }
+
+            ValidateString(similarity.Status, sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.Status", errors);
+            ValidateString(similarity.Reason, sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.Reason", errors);
+        }
+    }
+
+    private static void ValidateAuxiliaryStrings(
+        int sourceRow,
+        string nodeKind,
+        string nodeId,
+        string displayName,
+        string status,
+        string reason,
+        string evidence,
+        string evidenceSource,
+        string evidenceSourceColumn,
+        List<ResultsSheetValidationError> errors)
+    {
+        if (!ResultsStatusCodes.IsDefined(status))
+        {
+            AddError(errors, "STATUS_INVALID", sourceRow, nodeKind, nodeId, displayName, "Status", "unknown");
+        }
+
+        ValidateString(status, sourceRow, nodeKind, nodeId, displayName, "Status", errors);
+        ValidateString(reason, sourceRow, nodeKind, nodeId, displayName, "Reason", errors);
+        ValidateString(evidence, sourceRow, nodeKind, nodeId, displayName, "Evidence", errors);
+        ValidateString(evidenceSource, sourceRow, nodeKind, nodeId, displayName, "EvidenceSource", errors);
+        ValidateString(evidenceSourceColumn, sourceRow, nodeKind, nodeId, displayName, "EvidenceSourceColumnId", errors);
     }
 
     private static void ValidateEvaluatorInputs(
@@ -896,21 +1112,94 @@ public sealed class ResultsSheetWriter
                 }
 
                 ImmutableArray<PreparedEvaluator> preparedEvaluators = evaluators.ToImmutable();
-                decimal? questionScore = scoreCalculator.Aggregate(
+                decimal? questionNormalized = scoreCalculator.Aggregate(
                     preparedEvaluators.Select(evaluator => new WeightedScoreInput(
                         evaluator.Score,
                         evaluator.Layout.Definition.Weight)),
                     definition.RoundingDigits);
-                questions.Add(new PreparedQuestion(questionLayout, preparedEvaluators, questionScore));
+
+                Dictionary<string, SpecialResultInput> specialInputs =
+                    (questionInput.SpecialResults.IsDefault ? [] : questionInput.SpecialResults)
+                    .ToDictionary(item => item.SpecialEvaluationId, StringComparer.Ordinal);
+                ImmutableArray<PreparedSpecial>.Builder specials = ImmutableArray.CreateBuilder<PreparedSpecial>();
+                foreach (SpecialLayout specialLayout in questionLayout.Specials)
+                {
+                    specialInputs.TryGetValue(specialLayout.Definition.Id, out SpecialResultInput? specialInput);
+                    specials.Add(new PreparedSpecial(
+                        specialLayout,
+                        specialInput?.AiRaw,
+                        specialInput?.Reason ?? string.Empty,
+                        specialInput?.Evidence ?? string.Empty,
+                        specialInput?.EvidenceSource ?? string.Empty,
+                        specialInput?.EvidenceSourceColumnId ?? string.Empty,
+                        specialInput?.Status ?? (definition.SpecialPoints == 0m
+                            ? ResultsStatusCodes.NotRunZeroBudget
+                            : ResultsStatusCodes.AiRuntimeFailed)));
+                }
+
+                ImmutableArray<PreparedSpecial> preparedSpecials = specials.ToImmutable();
+                decimal? specialQuestionRate = definition.SpecialPoints == 0m || preparedSpecials.IsEmpty
+                    ? null
+                    : scoreCalculator.SpecialQuestionRate(
+                        preparedSpecials.Select(item => item.AiRaw),
+                        definition.RoundingDigits);
+                SimilarityResultInput similarityInput = questionInput.Similarity
+                    ?? new SimilarityResultInput
+                    {
+                        AiRaw = questionInput.Scorable ? null : 0m,
+                        Status = questionInput.Scorable
+                            ? ResultsStatusCodes.AiRuntimeFailed
+                            : ResultsStatusCodes.Empty,
+                    };
+                decimal? questionRate = scoreCalculator.QuestionRate(
+                    questionInput.Scorable,
+                    questionNormalized);
+                decimal? questionEarned = scoreCalculator.QuestionEarned(
+                    questionRate,
+                    questionLayout.Definition.Points,
+                    definition.RoundingDigits);
+                decimal? similarityPenalty = scoreCalculator.SimilarityPenalty(
+                    questionLayout.Definition.Points,
+                    similarityInput.AiRaw,
+                    definition.SimilarityPenaltyWeight,
+                    definition.RoundingDigits);
+                questions.Add(new PreparedQuestion(
+                    questionLayout,
+                    preparedEvaluators,
+                    questionInput.Scorable,
+                    questionNormalized,
+                    questionRate,
+                    questionEarned,
+                    preparedSpecials,
+                    specialQuestionRate,
+                    new PreparedSimilarity(
+                        questionLayout.Similarity,
+                        similarityInput.AiRaw,
+                        similarityInput.Reason,
+                        similarityInput.Status,
+                        similarityPenalty)));
             }
 
             ImmutableArray<PreparedQuestion> preparedQuestions = questions.ToImmutable();
-            decimal? overall = scoreCalculator.Aggregate(
-                preparedQuestions.Select(question => new WeightedScoreInput(
-                    question.Score,
-                    question.Layout.Definition.Weight)),
+            decimal? specialEarned = scoreCalculator.SpecialEarned(
+                definition.SpecialPoints,
+                preparedQuestions
+                    .Where(question => question.Layout.SpecialQuestionRate is not null)
+                    .Select(question => question.SpecialQuestionRate),
                 definition.RoundingDigits);
-            preparedRows.Add(new PreparedRow(sourceRow, preparedQuestions, overall));
+            decimal? finalRaw = scoreCalculator.FinalRaw(
+                definition.BasePoints,
+                preparedQuestions.Select(question => question.Earned),
+                specialEarned,
+                preparedQuestions.Select(question => question.Similarity.Penalty),
+                definition.RoundingDigits);
+            preparedRows.Add(new PreparedRow(
+                sourceRow,
+                preparedQuestions,
+                definition.BasePoints,
+                specialEarned,
+                finalRaw,
+                WeightedScoreCalculator.FinalScore(finalRaw)));
         }
 
         return preparedRows.ToImmutable();
@@ -972,27 +1261,95 @@ public sealed class ResultsSheetWriter
                 }
 
                 formulas.Add(new FormulaCellDefinition(
-                    Address(sheetNames.ResultsSheetName, question.Score, sourceRow),
+                    Address(sheetNames.ResultsSheetName, question.Normalized, sourceRow),
                     new FormulaIdentity(
                         "Question",
                         question.Definition.Id,
                         question.Definition.DisplayName,
-                        QuestionScoreSuffix),
+                        QuestionNormalizedSuffix),
                     FormulaExpressions.Aggregate(
                         question.Evaluators.Select(evaluator => new WeightedFormulaChild(
                             Ref(Address(sheetNames.ResultsSheetName, evaluator.Score, sourceRow)),
                             Ref(configCells.EvaluatorWeightCells[evaluator.Definition.Id], absolute: true))),
                         Ref(configCells.RoundingDigitsCell, absolute: true))));
+
+                formulas.Add(new FormulaCellDefinition(
+                    Address(sheetNames.ResultsSheetName, question.Rate, sourceRow),
+                    new FormulaIdentity("Question", question.Definition.Id, question.Definition.DisplayName, QuestionRateSuffix),
+                    FormulaExpressions.QuestionRate(
+                        Ref(Address(sheetNames.ResultsSheetName, question.AnswerPresent, sourceRow)),
+                        Ref(Address(sheetNames.ResultsSheetName, question.Normalized, sourceRow)))));
+                formulas.Add(new FormulaCellDefinition(
+                    Address(sheetNames.ResultsSheetName, question.Earned, sourceRow),
+                    new FormulaIdentity("Question", question.Definition.Id, question.Definition.DisplayName, QuestionEarnedSuffix),
+                    FormulaExpressions.QuestionEarned(
+                        Ref(Address(sheetNames.ResultsSheetName, question.Rate, sourceRow)),
+                        Ref(configCells.QuestionPointsCells[question.Definition.Id], absolute: true),
+                        Ref(configCells.RoundingDigitsCell, absolute: true))));
+
+                if (question.SpecialQuestionRate is ColumnLayout specialQuestionRate)
+                {
+                    formulas.Add(new FormulaCellDefinition(
+                        Address(sheetNames.ResultsSheetName, specialQuestionRate, sourceRow),
+                        new FormulaIdentity("Question", question.Definition.Id, question.Definition.DisplayName, SpecialQuestionRateSuffix),
+                        FormulaExpressions.SpecialQuestionRate(
+                            question.Specials.Select(special => Ref(Address(
+                                sheetNames.ResultsSheetName,
+                                special.AiRaw,
+                                sourceRow))),
+                            Ref(configCells.SpecialPointsCell, absolute: true),
+                            Ref(configCells.RoundingDigitsCell, absolute: true))));
+                }
+
+                formulas.Add(new FormulaCellDefinition(
+                    Address(sheetNames.ResultsSheetName, question.Similarity.Penalty, sourceRow),
+                    new FormulaIdentity("Question", question.Definition.Id, question.Definition.DisplayName, SimilarityPenaltySuffix),
+                    FormulaExpressions.SimilarityPenalty(
+                        Ref(configCells.QuestionPointsCells[question.Definition.Id], absolute: true),
+                        Ref(Address(sheetNames.ResultsSheetName, question.Similarity.AiRaw, sourceRow)),
+                        Ref(configCells.SimilarityPenaltyWeightCell, absolute: true),
+                        Ref(configCells.RoundingDigitsCell, absolute: true))));
             }
 
             formulas.Add(new FormulaCellDefinition(
-                Address(sheetNames.ResultsSheetName, layout.Overall, sourceRow),
-                new FormulaIdentity("Definition", definition.Id, definition.Name, OverallScoreHeader),
-                FormulaExpressions.Aggregate(
-                    layout.Questions.Select(question => new WeightedFormulaChild(
-                        Ref(Address(sheetNames.ResultsSheetName, question.Score, sourceRow)),
-                        Ref(configCells.QuestionWeightCells[question.Definition.Id], absolute: true))),
+                Address(sheetNames.ResultsSheetName, layout.BasePoints, sourceRow),
+                new FormulaIdentity("Definition", definition.Id, definition.Name, BasePointsHeader),
+                new FormulaCell(Ref(configCells.BasePointsCell, absolute: true))));
+            formulas.Add(new FormulaCellDefinition(
+                Address(sheetNames.ResultsSheetName, layout.SpecialEarned, sourceRow),
+                new FormulaIdentity("Definition", definition.Id, definition.Name, SpecialEarnedHeader),
+                FormulaExpressions.SpecialEarned(
+                    layout.Questions
+                        .Where(question => question.SpecialQuestionRate is not null)
+                        .Select(question => Ref(Address(
+                            sheetNames.ResultsSheetName,
+                            question.SpecialQuestionRate!,
+                            sourceRow))),
+                    Ref(configCells.SpecialPointsCell, absolute: true),
                     Ref(configCells.RoundingDigitsCell, absolute: true))));
+            formulas.Add(new FormulaCellDefinition(
+                Address(sheetNames.ResultsSheetName, layout.FinalRaw, sourceRow),
+                new FormulaIdentity("Definition", definition.Id, definition.Name, FinalRawHeader),
+                FormulaExpressions.FinalRaw(
+                    Ref(configCells.AllocationValidCell, absolute: true),
+                    Ref(configCells.BasePointsCell, absolute: true),
+                    layout.Questions.Select(question => Ref(Address(
+                        sheetNames.ResultsSheetName,
+                        question.Earned,
+                        sourceRow))),
+                    Ref(Address(sheetNames.ResultsSheetName, layout.SpecialEarned, sourceRow)),
+                    layout.Questions.Select(question => Ref(Address(
+                        sheetNames.ResultsSheetName,
+                        question.Similarity.Penalty,
+                        sourceRow))),
+                    Ref(configCells.RoundingDigitsCell, absolute: true))));
+            formulas.Add(new FormulaCellDefinition(
+                Address(sheetNames.ResultsSheetName, layout.FinalScore, sourceRow),
+                new FormulaIdentity("Definition", definition.Id, definition.Name, FinalScoreHeader),
+                FormulaExpressions.FinalScore(Ref(Address(
+                    sheetNames.ResultsSheetName,
+                    layout.FinalRaw,
+                    sourceRow)))));
         }
 
         return formulas.ToImmutable();
@@ -1048,10 +1405,13 @@ public sealed class ResultsSheetWriter
         PreparedRow prepared,
         IReadOnlyDictionary<FormulaCellAddress, FormulaCellDefinition> formulas,
         AppOwnedSheetNames sheetNames,
-        ColumnLayout overallColumn,
+        ResultsLayout layout,
         ImmutableArray<WrittenFormulaCell>.Builder writtenFormulaCells)
     {
         Row row = new() { RowIndex = checked((uint)prepared.SourceRowNumber) };
+        row.Append(SpreadsheetLiteral.CreateNumberCell(
+            CellReference(layout.SourceRow, prepared.SourceRowNumber),
+            prepared.SourceRowNumber));
         foreach (PreparedQuestion question in prepared.Questions)
         {
             foreach (PreparedEvaluator evaluator in question.Evaluators)
@@ -1081,10 +1441,40 @@ public sealed class ResultsSheetWriter
                 AppendFormula(row, formulas, sheetNames, evaluator.Layout.Score, prepared.SourceRowNumber, evaluator.Score, writtenFormulaCells);
             }
 
-            AppendFormula(row, formulas, sheetNames, question.Layout.Score, prepared.SourceRowNumber, question.Score, writtenFormulaCells);
+            row.Append(SpreadsheetLiteral.CreateNumberCell(
+                CellReference(question.Layout.AnswerPresent, prepared.SourceRowNumber),
+                question.AnswerPresent ? 1 : 0));
+            AppendFormula(row, formulas, sheetNames, question.Layout.Normalized, prepared.SourceRowNumber, question.Normalized, writtenFormulaCells);
+            AppendFormula(row, formulas, sheetNames, question.Layout.Rate, prepared.SourceRowNumber, question.Rate, writtenFormulaCells);
+            AppendFormula(row, formulas, sheetNames, question.Layout.Earned, prepared.SourceRowNumber, question.Earned, writtenFormulaCells);
+            foreach (PreparedSpecial special in question.Specials)
+            {
+                row.Append(CreateOptionalNumberCell(special.Layout.AiRaw, prepared.SourceRowNumber, special.AiRaw));
+                stringCellWriter.Write(row, CellReference(special.Layout.Reason, prepared.SourceRowNumber), special.Reason);
+                stringCellWriter.Write(row, CellReference(special.Layout.Evidence, prepared.SourceRowNumber), special.Evidence);
+                stringCellWriter.Write(row, CellReference(special.Layout.EvidenceSource, prepared.SourceRowNumber), special.EvidenceSource);
+                stringCellWriter.Write(row, CellReference(special.Layout.EvidenceSourceColumn, prepared.SourceRowNumber), special.EvidenceSourceColumn);
+                stringCellWriter.Write(row, CellReference(special.Layout.Status, prepared.SourceRowNumber), special.Status);
+            }
+
+            if (question.Layout.SpecialQuestionRate is ColumnLayout specialRate)
+            {
+                AppendFormula(row, formulas, sheetNames, specialRate, prepared.SourceRowNumber, question.SpecialQuestionRate, writtenFormulaCells);
+            }
+
+            row.Append(CreateOptionalNumberCell(
+                question.Similarity.Layout.AiRaw,
+                prepared.SourceRowNumber,
+                question.Similarity.AiRaw));
+            stringCellWriter.Write(row, CellReference(question.Similarity.Layout.Reason, prepared.SourceRowNumber), question.Similarity.Reason);
+            stringCellWriter.Write(row, CellReference(question.Similarity.Layout.Status, prepared.SourceRowNumber), question.Similarity.Status);
+            AppendFormula(row, formulas, sheetNames, question.Similarity.Layout.Penalty, prepared.SourceRowNumber, question.Similarity.Penalty, writtenFormulaCells);
         }
 
-        AppendFormula(row, formulas, sheetNames, overallColumn, prepared.SourceRowNumber, prepared.Overall, writtenFormulaCells);
+        AppendFormula(row, formulas, sheetNames, layout.BasePoints, prepared.SourceRowNumber, prepared.BasePoints, writtenFormulaCells);
+        AppendFormula(row, formulas, sheetNames, layout.SpecialEarned, prepared.SourceRowNumber, prepared.SpecialEarned, writtenFormulaCells);
+        AppendFormula(row, formulas, sheetNames, layout.FinalRaw, prepared.SourceRowNumber, prepared.FinalRaw, writtenFormulaCells);
+        AppendFormula(row, formulas, sheetNames, layout.FinalScore, prepared.SourceRowNumber, prepared.FinalScore, writtenFormulaCells);
         return row;
     }
 
@@ -1281,22 +1671,70 @@ public sealed class ResultsSheetWriter
             Criteria.SelectMany(criterion => criterion.AllColumns).Append(Score);
     }
 
+    private sealed record SpecialLayout(
+        SpecialEvaluationDefinition Definition,
+        ColumnLayout AiRaw,
+        ColumnLayout Reason,
+        ColumnLayout Evidence,
+        ColumnLayout EvidenceSource,
+        ColumnLayout EvidenceSourceColumn,
+        ColumnLayout Status)
+    {
+        internal IEnumerable<ColumnLayout> AllColumns =>
+        [AiRaw, Reason, Evidence, EvidenceSource, EvidenceSourceColumn, Status];
+    }
+
+    private sealed record SimilarityLayout(
+        ColumnLayout AiRaw,
+        ColumnLayout Reason,
+        ColumnLayout Status,
+        ColumnLayout Penalty)
+    {
+        internal IEnumerable<ColumnLayout> AllColumns => [AiRaw, Reason, Status, Penalty];
+    }
+
     private sealed record QuestionLayout(
         QuestionDefinition Definition,
         ImmutableArray<EvaluatorLayout> Evaluators,
-        ColumnLayout Score)
+        ColumnLayout AnswerPresent,
+        ColumnLayout Normalized,
+        ColumnLayout Rate,
+        ColumnLayout Earned,
+        ImmutableArray<SpecialLayout> Specials,
+        ColumnLayout? SpecialQuestionRate,
+        SimilarityLayout Similarity)
     {
-        internal IEnumerable<ColumnLayout> AllColumns =>
-            Evaluators.SelectMany(evaluator => evaluator.AllColumns).Append(Score);
+        internal IEnumerable<ColumnLayout> AllColumns
+        {
+            get
+            {
+                IEnumerable<ColumnLayout> columns = Evaluators
+                    .SelectMany(evaluator => evaluator.AllColumns)
+                    .Concat([AnswerPresent, Normalized, Rate, Earned])
+                    .Concat(Specials.SelectMany(special => special.AllColumns));
+                if (SpecialQuestionRate is not null)
+                {
+                    columns = columns.Append(SpecialQuestionRate);
+                }
+
+                return columns.Concat(Similarity.AllColumns);
+            }
+        }
     }
 
     private sealed record ResultsLayout(
+        ColumnLayout SourceRow,
         ImmutableArray<QuestionLayout> Questions,
-        ColumnLayout Overall,
+        ColumnLayout BasePoints,
+        ColumnLayout SpecialEarned,
+        ColumnLayout FinalRaw,
+        ColumnLayout FinalScore,
         int ColumnCount)
     {
         internal IEnumerable<ColumnLayout> AllColumns =>
-            Questions.SelectMany(question => question.AllColumns).Append(Overall);
+            new[] { SourceRow }
+                .Concat(Questions.SelectMany(question => question.AllColumns))
+                .Concat([BasePoints, SpecialEarned, FinalRaw, FinalScore]);
     }
 
     private sealed record PreparedCriterion(
@@ -1317,15 +1755,40 @@ public sealed class ResultsSheetWriter
         ImmutableArray<PreparedCriterion> Criteria,
         decimal? Score);
 
+    private sealed record PreparedSpecial(
+        SpecialLayout Layout,
+        decimal? AiRaw,
+        string Reason,
+        string Evidence,
+        string EvidenceSource,
+        string EvidenceSourceColumn,
+        string Status);
+
+    private sealed record PreparedSimilarity(
+        SimilarityLayout Layout,
+        decimal? AiRaw,
+        string Reason,
+        string Status,
+        decimal? Penalty);
+
     private sealed record PreparedQuestion(
         QuestionLayout Layout,
         ImmutableArray<PreparedEvaluator> Evaluators,
-        decimal? Score);
+        bool AnswerPresent,
+        decimal? Normalized,
+        decimal? Rate,
+        decimal? Earned,
+        ImmutableArray<PreparedSpecial> Specials,
+        decimal? SpecialQuestionRate,
+        PreparedSimilarity Similarity);
 
     private sealed record PreparedRow(
         int SourceRowNumber,
         ImmutableArray<PreparedQuestion> Questions,
-        decimal? Overall);
+        decimal BasePoints,
+        decimal? SpecialEarned,
+        decimal? FinalRaw,
+        decimal? FinalScore);
 
     private sealed record PreparedSheet(
         Worksheet Worksheet,

@@ -2,192 +2,157 @@
 
 | 項目 | 内容 |
 |---|---|
-| Persona | 開発者、アーキテクト、QA、security reviewer |
-| Current scope | requirements v3.0 / ADR-0011 |
-| Gap closure implementation | commit `69e4b99` |
-| Known implementation gaps | なし（IMPL-GAP-001 / 002はclosed、新acceptance `PASS`） |
+| Current requirement | requirements v4.0 |
+| Current decision | ADR-0012 |
+| Detailed design | [`detailed-design.md`](detailed-design.md) |
+| Production projects | 2（Core / App） |
+| Target platforms | Windows 11 x64、macOS arm64/x64 |
 
-旧scopeの構成、署名record、ReportDefinition、cross-platform、mandatory reviewは[`docs-dev/README.md`](README.md)で履歴として分離します。本書はcurrent production sourceだけを説明します。
+本書はcomponent境界と実行data flowの正本である。型、sheet、formula、checkpoint encodingの詳細は[詳細設計書](detailed-design.md)と[Excel契約](excel-contract.md)を参照する。
 
-## 1. 構成と依存方向
+## 1. Project境界
 
-初版の production project は正確に2件、test project は正確に2件です。追加の Application / Infrastructure / Platform project や、独立した E2E project は設けません。
+| Project | 責務 | 禁止依存 |
+|---|---|---|
+| `StudyReportEvaluator.Core` | v4 definition、snapshot、Prompt、closed result validation、allocation、score preview、formula AST | Avalonia、Open XML、Copilot SDK、filesystem |
+| `StudyReportEvaluator.App` | Avalonia UI、workbook I/O、Copilot adapter、checkpoint／resume、platform composition | Coreからの逆参照 |
 
-| 種別 | Project | 責務 | 直接依存 |
-|---|---|---|---|
-| production | `src/StudyReportEvaluator.Core/` | definition、immutable snapshot、Prompt rendering、result validation、scoring、formula AST | BCL-only |
-| production | `src/StudyReportEvaluator.App/` | Avalonia UI、Open XML workbook adapter、GitHub Copilot adapter、workflow、composition root | Core、Avalonia、DocumentFormat.OpenXml、GitHub.Copilot.SDK |
-| test | `tests/StudyReportEvaluator.Core.Tests/` | Core unit / contract / formula golden tests | Core |
-| test | `tests/StudyReportEvaluator.App.Tests/` | adapter、UI、integration、E2E、publish / package、documentation tests | Core、App |
-
-Core は Avalonia、Open XML、Copilot SDK を参照しません。外部frameworkとI/Oは App 側のadapterに閉じ、依存方向を App → Core の一方向にします。
+Core/App以外のproduction projectを追加しない。checkpointのためのdatabase、server、event storeを追加しない。
 
 ```mermaid
 flowchart LR
-    CoreTests[Core.Tests] --> Core[StudyReportEvaluator.Core\nBCL-only]
-    AppTests[App.Tests] --> App[StudyReportEvaluator.App]
+    CoreTests --> Core
+    AppTests --> App
     AppTests --> Core
     App --> Core
-    App --> Avalonia[Avalonia]
-    App --> OpenXml[DocumentFormat.OpenXml]
-    App --> Copilot[GitHub.Copilot.SDK]
+    App --> Avalonia
+    App --> OpenXML
+    App --> CopilotSDK
 ```
 
-## 2. run のデータフロー
-
-利用者が編集するdefinitionはdraftです。実行開始時に ordered collection をdeep copyし、canonical JSONとSHA-256を持つ **immutable snapshot** を作ります。同じsnapshotだけをrun plan、Prompt、期待schema、result validation、formula layout、Config / Run metadataへ渡します。実行中のdraft編集は次のrunにだけ反映されます。
+## 2. Run data flow
 
 ```mermaid
 flowchart TD
-    Path[full pathをTextBoxへ入力] --> Input[標準 .xlsx\nread-only classification / snapshot]
-    Input --> Mapping[sheet / row / column mapping]
-    Mapping --> Draft[QuantificationDefinition draft]
-    Draft --> DesignCheck[Design validation\nPromptを含む]
-    DesignCheck --> Snapshot[run開始時 immutable snapshot\ncanonical JSON + SHA-256]
-    Snapshot --> Admission[run admission\nConfig / Results / formula\n全selected-row request / model 80%\n最大20,000 attempts]
-    Admission --> Plan[rows × questions × evaluators]
-    Plan --> Prompt[app-owned Prompt renderer]
-    Prompt --> CopilotSession[restricted ephemeral Copilot session]
-    CopilotSession --> Validation[closed result validation]
-    Validation --> ResultsUI[Results UI\nraw / override / preview]
-    ResultsUI -->|利用者がexportを明示開始| ExportCheck[output path / override check]
-    ExportCheck --> Layout[Results layout / formula AST\ncolumn・length・arity preflight]
-    Snapshot --> Layout
-    Layout --> Temp[target-local working .xlsx]
-    Temp --> Reopen[flush / close / reopen / validate]
-    Reopen --> Recheck[input SHA-256 / size / last-write time recheck]
-    Recheck --> Rename[no-overwrite atomic rename]
-    Rename --> Output[別パスの完成 .xlsx]
-    Draft -. 次回run .-> Snapshot
+    Launch[GUI / --input / --prompt] --> Input[native picker or path\nread-only xlsx]
+    Input --> Mapping[sheet / question row 1 or 2\nnormal + special columns]
+    Mapping --> Draft[v4 definition draft]
+    Draft --> Snapshot[immutable canonical snapshot + SHA-256]
+    Snapshot --> Admission[allocation / workbook / formula / request / model preflight]
+    Admission --> Reserve[result/eval timestamp\nfinal + partial reservation]
+    Reserve --> InitialCheckpoint[initial partial.xlsx]
+    InitialCheckpoint --> References[auto reference once per question]
+    References --> ReferenceCheckpoint[checkpoint after each reference]
+    ReferenceCheckpoint --> Rows[student rows in ascending order]
+    Rows --> Normal[normal evaluator calls]
+    Rows --> Special[special calls when budget > 0]
+    Rows --> Similarity[auto similarity calls]
+    Normal --> RowCheckpoint[complete-row checkpoint]
+    Special --> RowCheckpoint
+    Similarity --> RowCheckpoint
+    RowCheckpoint -->|next row| Rows
+    RowCheckpoint --> Finalize[Config / References / Results / Run + formulas]
+    Finalize --> Validate[close / reopen / validate / input recheck]
+    Validate --> Commit[no-overwrite atomic final commit]
+    Commit --> Cleanup[partial cleanup]
+    Cleanup --> Results[completion summary]
 ```
 
-run admissionは、exportと同じResults layout / formula AST / validatorをI/Oなしで実行します。続いて入力identityを取得し、全selected rowの実payload / JSON schemaを測定し、request 65,536 Unicode scalars、SDK model上限の80%、retry込み20,000 attemptsを検査します。合格後に入力identityを再確認してからだけAI dispatchへ進みます。実装根拠: [`WorkbookExecutionPreflight.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/WorkbookExecutionPreflight.cs)、[`EvaluationRequestCapacityValidator.cs`](../src/StudyReportEvaluator.App/Copilot/EvaluationRequestCapacityValidator.cs)、[`QuantificationOrchestrator.cs`](../src/StudyReportEvaluator.App/Workflow/QuantificationOrchestrator.cs)。
+run開始後のdraft変更は次runだけへ反映する。current run、checkpoint、resume、formula、final workbookは同じsnapshotを使用する。
 
-## 3. Prompt・result・capability 境界
+## 3. AI境界
 
-- Knowledge evaluator は app-owned の semantic coverage instruction を使い、単語一致ではなく説明・関係・具体的適用を評価します。Custom evaluator は利用者templateを使いますが、app-owned structured-output contract は外せません。
-- 1回の評価単位は1行 × 1質問 × 1evaluatorです。**workbook由来の値**は、選択済みの同じ行の主回答と補助列だけをPromptへ入れ、他行、非選択列、file pathは渡しません。
-- Promptにはquestion text、criterion ID / display name / description / effective range、CustomまたはKnowledge template、expected IDs、許可source IDs、app-owned output contractも含めます。
-- AIへ要求するのは、期待するevaluator IDと各criterionのraw score、短いreason、連続substringのevidence、source kind、stable source column IDだけです。weight、evaluator / question / overall aggregate、合否は要求しません。
-- expected ID、全criterion、range、evidence provenanceをclosed schemaとCore validatorで確認します。partial result、unknown field、duplicate、range外を部分採用せず、0点にも変換しません。
-- evaluatorごとにrestricted ephemeral sessionを作り、公開toolは `submit_quantification` 1件だけです。shell、filesystem、GitHub write、MCP、ambient memoryやremote sessionを公開せず、permission requestを拒否します。
-- schema failureは最大1回、transient network / timeoutは最大2回だけ新sessionでretryします。各attemptは既定120秒、並列度は既定1・最大3です。cancel後に新規dispatchせず、sessionをabort / dispose / deleteします。
-- logはevent codeとsafe dimensionだけを保持し、回答、Prompt、reason、evidence、token文字列、credentialを記録しません。SDKが返したnumeric input / output / reasoning / cache token countsはlogではなくRunSummaryへ集計し、観測unit数とともにRun sheetへ保存します。
+| Operation | Model | Workbook由来input | Tool |
+|---|---|---|---|
+| Reference | `auto` | なし。question textのみ | `submit_reference_answer` |
+| Normal | user-selected | current rowのnormal primary/supporting | `submit_quantification` |
+| Special | user-selected | current rowのspecial primary/supporting | `submit_special_quantification` |
+| Similarity | `auto` | current row primary + stored reference | `submit_similarity` |
 
-```mermaid
-flowchart LR
-    subgraph Local[Local process]
-        Row[同一行のselected cells]
-        Def[question / Prompt / criteria / range / IDs]
-        Builder[SafeEvaluationPayloadBuilder]
-        Validator[closed result validator]
-    end
-    Row --> Builder
-    Def --> Builder
-    Builder -->|rendered Prompt| C[Copilot CLI / GitHub Copilot]
-    C -->|submit_quantification exactly once| Validator
-    Validator -->|accepted criterion result only| Result[RunSummary]
-```
+各attemptはrestricted sessionを新規作成する。公開toolは該当operationの1件だけで、shell、filesystem、Web、GitHub write、MCP、ambient memoryを公開しない。normal assistant bodyはresultとして採用しない。tool call exactly once、closed property set、expected ID、finite range、same-row evidenceをvalidationする。
 
-実装根拠: [`SafeEvaluationPayloadBuilder.cs`](../src/StudyReportEvaluator.Core/Prompting/SafeEvaluationPayloadBuilder.cs#L38-L160)、[`EvaluationSchemaFactory.cs`](../src/StudyReportEvaluator.App/Copilot/EvaluationSchemaFactory.cs#L179-L243)、[`SubmitQuantificationTool.cs`](../src/StudyReportEvaluator.App/Copilot/SubmitQuantificationTool.cs)。
+`auto`がavailable modelにない場合はrunを開始せず、別modelへfallbackしない。SDK session persistenceをjob resumeに使用せず、partial workbookだけをresume正本とする。
 
-### attempt lifecycle
+## 4. Score境界
 
-```mermaid
-sequenceDiagram
-    participant S as Scheduler
-    participant R as RetryCoordinator
-    participant C as CopilotClient
-    participant E as EphemeralSession
-    S->>R: payload + model + cancellation
-    R->>C: start / auth check
-    C->>E: create restricted session
-    E->>E: submit_quantification
-    alt accepted
-        E-->>R: validated result
-    else schema / network / timeout
-        R->>E: abort when required
-        R->>E: dispose / delete
-        R->>C: retry with a new session within budget
-    end
-    R->>E: dispose / delete
-    R-->>S: status + accepted result or blank + observed numeric usage
-```
+AIはnormal raw、special 0〜1、similarity 0〜1だけを返す。Excelが次を計算する。
 
-schema failureは最大2 attempts、network / timeoutは最大3 attemptsです。cleanup失敗時は後続retryを行いません。根拠: [`RetryAndCleanupCoordinator.cs`](../src/StudyReportEvaluator.App/Copilot/RetryAndCleanupCoordinator.cs#L113-L291)。
+$$
+QuestionEarned_q=QuestionPoints_q\times QuestionRate_q
+$$
 
-## 4. workbook 境界
+$$
+SpecialEarned=SpecialPoints\times average(SpecialQuestionRate)
+$$
 
-Open XML adapterは入力をread-onlyで識別し、出力先directory内の一意な **target-local** temp `.xlsx` へbyte-copyします。Config、Results、Run sheetと式を書いた後、flush、close、reopen、formula / cached value / referenceを検証し、入力のSHA-256・size・last-write timeが開始時と完全一致することを再確認します。
+$$
+SimilarityPenalty_q=QuestionPoints_q\times Similarity_q\times SimilarityPenaltyWeight
+$$
 
-final pathは入力と異なる `.xlsx` に限り、既存fileを上書きしません。完成状態への遷移は同一volumeのno-overwrite atomic renameだけです。commit前のcancelまたは検証失敗では完成名を作らずtempをbest effortで削除し、rename critical section開始後はvalid finalまたはfinalなしの安全点までcancelを遅延します。
+$$
+FinalRaw=BasePoints+\sum QuestionEarned+SpecialEarned-\sum SimilarityPenalty
+$$
 
-formulaはCoreのclosed ASTから生成し、Configの検証済みcellだけを参照します。回答、Prompt、reason、evidenceなどのuntrusted textはinline string cellとして保存し、formulaとして解釈させません。詳細は [Excel / formula 契約](excel-contract.md) を参照してください。
+$$
+FinalScore=clamp(FinalRaw,0,100)
+$$
 
-出力は入力を縮小したcopyではありません。入力全体をbyte-copyし、ConfigにはCustom Prompt、question / criterion text、canonical snapshotも保存します。そのためoutputは入力と同等以上に機密です。根拠: [`WorkingPackage.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/WorkingPackage.cs#L105-L155)、[`ConfigSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/ConfigSheetWriter.cs#L129-L249)。
+empty inputはAIを呼ばず0へ変換する。technical failureはblankとし、formula ancestorへblankを伝播する。
 
-## 5. UI と warning
+## 5. Workbook境界
 
-Avalonia shellは **入力 → 定量化設計 → 実行 → 結果・出力** の4 stepです。keyboard navigation、文字による状態表現、200% scale時のscrollをrequired UI testで確認します。
+inputはread-onlyでsnapshotし、partial／finalはいずれもinputのbyte-copyから作る。
 
-- 入力とoutputはnative pickerではなくfull pathのTextBoxです。
-- Results UIはraw、override、effective、normalized、evaluator、overallを表示します。Reason / Evidence / Question scoreはworkbookだけに出力します。
-- Results ViewModelは同じprocessで完了した`ExecutionRunContext`からだけloadします。保存済みoutputの再importはありません。
-- reusable definition profileの独立storeはありません。definition snapshotはoutput Configへ保存します。
-
-| 実行準備 | 結果review |
+| Workbook | App-owned sheet |
 |---|---|
-| ![Auto、concurrency、200 unitsを示す合成実行画面](../images/05-execution-auto.png) | ![raw、override、normalized、aggregateを示す合成結果画面](../images/06-results-review.png) |
+| partial | `Quantification_Checkpoint` |
+| final | `Quantification_Config`, `Quantification_References`, `Quantification_Results`, `Quantification_Run` |
 
-画像はproduction viewのheadless Skia renderです。認証とscoreはfake、inputは合成です。provenance: [`images/README.md`](../images/README.md)。
+partialはcanonical snapshot、runtime identity、references、complete rowsをhash付きchunk JSONで保存する。row途中の結果をcompleteとして保存しない。updateは新temp workbookを完全検証してからsame-volume atomic replaceするため、失敗時は旧partialが残る。
 
-> AIによる定量値には誤りや偏りが含まれる可能性があります。利用目的に応じて結果を確認してください。
+finalは新tempへ4 sheetとformulaを書き、close、read-only reopen、package/formula/cached value/original preservationを検証する。input identityを再確認し、no-overwrite renameだけで完成名を作る。
 
-warningはpersistent non-modal bannerであり **nonblocking** です。Focusable / tab stop / hit testの対象にせず、checkbox、dismiss、同意、承認、role、期限、snapshot fieldを持ちません。warningへ一度も操作しなくてもmapping、run、cancel、override、exportを行えます。file形式、range、formula、output pathなどの技術的validationは別のblocking errorとして表示します。
+## 6. UI境界
 
-bannerはshell rootにあり、現在は4 stepすべてで表示されます。要求の「入力画面と結果画面を含むpersistent表示」を上回る表示範囲です。根拠: [`MainWindow.axaml`](../src/StudyReportEvaluator.App/Views/MainWindow.axaml#L140-L177)。
+4 stepを維持する。
 
-## 6. 永続化とnetwork
+1. Input: native picker／path、sheet、question row、normal mapping。
+2. Design: base、special、question points、equalize、normal evaluator、special item、imported Prompt。
+3. Execution: auth/model/auto、output paths、new/resume、stage/reference/row/unit progress、cancel。
+4. Results: finalまたはpartial path、counts、per-row score preview、cleanup warning。
 
-app-owned database と cloud backend はありません。definitionとrun provenanceは完成workbookのConfig / Run sheetへ保存します。通常のworkbook読込、preview、出力はlocal I/Oだけで完結し、外部通信はAI実行時に既存Copilot CLIログインを使ってGitHub Copilotへ接続する場合だけです。アプリ固有secretは保存しません。
+runはExecutionの明示buttonからだけ開始する。command-line引数とPrompt適用でauto-runしない。
 
-Copilot CLIはpackageへ同梱せず、Windowsでは`PATH`上の`copilot.exe`だけを探索します。SDK clientは`CopilotClientMode.CopilotCli`、`UseLoggedInUser=true`です。根拠: [`CopilotClientFactory.cs`](../src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs#L15-L57)、[`CopilotClientFactory.cs`](../src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs#L258-L270)。
+指定warningはshell rootへ常時表示し、focus、checkbox、dismiss、snapshot field、processing dependencyを持たない。
 
-## 7. validation timing
+## 7. Persistenceとnetwork
 
-| Validation | Current timing | Blocking boundary |
-|---|---|---|
-| file classification / input snapshot | Input load | workbookをadoptしない |
-| mapping / structural definition | Input、Execution、snapshot creation | run開始をblock |
-| Custom Prompt ownership / syntax | Design、Execution、snapshot creation | run開始をblock。input capture / row read / session / runner 0 |
-| empty primary | unit row read後 | AI dispatchせず`EMPTY` |
-| AI schema / range / evidence | tool handler + Core validator | payload全体を拒否 |
-| override | Results UI + output preparation | exportをblock |
-| Config / Results / formula capacity | Execution + orchestrator run admission、export | AI dispatch前にblockし、exportでも同じvalidatorを再実行 |
-| request / model context / retry capacity | orchestrator run admission | 全selected row測定後、AI dispatch前にblock |
-| package / formula / cached value | temp write後のread-only reopen | final renameをblock |
-| input identity | run後およびrename直前 | final renameをblock |
+app-owned databaseとcloud backendはない。durable stateはpartial/final workbookだけである。外部通信はAI operationだけで、bundled Copilot CLIとGitHub Copilotを使う。
 
-## 8. tests と gates
+checkpointとoutputはinput全体、Prompt、reference、AI resultを含むためinputと同等以上に機密である。application logはsafe code、ID、dimension、timingだけを保持する。
 
-required pathはMicrosoft Excel、Office、LibreOffice、COM automationを必要としません。
+## 8. Platform delivery
 
-| Surface | Required evidence |
+- End-user appはRID別.NET 10 self-containedで、.NET Runtime／SDKを別installしない。
+- SDK互換Copilot CLIをpackageに含め、manifestでpath/hashを固定する。
+- Windowsはwin-x64、user-local install、admin不要。
+- macOSはosx-arm64／osx-x64を別packageとし、bundle-relative CLI pathを使う。
+- macOS releaseはDeveloper ID署名、notary、staple、verificationが揃ったrunだけを公開する。
+- external credential／runnerなしではrelease evidenceを`NOT_RUN_EXTERNAL_PREREQUISITE`とし、PASSを捏造しない。
+
+## 9. Validation timing
+
+| Timing | Validation |
 |---|---|
-| Core | definition / snapshot / Prompt / result / scoring / formula unit・golden tests、GATE-CORE `PASS` |
-| Excel | sample structural probe、synthetic output reopen、formula / cached oracle、input immutability、atomic fault tests、GATE-EXCEL `PASS` |
-| AI | fake authentication / schema / capability / retry / timeout / cleanup tests、GATE-AI `PASS` |
-| App | 4-step journey、warning nonblock、keyboard / 200%、cancel / partial output tests、GATE-APP `PASS` |
-| Windows delivery | Windows 11 x64 self-contained publish、unsigned ZIP、SHA-256 sidecar、layout / tamper tests |
-| Historical generated gate | HEAD `62581a3`、solution tests 452/452、GATE-ACCEPTANCE `PASS` |
-| Current generated gate | evaluation HEAD `3f4227e`、solution 485/485、independent review blocker/high/medium 0、GATE-ACCEPTANCE `PASS` |
+| Input load | extension、package graph、安全上限、metadata、identity |
+| Design | definition、Prompt、allocation、special minimum |
+| Run admission | snapshot、mapping、formula layout、request/model capacity、auto availability、paths |
+| Resume admission | checkpoint schema/hash/input/definition/model/runtime、completed row IDs |
+| AI callback | tool count、closed schema、ID、range、evidence |
+| Checkpoint save | package、checkpoint sheet、JSON chunk/hash、input identity |
+| Final write | sheets、formula/ref/DAG/cached values、original preservation |
+| Final commit | input identity、target absence、same-volume atomic rename |
 
-optional live Copilot smokeとoptional Microsoft Excel recalculation smokeは、固定合成データだけで`PASS`しました。generated evidenceはそれぞれ`artifacts/test/live-copilot-smoke.json`と`artifacts/test/external-recalculation-smoke.json`です。どちらもrequired test、実在データ品質、全環境保証へ読み替えません。
+## 10. Evidence boundary
 
-旧GATE-ACCEPTANCE後の監査で確認したIMPL-GAP-001 / 002はcommit `69e4b99`でclosedです。旧gate artifactは履歴として不変に保ち、新しいfinal acceptanceを評価HEAD `3f4227e`の別証跡`gate-acceptance-3f4227e.json`へ`PASS`として記録しました。詳細: [`implementation-status.md`](implementation-status.md)。
-
-## 9. 外部仕様出典
-
-- Microsoft [Working with formulas](https://learn.microsoft.com/office/open-xml/spreadsheet/working-with-formulas) — SpreadsheetMLの`CellFormula`とcached `CellValue`（2026-09-01確認）
-- Microsoft [Excel specifications and limits](https://support.microsoft.com/office/excel-specifications-and-limits-1672b34d-7043-467e-8e27-269d656771c3) — row / column / cell / formula等の媒体上限（2026-09-01確認）
-- Microsoft [.NET application publishing overview](https://learn.microsoft.com/dotnet/core/deploying/#publish-as-self-contained) — self-contained deployment（2026-09-01確認）
+Required deterministic testsはfake Copilot transportとOpen XML／Core oracleだけで成立させる。authenticated Copilot、external spreadsheet recalculation、macOS signing/notaryは別のadvisoryまたはexternal-prerequisite evidenceとして記録し、required fake/oracle evidenceの代替にしない。

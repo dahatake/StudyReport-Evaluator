@@ -2,6 +2,8 @@
 
 対象読者は、Knowledge以外の観点を独自Promptで定量化する教員・評価設計者です。開発者向けの実装根拠は本書末尾にまとめます。
 
+機械学習PBLを題材にしたready-to-save `.txt`例、GitHub Copilotへ貼る起動依頼、Imported Promptの明示適用手順は[GitHub CopilotからPromptで起動する](prompt-launch.md)を参照してください。
+
 ## KnowledgeとCustomの使い分け
 
 | 種別 | 適した用途 | Prompt ownership |

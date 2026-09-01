@@ -1,10 +1,12 @@
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Reflection;
 using System.Windows.Input;
 using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Workflow;
 using StudyReportEvaluator.App.Workbooks.Mapping;
+using StudyReportEvaluator.App.Workbooks.Checkpoint;
 using StudyReportEvaluator.App.Workbooks.Reading;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
@@ -148,14 +150,85 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
         EphemeralEvaluationRunner runner = new(
             new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory()),
             runnerOptions);
-        QuantificationOrchestrator orchestrator = new(
+        EphemeralEvaluationRunnerAdapter normalRunner = new(runner);
+        if (!request.UseDurableWorkflow)
+        {
+            QuantificationOrchestrator orchestrator = new(rowSource, normalRunner);
+            return orchestrator.RunAsync(request, progress, cancellationToken);
+        }
+
+        CopilotRuntimeIdentity identity = request.RuntimeIdentity
+            ?? throw new QuantificationRunException("RUNTIME_IDENTITY_REQUIRED");
+        SdkEphemeralCopilotTransportFactory transportFactory =
+            new(new CopilotClientFactory());
+        DurableQuantificationOrchestrator durable = new(
             rowSource,
-            new EphemeralEvaluationRunnerAdapter(runner));
-        return orchestrator.RunAsync(request, progress, cancellationToken);
+            normalRunner,
+            new ReferenceAnswerOperationRunnerAdapter(new ReferenceAnswerEvaluationRunner(
+                transportFactory,
+                runnerOptions)),
+            new SpecialEvaluationOperationRunnerAdapter(new SpecialEvaluationRunner(
+                transportFactory,
+                runnerOptions)),
+            new SimilarityEvaluationOperationRunnerAdapter(new SimilarityEvaluationRunner(
+                transportFactory,
+                runnerOptions)));
+        return durable.RunAsync(
+            new DurableQuantificationRunRequest
+            {
+                Run = request,
+                Runtime = new CheckpointRuntimeIdentity
+                {
+                    ApplicationIdentity = ApplicationIdentity(),
+                    CliVersion = identity.CliVersion,
+                    CliSha256 = identity.CliSha256,
+                    SdkInformationalVersion = identity.SdkInformationalVersion,
+                },
+                OutputDirectory = request.OutputDirectory,
+                ResumePartialPath = request.ResumePartialPath,
+            },
+            value => progress?.Invoke(ToLegacyProgress(value)),
+            cancellationToken);
     }
 
     public override string ToString() =>
         $"{nameof(QuantificationRunBoundary)} {{ Content = <redacted> }}";
+
+    private static EvaluationProgress ToLegacyProgress(DurableEvaluationProgress value) =>
+        new(
+            value.OperationTotal,
+            value.OperationCompleted,
+            value.InFlight,
+            value.Stage switch
+            {
+                DurableEvaluationStage.Cancelling => EvaluationProgressStatus.Cancelling,
+                DurableEvaluationStage.Completed when string.Equals(
+                    value.StatusCode,
+                    QuantificationRunStatusCodes.Success,
+                    StringComparison.Ordinal) => EvaluationProgressStatus.Completed,
+                DurableEvaluationStage.Completed => EvaluationProgressStatus.Cancelled,
+                _ => EvaluationProgressStatus.Running,
+            },
+            value.Stage,
+            value.ReferenceCompleted,
+            value.ReferenceTotal,
+            value.RowCompleted,
+            value.RowTotal,
+            value.StatusCode,
+            value.FinalPath,
+            value.PartialPath);
+
+    private static string ApplicationIdentity()
+    {
+        Assembly assembly = typeof(QuantificationRunBoundary).Assembly;
+        string? informationalVersion = assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+        string version = informationalVersion?.Split('+', 2)[0]
+            ?? assembly.GetName().Version?.ToString(3)
+            ?? "unknown";
+        return (assembly.GetName().Name ?? "StudyReportEvaluator.App") + "/" + version;
+    }
 }
 
 public sealed class ExecutionTechnicalError
@@ -260,6 +333,16 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     private int progressCompleted;
     private int progressInFlight;
     private EvaluationProgressStatus? progressStatus;
+    private DurableEvaluationStage? progressStage;
+    private int referenceCompleted;
+    private int referenceTotal;
+    private int rowCompleted;
+    private int rowTotal;
+    private string reservedFinalPath = string.Empty;
+    private string partialPath = string.Empty;
+    private string outputDirectory = string.Empty;
+    private string resumePartialPath = string.Empty;
+    private bool isResumeMode;
     private ExecutionRunContext? lastRunContext;
     private CancellationTokenSource? authenticationCancellation;
     private CancellationTokenSource? runCancellation;
@@ -373,6 +456,50 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     public string ConcurrencyText =>
         $"最大 {MaxConcurrency.ToString(CultureInfo.InvariantCulture)} 件を並列実行（許可範囲 1～3）";
 
+    public string OutputDirectory
+    {
+        get => outputDirectory;
+        set
+        {
+            if (SetProperty(ref outputDirectory, value ?? string.Empty))
+            {
+                runtimeErrorCode = null;
+                Revalidate();
+            }
+        }
+    }
+
+    public string ResumePartialPath
+    {
+        get => resumePartialPath;
+        set
+        {
+            if (SetProperty(ref resumePartialPath, value ?? string.Empty))
+            {
+                runtimeErrorCode = null;
+                Revalidate();
+            }
+        }
+    }
+
+    public bool IsResumeMode
+    {
+        get => isResumeMode;
+        set
+        {
+            if (SetProperty(ref isResumeMode, value))
+            {
+                runtimeErrorCode = null;
+                OnPropertiesChanged(nameof(OutputModeText), nameof(CanStart));
+                Revalidate();
+            }
+        }
+    }
+
+    public string OutputModeText => IsResumeMode
+        ? "既存の .partial.xlsx をread-only検証して再開します。"
+        : "新規runとしてfinal/partial名を同時予約します。";
+
     public long PlannedEvaluationCount
     {
         get
@@ -385,12 +512,17 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             long selectedRows = Math.Max(
                 0L,
                 ((long)definition.LastDataRow - definition.FirstDataRow) + 1L);
-            long enabledEvaluators = definition.Questions
+            long referenceOperations = definition.Questions.Count(question => question.Enabled);
+            long normalOperations = definition.Questions
                 .Where(question => question.Enabled)
                 .Sum(question => (long)question.Evaluators.Count(evaluator => evaluator.Enabled));
+            long specialOperations = definition.Questions
+                .Where(question => question.Enabled)
+                .Sum(question => (long)question.SpecialEvaluations.Count(special => special.Enabled));
             try
             {
-                return checked(selectedRows * enabledEvaluators);
+                return checked(referenceOperations
+                    + selectedRows * (normalOperations + specialOperations + referenceOperations));
             }
             catch (OverflowException)
             {
@@ -469,6 +601,39 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
     public int ProgressInFlight => progressInFlight;
 
+    public DurableEvaluationStage? ProgressStage => progressStage;
+
+    public int ReferenceCompleted => referenceCompleted;
+
+    public int ReferenceTotal => referenceTotal;
+
+    public int RowCompleted => rowCompleted;
+
+    public int RowTotal => rowTotal;
+
+    public string ReservedFinalPath => reservedFinalPath;
+
+    public string PartialPath => partialPath;
+
+    public string StageText => progressStage switch
+    {
+        DurableEvaluationStage.Preparing => "準備中",
+        DurableEvaluationStage.GeneratingReferences => "参照回答を生成中",
+        DurableEvaluationStage.EvaluatingRows => "学生行を評価中",
+        DurableEvaluationStage.SavingCheckpoint => "checkpointを保存中",
+        DurableEvaluationStage.FinalizingWorkbook => "final workbookを検証中",
+        DurableEvaluationStage.Completed => "完了",
+        DurableEvaluationStage.Cancelling => "cancel処理中",
+        _ => "未開始",
+    };
+
+    public string DurableProgressText =>
+        $"参照 {ReferenceCompleted.ToString(CultureInfo.InvariantCulture)} / {ReferenceTotal.ToString(CultureInfo.InvariantCulture)} · 行 {RowCompleted.ToString(CultureInfo.InvariantCulture)} / {RowTotal.ToString(CultureInfo.InvariantCulture)}";
+
+    public string OutputIdentityText => string.IsNullOrWhiteSpace(PartialPath)
+        ? "run開始時にfinal/partial pathを予約します。"
+        : $"final: {(string.IsNullOrWhiteSpace(ReservedFinalPath) ? "—" : ReservedFinalPath)}{Environment.NewLine}partial: {PartialPath}";
+
     public double ProgressPercent => progressTotal == 0
         ? 0d
         : (double)progressCompleted / progressTotal * 100d;
@@ -499,9 +664,13 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             RunSummary summary = lastRunContext.Summary;
             return summary.StatusCode switch
             {
-                QuantificationRunStatusCodes.Success => "実行が完了しました。",
-                QuantificationRunStatusCodes.Cancelled => "cancel 済みの部分結果を保持しました。",
+                QuantificationRunStatusCodes.Success when summary.PartialCleanupFailed =>
+                    "final workbookは有効ですが、partial cleanupに失敗しました。",
+                QuantificationRunStatusCodes.Success => "検証済みfinal workbookを自動作成しました。",
+                QuantificationRunStatusCodes.Cancelled => "cancel 済みの部分結果をpartial checkpointへ保持しました。",
                 QuantificationRunStatusCodes.InputChanged => "入力変更を検出したため、出力は停止されています。",
+                QuantificationRunStatusCodes.CheckpointFailed => "checkpointを安全に保存できなかったため停止しました。",
+                QuantificationRunStatusCodes.OutputInvalid => "final検証に失敗したためpartialを保持しました。",
                 _ => "実行状態を確認してください。",
             };
         }
@@ -562,12 +731,21 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         definition = InputViewModel.CloneDefinition(draftDefinition);
         workbookMetadata = metadata;
         inputPath = configuredInputPath;
+        outputDirectory = Path.Combine(
+            Path.GetDirectoryName(Path.GetFullPath(configuredInputPath)) ?? string.Empty,
+            "result");
+        resumePartialPath = string.Empty;
+        isResumeMode = false;
         runtimeErrorCode = null;
         runPreflightErrors = [];
         LastRunContext = null;
         ResetProgress();
         OnPropertiesChanged(
             nameof(IsConfigured),
+            nameof(OutputDirectory),
+            nameof(ResumePartialPath),
+            nameof(IsResumeMode),
+            nameof(OutputModeText),
             nameof(PlannedEvaluationCount),
             nameof(WorstCaseAttemptCount),
             nameof(PlanSummary),
@@ -586,12 +764,19 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         definition = null;
         workbookMetadata = null;
         inputPath = string.Empty;
+        outputDirectory = string.Empty;
+        resumePartialPath = string.Empty;
+        isResumeMode = false;
         runtimeErrorCode = null;
         runPreflightErrors = [];
         LastRunContext = null;
         ResetProgress();
         OnPropertiesChanged(
             nameof(IsConfigured),
+            nameof(OutputDirectory),
+            nameof(ResumePartialPath),
+            nameof(IsResumeMode),
+            nameof(OutputModeText),
             nameof(PlannedEvaluationCount),
             nameof(WorstCaseAttemptCount),
             nameof(PlanSummary),
@@ -689,6 +874,10 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             MaximumContextWindowTokens = runModel.MaximumContextWindowTokens
                 ?? runModel.EffectivePromptTokenLimit.Value,
             MaxConcurrency = MaxConcurrency,
+            RuntimeIdentity = runRuntimeIdentity,
+            OutputDirectory = IsResumeMode ? null : OutputDirectory,
+            ResumePartialPath = IsResumeMode ? ResumePartialPath : null,
+            UseDurableWorkflow = true,
         };
 
         runCancellation?.Cancel();
@@ -853,20 +1042,48 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         progressCompleted = progress.Completed;
         progressInFlight = progress.InFlight;
         progressStatus = progress.Status;
+        progressStage = progress.Stage;
+        referenceCompleted = progress.ReferenceCompleted;
+        referenceTotal = progress.ReferenceTotal;
+        rowCompleted = progress.RowCompleted;
+        rowTotal = progress.RowTotal;
+        reservedFinalPath = progress.FinalPath ?? reservedFinalPath;
+        partialPath = progress.PartialPath ?? partialPath;
         OnPropertiesChanged(
             nameof(ProgressTotal),
             nameof(ProgressCompleted),
             nameof(ProgressInFlight),
             nameof(ProgressPercent),
             nameof(ProgressText),
+            nameof(ProgressStage),
+            nameof(ReferenceCompleted),
+            nameof(ReferenceTotal),
+            nameof(RowCompleted),
+            nameof(RowTotal),
+            nameof(ReservedFinalPath),
+            nameof(PartialPath),
+            nameof(StageText),
+            nameof(DurableProgressText),
+            nameof(OutputIdentityText),
             nameof(RunStatusText));
     }
 
     private void ApplyCompletedSummary(RunSummary summary)
     {
-        progressTotal = summary.PlannedEvaluationCount;
-        progressCompleted = summary.CompletedEvaluationCount;
+        progressTotal = summary.PlannedOperationCount;
+        progressCompleted = summary.CompletedOperationCount;
         progressInFlight = 0;
+        progressStage = DurableEvaluationStage.Completed;
+        if (summary.IsDurable)
+        {
+            referenceTotal = summary.Snapshot.Definition.Questions.Count(question => question.Enabled);
+            referenceCompleted = summary.References.Length;
+            rowTotal = summary.Plan.Mapping.SelectedRowCount;
+            rowCompleted = summary.CompletedRows.Length;
+        }
+
+        reservedFinalPath = summary.FinalPath ?? reservedFinalPath;
+        partialPath = summary.PartialPath ?? partialPath;
         progressStatus = summary.IsPartial
             ? EvaluationProgressStatus.Cancelled
             : EvaluationProgressStatus.Completed;
@@ -875,7 +1092,17 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             nameof(ProgressCompleted),
             nameof(ProgressInFlight),
             nameof(ProgressPercent),
-            nameof(ProgressText));
+            nameof(ProgressText),
+            nameof(ProgressStage),
+            nameof(ReferenceCompleted),
+            nameof(ReferenceTotal),
+            nameof(RowCompleted),
+            nameof(RowTotal),
+            nameof(ReservedFinalPath),
+            nameof(PartialPath),
+            nameof(StageText),
+            nameof(DurableProgressText),
+            nameof(OutputIdentityText));
     }
 
     private void ResetProgress()
@@ -884,12 +1111,29 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         progressCompleted = 0;
         progressInFlight = 0;
         progressStatus = null;
+        progressStage = null;
+        referenceCompleted = 0;
+        referenceTotal = 0;
+        rowCompleted = 0;
+        rowTotal = 0;
+        reservedFinalPath = string.Empty;
+        partialPath = string.Empty;
         OnPropertiesChanged(
             nameof(ProgressTotal),
             nameof(ProgressCompleted),
             nameof(ProgressInFlight),
             nameof(ProgressPercent),
-            nameof(ProgressText));
+            nameof(ProgressText),
+            nameof(ProgressStage),
+            nameof(ReferenceCompleted),
+            nameof(ReferenceTotal),
+            nameof(RowCompleted),
+            nameof(RowTotal),
+            nameof(ReservedFinalPath),
+            nameof(PartialPath),
+            nameof(StageText),
+            nameof(DurableProgressText),
+            nameof(OutputIdentityText));
     }
 
     private void Revalidate()
@@ -974,6 +1218,54 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 "CONCURRENCY_OUT_OF_RANGE",
                 "Concurrency",
                 "並列度は 1～3 にしてください。"));
+        }
+
+        if (IsResumeMode)
+        {
+            try
+            {
+                string resumePath = Path.GetFullPath(ResumePartialPath);
+                if (!resumePath.EndsWith(".partial.xlsx", StringComparison.OrdinalIgnoreCase)
+                    || !File.Exists(resumePath))
+                {
+                    AddError(errors, new ExecutionTechnicalError(
+                        "RESUME_PARTIAL_REQUIRED",
+                        "Resume",
+                        "既存の .partial.xlsx checkpointを指定してください。"));
+                }
+            }
+            catch (Exception exception) when (exception is ArgumentException
+                or NotSupportedException
+                or PathTooLongException)
+            {
+                AddError(errors, new ExecutionTechnicalError(
+                    "RESUME_PARTIAL_REQUIRED",
+                    "Resume",
+                    "既存の .partial.xlsx checkpointを指定してください。"));
+            }
+        }
+        else
+        {
+            try
+            {
+                string targetDirectory = Path.GetFullPath(OutputDirectory);
+                if (File.Exists(targetDirectory))
+                {
+                    AddError(errors, new ExecutionTechnicalError(
+                        "OUTPUT_DIRECTORY_INVALID",
+                        "Output directory",
+                        "既存directoryまたは作成可能なdirectoryを指定してください。"));
+                }
+            }
+            catch (Exception exception) when (exception is ArgumentException
+                or NotSupportedException
+                or PathTooLongException)
+            {
+                AddError(errors, new ExecutionTechnicalError(
+                    "OUTPUT_DIRECTORY_INVALID",
+                    "Output directory",
+                    "既存directoryまたは作成可能なdirectoryを指定してください。"));
+            }
         }
 
         switch (AuthenticationState)
@@ -1076,6 +1368,13 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         "INPUT_SNAPSHOT_FAILED" => "入力 workbook の immutable identity を取得できませんでした。",
         "MAPPING_INVALID" => "入力 workbook と列 mapping が一致しません。",
         "DEFINITION_INVALID" => "定量化設計に技術的な問題があります。",
+        CheckpointAdmissionStatusCodes.InputMismatch => "checkpointと現在の入力identityが一致しません。",
+        CheckpointAdmissionStatusCodes.DefinitionMismatch => "checkpointと現在の定量化設計が一致しません。",
+        CheckpointAdmissionStatusCodes.ModelMismatch => "checkpointと選択modelが一致しません。",
+        CheckpointAdmissionStatusCodes.RuntimeMismatch => "checkpointと現在のCLI/SDK runtime identityが一致しません。",
+        CheckpointStatusCodes.Invalid or CheckpointStatusCodes.HashMismatch or CheckpointStatusCodes.SchemaUnsupported =>
+            "checkpointをclosed validationできないため再開しませんでした。",
+        CheckpointStatusCodes.SaveFailed => "checkpointを安全に保存できませんでした。",
         "RUN_CANCELLED_WITHOUT_SUMMARY" => "部分結果を確定する前に実行が中断されました。再実行してください。",
         _ => "実行を安全に完了できませんでした。状態を確認して再実行してください。",
     };

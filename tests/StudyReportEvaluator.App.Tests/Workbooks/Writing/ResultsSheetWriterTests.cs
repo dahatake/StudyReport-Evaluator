@@ -52,16 +52,14 @@ public sealed class ResultsSheetWriterTests
         Assert.Equal(names.ResultsSheetName, writeResult.SheetName);
         Assert.Equal(1, writeResult.HeaderRow);
         Assert.Equal(1, writeResult.DataRowCount);
-        Assert.Equal(23, writeResult.ColumnCount);
-        Assert.Equal(7, writeResult.FormulaCells.Length);
+        Assert.Equal(34, writeResult.ColumnCount);
+        Assert.Equal(13, writeResult.FormulaCells.Length);
         Assert.Equal(
             writeResult.FormulaCells.Length,
             writeResult.FormulaCells.Select(item => item.Definition.Target).Distinct().Count());
-        Assert.Equal(
-            CachedDecimal(Cell(worksheet, "W2")),
-            Assert.Single(
-                writeResult.FormulaCells,
-                item => item.Definition.Identity.Field == ResultsSheetWriter.OverallScoreHeader).CachedValue);
+        Assert.Equal(99.1m, Assert.Single(
+            writeResult.FormulaCells,
+            item => item.Definition.Identity.Field == ResultsSheetWriter.FinalScoreHeader).CachedValue);
         Assert.All(
             writeResult.FormulaCells,
             item => Assert.Contains("<redacted>", item.ToString(), StringComparison.Ordinal));
@@ -69,6 +67,7 @@ public sealed class ResultsSheetWriterTests
 
         string[] expectedHeaders =
         [
+            "SourceRow",
             "Q1.E1.C-A.Scorable",
             "Q1.E1.C-A.AI_Raw",
             "Q1.E1.C-A.Override",
@@ -90,8 +89,18 @@ public sealed class ResultsSheetWriterTests
             "Q1.E1.C-B.Evidence_SourceColumn",
             "Q1.E1.C-B.Status",
             "Q1.E1.Evaluator_Score",
-            "Q1.Question_Score",
-            "Overall_Score",
+            "Q1.Answer_Present",
+            "Q1.Question_Normalized",
+            "Q1.Question_Rate",
+            "Q1.Question_Earned",
+            "Q1.Similarity_AI_Raw",
+            "Q1.Similarity_Reason",
+            "Q1.Similarity_Status",
+            "Q1.Similarity_Penalty",
+            "Base_Points",
+            "Special_Earned",
+            "Final_Raw",
+            "Final_Score",
         ];
         Row header = worksheet.Descendants<Row>().Single(row => row.RowIndex?.Value == 1);
         Assert.Equal(expectedHeaders, header.Elements<Cell>().Select(cell => cell.InnerText));
@@ -100,60 +109,40 @@ public sealed class ResultsSheetWriterTests
         Assert.DoesNotContain("E-DISABLED", header.InnerText, StringComparison.Ordinal);
         Assert.DoesNotContain("Q-DISABLED", header.InnerText, StringComparison.Ordinal);
 
-        AssertNumber(Cell(worksheet, "A2"), "1");
-        AssertNumber(Cell(worksheet, "B2"), "25");
-        AssertTrulyBlank(Cell(worksheet, "C2"));
-        AssertNumber(Cell(worksheet, "K2"), "1");
-        AssertNumber(Cell(worksheet, "L2"), "8");
-        AssertTrulyBlank(Cell(worksheet, "M2"));
-        AssertInline(Cell(worksheet, "F2"), ReasonA);
-        AssertInline(Cell(worksheet, "G2"), EvidenceA);
-        AssertInline(Cell(worksheet, "H2"), "PRIMARY_ANSWER");
-        AssertInline(Cell(worksheet, "I2"), "G");
-        AssertInline(Cell(worksheet, "J2"), ResultsStatusCodes.Success);
-        AssertInline(Cell(worksheet, "P2"), ReasonB);
-        AssertInline(Cell(worksheet, "Q2"), EvidenceB);
-        AssertInline(Cell(worksheet, "R2"), "SUPPORTING_COLUMN");
-        AssertInline(Cell(worksheet, "S2"), "H");
+        AssertNumber(CellByHeader(worksheet, "SourceRow", 2), "2");
+        AssertNumber(CellByHeader(worksheet, "Q1.E1.C-A.Scorable", 2), "1");
+        AssertNumber(CellByHeader(worksheet, "Q1.E1.C-A.AI_Raw", 2), "25");
+        AssertTrulyBlank(CellByHeader(worksheet, "Q1.E1.C-A.Override", 2));
+        AssertNumber(CellByHeader(worksheet, "Q1.E1.C-B.AI_Raw", 2), "8");
+        AssertInline(CellByHeader(worksheet, "Q1.E1.C-A.Reason", 2), ReasonA);
+        AssertInline(CellByHeader(worksheet, "Q1.E1.C-A.Evidence", 2), EvidenceA);
+        AssertInline(CellByHeader(worksheet, "Q1.E1.C-A.Evidence_Source", 2), "PRIMARY_ANSWER");
+        AssertInline(CellByHeader(worksheet, "Q1.E1.C-A.Evidence_SourceColumn", 2), "G");
+        AssertInline(CellByHeader(worksheet, "Q1.E1.C-B.Evidence_Source", 2), "SUPPORTING_COLUMN");
+        AssertInline(CellByHeader(worksheet, "Q1.E1.C-B.Evidence_SourceColumn", 2), "H");
 
-        string resultsName = Quote(names.ResultsSheetName);
         string aMin = ConfigReference(config.CriterionMinimumCells["C-A"]);
         string aMax = ConfigReference(config.CriterionMaximumCells["C-A"]);
-        string bMin = ConfigReference(config.CriterionMinimumCells["C-B"]);
-        string bMax = ConfigReference(config.CriterionMaximumCells["C-B"]);
-        string rounding = ConfigReference(config.RoundingDigitsCell);
         string weightA = ConfigReference(config.CriterionWeightCells["C-A"]);
         string weightB = ConfigReference(config.CriterionWeightCells["C-B"]);
-        string evaluatorWeight = ConfigReference(config.EvaluatorWeightCells["E1"]);
-        string questionWeight = ConfigReference(config.QuestionWeightCells["Q1"]);
-        AssertFormula(
-            Cell(worksheet, "D2"),
-            $"IF(({resultsName}!A2<>1),\"\",IF(({resultsName}!C2=\"\"),IF(ISNUMBER({resultsName}!B2),IF(({resultsName}!B2<{aMin}),\"\",IF(({resultsName}!B2>{aMax}),\"\",{resultsName}!B2)),\"\"),IF(ISNUMBER({resultsName}!C2),IF(({resultsName}!C2<{aMin}),\"\",IF(({resultsName}!C2>{aMax}),\"\",{resultsName}!C2)),\"\")))",
-            "25");
-        AssertFormula(
-            Cell(worksheet, "E2"),
-            $"IF(ISNUMBER({resultsName}!D2),IFERROR(ROUND(((({resultsName}!D2-{aMin})/({aMax}-{aMin}))*100),{rounding}),\"\"),\"\")",
-            "83.3");
-        AssertFormula(
-            Cell(worksheet, "O2"),
-            $"IF(ISNUMBER({resultsName}!N2),IFERROR(ROUND(((({resultsName}!N2-{bMin})/({bMax}-{bMin}))*100),{rounding}),\"\"),\"\")",
-            "77.8");
-        string evaluatorFormula =
-            $"IF((COUNT({resultsName}!E2,{resultsName}!O2)=2),IFERROR(ROUND((SUM(({resultsName}!E2*{weightA}),({resultsName}!O2*{weightB}))/SUM({weightA},{weightB})),{rounding}),\"\"),\"\")";
-        AssertFormula(Cell(worksheet, "U2"), evaluatorFormula, "81.5");
-        Assert.DoesNotContain("E2:O2", evaluatorFormula, StringComparison.Ordinal);
+        AssertFormulaCache(CellByHeader(worksheet, "Q1.E1.C-A.Effective_Raw", 2), "25");
+        AssertFormulaCache(CellByHeader(worksheet, "Q1.E1.C-A.Normalized", 2), "83.3");
+        AssertFormulaCache(CellByHeader(worksheet, "Q1.E1.C-B.Normalized", 2), "77.8");
+        Cell evaluatorCell = CellByHeader(worksheet, "Q1.E1.Evaluator_Score", 2);
+        string evaluatorFormula = evaluatorCell.CellFormula?.Text ?? string.Empty;
+        AssertFormulaCache(evaluatorCell, "81.5");
         Assert.DoesNotContain("C-DISABLED", string.Concat(worksheet.Descendants<CellFormula>().Select(formula => formula.Text)), StringComparison.Ordinal);
         Assert.DoesNotContain("83.3", evaluatorFormula, StringComparison.Ordinal);
         Assert.Contains(weightA, evaluatorFormula, StringComparison.Ordinal);
         Assert.Contains(weightB, evaluatorFormula, StringComparison.Ordinal);
-        AssertFormula(
-            Cell(worksheet, "V2"),
-            $"IF((COUNT({resultsName}!U2)=1),IFERROR(ROUND((SUM(({resultsName}!U2*{evaluatorWeight}))/SUM({evaluatorWeight})),{rounding}),\"\"),\"\")",
-            "81.5");
-        AssertFormula(
-            Cell(worksheet, "W2"),
-            $"IF((COUNT({resultsName}!V2)=1),IFERROR(ROUND((SUM(({resultsName}!V2*{questionWeight}))/SUM({questionWeight})),{rounding}),\"\"),\"\")",
-            "81.5");
+        AssertFormulaCache(CellByHeader(worksheet, "Q1.Question_Normalized", 2), "81.5");
+        AssertFormulaCache(CellByHeader(worksheet, "Q1.Question_Rate", 2), "0.815");
+        AssertFormulaCache(CellByHeader(worksheet, "Q1.Question_Earned", 2), "2.4");
+        AssertFormulaCache(CellByHeader(worksheet, "Q1.Similarity_Penalty", 2), "0.3");
+        AssertFormulaCache(CellByHeader(worksheet, "Base_Points", 2), "97");
+        AssertFormulaCache(CellByHeader(worksheet, "Special_Earned", 2), "0");
+        AssertFormulaCache(CellByHeader(worksheet, "Final_Raw", 2), "99.1");
+        AssertFormulaCache(CellByHeader(worksheet, "Final_Score", 2), "99.1");
         Assert.All(
             worksheet.Descendants<CellFormula>(),
             formula => Assert.False(formula.Text.StartsWith("=", StringComparison.Ordinal)));
@@ -164,16 +153,16 @@ public sealed class ResultsSheetWriterTests
         Assert.Equal(83.3m, oracleA);
         Assert.Equal(77.8m, oracleB);
         Assert.Equal(81.5m, oracleEvaluator);
-        Assert.Equal(oracleA, CachedDecimal(Cell(worksheet, "E2")));
-        Assert.Equal(oracleB, CachedDecimal(Cell(worksheet, "O2")));
-        Assert.Equal(oracleEvaluator, CachedDecimal(Cell(worksheet, "U2")));
-        Assert.Equal(oracleEvaluator, CachedDecimal(Cell(worksheet, "V2")));
-        Assert.Equal(oracleEvaluator, CachedDecimal(Cell(worksheet, "W2")));
+        Assert.Equal(oracleA, CachedDecimal(CellByHeader(worksheet, "Q1.E1.C-A.Normalized", 2)));
+        Assert.Equal(oracleB, CachedDecimal(CellByHeader(worksheet, "Q1.E1.C-B.Normalized", 2)));
+        Assert.Equal(oracleEvaluator, CachedDecimal(evaluatorCell));
 
         DataValidation[] validations = worksheet.Descendants<DataValidation>().ToArray();
         Assert.Equal(2, validations.Length);
-        AssertDecimalValidation(validations.Single(item => item.SequenceOfReferences?.InnerText == "C2"), aMin, aMax);
-        AssertDecimalValidation(validations.Single(item => item.SequenceOfReferences?.InnerText == "M2"), bMin, bMax);
+        AssertDecimalValidation(
+            validations.Single(item => item.SequenceOfReferences?.InnerText == CellByHeader(worksheet, "Q1.E1.C-A.Override", 2).CellReference?.Value),
+            aMin,
+            aMax);
         Assert.NotNull(GetWorksheet(reopened, AppOwnedSheetNameResolver.ResultsBaseName));
     }
 
@@ -204,49 +193,138 @@ public sealed class ResultsSheetWriterTests
         Worksheet worksheet = GetWorksheet(reopened, names.ResultsSheetName);
         Assert.Empty(new OpenXmlValidator().Validate(reopened, TestContext.Current.CancellationToken));
 
-        AssertNumber(Cell(worksheet, "A2"), "0");
-        AssertTrulyBlank(Cell(worksheet, "B2"));
-        AssertTrulyBlank(Cell(worksheet, "C2"));
-        AssertFormulaWithoutCache(Cell(worksheet, "D2"));
-        AssertFormulaWithoutCache(Cell(worksheet, "E2"));
-        AssertFormulaWithoutCache(Cell(worksheet, "K2"));
-        AssertFormulaWithoutCache(Cell(worksheet, "L2"));
-        AssertFormulaWithoutCache(Cell(worksheet, "M2"));
-        AssertInline(Cell(worksheet, "J2"), ResultsStatusCodes.Empty);
+        AssertNumber(CellByHeader(worksheet, "Q1.E1.C1.Scorable", 2), "0");
+        AssertTrulyBlank(CellByHeader(worksheet, "Q1.E1.C1.AI_Raw", 2));
+        AssertTrulyBlank(CellByHeader(worksheet, "Q1.E1.C1.Override", 2));
+        AssertFormulaWithoutCache(CellByHeader(worksheet, "Q1.E1.C1.Effective_Raw", 2));
+        AssertFormulaWithoutCache(CellByHeader(worksheet, "Q1.Question_Normalized", 2));
+        AssertFormulaCache(CellByHeader(worksheet, "Q1.Question_Rate", 2), "0");
+        AssertFormulaCache(CellByHeader(worksheet, "Q1.Question_Earned", 2), "0");
+        AssertFormulaCache(CellByHeader(worksheet, "Final_Score", 2), "99");
+        AssertInline(CellByHeader(worksheet, "Q1.E1.C1.Status", 2), ResultsStatusCodes.Empty);
 
-        AssertNumber(Cell(worksheet, "A3"), "1");
-        AssertTrulyBlank(Cell(worksheet, "B3"));
-        AssertTrulyBlank(Cell(worksheet, "C3"));
-        AssertFormulaWithoutCache(Cell(worksheet, "D3"));
-        AssertFormulaWithoutCache(Cell(worksheet, "M3"));
-        AssertInline(Cell(worksheet, "J3"), ResultsStatusCodes.Cancelled);
+        AssertNumber(CellByHeader(worksheet, "Q1.E1.C1.Scorable", 3), "1");
+        AssertTrulyBlank(CellByHeader(worksheet, "Q1.E1.C1.AI_Raw", 3));
+        AssertTrulyBlank(CellByHeader(worksheet, "Q1.E1.C1.Override", 3));
+        AssertFormulaWithoutCache(CellByHeader(worksheet, "Q1.E1.C1.Effective_Raw", 3));
+        AssertFormulaWithoutCache(CellByHeader(worksheet, "Final_Score", 3));
+        AssertInline(CellByHeader(worksheet, "Q1.E1.C1.Status", 3), ResultsStatusCodes.Cancelled);
 
-        AssertTrulyBlank(Cell(worksheet, "B4"));
-        AssertNumber(Cell(worksheet, "C4"), "5");
-        AssertFormula(Cell(worksheet, "D4"), Cell(worksheet, "D4").CellFormula?.Text ?? string.Empty, "5");
-        AssertFormula(Cell(worksheet, "E4"), Cell(worksheet, "E4").CellFormula?.Text ?? string.Empty, "50");
-        AssertFormula(Cell(worksheet, "M4"), Cell(worksheet, "M4").CellFormula?.Text ?? string.Empty, "50");
-        AssertInline(Cell(worksheet, "J4"), ResultsStatusCodes.AiOutputInvalid);
+        AssertTrulyBlank(CellByHeader(worksheet, "Q1.E1.C1.AI_Raw", 4));
+        AssertNumber(CellByHeader(worksheet, "Q1.E1.C1.Override", 4), "5");
+        AssertFormulaCache(CellByHeader(worksheet, "Q1.E1.C1.Effective_Raw", 4), "5");
+        AssertFormulaCache(CellByHeader(worksheet, "Q1.E1.C1.Normalized", 4), "50");
+        AssertFormulaCache(CellByHeader(worksheet, "Final_Score", 4), "99.5");
+        AssertInline(CellByHeader(worksheet, "Q1.E1.C1.Status", 4), ResultsStatusCodes.AiOutputInvalid);
 
-        AssertNumber(Cell(worksheet, "B5"), "11");
-        AssertNumber(Cell(worksheet, "C5"), "4");
-        Assert.Equal("4", Cell(worksheet, "D5").CellValue?.Text);
-        Assert.Equal("40", Cell(worksheet, "E5").CellValue?.Text);
-        string effectiveFormula = Cell(worksheet, "D5").CellFormula?.Text ?? string.Empty;
-        Assert.Contains("C5=\"\"", effectiveFormula, StringComparison.Ordinal);
+        AssertNumber(CellByHeader(worksheet, "Q1.E1.C1.AI_Raw", 5), "11");
+        AssertNumber(CellByHeader(worksheet, "Q1.E1.C1.Override", 5), "4");
+        Assert.Equal("4", CellByHeader(worksheet, "Q1.E1.C1.Effective_Raw", 5).CellValue?.Text);
+        Assert.Equal("40", CellByHeader(worksheet, "Q1.E1.C1.Normalized", 5).CellValue?.Text);
+        string effectiveFormula = CellByHeader(worksheet, "Q1.E1.C1.Effective_Raw", 5).CellFormula?.Text ?? string.Empty;
+        string overrideReference = CellByHeader(worksheet, "Q1.E1.C1.Override", 5).CellReference?.Value ?? string.Empty;
+        Assert.Contains(overrideReference + "=\"\"", effectiveFormula, StringComparison.Ordinal);
         Assert.Contains("ISNUMBER", effectiveFormula, StringComparison.Ordinal);
         Assert.DoesNotContain("MIN(", effectiveFormula, StringComparison.Ordinal);
         Assert.DoesNotContain("MAX(", effectiveFormula, StringComparison.Ordinal);
 
         DataValidation[] validations = worksheet.Descendants<DataValidation>().ToArray();
         Assert.Equal(4, validations.Length);
-        DataValidation emptyValidation = validations.Single(item => item.SequenceOfReferences?.InnerText == "C2");
+        string emptyOverrideReference = CellByHeader(worksheet, "Q1.E1.C1.Override", 2).CellReference?.Value
+            ?? throw new InvalidDataException("Override reference is missing.");
+        DataValidation emptyValidation = validations.Single(item => item.SequenceOfReferences?.InnerText == emptyOverrideReference);
         Assert.Equal(DataValidationValues.Custom, emptyValidation.Type?.Value);
         Assert.True(emptyValidation.AllowBlank?.Value == true);
-        Assert.Contains("C2=\"\"", emptyValidation.Formula1?.Text ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains(emptyOverrideReference + "=\"\"", emptyValidation.Formula1?.Text ?? string.Empty, StringComparison.Ordinal);
         Assert.All(
-            validations.Where(item => item.SequenceOfReferences?.InnerText != "C2"),
+            validations.Where(item => item.SequenceOfReferences?.InnerText != emptyOverrideReference),
             item => Assert.Equal(DataValidationValues.Decimal, item.Type?.Value));
+    }
+
+    [Fact]
+    public void Special_and_similarity_results_are_separate_literals_with_excel_owned_final_score()
+    {
+        using TemporaryWorkbook input = X01SyntheticWorkbookFactory.Create();
+        QuantificationDefinition source = CreateSingleCriterionDefinition(2, 2);
+        SpecialEvaluationDefinition first = new()
+        {
+            Id = "S1",
+            DisplayName = "Student prompt",
+            PrimarySourceColumn = "G",
+            PromptTemplate = "Evaluate {回答}",
+        };
+        SpecialEvaluationDefinition second = first with { Id = "S2", DisplayName = "Prompt considerations" };
+        QuantificationDefinition definition = source with
+        {
+            BasePoints = 89m,
+            SpecialPoints = 10m,
+            Questions = [source.Questions[0] with { SpecialEvaluations = [first, second] }],
+        };
+        QuantificationSnapshot snapshot = QuantificationSnapshot.Create(definition);
+        AppOwnedSheetNames names;
+        ResultsSheetWriteResult result;
+        using (SpreadsheetDocument document = SpreadsheetDocument.Open(input.Path, true))
+        {
+            names = new AppOwnedSheetNameResolver().Resolve(document);
+            ConfigCellAddressMap config = new ConfigSheetWriter().Write(document, snapshot, names);
+            result = new ResultsSheetWriter().Write(
+                document,
+                snapshot,
+                names,
+                config,
+                [
+                    new ResultsSheetRowInput
+                    {
+                        SourceRowNumber = 2,
+                        Questions =
+                        [
+                            new QuestionResultInput
+                            {
+                                QuestionId = "Q1",
+                                Scorable = true,
+                                Evaluators =
+                                [
+                                    new EvaluatorResultInput
+                                    {
+                                        EvaluatorId = "E1",
+                                        Status = ResultsStatusCodes.Success,
+                                        AiResult = new QuantificationResult
+                                        {
+                                            EvaluatorId = "E1",
+                                            Criteria = [CriterionResult("C1", 5m, "reason", "", EvidenceSourceKind.None, "")],
+                                        },
+                                    },
+                                ],
+                                SpecialResults =
+                                [
+                                    new SpecialResultInput { SpecialEvaluationId = "S1", AiRaw = 0.8m, Status = ResultsStatusCodes.Success },
+                                    new SpecialResultInput { SpecialEvaluationId = "S2", AiRaw = 0.6m, Status = ResultsStatusCodes.Success },
+                                ],
+                                Similarity = new SimilarityResultInput
+                                {
+                                    AiRaw = 0.5m,
+                                    Reason = "semantic overlap",
+                                    Status = ResultsStatusCodes.Success,
+                                },
+                            },
+                        ],
+                    },
+                ]);
+        }
+
+        using SpreadsheetDocument reopened = SpreadsheetDocument.Open(input.Path, false);
+        Worksheet worksheet = GetWorksheet(reopened, names.ResultsSheetName);
+        Assert.Equal(37, result.ColumnCount);
+        AssertNumber(CellByHeader(worksheet, "Q1.S1.Special_AI_Raw", 2), "0.8");
+        AssertNumber(CellByHeader(worksheet, "Q1.S2.Special_AI_Raw", 2), "0.6");
+        AssertFormulaCache(CellByHeader(worksheet, "Q1.Special_Question_Rate", 2), "0.7");
+        AssertNumber(CellByHeader(worksheet, "Q1.Similarity_AI_Raw", 2), "0.5");
+        AssertFormulaCache(CellByHeader(worksheet, "Q1.Similarity_Penalty", 2), "0.1");
+        AssertFormulaCache(CellByHeader(worksheet, "Base_Points", 2), "89");
+        AssertFormulaCache(CellByHeader(worksheet, "Special_Earned", 2), "7");
+        AssertFormulaCache(CellByHeader(worksheet, "Final_Raw", 2), "96.4");
+        AssertFormulaCache(CellByHeader(worksheet, "Final_Score", 2), "96.4");
+        Assert.Empty(new OpenXmlValidator().Validate(reopened, TestContext.Current.CancellationToken));
     }
 
     [Theory]
@@ -357,7 +435,7 @@ public sealed class ResultsSheetWriterTests
             () => new ResultsSheetWriter().Write(document, snapshot, names, config, []));
 
         ResultsSheetValidationError error = Assert.Single(exception.Errors, item => item.Code == "COLUMN_LIMIT_EXCEEDED");
-        Assert.Equal((criterionCount * 10 + 3).ToString(CultureInfo.InvariantCulture), error.SafeOffendingValue);
+        Assert.Equal((criterionCount * 10 + 14).ToString(CultureInfo.InvariantCulture), error.SafeOffendingValue);
         Assert.Equal(before, document.WorkbookPart?.WorksheetParts.Count() ?? 0);
         Assert.DoesNotContain(Workbook(document).Descendants<Sheet>(), sheet => sheet.Name?.Value == names.ResultsSheetName);
     }
@@ -460,7 +538,7 @@ public sealed class ResultsSheetWriterTests
             QuestionText = "Synthetic question",
             PrimarySourceColumn = "G",
             SupportingSourceColumns = ["H"],
-            Weight = 3m,
+            Points = 3m,
             Enabled = true,
             Evaluators = [enabledEvaluator, disabledEvaluator],
         };
@@ -470,7 +548,7 @@ public sealed class ResultsSheetWriterTests
             DisplayName = "Disabled question",
             QuestionText = "Synthetic disabled question",
             PrimarySourceColumn = "K",
-            Weight = 999m,
+            Points = 999m,
             Enabled = false,
             Evaluators =
             [
@@ -506,6 +584,7 @@ public sealed class ResultsSheetWriterTests
             HeaderRow = 1,
             FirstDataRow = firstRow,
             LastDataRow = lastRow,
+            BasePoints = 97m,
             RoundingDigits = 1,
             Questions = [enabledQuestion, disabledQuestion],
         };
@@ -521,6 +600,7 @@ public sealed class ResultsSheetWriterTests
             HeaderRow = 1,
             FirstDataRow = firstRow,
             LastDataRow = lastRow,
+            BasePoints = 99m,
             RoundingDigits = 1,
             Questions =
             [
@@ -530,7 +610,7 @@ public sealed class ResultsSheetWriterTests
                     DisplayName = "Question",
                     QuestionText = "Synthetic question",
                     PrimarySourceColumn = "G",
-                    Weight = 1m,
+                    Points = 1m,
                     Evaluators =
                     [
                         new EvaluatorDefinition
@@ -605,6 +685,12 @@ public sealed class ResultsSheetWriterTests
                             },
                         },
                     ],
+                    Similarity = new SimilarityResultInput
+                    {
+                        AiRaw = 0.99m,
+                        Reason = "synthetic similarity",
+                        Status = ResultsStatusCodes.Success,
+                    },
                 },
             ],
         };
@@ -645,6 +731,12 @@ public sealed class ResultsSheetWriterTests
                                 : [new CriterionOverrideInput { CriterionId = "C1", Value = overrideValue }],
                         },
                     ],
+                    Similarity = new SimilarityResultInput
+                    {
+                        AiRaw = 0m,
+                        Reason = string.Empty,
+                        Status = scorable ? ResultsStatusCodes.Success : ResultsStatusCodes.Empty,
+                    },
                 },
             ],
         };
@@ -699,6 +791,14 @@ public sealed class ResultsSheetWriterTests
         Assert.Equal(expectedCache, cell.CellValue?.Text);
     }
 
+    private static void AssertFormulaCache(Cell cell, string expectedCache)
+    {
+        Assert.NotNull(cell.CellFormula);
+        Assert.False((cell.CellFormula?.Text ?? string.Empty).StartsWith("=", StringComparison.Ordinal));
+        Assert.Equal(CellValues.Number, cell.DataType?.Value);
+        Assert.Equal(expectedCache, cell.CellValue?.Text);
+    }
+
     private static void AssertFormulaWithoutCache(Cell cell)
     {
         Assert.NotNull(cell.CellFormula);
@@ -740,6 +840,16 @@ public sealed class ResultsSheetWriterTests
 
     private static Cell Cell(Worksheet worksheet, string reference) =>
         worksheet.Descendants<Cell>().Single(cell => string.Equals(cell.CellReference?.Value, reference, StringComparison.Ordinal));
+
+    private static Cell CellByHeader(Worksheet worksheet, string header, int rowNumber)
+    {
+        Row headerRow = worksheet.Descendants<Row>().Single(row => row.RowIndex?.Value == 1);
+        Cell headerCell = headerRow.Elements<Cell>().Single(cell => cell.InnerText == header);
+        string column = new((headerCell.CellReference?.Value ?? string.Empty)
+            .TakeWhile(char.IsAsciiLetter)
+            .ToArray());
+        return Cell(worksheet, column + rowNumber.ToString(CultureInfo.InvariantCulture));
+    }
 
     private static Worksheet GetWorksheet(SpreadsheetDocument document, string name)
     {

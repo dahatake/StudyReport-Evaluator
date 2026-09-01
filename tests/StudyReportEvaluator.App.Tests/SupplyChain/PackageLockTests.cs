@@ -24,13 +24,18 @@ public sealed partial class PackageLockTests
         Assert.False(global.RootElement.GetProperty("sdk").GetProperty("allowPrerelease").GetBoolean());
 
         XDocument central = XDocument.Load(Path.Combine(root, "Directory.Packages.props"));
+        Dictionary<string, string> properties = central.Descendants("PropertyGroup")
+            .Elements()
+            .ToDictionary(element => element.Name.LocalName, element => element.Value, StringComparer.OrdinalIgnoreCase);
         XElement[] versions = central.Descendants("PackageVersion").ToArray();
         Assert.NotEmpty(versions);
         Assert.Equal(versions.Length, versions.Select(element => (string?)element.Attribute("Include")).Distinct(StringComparer.OrdinalIgnoreCase).Count());
 
         foreach (XElement item in versions)
         {
-            string version = (string?)item.Attribute("Version") ?? string.Empty;
+            string version = ResolveVersion(
+                (string?)item.Attribute("Version") ?? string.Empty,
+                properties);
             Assert.Matches(ExactVersion(), version);
         }
     }
@@ -65,11 +70,15 @@ public sealed partial class PackageLockTests
     public void Every_current_project_has_a_version_two_lock_file_matching_direct_versions()
     {
         string root = FindRepositoryRoot();
-        Dictionary<string, string> central = XDocument.Load(Path.Combine(root, "Directory.Packages.props"))
+        XDocument centralDocument = XDocument.Load(Path.Combine(root, "Directory.Packages.props"));
+        Dictionary<string, string> properties = centralDocument.Descendants("PropertyGroup")
+            .Elements()
+            .ToDictionary(element => element.Name.LocalName, element => element.Value, StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string> central = centralDocument
             .Descendants("PackageVersion")
             .ToDictionary(
                 element => (string)element.Attribute("Include")!,
-                element => (string)element.Attribute("Version")!,
+                element => ResolveVersion((string)element.Attribute("Version")!, properties),
                 StringComparer.OrdinalIgnoreCase);
 
         foreach (string projectPath in ProjectPaths)
@@ -109,6 +118,20 @@ public sealed partial class PackageLockTests
 
     [GeneratedRegex(@"^\d+(?:\.\d+){1,3}$", RegexOptions.CultureInvariant)]
     private static partial Regex ExactVersion();
+
+    [GeneratedRegex(@"^\$\((?<name>[A-Za-z_][A-Za-z0-9_.-]*)\)$", RegexOptions.CultureInvariant)]
+    private static partial Regex PropertyReference();
+
+    private static string ResolveVersion(
+        string value,
+        IReadOnlyDictionary<string, string> properties)
+    {
+        Match match = PropertyReference().Match(value);
+        return match.Success
+            && properties.TryGetValue(match.Groups["name"].Value, out string? resolved)
+                ? resolved
+                : value;
+    }
 
     private static string FindRepositoryRoot()
     {

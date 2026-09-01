@@ -50,6 +50,40 @@ public static class BuiltInPromptTemplates
         Evidence must come from the identified same-row primary or supporting source. If no evidence exists, return an empty evidence string, NONE, and an empty source column ID.
         """;
 
+    public const string ReferenceAnswerTemplate = """
+        次の設問に、設問文だけを根拠として回答してください。
+        学生の回答、採点情報、過去の回答は使用しないでください。
+        比較用の一つの回答本文だけを返してください。
+
+        ### 設問
+        {設問}
+
+        [APP-OWNED REFERENCE OUTPUT CONTRACT]
+        Call the submit_reference_answer tool exactly once and do not substitute normal assistant text.
+        Return only the expected question ID and one non-empty reference answer.
+        """;
+
+    public const string SpecialOutputInstruction = """
+        [APP-OWNED SPECIAL OUTPUT CONTRACT]
+        Evaluate only the supplied same-row sources. Zero means the criterion is not met and one means it is fully met.
+        Call the submit_special_quantification tool exactly once and do not substitute normal assistant text.
+        Return only the expected special evaluation ID, one finite score from 0 through 1, a short reason, exact contiguous evidence, evidence source kind, and source column ID.
+        Do not return question points, an aggregate, a final score, pass/fail, misconduct, or an additional field.
+        """;
+
+    public const string SimilarityInstruction = """
+        設問に対する二つの回答の意味内容と表現の類似度を評価してください。
+        0は類似しない、1は同一または実質同一です。
+        不正行為や回答品質を判定せず、類似度だけを返してください。
+        """;
+
+    public const string SimilarityOutputInstruction = """
+        [APP-OWNED SIMILARITY OUTPUT CONTRACT]
+        Call the submit_similarity tool exactly once and do not substitute normal assistant text.
+        Return only the expected question ID, one finite similarity from 0 through 1, and a short reason.
+        Do not return a misconduct decision, answer-quality judgment, score, penalty, or additional field.
+        """;
+
     public static string GetKnowledgeTemplate(string? version)
     {
         if (!string.Equals(version, KnowledgeTemplateVersion, StringComparison.Ordinal))

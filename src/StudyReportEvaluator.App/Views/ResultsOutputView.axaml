@@ -125,6 +125,50 @@
           </Border>
         </Grid>
 
+        <Border Classes="card" IsVisible="{Binding IsAutomaticOutput}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="AUTO FINALIZATION" Classes="kicker" />
+            <TextBlock Text="final / partial path" Classes="heading" />
+            <TextBlock
+                Text="{Binding DurableOutputText}"
+                TextWrapping="Wrap"
+                AutomationProperties.AutomationId="ResultsDurableOutput" />
+            <TextBlock
+                Text="final生成後のoverrideは、下のoptional exportで別名workbookとして保存できます。"
+                Classes="muted"
+                TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <TextBlock Text="FORMULA PREVIEW" Classes="kicker" />
+            <TextBlock Text="行ごとの配点・減点・最終点" Classes="heading" />
+            <ListBox
+                x:Name="RowScoreList"
+                ItemsSource="{Binding RowScores}"
+                MaxHeight="260"
+                AutomationProperties.AutomationId="ResultsRowScores"
+                AutomationProperties.Name="行ごとのQuestionEarned SpecialEarned SimilarityPenalty FinalRaw FinalScore">
+              <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="viewModels:ResultsRowScoreViewModel">
+                  <Border Margin="0,0,0,6" Padding="10" Classes="metric">
+                    <Grid ColumnDefinitions="60,2*,110,130,100,100" ColumnSpacing="10">
+                      <TextBlock Text="{Binding SourceRowNumber}" FontWeight="SemiBold" />
+                      <TextBlock Grid.Column="1" Text="{Binding QuestionEarnedText}" TextWrapping="Wrap" />
+                      <TextBlock Grid.Column="2" Text="{Binding SpecialEarnedText, StringFormat='Special {0}'}" />
+                      <TextBlock Grid.Column="3" Text="{Binding SimilarityPenaltyText, StringFormat='Penalty {0}'}" />
+                      <TextBlock Grid.Column="4" Text="{Binding FinalRawText, StringFormat='Raw {0}'}" />
+                      <TextBlock Grid.Column="5" Text="{Binding FinalScoreText, StringFormat='Final {0}'}" FontWeight="Bold" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </StackPanel>
+        </Border>
+
         <Border Classes="card">
           <StackPanel Spacing="12">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
@@ -228,7 +272,7 @@
         <Border Classes="card">
           <StackPanel Spacing="12">
             <TextBlock Text="ATOMIC OUTPUT" Classes="kicker" />
-            <TextBlock Text="別 workbook へ出力" Classes="heading" />
+            <TextBlock Text="override反映版を別 workbook へ任意出力" Classes="heading" />
             <TextBlock Text="Output path" FontWeight="SemiBold" />
             <TextBox
                 x:Name="OutputPathTextBox"

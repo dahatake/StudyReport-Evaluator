@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text.Json;
 using GitHub.Copilot;
 using StudyReportEvaluator.App.Copilot;
 using Xunit;
@@ -9,6 +11,64 @@ namespace StudyReportEvaluator.App.Tests.Copilot;
 
 public sealed class CopilotClientFactoryTests
 {
+    [Fact]
+    public async Task Bundled_resolver_accepts_only_the_current_rid_manifest_and_matching_binary()
+    {
+        using TemporaryBundledCli bundle = TemporaryBundledCli.Create();
+        BundledCopilotCliPathResolver resolver = new(bundle.Directory);
+
+        string? result = await resolver.ResolveAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(bundle.CliPath, result);
+        Assert.DoesNotContain(bundle.Directory, resolver.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Bundled_resolver_hash_mismatch_maps_to_runtime_failure()
+    {
+        using TemporaryBundledCli bundle = TemporaryBundledCli.Create(cliSha256: new string('0', 64));
+        CopilotClientFactory factory = new(new BundledCopilotCliPathResolver(bundle.Directory));
+
+        CopilotClientCreationResult result = await factory.CreateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(CopilotClientCreationStatus.RuntimeFailed, result.Status);
+        Assert.Null(result.Client);
+        Assert.Null(result.Identity);
+    }
+
+    [Fact]
+    public async Task Missing_bundled_manifest_does_not_fall_back_to_path()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "StudyReportEvaluator-A01-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string pathNamedCli = Path.Combine(directory, OperatingSystem.IsWindows() ? "copilot.exe" : "copilot");
+            File.Copy(typeof(CopilotClientFactoryTests).Assembly.Location, pathNamedCli);
+            CopilotClientFactory factory = new(new BundledCopilotCliPathResolver(directory));
+
+            CopilotClientCreationResult result = await factory.CreateAsync(TestContext.Current.CancellationToken);
+
+            Assert.Equal(CopilotClientCreationStatus.CliUnavailable, result.Status);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Default_factory_uses_only_the_bundled_runtime_resolver()
+    {
+        CopilotClientFactory factory = new();
+        FieldInfo field = typeof(CopilotClientFactory).GetField(
+            "_pathResolver",
+            BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("The path resolver field was not found.");
+
+        Assert.IsType<BundledCopilotCliPathResolver>(field.GetValue(factory));
+    }
+
     [Fact]
     public async Task Factory_uses_explicit_cli_path_existing_login_and_no_secret_or_telemetry()
     {
@@ -160,6 +220,77 @@ public sealed class CopilotClientFactoryTests
             WasCalled = true;
             cancellationToken.ThrowIfCancellationRequested();
             return ValueTask.FromResult(path);
+        }
+    }
+
+    private sealed class TemporaryBundledCli : IDisposable
+    {
+        private TemporaryBundledCli(string directory, string cliPath)
+        {
+            Directory = directory;
+            CliPath = cliPath;
+        }
+
+        public string Directory { get; }
+
+        public string CliPath { get; }
+
+        public static TemporaryBundledCli Create(string? cliSha256 = null)
+        {
+            string runtimeIdentifier = CurrentRuntimeIdentifier();
+            string binaryName = OperatingSystem.IsWindows() ? "copilot.exe" : "copilot";
+            string directory = Path.Combine(
+                Path.GetTempPath(),
+                "StudyReportEvaluator-A01-" + Guid.NewGuid().ToString("N"));
+            string nativeDirectory = Path.Combine(directory, "runtimes", runtimeIdentifier, "native");
+            DirectoryInfo created = System.IO.Directory.CreateDirectory(nativeDirectory);
+            string cliPath = Path.Combine(created.FullName, binaryName);
+            File.Copy(typeof(CopilotClientFactoryTests).Assembly.Location, cliPath);
+
+            string actualHash;
+            using (FileStream stream = File.OpenRead(cliPath))
+            {
+                actualHash = Convert.ToHexString(SHA256.HashData(stream));
+            }
+
+            FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(cliPath);
+            string cliVersion = versionInfo.ProductVersion ?? versionInfo.FileVersion
+                ?? throw new InvalidOperationException("The test binary has no version.");
+            string sdkVersion = typeof(CopilotClient).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion
+                ?? throw new InvalidOperationException("The SDK has no informational version.");
+            string manifest = JsonSerializer.Serialize(new
+            {
+                schemaVersion = 1,
+                runtimeIdentifier,
+                cliVersion,
+                cliSha256 = cliSha256 ?? actualHash,
+                sdkVersion,
+                cliRelativePath = $"runtimes/{runtimeIdentifier}/native/{binaryName}",
+            });
+            File.WriteAllText(Path.Combine(directory, BundledCopilotCliPathResolver.ManifestFileName), manifest);
+            return new TemporaryBundledCli(directory, cliPath);
+        }
+
+        public void Dispose()
+        {
+            if (System.IO.Directory.Exists(Directory))
+            {
+                System.IO.Directory.Delete(Directory, recursive: true);
+            }
+        }
+
+        private static string CurrentRuntimeIdentifier()
+        {
+            string os = OperatingSystem.IsWindows() ? "win" : "osx";
+            string architecture = RuntimeInformation.ProcessArchitecture switch
+            {
+                Architecture.X64 => "x64",
+                Architecture.Arm64 => "arm64",
+                _ => throw new PlatformNotSupportedException(),
+            };
+            return $"{os}-{architecture}";
         }
     }
 }

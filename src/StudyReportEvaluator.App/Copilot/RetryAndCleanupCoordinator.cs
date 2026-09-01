@@ -148,19 +148,24 @@ public sealed class EvaluationTokenUsage
         left > long.MaxValue - right ? long.MaxValue : left + right;
 }
 
-public interface IEphemeralEvaluationAttempt
+public interface IEphemeralEvaluationAttempt<TResult>
+    where TResult : class
 {
     string SessionId { get; }
 
     EvaluationTokenUsage TokenUsage => EvaluationTokenUsage.Unavailable;
 
-    Task<QuantificationResult> ExecuteAsync(CancellationToken cancellationToken);
+    Task<TResult> ExecuteAsync(CancellationToken cancellationToken);
 
     Task AbortAsync(CancellationToken cancellationToken);
 
     Task DisposeSessionAsync(CancellationToken cancellationToken);
 
     Task DeleteSessionAsync(CancellationToken cancellationToken);
+}
+
+public interface IEphemeralEvaluationAttempt : IEphemeralEvaluationAttempt<QuantificationResult>
+{
 }
 
 public enum EphemeralEvaluationStatus
@@ -267,6 +272,46 @@ public sealed class RetryAndCleanupCoordinator
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(attemptFactory);
+        EphemeralEvaluationResult<QuantificationResult> result = await ExecuteCoreAsync(
+            attempt => attemptFactory(attempt),
+            attemptTimeout,
+            cleanupTimeout,
+            maxConcurrency,
+            cancellationToken).ConfigureAwait(false);
+        return result.IsSuccess
+            ? EphemeralEvaluationResult.Succeeded(
+                result.AttemptCount,
+                result.AcceptedResult!,
+                result.TokenUsage)
+            : EphemeralEvaluationResult.Failed(
+                result.Status,
+                result.AttemptCount,
+                result.TokenUsage);
+    }
+
+    public Task<EphemeralEvaluationResult<TResult>> ExecuteAuxiliaryAsync<TResult>(
+        Func<int, IEphemeralEvaluationAttempt<TResult>> attemptFactory,
+        TimeSpan attemptTimeout,
+        TimeSpan cleanupTimeout,
+        int maxConcurrency,
+        CancellationToken cancellationToken)
+        where TResult : class =>
+        ExecuteCoreAsync(
+            attemptFactory,
+            attemptTimeout,
+            cleanupTimeout,
+            maxConcurrency,
+            cancellationToken);
+
+    private async Task<EphemeralEvaluationResult<TResult>> ExecuteCoreAsync<TResult>(
+        Func<int, IEphemeralEvaluationAttempt<TResult>> attemptFactory,
+        TimeSpan attemptTimeout,
+        TimeSpan cleanupTimeout,
+        int maxConcurrency,
+        CancellationToken cancellationToken)
+        where TResult : class
+    {
+        ArgumentNullException.ThrowIfNull(attemptFactory);
         ValidateFiniteTimeout(attemptTimeout, nameof(attemptTimeout));
         ValidateFiniteTimeout(cleanupTimeout, nameof(cleanupTimeout));
         if (maxConcurrency is < 1 or > 3)
@@ -294,14 +339,14 @@ public sealed class RetryAndCleanupCoordinator
                     maxConcurrency,
                     SafeLogFailureCategory.Cancelled,
                     identity: null);
-                return EphemeralEvaluationResult.Failed(
+                return EphemeralEvaluationResult<TResult>.Failed(
                     EphemeralEvaluationStatus.Cancelled,
                     attemptCount,
                     tokenUsage);
             }
 
             attemptCount++;
-            IEphemeralEvaluationAttempt attempt;
+            IEphemeralEvaluationAttempt<TResult> attempt;
             try
             {
                 attempt = attemptFactory(attemptCount)
@@ -317,7 +362,7 @@ public sealed class RetryAndCleanupCoordinator
                     maxConcurrency,
                     SafeLogFailureCategory.Fatal,
                     identity: null);
-                return EphemeralEvaluationResult.Failed(
+                return EphemeralEvaluationResult<TResult>.Failed(
                     EphemeralEvaluationStatus.Fatal,
                     attemptCount,
                     tokenUsage);
@@ -339,12 +384,12 @@ public sealed class RetryAndCleanupCoordinator
                 SafeLogFailureCategory.None,
                 identity);
 
-            QuantificationResult? acceptedResult = null;
+            TResult? acceptedResult = null;
             EvaluationAttemptFailureKind? failureKind = validUniqueSessionId
                 ? null
                 : EvaluationAttemptFailureKind.Fatal;
             bool abortRequired = !validUniqueSessionId;
-            Task<QuantificationResult>? executionTask = null;
+            Task<TResult>? executionTask = null;
 
             if (failureKind is null)
             {
@@ -419,7 +464,7 @@ public sealed class RetryAndCleanupCoordinator
                     maxConcurrency,
                     SafeLogFailureCategory.Cleanup,
                     identity);
-                return EphemeralEvaluationResult.Failed(
+                return EphemeralEvaluationResult<TResult>.Failed(
                     EphemeralEvaluationStatus.CleanupFailed,
                     attemptCount,
                     tokenUsage);
@@ -435,7 +480,7 @@ public sealed class RetryAndCleanupCoordinator
                     maxConcurrency,
                     SafeLogFailureCategory.None,
                     identity);
-                return EphemeralEvaluationResult.Succeeded(
+                return EphemeralEvaluationResult<TResult>.Succeeded(
                     attemptCount,
                     acceptedResult,
                     tokenUsage);
@@ -453,7 +498,7 @@ public sealed class RetryAndCleanupCoordinator
                     maxConcurrency,
                     SafeLogFailureCategory.Cancelled,
                     identity);
-                return EphemeralEvaluationResult.Failed(
+                return EphemeralEvaluationResult<TResult>.Failed(
                     EphemeralEvaluationStatus.Cancelled,
                     attemptCount,
                     tokenUsage);
@@ -485,17 +530,18 @@ public sealed class RetryAndCleanupCoordinator
                 continue;
             }
 
-            return EphemeralEvaluationResult.Failed(
+            return EphemeralEvaluationResult<TResult>.Failed(
                 MapTerminalStatus(terminalFailure),
                 attemptCount,
                 tokenUsage);
         }
     }
 
-    private static async Task<bool> CleanupAsync(
-        IEphemeralEvaluationAttempt attempt,
+    private static async Task<bool> CleanupAsync<TResult>(
+        IEphemeralEvaluationAttempt<TResult> attempt,
         bool abortRequired,
         TimeSpan cleanupTimeout)
+        where TResult : class
     {
         bool succeeded = true;
         if (abortRequired)
@@ -665,5 +711,67 @@ public sealed class RetryAndCleanupCoordinator
                 parameterName,
                 "The timeout must be positive and finite.");
         }
+    }
+}
+
+public sealed class EphemeralEvaluationResult<TResult>
+    where TResult : class
+{
+    internal EphemeralEvaluationResult(
+        EphemeralEvaluationStatus status,
+        int attemptCount,
+        TResult? acceptedResult,
+        EvaluationTokenUsage tokenUsage)
+    {
+        Status = status;
+        AttemptCount = attemptCount;
+        AcceptedResult = acceptedResult;
+        TokenUsage = tokenUsage;
+    }
+
+    public EphemeralEvaluationStatus Status { get; }
+
+    public string StatusCode => Status switch
+    {
+        EphemeralEvaluationStatus.Succeeded => "SUCCESS",
+        EphemeralEvaluationStatus.AiOutputInvalid => "AI_OUTPUT_INVALID",
+        EphemeralEvaluationStatus.AiTimeout => "AI_TIMEOUT",
+        EphemeralEvaluationStatus.NetworkFailed => "NETWORK_FAILED",
+        EphemeralEvaluationStatus.AuthRequired => "AUTH_REQUIRED",
+        EphemeralEvaluationStatus.Cancelled => "CANCELLED",
+        EphemeralEvaluationStatus.CleanupFailed => "CLEANUP_FAILED",
+        _ => "AI_RUNTIME_FAILED",
+    };
+
+    public int AttemptCount { get; }
+
+    public TResult? AcceptedResult { get; }
+
+    public EvaluationTokenUsage TokenUsage { get; }
+
+    public bool IsSuccess =>
+        Status == EphemeralEvaluationStatus.Succeeded
+        && AcceptedResult is not null;
+
+    public override string ToString() =>
+        $"{nameof(EphemeralEvaluationResult<TResult>)} {{ Status = {StatusCode}, AttemptCount = {AttemptCount}, Content = <redacted> }}";
+
+    internal static EphemeralEvaluationResult<TResult> Succeeded(
+        int attemptCount,
+        TResult acceptedResult,
+        EvaluationTokenUsage tokenUsage) =>
+        new(EphemeralEvaluationStatus.Succeeded, attemptCount, acceptedResult, tokenUsage);
+
+    internal static EphemeralEvaluationResult<TResult> Failed(
+        EphemeralEvaluationStatus status,
+        int attemptCount,
+        EvaluationTokenUsage tokenUsage)
+    {
+        if (status == EphemeralEvaluationStatus.Succeeded)
+        {
+            throw new ArgumentOutOfRangeException(nameof(status));
+        }
+
+        return new EphemeralEvaluationResult<TResult>(status, attemptCount, null, tokenUsage);
     }
 }

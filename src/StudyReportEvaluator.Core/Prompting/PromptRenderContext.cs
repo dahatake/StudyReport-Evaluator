@@ -72,6 +72,56 @@ public sealed class SafeEvaluationPayload
         $"SafeEvaluationPayload {{ QuestionId = {QuestionId}, EvaluatorId = {EvaluatorId}, Content = <redacted>, Sources = {1 + SupportingSources.Length}, Criteria = {ExpectedCriteria.Length} }}";
 }
 
+public sealed record SafeReferenceAnswerPayload(
+    string QuestionId,
+    string RenderedPrompt)
+{
+    public override string ToString() =>
+        $"{nameof(SafeReferenceAnswerPayload)} {{ QuestionId = {QuestionId}, Content = <redacted> }}";
+}
+
+public sealed class SafeSpecialEvaluationPayload
+{
+    public SafeSpecialEvaluationPayload(
+        string questionId,
+        string specialEvaluationId,
+        string renderedPrompt,
+        EvaluationSourceCell primarySource,
+        ImmutableArray<EvaluationSourceCell> supportingSources)
+    {
+        QuestionId = questionId;
+        SpecialEvaluationId = specialEvaluationId;
+        RenderedPrompt = renderedPrompt;
+        PrimarySource = primarySource;
+        SupportingSources = supportingSources;
+    }
+
+    public string QuestionId { get; }
+
+    public string SpecialEvaluationId { get; }
+
+    public string RenderedPrompt { get; }
+
+    public EvaluationSourceCell PrimarySource { get; }
+
+    public ImmutableArray<EvaluationSourceCell> SupportingSources { get; }
+
+    public IEnumerable<EvaluationSourceCell> Sources => SupportingSources.Prepend(PrimarySource);
+
+    public override string ToString() =>
+        $"{nameof(SafeSpecialEvaluationPayload)} {{ QuestionId = {QuestionId}, SpecialEvaluationId = {SpecialEvaluationId}, Content = <redacted>, Sources = {1 + SupportingSources.Length} }}";
+}
+
+public sealed record SafeSimilarityPayload(
+    string QuestionId,
+    string RenderedPrompt,
+    string StudentAnswer,
+    string ReferenceAnswer)
+{
+    public override string ToString() =>
+        $"{nameof(SafeSimilarityPayload)} {{ QuestionId = {QuestionId}, Content = <redacted> }}";
+}
+
 public class PromptConfigurationException : Exception
 {
     public PromptConfigurationException(string code, string message, int? position = null)

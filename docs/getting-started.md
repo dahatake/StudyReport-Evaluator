@@ -2,6 +2,8 @@
 
 対象読者は、Windows 11 x64で標準 `.xlsx` の回答を定量化する教員・採点者です。本書は現在のUIとproduction sourceだけを手順化し、未取得の画面やlive AI結果を作りません。
 
+GitHub Copilotへ起動依頼Promptを貼り、入力workbookと複数の評価Promptを事前入力して起動する場合は、[GitHub CopilotからPromptで起動する](prompt-launch.md)を先に参照してください。
+
 ## 全体像
 
 ```mermaid
@@ -43,7 +45,7 @@ flowchart LR
 | 回答開始行 | `2` | 最初の回答row |
 | 回答終了行 | `101` | 100名ならheaderを除く最終row |
 
-1. **ファイルpath（標準 `.xlsx`）**へfull pathを入力します。現在のUIにnative file pickerはありません。
+1. **ファイルを選択**でnative pickerを使うか、**ファイルpath（標準 `.xlsx`）**へfull pathを入力します。
 2. **read-onlyで読込**を選びます。
 3. 回答sheet、見出し行、回答開始行、回答終了行を確認します。
 4. 自動候補を出発点として、質問ごとの主回答列と補助列を確認・変更します。

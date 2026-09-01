@@ -1,0 +1,299 @@
+using GitHub.Copilot;
+using StudyReportEvaluator.App.Logging;
+using StudyReportEvaluator.Core.Domain;
+using StudyReportEvaluator.Core.Prompting;
+
+namespace StudyReportEvaluator.App.Copilot;
+
+public sealed class ReferenceAnswerEvaluationRunner
+{
+    public const string ModelId = "auto";
+
+    private readonly IEphemeralCopilotTransportFactory transportFactory;
+    private readonly AuxiliaryEvaluationSchemaFactory schemaFactory = new();
+    private readonly RetryAndCleanupCoordinator coordinator;
+    private readonly EphemeralEvaluationRunnerOptions options;
+
+    public ReferenceAnswerEvaluationRunner()
+        : this(new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory()))
+    {
+    }
+
+    public ReferenceAnswerEvaluationRunner(
+        IEphemeralCopilotTransportFactory transportFactory,
+        EphemeralEvaluationRunnerOptions? options = null,
+        SafeLogger? logger = null)
+    {
+        this.transportFactory = transportFactory
+            ?? throw new ArgumentNullException(nameof(transportFactory));
+        this.options = options ?? new EphemeralEvaluationRunnerOptions();
+        coordinator = new RetryAndCleanupCoordinator(logger);
+    }
+
+    public Task<EphemeralEvaluationResult<ReferenceAnswerResult>> EvaluateAsync(
+        SafeReferenceAnswerPayload payload,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        return coordinator.ExecuteAuxiliaryAsync(
+            _ => CreateAttempt(payload),
+            options.AttemptTimeout,
+            options.CleanupTimeout,
+            options.MaxConcurrency,
+            cancellationToken);
+    }
+
+    private IEphemeralEvaluationAttempt<ReferenceAnswerResult> CreateAttempt(
+        SafeReferenceAnswerPayload payload)
+    {
+        SessionConfig config = schemaFactory.CreateReferenceSessionConfig(payload, out SubmitReferenceAnswerTool collector);
+        return new CopilotAuxiliaryAttempt<ReferenceAnswerResult>(
+            transportFactory.Create()
+                ?? throw new InvalidOperationException("The transport factory returned no transport."),
+            config,
+            payload.RenderedPrompt,
+            ModelId,
+            $"ref-{Guid.NewGuid():N}",
+            () => collector.TryGetAcceptedResult(out ReferenceAnswerResult? result) ? result : null);
+    }
+}
+
+public sealed class SpecialEvaluationRunner
+{
+    private readonly IEphemeralCopilotTransportFactory transportFactory;
+    private readonly AuxiliaryEvaluationSchemaFactory schemaFactory = new();
+    private readonly RetryAndCleanupCoordinator coordinator;
+    private readonly EphemeralEvaluationRunnerOptions options;
+
+    public SpecialEvaluationRunner()
+        : this(new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory()))
+    {
+    }
+
+    public SpecialEvaluationRunner(
+        IEphemeralCopilotTransportFactory transportFactory,
+        EphemeralEvaluationRunnerOptions? options = null,
+        SafeLogger? logger = null)
+    {
+        this.transportFactory = transportFactory
+            ?? throw new ArgumentNullException(nameof(transportFactory));
+        this.options = options ?? new EphemeralEvaluationRunnerOptions();
+        coordinator = new RetryAndCleanupCoordinator(logger);
+    }
+
+    public Task<EphemeralEvaluationResult<SpecialQuantificationResult>> EvaluateAsync(
+        SafeSpecialEvaluationPayload payload,
+        string modelId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        EphemeralEvaluationRunner.ValidateModelId(modelId);
+        return coordinator.ExecuteAuxiliaryAsync(
+            _ => CreateAttempt(payload, modelId),
+            options.AttemptTimeout,
+            options.CleanupTimeout,
+            options.MaxConcurrency,
+            cancellationToken);
+    }
+
+    private IEphemeralEvaluationAttempt<SpecialQuantificationResult> CreateAttempt(
+        SafeSpecialEvaluationPayload payload,
+        string modelId)
+    {
+        SessionConfig config = schemaFactory.CreateSpecialSessionConfig(payload, out SubmitSpecialQuantificationTool collector);
+        return new CopilotAuxiliaryAttempt<SpecialQuantificationResult>(
+            transportFactory.Create()
+                ?? throw new InvalidOperationException("The transport factory returned no transport."),
+            config,
+            payload.RenderedPrompt,
+            modelId,
+            $"special-{Guid.NewGuid():N}",
+            () => collector.TryGetAcceptedResult(out SpecialQuantificationResult? result) ? result : null);
+    }
+}
+
+public sealed class SimilarityEvaluationRunner
+{
+    public const string ModelId = "auto";
+
+    private readonly IEphemeralCopilotTransportFactory transportFactory;
+    private readonly AuxiliaryEvaluationSchemaFactory schemaFactory = new();
+    private readonly RetryAndCleanupCoordinator coordinator;
+    private readonly EphemeralEvaluationRunnerOptions options;
+
+    public SimilarityEvaluationRunner()
+        : this(new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory()))
+    {
+    }
+
+    public SimilarityEvaluationRunner(
+        IEphemeralCopilotTransportFactory transportFactory,
+        EphemeralEvaluationRunnerOptions? options = null,
+        SafeLogger? logger = null)
+    {
+        this.transportFactory = transportFactory
+            ?? throw new ArgumentNullException(nameof(transportFactory));
+        this.options = options ?? new EphemeralEvaluationRunnerOptions();
+        coordinator = new RetryAndCleanupCoordinator(logger);
+    }
+
+    public Task<EphemeralEvaluationResult<SimilarityQuantificationResult>> EvaluateAsync(
+        SafeSimilarityPayload payload,
+        CancellationToken cancellationToken = default)
+    {
+        AuxiliaryEvaluationSchemaFactory.ValidateSimilarityPayload(payload);
+        return coordinator.ExecuteAuxiliaryAsync(
+            _ => CreateAttempt(payload),
+            options.AttemptTimeout,
+            options.CleanupTimeout,
+            options.MaxConcurrency,
+            cancellationToken);
+    }
+
+    private IEphemeralEvaluationAttempt<SimilarityQuantificationResult> CreateAttempt(
+        SafeSimilarityPayload payload)
+    {
+        SessionConfig config = schemaFactory.CreateSimilaritySessionConfig(payload, out SubmitSimilarityTool collector);
+        return new CopilotAuxiliaryAttempt<SimilarityQuantificationResult>(
+            transportFactory.Create()
+                ?? throw new InvalidOperationException("The transport factory returned no transport."),
+            config,
+            payload.RenderedPrompt,
+            ModelId,
+            $"similarity-{Guid.NewGuid():N}",
+            () => collector.TryGetAcceptedResult(out SimilarityQuantificationResult? result) ? result : null);
+    }
+}
+
+internal sealed class CopilotAuxiliaryAttempt<TResult> : IEphemeralEvaluationAttempt<TResult>
+    where TResult : class
+{
+    private readonly IEphemeralCopilotTransport transport;
+    private readonly SessionConfig sessionConfig;
+    private readonly MessageOptions messageOptions;
+    private readonly Func<TResult?> acceptedResult;
+    private IEphemeralCopilotSession? session;
+    private string? createdSessionId;
+    private EvaluationTokenUsage tokenUsage = EvaluationTokenUsage.Unavailable;
+
+    internal CopilotAuxiliaryAttempt(
+        IEphemeralCopilotTransport transport,
+        SessionConfig sessionConfig,
+        string prompt,
+        string modelId,
+        string sessionId,
+        Func<TResult?> acceptedResult)
+    {
+        this.transport = transport ?? throw new ArgumentNullException(nameof(transport));
+        this.sessionConfig = sessionConfig ?? throw new ArgumentNullException(nameof(sessionConfig));
+        ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
+        EphemeralEvaluationRunner.ValidateModelId(modelId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+        this.acceptedResult = acceptedResult ?? throw new ArgumentNullException(nameof(acceptedResult));
+        this.sessionConfig.SessionId = sessionId;
+        this.sessionConfig.Model = modelId;
+        messageOptions = new MessageOptions
+        {
+            Prompt = prompt,
+            Attachments = [],
+            DisplayPrompt = null,
+            RequestHeaders = null,
+        };
+        SessionId = sessionId;
+    }
+
+    public string SessionId { get; }
+
+    public EvaluationTokenUsage TokenUsage => Volatile.Read(ref tokenUsage);
+
+    public async Task<TResult> ExecuteAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await transport.StartAsync(cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!await transport.IsAuthenticatedAsync(cancellationToken).ConfigureAwait(false))
+        {
+            throw new EvaluationAuthenticationException();
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        IEphemeralCopilotSession created = await transport
+            .CreateSessionAsync(sessionConfig, cancellationToken)
+            .ConfigureAwait(false);
+        session = created ?? throw new EvaluationFatalException();
+        createdSessionId = created.SessionId;
+        if (!string.Equals(SessionId, created.SessionId, StringComparison.Ordinal))
+        {
+            throw new EvaluationFatalException();
+        }
+
+        await created.SendAndWaitAsync(messageOptions, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            Volatile.Write(
+                ref tokenUsage,
+                await created.GetUsageAsync(cancellationToken).ConfigureAwait(false)
+                ?? EvaluationTokenUsage.Unavailable);
+        }
+        catch
+        {
+            Volatile.Write(ref tokenUsage, EvaluationTokenUsage.Unavailable);
+        }
+
+        return acceptedResult() ?? throw new EvaluationSchemaException();
+    }
+
+    public Task AbortAsync(CancellationToken cancellationToken) =>
+        Volatile.Read(ref session)?.AbortAsync(cancellationToken) ?? Task.CompletedTask;
+
+    public async Task DisposeSessionAsync(CancellationToken cancellationToken)
+    {
+        IEphemeralCopilotSession? current = Volatile.Read(ref session);
+        if (current is not null)
+        {
+            await current.DisposeAsync().AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    public async Task DeleteSessionAsync(CancellationToken cancellationToken)
+    {
+        bool succeeded = true;
+        string? sessionId = Volatile.Read(ref createdSessionId);
+        if (sessionId is not null)
+        {
+            try
+            {
+                await transport.DeleteSessionAsync(sessionId, cancellationToken)
+                    .WaitAsync(cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                succeeded = false;
+            }
+        }
+
+        try
+        {
+            await transport.StopAsync(cancellationToken).WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            succeeded = false;
+        }
+
+        try
+        {
+            await transport.DisposeAsync().AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            succeeded = false;
+        }
+
+        if (!succeeded)
+        {
+            throw new EvaluationCleanupException();
+        }
+    }
+}

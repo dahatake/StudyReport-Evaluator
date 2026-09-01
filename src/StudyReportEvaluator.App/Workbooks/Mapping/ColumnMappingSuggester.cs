@@ -133,6 +133,7 @@ public sealed class ColumnMappingSuggester
         "完了時刻",
         "送信時刻",
         "提出日時",
+        "提出者",
         "更新日時",
         "タイムスタンプ",
         "timestamp",

@@ -134,6 +134,88 @@ public sealed class QuantificationDesignViewTests
     }
 
     [Fact]
+    public void Root_allocation_defaults_manual_edits_and_explicit_equalize_follow_the_v4_contract()
+    {
+        QuantificationDesignViewModel viewModel = new();
+        QuestionDesignItemViewModel first = Assert.Single(viewModel.Questions);
+
+        Assert.Equal(60m, viewModel.BasePoints);
+        Assert.Equal(0m, viewModel.SpecialPoints);
+        Assert.Equal(0.1m, viewModel.SimilarityPenaltyWeight);
+        Assert.Equal(40m, first.Points);
+        Assert.Equal(100m, viewModel.AllocationTotal);
+        Assert.Equal(0m, viewModel.AllocationRemaining);
+        Assert.True(viewModel.IsAllocationValid);
+
+        QuestionDesignItemViewModel second = viewModel.DuplicateQuestion(first.Id);
+        Assert.Equal(40m, first.Points);
+        Assert.Equal(40m, second.Points);
+        Assert.Equal(140m, viewModel.AllocationTotal);
+        Assert.False(viewModel.IsAllocationValid);
+
+        viewModel.BasePoints = 50m;
+        viewModel.SpecialPoints = 10m;
+        viewModel.SimilarityPenaltyWeight = 0.25m;
+        viewModel.AddSpecialEvaluation(first.Id);
+        Assert.Equal(40m, first.Points);
+        Assert.Equal(40m, second.Points);
+        Assert.False(viewModel.IsAllocationValid);
+
+        viewModel.EqualizeQuestionPoints();
+
+        Assert.Equal(20m, first.Points);
+        Assert.Equal(20m, second.Points);
+        Assert.Equal(100m, viewModel.AllocationTotal);
+        Assert.True(viewModel.IsAllocationValid);
+        Assert.Contains("100", viewModel.AllocationSummary, StringComparison.Ordinal);
+        Assert.True(viewModel.BuildSnapshot().HasValidHash());
+    }
+
+    [Fact]
+    public void Special_items_support_crud_source_mapping_prompt_validation_and_snapshot_isolation()
+    {
+        QuantificationDesignViewModel viewModel = new(
+            initialDefinition: null,
+            availableColumnNames: ["A", "B", "C"]);
+        QuestionDesignItemViewModel question = Assert.Single(viewModel.Questions);
+        viewModel.BasePoints = 50m;
+        viewModel.SpecialPoints = 10m;
+        SpecialEvaluationDesignItemViewModel special = viewModel.AddSpecialEvaluation(question.Id);
+
+        special.DisplayName = "学生Prompt";
+        special.PrimarySourceColumn = "B";
+        special.SupportingColumns.Single(item => item.ColumnName == "A").IsSelected = true;
+        special.SupportingColumns.Single(item => item.ColumnName == "C").IsSelected = true;
+        special.PromptTemplate = "観点に沿って評価してください。{回答} {補助情報}";
+
+        Assert.Equal(["A", "C"], viewModel.Draft.Questions[0].SpecialEvaluations[0].SupportingSourceColumns);
+        Assert.False(special.SupportingColumns.Single(item => item.ColumnName == "B").CanSelect);
+        Assert.True(viewModel.IsValid);
+
+        SpecialEvaluationDesignItemViewModel copy = viewModel.DuplicateSpecialEvaluation(question.Id, special.Id);
+        Assert.NotEqual(special.Id, copy.Id);
+        Assert.Equal(special.PromptTemplate, copy.PromptTemplate);
+        viewModel.MoveSpecialEvaluationUp(question.Id, copy.Id);
+        Assert.Equal(copy.Id, question.SpecialEvaluations[0].Id);
+        copy.Enabled = false;
+        Assert.False(viewModel.Draft.Questions[0].SpecialEvaluations[0].Enabled);
+        viewModel.DeleteSpecialEvaluation(question.Id, copy.Id);
+        Assert.Single(question.SpecialEvaluations);
+
+        QuantificationSnapshot snapshot = viewModel.BuildSnapshot();
+        special.PromptTemplate = "missing placeholder";
+        Assert.False(viewModel.IsValid);
+        Assert.Contains(viewModel.ValidationErrors, error =>
+            error.NodeId == special.Id && error.Field == "PromptTemplate");
+        Assert.Equal(
+            "観点に沿って評価してください。{回答} {補助情報}",
+            snapshot.Definition.Questions[0].SpecialEvaluations[0].PromptTemplate);
+
+        special.PromptTemplate = "fixed {回答}";
+        Assert.True(viewModel.IsValid);
+    }
+
+    [Fact]
     public void Custom_template_validation_handles_required_placeholders_unknown_and_escaped_braces()
     {
         QuantificationDesignViewModel viewModel = new();
@@ -237,12 +319,13 @@ public sealed class QuantificationDesignViewTests
         firstEvaluator.Minimum = 10m;
         Assert.False(viewModel.CanBuildSnapshot);
         firstEvaluator.Minimum = 0m;
-        firstQuestion.Weight = 0m;
+        firstQuestion.Weight = -1m;
         Assert.False(viewModel.CanBuildSnapshot);
         Assert.Contains(
             viewModel.ValidationErrors,
-            error => error.NodeId == firstQuestion.Id && error.Field == "Weight");
+            error => error.NodeId == firstQuestion.Id && error.Field == "Points");
         firstQuestion.Weight = 2m;
+        viewModel.EqualizeQuestionPoints();
         Assert.True(viewModel.CanBuildSnapshot);
         Assert.True(viewModel.BuildSnapshot().HasValidHash());
     }
@@ -273,6 +356,7 @@ public sealed class QuantificationDesignViewTests
             firstCriterion.Id);
         Assert.Equal(50m, firstCriterion.EffectiveWeightPercentage);
         Assert.Equal(50m, secondCriterion.EffectiveWeightPercentage);
+        viewModel.EqualizeQuestionPoints();
         Assert.True(viewModel.CanBuildSnapshot);
     }
 
@@ -367,6 +451,10 @@ public sealed class QuantificationDesignViewTests
             Dispatcher.UIThread.RunJobs();
 
             TextBox name = Required<TextBox>(view, "DefinitionNameTextBox");
+            TextBox basePoints = Required<TextBox>(view, "BasePointsTextBox");
+            TextBox specialPoints = Required<TextBox>(view, "SpecialPointsTextBox");
+            TextBox similarityWeight = Required<TextBox>(view, "SimilarityPenaltyWeightTextBox");
+            Button equalize = Required<Button>(view, "EqualizeQuestionPointsButton");
             ScrollViewer scroll = Required<ScrollViewer>(view, "QuantificationDesignScrollViewer");
             ListBox questions = Required<ListBox>(view, "QuestionEditorList");
             Border validation = Required<Border>(view, "DesignValidationSummary");
@@ -380,6 +468,10 @@ public sealed class QuantificationDesignViewTests
             Assert.Equal(ScrollBarVisibility.Auto, scroll.VerticalScrollBarVisibility);
             Assert.Equal("DesignQuestions", AutomationProperties.GetAutomationId(questions));
             Assert.Equal("DesignValidationSummary", AutomationProperties.GetAutomationId(validation));
+            Assert.Equal("DesignBasePoints", AutomationProperties.GetAutomationId(basePoints));
+            Assert.Equal("DesignSpecialPoints", AutomationProperties.GetAutomationId(specialPoints));
+            Assert.Equal("DesignSimilarityPenaltyWeight", AutomationProperties.GetAutomationId(similarityWeight));
+            Assert.Equal("EqualizeQuestionPoints", AutomationProperties.GetAutomationId(equalize));
             Assert.Same(name, window.FocusManager?.GetFocusedElement());
             Assert.True(name.MinHeight >= 44d);
             Assert.True(knowledgePreview.IsVisible);
@@ -432,6 +524,7 @@ public sealed class QuantificationDesignViewTests
         HeaderRow = 1,
         FirstDataRow = 2,
         LastDataRow = 531,
+        BasePoints = 45m,
         RoundingDigits = 1,
         Questions =
         [
@@ -442,7 +535,7 @@ public sealed class QuantificationDesignViewTests
                 QuestionText = $"Question text {question}",
                 PrimarySourceColumn = "A",
                 SupportingSourceColumns = [],
-                Weight = question,
+                Points = question,
                 Enabled = true,
                 Evaluators =
                 [

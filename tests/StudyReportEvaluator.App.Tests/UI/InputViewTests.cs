@@ -11,6 +11,8 @@ using Avalonia.VisualTree;
 using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.App.ViewModels;
 using StudyReportEvaluator.App.Views;
+using StudyReportEvaluator.App.Workbooks.Intake;
+using StudyReportEvaluator.App.Workbooks.Reading;
 using StudyReportEvaluator.Core.Domain;
 using Xunit;
 
@@ -139,6 +141,102 @@ public sealed class InputViewTests
         Assert.False(viewModel.CanContinue);
     }
 
+    [AvaloniaFact]
+    public async Task Native_picker_selection_uses_the_same_read_only_loader_and_cancel_preserves_state()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        CountingInputLoader loader = new();
+        InputViewModel viewModel = new(loader);
+        ScriptedInputWorkbookPicker picker = new(workbook.Path, null);
+        InputView view = new(viewModel, picker);
+        Window window = new() { Content = view };
+
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            await view.PickFileAsync();
+
+            Assert.Equal(Path.GetFullPath(workbook.Path), Path.GetFullPath(viewModel.FilePath));
+            Assert.True(viewModel.HasLoadedWorkbook);
+            Assert.True(viewModel.CanContinue);
+            Assert.Equal(1, loader.LoadCount);
+            InputSnapshot? snapshot = viewModel.Snapshot;
+            WorkbookMetadata? metadata = viewModel.Metadata;
+
+            await view.PickFileAsync();
+
+            Assert.Equal(2, picker.CallCount);
+            Assert.Equal(1, loader.LoadCount);
+            Assert.Same(snapshot, viewModel.Snapshot);
+            Assert.Same(metadata, viewModel.Metadata);
+            Assert.Equal(workbook.Path, viewModel.FilePath);
+            Button pick = Required<Button>(view, "PickFileButton");
+            Assert.True(pick.IsEnabled);
+            Assert.Equal("PickInputWorkbook", AutomationProperties.GetAutomationId(pick));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
+    public void Question_text_row_choices_are_closed_to_one_or_two()
+    {
+        InputViewModel viewModel = new();
+
+        Assert.Equal([1, 2], viewModel.HeaderRowOptions);
+        viewModel.HeaderRow = 2;
+        Assert.Equal(2, viewModel.HeaderRow);
+        Assert.Throws<ArgumentOutOfRangeException>(() => viewModel.HeaderRow = 0);
+        Assert.Throws<ArgumentOutOfRangeException>(() => viewModel.HeaderRow = 3);
+        Assert.Equal(2, viewModel.HeaderRow);
+    }
+
+    [Fact]
+    public async Task Changing_question_text_row_preserves_manual_points_and_requires_explicit_header_reload()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        InputViewModel viewModel = new();
+        await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        decimal[] points = viewModel.DefinitionDraft.Questions.Select(question => question.Points).ToArray();
+
+        viewModel.HeaderRow = 2;
+
+        Assert.Equal(points, viewModel.DefinitionDraft.Questions.Select(question => question.Points));
+        Assert.False(viewModel.CanContinue);
+        Assert.Contains(viewModel.ValidationErrors, error => error.Code == "HEADER_METADATA_MISMATCH");
+    }
+
+    [AvaloniaFact]
+    public async Task Picker_local_path_unavailable_is_distinguished_from_cancel_without_disclosing_content()
+    {
+        InputViewModel viewModel = new();
+        InputView view = new(viewModel, new ThrowingInputWorkbookPicker());
+        Window window = new() { Content = view };
+
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            await view.PickFileAsync();
+
+            TextBlock status = Required<TextBlock>(view, "PickerStatusMessage");
+            Assert.True(status.IsVisible);
+            Assert.Contains("pathを直接入力", status.Text, StringComparison.Ordinal);
+            Assert.DoesNotContain("PRIVATE", status.Text, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, viewModel.FilePath);
+            Assert.False(viewModel.HasLoadedWorkbook);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     [Fact]
     public async Task Question_mapping_add_copy_reorder_disable_delete_always_creates_a_new_draft()
     {
@@ -250,6 +348,8 @@ public sealed class InputViewTests
 
             TextBox filePath = Required<TextBox>(view, "FilePathTextBox");
             Button load = Required<Button>(view, "LoadFileButton");
+            Button pick = Required<Button>(view, "PickFileButton");
+            ComboBox headerRow = Required<ComboBox>(view, "HeaderRowComboBox");
             ScrollViewer scroll = Required<ScrollViewer>(view, "InputScrollViewer");
             ListBox suggestions = Required<ListBox>(view, "MappingSuggestionList");
             ListBox questions = Required<ListBox>(view, "InputQuestionList");
@@ -268,6 +368,9 @@ public sealed class InputViewTests
             Assert.Equal(ScrollBarVisibility.Auto, scroll.VerticalScrollBarVisibility);
             Assert.Equal("InputFilePath", AutomationProperties.GetAutomationId(filePath));
             Assert.Equal("LoadInputWorkbook", AutomationProperties.GetAutomationId(load));
+            Assert.Equal("PickInputWorkbook", AutomationProperties.GetAutomationId(pick));
+            Assert.Equal("InputHeaderRow", AutomationProperties.GetAutomationId(headerRow));
+            Assert.Equal([1, 2], headerRow.Items.Cast<int>());
             Assert.Equal("InputMappingSuggestions", AutomationProperties.GetAutomationId(suggestions));
             Assert.Equal("InputQuestionMappings", AutomationProperties.GetAutomationId(questions));
             Assert.Equal("InputValidationSummary", AutomationProperties.GetAutomationId(validation));
@@ -275,6 +378,7 @@ public sealed class InputViewTests
                 AutomationProperties.GetAutomationId(questionName),
                 AutomationProperties.GetAutomationId(primaryColumn));
             Assert.True(filePath.MinHeight >= 44d);
+            Assert.True(pick.MinHeight >= 44d);
             Assert.True(load.MinHeight >= 44d);
             Assert.Same(filePath, window.FocusManager?.GetFocusedElement());
 
@@ -347,5 +451,25 @@ public sealed class InputViewTests
             await release.Task.WaitAsync(cancellationToken);
             return await inner.LoadAsync(filePath, headerRow, cancellationToken);
         }
+    }
+
+    private sealed class ScriptedInputWorkbookPicker(params string?[] paths) : IInputWorkbookPicker
+    {
+        private readonly Queue<string?> values = new(paths);
+
+        public int CallCount { get; private set; }
+
+        public Task<string?> PickAsync(TopLevel topLevel)
+        {
+            ArgumentNullException.ThrowIfNull(topLevel);
+            CallCount++;
+            return Task.FromResult(values.Count > 0 ? values.Dequeue() : null);
+        }
+    }
+
+    private sealed class ThrowingInputWorkbookPicker : IInputWorkbookPicker
+    {
+        public Task<string?> PickAsync(TopLevel topLevel) =>
+            throw new InputWorkbookPickerPathUnavailableException();
     }
 }

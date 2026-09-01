@@ -98,7 +98,12 @@ public sealed class ConfigAndRunSheetWriterTests
 
         Assert.Equal(planned.SheetName, written.SheetName);
         Assert.Equal(planned.RoundingDigitsCell, written.RoundingDigitsCell);
-        Assert.Equal(planned.QuestionWeightCells, written.QuestionWeightCells);
+        Assert.Equal(planned.BasePointsCell, written.BasePointsCell);
+        Assert.Equal(planned.SpecialPointsCell, written.SpecialPointsCell);
+        Assert.Equal(planned.SimilarityPenaltyWeightCell, written.SimilarityPenaltyWeightCell);
+        Assert.Equal(planned.AllocationTotalCell, written.AllocationTotalCell);
+        Assert.Equal(planned.AllocationValidCell, written.AllocationValidCell);
+        Assert.Equal(planned.QuestionPointsCells, written.QuestionPointsCells);
         Assert.Equal(planned.EvaluatorWeightCells, written.EvaluatorWeightCells);
         Assert.Equal(planned.EvaluatorMinimumCells, written.EvaluatorMinimumCells);
         Assert.Equal(planned.EvaluatorMaximumCells, written.EvaluatorMaximumCells);
@@ -106,6 +111,22 @@ public sealed class ConfigAndRunSheetWriterTests
         Assert.Equal(planned.CriterionMinimumCells, written.CriterionMinimumCells);
         Assert.Equal(planned.CriterionMaximumCells, written.CriterionMaximumCells);
         Assert.Equal(planned.VerifiedCells, written.VerifiedCells);
+        FormulaSerializer serializer = new();
+        Assert.Equal(
+            planned.FormulaCells.Select(item => (
+                item.Definition.Target,
+                item.Definition.Identity,
+                Formula: serializer.Serialize(item.Definition.Expression),
+                item.CachedValue)),
+            written.FormulaCells.Select(item => (
+                item.Definition.Target,
+                item.Definition.Identity,
+                Formula: serializer.Serialize(item.Definition.Expression),
+                item.CachedValue)));
+        Assert.Equal(2, written.FormulaCells.Length);
+        Assert.Equal(
+            [written.AllocationTotalCell, written.AllocationValidCell],
+            written.FormulaCells.Select(item => item.Definition.Target));
         Assert.Equal(
             GetWorksheet(document, names.ConfigSheetName).Descendants<Row>().LongCount(),
             writer.CalculateRequiredRowCount(snapshot));
@@ -178,7 +199,7 @@ public sealed class ConfigAndRunSheetWriterTests
     {
         Worksheet worksheet = GetWorksheet(document, names.ConfigSheetName);
         Row[] rows = worksheet.Descendants<Row>().ToArray();
-        Assert.Empty(worksheet.Descendants<CellFormula>());
+        Assert.Equal(2, worksheet.Descendants<CellFormula>().Count());
         Assert.All(
             worksheet.Descendants<Cell>().Where(IsTextualCell),
             cell => Assert.Equal(CellValues.InlineString, cell.DataType?.Value));
@@ -189,8 +210,13 @@ public sealed class ConfigAndRunSheetWriterTests
         Assert.Equal("2", Text(definition, "M"));
         Assert.Equal("3", Text(definition, "N"));
         Assert.Equal("2", Text(definition, "U"));
-        Assert.Equal("3.0", Text(definition, "V"));
+        Assert.Equal("4.0", Text(definition, "V"));
         Assert.Equal(snapshot.Sha256, Text(definition, "W"));
+        Assert.Equal("60", Text(definition, "Z"));
+        Assert.Equal("10", Text(definition, "AA"));
+        Assert.Equal("0.1", Text(definition, "AB"));
+        Assert.Equal("100", CachedValue(definition, "AD"));
+        Assert.Equal("1", CachedValue(definition, "AE"));
 
         string reconstructedSnapshot = string.Concat(
             rows.Where(row => Text(row, "A") == "CANONICAL_JSON")
@@ -204,7 +230,7 @@ public sealed class ConfigAndRunSheetWriterTests
         Assert.Equal(QuestionBodyCanary, Text(question, "G"));
         Assert.Equal("G", Text(question, "O"));
         Assert.Equal("1", Text(question, "Q"));
-        Assert.Equal("3", Text(question, "R"));
+        Assert.Equal("30", Text(question, "AC"));
         Assert.Equal(["H", "K"], rows
             .Where(row => Text(row, "A") == "SUPPORTING_SOURCE" && Text(row, "D") == "Q1")
             .OrderBy(row => int.Parse(Text(row, "X"), CultureInfo.InvariantCulture))
@@ -227,16 +253,29 @@ public sealed class ConfigAndRunSheetWriterTests
         Assert.Equal("-5", Text(explicitCriterion, "S"));
         Assert.Equal("5", Text(explicitCriterion, "T"));
 
+        Row special = FindRecord(rows, "SPECIAL_EVALUATION", "S1");
+        Assert.Equal("G", Text(special, "AF"));
+        Assert.Equal("Evaluate {回答}", Text(special, "H"));
+        Assert.Equal(
+            ["K"],
+            rows.Where(row => Text(row, "A") == "SPECIAL_SUPPORTING_SOURCE" && Text(row, "D") == "S1")
+                .Select(row => Text(row, "AG")));
+
         Assert.Equal(names.ConfigSheetName, addresses.SheetName);
         AssertAddressValue(worksheet, addresses.RoundingDigitsCell, "2");
-        AssertAddressValue(worksheet, addresses.QuestionWeightCells["Q1"], "3");
+        AssertAddressValue(worksheet, addresses.BasePointsCell, "60");
+        AssertAddressValue(worksheet, addresses.SpecialPointsCell, "10");
+        AssertAddressValue(worksheet, addresses.SimilarityPenaltyWeightCell, "0.1");
+        AssertAddressValue(worksheet, addresses.AllocationTotalCell, "100");
+        AssertAddressValue(worksheet, addresses.AllocationValidCell, "1");
+        AssertAddressValue(worksheet, addresses.QuestionPointsCells["Q1"], "30");
         AssertAddressValue(worksheet, addresses.EvaluatorWeightCells["E1"], "2");
         AssertAddressValue(worksheet, addresses.CriterionWeightCells["C1"], "4");
         AssertAddressValue(worksheet, addresses.CriterionMinimumCells["C1"], "1");
         AssertAddressValue(worksheet, addresses.CriterionMaximumCells["C2"], "5");
         Assert.Equal(addresses.VerifiedCells.Count, addresses.VerifiedCells.Distinct().Count());
         Assert.All(addresses.VerifiedCells, address => Assert.Equal(names.ConfigSheetName, address.SheetName));
-        AssertReadOnly(addresses.QuestionWeightCells, "Injected", new FormulaCellAddress("Injected", "A", 1));
+        AssertReadOnly(addresses.QuestionPointsCells, "Injected", new FormulaCellAddress("Injected", "A", 1));
         IList<FormulaCellAddress> verified = Assert.IsAssignableFrom<IList<FormulaCellAddress>>(addresses.VerifiedCells);
         Assert.True(verified.IsReadOnly);
         Assert.Throws<NotSupportedException>(() => verified.Add(new FormulaCellAddress("Injected", "A", 1)));
@@ -285,6 +324,7 @@ public sealed class ConfigAndRunSheetWriterTests
         Assert.Equal("12", records["CacheReadTokenCount"].InnerText);
         Assert.Equal("6", records["CacheWriteTokenCount"].InnerText);
         Assert.Equal(names.ConfigSheetName, records["ConfigSheetName"].InnerText);
+        Assert.Equal(names.ReferencesSheetName, records["ReferencesSheetName"].InnerText);
         Assert.Equal(names.ResultsSheetName, records["ResultsSheetName"].InnerText);
         Assert.Equal(names.RunSheetName, records["RunSheetName"].InnerText);
         Assert.Equal(CellValues.Number, records["InputSizeBytes"].DataType?.Value);
@@ -377,9 +417,20 @@ public sealed class ConfigAndRunSheetWriterTests
             QuestionText = QuestionBodyCanary,
             PrimarySourceColumn = "G",
             SupportingSourceColumns = ["H", "K"],
-            Weight = 3m,
+            Points = 30m,
             Enabled = true,
             Evaluators = [enabledEvaluator],
+            SpecialEvaluations =
+            [
+                new SpecialEvaluationDefinition
+                {
+                    Id = "S1",
+                    DisplayName = "Synthetic special evaluation",
+                    PrimarySourceColumn = "G",
+                    SupportingSourceColumns = ["K"],
+                    PromptTemplate = "Evaluate {回答}",
+                },
+            ],
         };
         EvaluatorDefinition disabledEvaluator = new()
         {
@@ -409,7 +460,7 @@ public sealed class ConfigAndRunSheetWriterTests
             QuestionText = "Synthetic disabled question text",
             PrimarySourceColumn = "C",
             SupportingSourceColumns = [],
-            Weight = 5m,
+            Points = 5m,
             Enabled = false,
             Evaluators = [disabledEvaluator],
         };
@@ -422,6 +473,9 @@ public sealed class ConfigAndRunSheetWriterTests
             HeaderRow = 1,
             FirstDataRow = 2,
             LastDataRow = 3,
+            BasePoints = 60m,
+            SpecialPoints = 10m,
+            SimilarityPenaltyWeight = 0.1m,
             RoundingDigits = 2,
             Questions = [enabledQuestion, disabledQuestion],
         };
@@ -538,7 +592,7 @@ public sealed class ConfigAndRunSheetWriterTests
                 candidate.CellReference?.Value,
                 address.ColumnName + address.RowNumber.ToString(CultureInfo.InvariantCulture),
                 StringComparison.Ordinal));
-        Assert.Equal(expected, cell.InnerText);
+        Assert.Equal(expected, cell.CellFormula is null ? cell.InnerText : cell.CellValue?.InnerText);
     }
 
     private static void AssertReadOnly(
@@ -574,6 +628,9 @@ public sealed class ConfigAndRunSheetWriterTests
             Column(candidate.CellReference?.Value),
             column,
             StringComparison.Ordinal));
+
+    private static string CachedValue(Row row, string column) =>
+        Cell(row, column).CellValue?.InnerText ?? string.Empty;
 
     private static string Column(string? reference) =>
         new((reference ?? string.Empty).TakeWhile(char.IsAsciiLetter).ToArray());

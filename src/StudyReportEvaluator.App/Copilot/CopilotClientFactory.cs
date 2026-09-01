@@ -1,8 +1,11 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using GitHub.Copilot;
 
 namespace StudyReportEvaluator.App.Copilot;
@@ -12,57 +15,182 @@ public interface ICopilotCliPathResolver
     ValueTask<string?> ResolveAsync(CancellationToken cancellationToken);
 }
 
-public sealed class EnvironmentPathCopilotCliPathResolver : ICopilotCliPathResolver
+public sealed class BundledCopilotCliPathResolver : ICopilotCliPathResolver
 {
-    private static readonly string[] WindowsExecutableNames = ["copilot.exe"];
-    private static readonly string[] OtherExecutableNames = ["copilot"];
+    public const string ManifestFileName = "copilot-runtime.json";
 
-    public ValueTask<string?> ResolveAsync(CancellationToken cancellationToken)
+    private static readonly JsonSerializerOptions ManifestJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = false,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+    };
+
+    private readonly string applicationBaseDirectory;
+
+    public BundledCopilotCliPathResolver()
+        : this(AppContext.BaseDirectory)
+    {
+    }
+
+    public BundledCopilotCliPathResolver(string applicationBaseDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationBaseDirectory);
+        if (!Path.IsPathFullyQualified(applicationBaseDirectory))
+        {
+            throw new ArgumentException("The application base directory must be absolute.", nameof(applicationBaseDirectory));
+        }
+
+        this.applicationBaseDirectory = Path.GetFullPath(applicationBaseDirectory);
+    }
+
+    public async ValueTask<string?> ResolveAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        string? searchPath = Environment.GetEnvironmentVariable("PATH");
-        if (string.IsNullOrWhiteSpace(searchPath))
+        string manifestPath = Path.Combine(applicationBaseDirectory, ManifestFileName);
+        if (!File.Exists(manifestPath))
         {
-            return ValueTask.FromResult<string?>(null);
+            return null;
         }
 
-        string[] executableNames = OperatingSystem.IsWindows()
-            ? WindowsExecutableNames
-            : OtherExecutableNames;
-
-        foreach (string entry in searchPath.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        BundledCopilotManifest manifest;
+        await using (FileStream manifestStream = new(
+            manifestPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
+            }))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            string directory = entry.Trim('"');
-            if (!Path.IsPathFullyQualified(directory))
-            {
-                continue;
-            }
-
-            foreach (string executableName in executableNames)
-            {
-                try
-                {
-                    string candidate = Path.GetFullPath(Path.Combine(directory, executableName));
-                    if (File.Exists(candidate))
-                    {
-                        return ValueTask.FromResult<string?>(candidate);
-                    }
-                }
-                catch (Exception exception) when (IsInvalidPathException(exception))
-                {
-                    // Ignore malformed PATH entries. No path value is logged or retained.
-                }
-            }
+            manifest = await JsonSerializer.DeserializeAsync<BundledCopilotManifest>(
+                manifestStream,
+                ManifestJsonOptions,
+                cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidDataException("The bundled Copilot manifest is empty.");
         }
 
-        return ValueTask.FromResult<string?>(null);
+        string expectedRuntimeIdentifier = GetCurrentRuntimeIdentifier()
+            ?? throw new PlatformNotSupportedException("The current platform has no bundled Copilot runtime.");
+        string expectedRelativePath = $"runtimes/{expectedRuntimeIdentifier}/native/"
+            + (OperatingSystem.IsWindows() ? "copilot.exe" : "copilot");
+        string sdkVersion = typeof(CopilotClient).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion
+            ?? throw new InvalidDataException("The Copilot SDK informational version cannot be verified.");
+        if (manifest.SchemaVersion != 1
+            || !string.Equals(manifest.RuntimeIdentifier, expectedRuntimeIdentifier, StringComparison.Ordinal)
+            || !string.Equals(manifest.CliRelativePath, expectedRelativePath, StringComparison.Ordinal)
+            || !string.Equals(manifest.SdkVersion, sdkVersion, StringComparison.Ordinal)
+            || !CopilotRuntimeIdentity.IsSafeVersion(manifest.CliVersion)
+            || manifest.CliSha256.Length != 64
+            || manifest.CliSha256.Any(character => !Uri.IsHexDigit(character)))
+        {
+            throw new InvalidDataException("The bundled Copilot manifest is invalid.");
+        }
+
+        string cliPath = Path.GetFullPath(
+            Path.Combine(
+                applicationBaseDirectory,
+                manifest.CliRelativePath.Replace('/', Path.DirectorySeparatorChar)));
+        string relativeToBase = Path.GetRelativePath(applicationBaseDirectory, cliPath);
+        if (Path.IsPathFullyQualified(relativeToBase)
+            || relativeToBase == ".."
+            || relativeToBase.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("The bundled Copilot path escapes the application directory.");
+        }
+
+        FileInfo before = new(cliPath);
+        before.Refresh();
+        if (!before.Exists || before.Length == 0)
+        {
+            return null;
+        }
+
+        byte[] hash;
+        await using (FileStream cliStream = new(
+            cliPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
+            }))
+        {
+            hash = await SHA256.HashDataAsync(cliStream, cancellationToken).ConfigureAwait(false);
+        }
+
+        FileInfo after = new(cliPath);
+        after.Refresh();
+        string? actualVersion = ReadSafeFileVersion(cliPath);
+        if (!after.Exists
+            || before.Length != after.Length
+            || before.LastWriteTimeUtc != after.LastWriteTimeUtc
+            || !string.Equals(Convert.ToHexString(hash), manifest.CliSha256, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(actualVersion, manifest.CliVersion, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("The bundled Copilot runtime does not match its manifest.");
+        }
+
+        return cliPath;
     }
 
-    private static bool IsInvalidPathException(Exception exception) =>
-        exception is ArgumentException or NotSupportedException or PathTooLongException;
+    public override string ToString() =>
+        $"{nameof(BundledCopilotCliPathResolver)} {{ Content = <redacted> }}";
+
+    private static string? GetCurrentRuntimeIdentifier()
+    {
+        string? os = OperatingSystem.IsWindows()
+            ? "win"
+            : OperatingSystem.IsMacOS()
+                ? "osx"
+                : null;
+        string? architecture = RuntimeInformation.ProcessArchitecture switch
+        {
+            Architecture.X64 => "x64",
+            Architecture.Arm64 => "arm64",
+            _ => null,
+        };
+        return os is null || architecture is null ? null : $"{os}-{architecture}";
+    }
+
+    private static string? ReadSafeFileVersion(string path)
+    {
+        FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(path);
+        foreach (string? candidate in new[] { versionInfo.ProductVersion, versionInfo.FileVersion })
+        {
+            if (candidate is not null && CopilotRuntimeIdentity.IsSafeVersion(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private sealed record BundledCopilotManifest
+    {
+        [JsonPropertyName("schemaVersion")]
+        public int SchemaVersion { get; init; }
+
+        [JsonPropertyName("runtimeIdentifier")]
+        public required string RuntimeIdentifier { get; init; }
+
+        [JsonPropertyName("cliVersion")]
+        public required string CliVersion { get; init; }
+
+        [JsonPropertyName("cliSha256")]
+        public required string CliSha256 { get; init; }
+
+        [JsonPropertyName("sdkVersion")]
+        public required string SdkVersion { get; init; }
+
+        [JsonPropertyName("cliRelativePath")]
+        public required string CliRelativePath { get; init; }
+    }
 }
 
 public interface ICopilotClientFactory
@@ -183,7 +311,7 @@ public sealed class CopilotClientFactory : ICopilotClientFactory
     private readonly ICopilotCliPathResolver _pathResolver;
 
     public CopilotClientFactory()
-        : this(new EnvironmentPathCopilotCliPathResolver())
+        : this(new BundledCopilotCliPathResolver())
     {
     }
 

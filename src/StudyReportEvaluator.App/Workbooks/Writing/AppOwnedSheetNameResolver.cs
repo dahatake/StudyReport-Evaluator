@@ -7,17 +7,21 @@ public sealed class AppOwnedSheetNames
 {
     internal AppOwnedSheetNames(
         string configSheetName,
+        string referencesSheetName,
         string resultsSheetName,
         string runSheetName)
     {
         ConfigSheetName = configSheetName;
+        ReferencesSheetName = referencesSheetName;
         ResultsSheetName = resultsSheetName;
         RunSheetName = runSheetName;
         AllSheetNames = Array.AsReadOnly(
-            [ConfigSheetName, ResultsSheetName, RunSheetName]);
+            [ConfigSheetName, ReferencesSheetName, ResultsSheetName, RunSheetName]);
     }
 
     public string ConfigSheetName { get; }
+
+    public string ReferencesSheetName { get; }
 
     public string ResultsSheetName { get; }
 
@@ -33,6 +37,7 @@ public sealed class AppOwnedSheetNameResolver
 {
     public const int MaximumSheetNameLength = 31;
     public const string ConfigBaseName = "Quantification_Config";
+    public const string ReferencesBaseName = "Quantification_References";
     public const string ResultsBaseName = "Quantification_Results";
     public const string RunBaseName = "Quantification_Run";
 
@@ -63,9 +68,10 @@ public sealed class AppOwnedSheetNameResolver
         HashSet<string> allocated = new(existingSheetNames, StringComparer.OrdinalIgnoreCase);
 
         string config = ResolveAndReserve(ConfigBaseName, allocated);
+        string references = ResolveAndReserve(ReferencesBaseName, allocated);
         string results = ResolveAndReserve(ResultsBaseName, allocated);
         string run = ResolveAndReserve(RunBaseName, allocated);
-        return new AppOwnedSheetNames(config, results, run);
+        return new AppOwnedSheetNames(config, references, results, run);
     }
 
     public string ResolveUniqueName(string baseName, IEnumerable<string> existingSheetNames)

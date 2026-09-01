@@ -37,7 +37,7 @@ public sealed class QuantificationSnapshotTests
         {
             PrimarySourceColumn = "L",
             SupportingSourceColumns = ["A"],
-            Weight = 99m,
+            Points = 99m,
             Enabled = false,
             Evaluators =
             [
@@ -95,5 +95,48 @@ public sealed class QuantificationSnapshotTests
         Assert.Empty(snapshot.Definition.Questions[1].Evaluators);
         Assert.False(snapshot.Definition.Questions[1].SupportingSourceColumns.IsDefault);
         Assert.Empty(snapshot.Definition.Questions[1].SupportingSourceColumns);
+    }
+
+    [Fact]
+    public void Snapshot_deep_copies_special_definitions_and_binds_them_to_the_hash()
+    {
+        QuantificationDefinition source = C02TestDefinitions.CreateValid();
+        SpecialEvaluationDefinition special = new()
+        {
+            Id = "S1",
+            DisplayName = "Prompt quality",
+            PrimarySourceColumn = "G",
+            SupportingSourceColumns = ["K"],
+            PromptTemplate = "Evaluate {回答}",
+        };
+        QuantificationDefinition definition = source with
+        {
+            SpecialPoints = 10m,
+            Questions =
+            [
+                source.Questions[0] with { Points = 30m, SpecialEvaluations = [special] },
+                source.Questions[1],
+            ],
+        };
+
+        QuantificationSnapshot snapshot = QuantificationSnapshot.Create(definition);
+
+        SpecialEvaluationDefinition frozen = Assert.Single(snapshot.Definition.Questions[0].SpecialEvaluations);
+        Assert.NotSame(special, frozen);
+        Assert.Equal(["K"], frozen.SupportingSourceColumns);
+        Assert.True(snapshot.HasValidHash());
+        Assert.NotEqual(
+            snapshot.Sha256,
+            new CanonicalDefinitionSerializer().ComputeSha256(snapshot.Definition with
+            {
+                Questions =
+                [
+                    snapshot.Definition.Questions[0] with
+                    {
+                        SpecialEvaluations = [frozen with { PromptTemplate = "Changed {回答}" }],
+                    },
+                    snapshot.Definition.Questions[1],
+                ],
+            }));
     }
 }

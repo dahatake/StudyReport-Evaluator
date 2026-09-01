@@ -59,6 +59,9 @@ public sealed class QuantificationSnapshot
         Evaluators = DefinitionCollectionOperations.Normalize(question.Evaluators)
             .Select(FreezeEvaluator)
             .ToImmutableArray(),
+        SpecialEvaluations = DefinitionCollectionOperations.Normalize(question.SpecialEvaluations)
+            .Select(FreezeSpecialEvaluation)
+            .ToImmutableArray(),
     };
 
     private static EvaluatorDefinition FreezeEvaluator(EvaluatorDefinition evaluator) => evaluator with
@@ -67,4 +70,12 @@ public sealed class QuantificationSnapshot
             .Select(criterion => criterion with { })
             .ToImmutableArray(),
     };
+
+    private static SpecialEvaluationDefinition FreezeSpecialEvaluation(
+        SpecialEvaluationDefinition specialEvaluation) => specialEvaluation with
+        {
+            SupportingSourceColumns = DefinitionCollectionOperations.Normalize(
+                    specialEvaluation.SupportingSourceColumns)
+                .ToImmutableArray(),
+        };
 }

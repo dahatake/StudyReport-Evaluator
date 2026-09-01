@@ -14,6 +14,7 @@ StudyReport Evaluator は、標準 `.xlsx` の回答を読み取り、動的に�
 | 初めて利用する教員・採点者 | [はじめに](docs/getting-started.md) |
 | 機能とscoreの意味を確認する人 | [機能リファレンス](docs/features.md) |
 | Custom Promptを設計する人 | [Custom evaluatorガイド](docs/custom-evaluator-guide.md) |
+| GitHub CopilotへPromptを貼って起動したい人 | [GitHub CopilotからPromptで起動する](docs/prompt-launch.md) |
 | 情報管理・運用担当 | [データとprivacy](docs/privacy-and-data-handling.md) |
 | エラーを解決する人 | [トラブルシューティング](docs/troubleshooting.md) |
 | 要求所有者・QA | [要求定義書](docs/requirements-definition.md) |
@@ -44,16 +45,16 @@ StudyReport Evaluator は、標準 `.xlsx` の回答を読み取り、動的に�
 
 ## 教育倫理上の注意
 
-> AIによる定量値には誤りや偏りが含まれる可能性があります。利用目的に応じて結果を確認してください。
+> 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません
 
 この注意は persistent non-modal banner として表示するだけの **nonblocking** な案内です。checkbox、同意、承認、必須の人手確認を要求せず、mapping、AI実行、cancel、override、Excel計算、出力を妨げたり、score や weight を変更したりしません。ファイル形式、数値範囲、式、出力先などの技術的検証は、破損・情報漏えい・計算不能を防ぐため別途適用されます。
 
 ## 4ステップの操作
 
-1. **入力** — `.xlsx`のfull pathを入力し、sheet、見出し行、データ行、質問ごとの主回答列と補助列を選びます。現在のUIにnative file pickerはありません。
-2. **定量化設計** — Knowledge の知識ポイント、Custom Prompt、評価項目、range、criterion / evaluator / question の weight を設定し、snapshot preflightが有効であることを確認します。
-3. **実行** — Copilot CLI のログイン状態と model を確認します。開始前にCustom Prompt、Excel layout / formula、実際のselected-row request容量、model context budget、最大retry件数を検証し、immutable snapshot に固定した評価を開始します。進捗確認と cancel ができます。
-4. **結果・出力** — AI raw、任意の override、effective / normalized / aggregate preview を確認し、既存directory内の新規 `.xlsx` full pathへ出力します。Reason / Evidence / Question scoreは出力workbookで確認します。
+1. **入力** — native pickerまたは`.xlsx`のfull pathから、sheet、質問文の行1/2、回答行、通常／固有評価のsource列を選びます。
+2. **定量化設計** — Base／Special／Question points、Similarity penalty weight、Knowledge／Custom evaluator、固有評価、Imported Promptを設定し、snapshot preflightを確認します。
+3. **実行** — Copilot CLI login、model、concurrency、新規run／resume、final／partial directoryを確認して開始します。参照生成、学生行、checkpoint、finalizationの進捗とcancelを表示します。
+4. **結果** — finalまたはpartial path、QuestionEarned、SpecialEarned、SimilarityPenalty、FinalRaw、FinalScoreを確認します。必要ならoverride反映版を別名で任意出力できます。
 
 ```mermaid
 flowchart LR
@@ -63,7 +64,7 @@ flowchart LR
 	O --> X[検証済み別workbook]
 ```
 
-画面どおりの詳細手順は[はじめに](docs/getting-started.md)を参照してください。
+画面どおりの詳細手順は[はじめに](docs/getting-started.md)、GitHub Copilotへ貼る具体的な起動依頼と機械学習PBLの評価Prompt例は[GitHub CopilotからPromptで起動する](docs/prompt-launch.md)を参照してください。
 
 ## 画面プレビュー
 

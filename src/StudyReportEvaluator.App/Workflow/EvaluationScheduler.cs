@@ -149,13 +149,27 @@ public sealed record EvaluationProgress
         int total,
         int completed,
         int inFlight,
-        EvaluationProgressStatus status)
+        EvaluationProgressStatus status,
+        DurableEvaluationStage? stage = null,
+        int referenceCompleted = 0,
+        int referenceTotal = 0,
+        int rowCompleted = 0,
+        int rowTotal = 0,
+        string? detailStatusCode = null,
+        string? finalPath = null,
+        string? partialPath = null)
     {
         if (total < 0
             || completed < 0
             || completed > total
             || inFlight < 0
-            || completed + inFlight > total)
+            || completed + inFlight > total
+            || referenceCompleted < 0
+            || referenceCompleted > referenceTotal
+            || referenceTotal < 0
+            || rowCompleted < 0
+            || rowCompleted > rowTotal
+            || rowTotal < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(completed));
         }
@@ -164,6 +178,14 @@ public sealed record EvaluationProgress
         Completed = completed;
         InFlight = inFlight;
         Status = status;
+        Stage = stage;
+        ReferenceCompleted = referenceCompleted;
+        ReferenceTotal = referenceTotal;
+        RowCompleted = rowCompleted;
+        RowTotal = rowTotal;
+        DetailStatusCode = detailStatusCode;
+        FinalPath = finalPath;
+        PartialPath = partialPath;
     }
 
     public int Total { get; }
@@ -173,6 +195,22 @@ public sealed record EvaluationProgress
     public int InFlight { get; }
 
     public EvaluationProgressStatus Status { get; }
+
+    public DurableEvaluationStage? Stage { get; }
+
+    public int ReferenceCompleted { get; }
+
+    public int ReferenceTotal { get; }
+
+    public int RowCompleted { get; }
+
+    public int RowTotal { get; }
+
+    public string? DetailStatusCode { get; }
+
+    public string? FinalPath { get; }
+
+    public string? PartialPath { get; }
 
     public string StatusCode => Status switch
     {
@@ -264,6 +302,7 @@ public sealed class EvaluationScheduler
     private readonly IEvaluationRunner runner;
     private readonly SafeEvaluationPayloadBuilder payloadBuilder;
     private readonly QuantificationResultValidator resultValidator;
+    private readonly EvaluationRequestCapacityValidator requestCapacityValidator;
 
     public EvaluationScheduler(
         IEvaluationRowSource rowSource,
@@ -273,6 +312,7 @@ public sealed class EvaluationScheduler
         this.runner = runner ?? throw new ArgumentNullException(nameof(runner));
         payloadBuilder = new SafeEvaluationPayloadBuilder();
         resultValidator = new QuantificationResultValidator();
+        requestCapacityValidator = new EvaluationRequestCapacityValidator();
     }
 
     /// <summary>
@@ -443,6 +483,32 @@ public sealed class EvaluationScheduler
             return RuntimeFailure(item);
         }
 
+        return await ExecuteItemAsync(
+            plan,
+            item,
+            row,
+            modelId,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    internal async Task<EvaluationUnitResult> ExecuteItemAsync(
+        EvaluationPlan plan,
+        EvaluationPlanItem item,
+        EvaluationRowData row,
+        string modelId,
+        CancellationToken cancellationToken,
+        int? maximumPromptTokens = null,
+        int? maximumContextWindowTokens = null)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(row);
+        ArgumentException.ThrowIfNullOrWhiteSpace(modelId);
+        if (row.SourceRowNumber != item.SourceRowNumber)
+        {
+            return RuntimeFailure(item);
+        }
+
         Dictionary<string, string?> selectedCells = new(StringComparer.OrdinalIgnoreCase);
         foreach (string column in item.SelectedSourceColumns)
         {
@@ -486,6 +552,13 @@ public sealed class EvaluationScheduler
         if (cancellationToken.IsCancellationRequested)
         {
             return Cancelled(item, scorable: true, scorableKnown: true);
+        }
+
+        if (maximumPromptTokens is int promptLimit
+            && maximumContextWindowTokens is int contextLimit
+            && !requestCapacityValidator.Validate(payload, promptLimit, contextLimit).IsValid)
+        {
+            return Failure(item, ResultsStatusCodes.AiOutputInvalid, scorable: true);
         }
 
         EvaluationRunnerResult runnerResult;

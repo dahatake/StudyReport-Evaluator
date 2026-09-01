@@ -158,6 +158,7 @@ public sealed class SyntheticQuantificationJourneyTests
         string outputPath = Path.Combine(workbook.RootDirectory, "synthetic-e01-output.xlsx");
         Assert.False(File.Exists(outputPath));
         AppOwnedSheetNames sheetNames;
+        ConfigCellAddressMap configCells;
         ResultsSheetWriteResult resultsWrite;
         string temporaryPath;
         using (WorkingPackage package = WorkingPackage.Create(workbook.Path, outputPath))
@@ -166,10 +167,23 @@ public sealed class SyntheticQuantificationJourneyTests
             using (SpreadsheetDocument document = package.OpenForEditing())
             {
                 sheetNames = new AppOwnedSheetNameResolver().Resolve(document);
-                ConfigCellAddressMap configCells = new ConfigSheetWriter().Write(
+                configCells = new ConfigSheetWriter().Write(
                     document,
                     preparation.Snapshot,
                     sheetNames);
+                new ReferenceAnswersSheetWriter().Write(
+                    document,
+                    preparation.Snapshot,
+                    sheetNames,
+                    preparation.Snapshot.Definition.Questions
+                        .Where(question => question.Enabled)
+                        .Select(question => new ReferenceAnswerSheetRow
+                        {
+                            QuestionId = question.Id,
+                            ModelId = "auto",
+                            StatusCode = ResultsStatusCodes.AiRuntimeFailed,
+                            GeneratedAtUtc = summary.EndedAtUtc,
+                        }));
                 resultsWrite = new ResultsSheetWriter().Write(
                     document,
                     preparation.Snapshot,
@@ -183,9 +197,10 @@ public sealed class SyntheticQuantificationJourneyTests
             }
 
             Assert.Equal(530, resultsWrite.DataRowCount);
-            Assert.Equal(35, resultsWrite.ColumnCount);
-            Assert.Equal(5_830, resultsWrite.FormulaCells.Length);
-            ImmutableArray<ExpectedFormulaCell> expectedFormulas = resultsWrite.FormulaCells
+            Assert.Equal(53, resultsWrite.ColumnCount);
+            Assert.Equal(10_600, resultsWrite.FormulaCells.Length);
+            ImmutableArray<ExpectedFormulaCell> expectedFormulas = configCells.FormulaCells
+                .Concat(resultsWrite.FormulaCells)
                 .Select(cell => new ExpectedFormulaCell(cell.Definition, cell.CachedValue))
                 .ToImmutableArray();
             OutputPackageValidationPlan validationPlan = OutputPackageValidationPlan.Capture(
@@ -237,6 +252,7 @@ public sealed class SyntheticQuantificationJourneyTests
             HeaderRow = SyntheticWorkbookFactory.HeaderRow,
             FirstDataRow = SyntheticWorkbookFactory.FirstDataRow,
             LastDataRow = SyntheticWorkbookFactory.LastDataRow,
+            BasePoints = 95m,
             RoundingDigits = 2,
             Questions =
             [
@@ -247,7 +263,7 @@ public sealed class SyntheticQuantificationJourneyTests
                     QuestionText = "=SYNTHETIC KNOWLEDGE QUESTION",
                     PrimarySourceColumn = "F",
                     SupportingSourceColumns = ["H"],
-                    Weight = 3m,
+                    Points = 3m,
                     Evaluators =
                     [
                         new EvaluatorDefinition
@@ -316,7 +332,7 @@ public sealed class SyntheticQuantificationJourneyTests
                     QuestionText = "+SYNTHETIC PROMPT QUESTION",
                     PrimarySourceColumn = "J",
                     SupportingSourceColumns = ["K"],
-                    Weight = 2m,
+                    Points = 2m,
                     Evaluators =
                     [
                         new EvaluatorDefinition
@@ -356,7 +372,7 @@ public sealed class SyntheticQuantificationJourneyTests
                     QuestionText = "SYNTHETIC disabled question",
                     PrimarySourceColumn = "I",
                     SupportingSourceColumns = [],
-                    Weight = 29m,
+                    Points = 29m,
                     Enabled = false,
                     Evaluators =
                     [
@@ -428,7 +444,7 @@ public sealed class SyntheticQuantificationJourneyTests
             GetWorksheet(document, SyntheticWorkbookFactory.SourceSheetName).OuterXml);
 
         Worksheet config = GetWorksheet(document, sheetNames.ConfigSheetName);
-        Assert.Empty(config.Descendants<CellFormula>());
+        Assert.Equal(2, config.Descendants<CellFormula>().Count());
         Row[] configRows = config.Descendants<Row>().ToArray();
         string reconstructedSnapshot = string.Concat(
             configRows
@@ -452,9 +468,9 @@ public sealed class SyntheticQuantificationJourneyTests
 
         Worksheet results = GetWorksheet(document, sheetNames.ResultsSheetName);
         Dictionary<string, string> headers = ReadHeaders(results);
-        Assert.Equal(35, headers.Count);
+        Assert.Equal(53, headers.Count);
         Assert.Equal(531, results.Descendants<Row>().Count());
-        Assert.Equal(5_830, results.Descendants<CellFormula>().Count());
+        Assert.Equal(10_600, results.Descendants<CellFormula>().Count());
         Assert.DoesNotContain(headers.Keys, header =>
             header.Contains("DISABLED", StringComparison.Ordinal));
 
@@ -462,12 +478,12 @@ public sealed class SyntheticQuantificationJourneyTests
         AssertNumericResult(results, headers, "Q-KNOW.E-KNOW.C-KNOW-INHERITED.Effective_Raw", 2, 8.5m, formula: true);
         AssertNumericResult(results, headers, "Q-KNOW.E-KNOW.C-KNOW-INHERITED.Normalized", 2, 85m, formula: true);
         AssertNumericResult(results, headers, "Q-KNOW.E-KNOW.Evaluator_Score", 2, 73.33m, formula: true);
-        AssertNumericResult(results, headers, "Q-KNOW.Question_Score", 2, 73.33m, formula: true);
+        AssertNumericResult(results, headers, "Q-KNOW.Question_Normalized", 2, 73.33m, formula: true);
         AssertNumericResult(results, headers, "Q-PROMPT.E-CUSTOM.C-CUSTOM.Override", 3, 1.5m, formula: false);
         AssertNumericResult(results, headers, "Q-PROMPT.E-CUSTOM.C-CUSTOM.Effective_Raw", 3, 1.5m, formula: true);
         AssertNumericResult(results, headers, "Q-PROMPT.E-CUSTOM.C-CUSTOM.Normalized", 3, 87.5m, formula: true);
-        AssertNumericResult(results, headers, ResultsSheetWriter.OverallScoreHeader, 2, 59m, formula: true);
-        AssertNumericResult(results, headers, ResultsSheetWriter.OverallScoreHeader, 3, 67.5m, formula: true);
+        AssertBlankFormula(CellByHeader(results, headers, ResultsSheetWriter.FinalScoreHeader, 2));
+        AssertBlankFormula(CellByHeader(results, headers, ResultsSheetWriter.FinalScoreHeader, 3));
 
         for (int sourceRow = 2; sourceRow <= 5; sourceRow++)
         {
@@ -520,18 +536,20 @@ public sealed class SyntheticQuantificationJourneyTests
         AssertBlankFormula(CellByHeader(
             results,
             headers,
-            "Q-KNOW.Question_Score",
+            "Q-KNOW.Question_Normalized",
             blankRow));
         AssertBlankFormula(CellByHeader(
             results,
             headers,
-            "Q-PROMPT.Question_Score",
+            "Q-PROMPT.Question_Normalized",
             blankRow));
-        AssertBlankFormula(CellByHeader(
+        AssertNumericResult(
             results,
             headers,
-            ResultsSheetWriter.OverallScoreHeader,
-            blankRow));
+            ResultsSheetWriter.FinalScoreHeader,
+            blankRow,
+            95m,
+            formula: true);
         Assert.All(results.Descendants<Cell>().Where(cell => cell.CellFormula is not null), cell =>
         {
             Assert.False(cell.CellFormula!.Text?.StartsWith('=') == true);
@@ -550,6 +568,7 @@ public sealed class SyntheticQuantificationJourneyTests
         Assert.Equal(expectedPlanCount.ToString(CultureInfo.InvariantCulture), runRecords["CompletedEvaluationCount"].InnerText);
         Assert.Equal("0", runRecords["ErrorCount"].InnerText);
         Assert.Equal(sheetNames.ConfigSheetName, runRecords["ConfigSheetName"].InnerText);
+        Assert.Equal(sheetNames.ReferencesSheetName, runRecords["ReferencesSheetName"].InnerText);
         Assert.Equal(sheetNames.ResultsSheetName, runRecords["ResultsSheetName"].InnerText);
         Assert.Equal(sheetNames.RunSheetName, runRecords["RunSheetName"].InnerText);
         Assert.StartsWith("DocumentFormat.OpenXml/3.5.1", runRecords["OpenXmlSdkIdentity"].InnerText, StringComparison.Ordinal);

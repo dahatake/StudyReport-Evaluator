@@ -272,8 +272,9 @@ public sealed class ResultsOutputViewTests
         Workbook outputWorkbook = outputPart.Workbook
             ?? throw new InvalidDataException("The output workbook root is missing.");
         Sheet[] sheets = outputWorkbook.Descendants<Sheet>().ToArray();
-        Assert.Equal(4, sheets.Length);
+        Assert.Equal(5, sheets.Length);
         Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.ConfigBaseName);
+        Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.ReferencesBaseName);
         Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.ResultsBaseName);
         Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.RunBaseName);
         Assert.NotEmpty(outputPart.WorksheetParts.SelectMany(part =>
