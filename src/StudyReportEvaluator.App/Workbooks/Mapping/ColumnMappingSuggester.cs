@@ -222,8 +222,11 @@ public sealed class ColumnMappingSuggester
         uint headerRow,
         WorksheetMetadata worksheet)
     {
-        CandidateDraft[] drafts = worksheet.HeaderCells
+        CandidateDraft[] allDrafts = worksheet.HeaderCells
             .Select(header => CreateCandidateDraft(header))
+            .OrderBy(candidate => candidate.ColumnIndex)
+            .ToArray();
+        CandidateDraft[] drafts = InferPromptCompanionAnswers(allDrafts)
             .Where(candidate => candidate.Roles != ColumnMappingCandidateRole.None)
             .OrderBy(candidate => candidate.ColumnIndex)
             .ToArray();
@@ -285,7 +288,8 @@ public sealed class ColumnMappingSuggester
                 header.ColumnIndex,
                 header.ColumnName,
                 ColumnMappingCandidateRole.None,
-                IsPromptContextSupport: false);
+                IsPromptContextSupport: false,
+                CanBePromptCompanionAnswer: false);
         }
 
         bool hasPrompt = normalized.Contains("prompt", StringComparison.Ordinal)
@@ -322,7 +326,31 @@ public sealed class ColumnMappingSuggester
             header.ColumnIndex,
             header.ColumnName,
             roles,
-            IsPromptContextSupport: isSupporting && hasPrompt);
+            IsPromptContextSupport: isSupporting && hasPrompt,
+            CanBePromptCompanionAnswer: roles == ColumnMappingCandidateRole.None);
+    }
+
+    private static IReadOnlyList<CandidateDraft> InferPromptCompanionAnswers(
+        IReadOnlyList<CandidateDraft> candidates)
+    {
+        CandidateDraft[] inferred = candidates.ToArray();
+        for (int index = 1; index < inferred.Length; index++)
+        {
+            CandidateDraft prompt = inferred[index];
+            CandidateDraft companion = inferred[index - 1];
+            bool isStudentPrompt = (prompt.Roles & ColumnMappingCandidateRole.StudentPromptPrimary) != 0;
+            if (isStudentPrompt
+                && companion.CanBePromptCompanionAnswer
+                && prompt.ColumnIndex == companion.ColumnIndex + 1)
+            {
+                inferred[index - 1] = companion with
+                {
+                    Roles = ColumnMappingCandidateRole.PrimaryAnswer,
+                };
+            }
+        }
+
+        return inferred;
     }
 
     private static Dictionary<uint, List<string>> PairPromptSupportingColumns(
@@ -478,5 +506,6 @@ public sealed class ColumnMappingSuggester
         uint ColumnIndex,
         string ColumnName,
         ColumnMappingCandidateRole Roles,
-        bool IsPromptContextSupport);
+        bool IsPromptContextSupport,
+        bool CanBePromptCompanionAnswer);
 }

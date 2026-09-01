@@ -81,6 +81,50 @@ public sealed class ColumnMappingSuggesterTests
     }
 
     [Fact]
+    public void Student_prompt_semantics_infer_the_adjacent_unclassified_answer_at_arbitrary_columns()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
+            "Responses",
+            headerRow: 3,
+            lastRow: 12,
+            lastColumn: 22,
+            new X02Header(20, "Course-specific long response field"),
+            new X02Header(21, "Student Prompt"),
+            new X02Header(22, "Prompt rationale and viewpoint"));
+
+        WorksheetMappingSuggestion suggestion = Assert.IsType<WorksheetMappingSuggestion>(
+            suggester.Suggest(reader.Read(workbook.Path, 3)).SuggestedWorksheet);
+
+        AssertRoles(suggestion, "T", ColumnMappingCandidateRole.PrimaryAnswer);
+        ColumnMappingCandidate prompt = AssertRoles(
+            suggestion,
+            "U",
+            ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.StudentPromptPrimary);
+        Assert.Equal(["V"], prompt.SuggestedSupportingColumns);
+    }
+
+    [Fact]
+    public void Management_header_before_a_student_prompt_is_never_inferred_as_an_answer()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
+            "Responses",
+            headerRow: 1,
+            lastRow: 4,
+            lastColumn: 4,
+            new X02Header(2, "Email address"),
+            new X02Header(3, "Student Prompt"));
+
+        WorksheetMappingSuggestion suggestion = Assert.IsType<WorksheetMappingSuggestion>(
+            suggester.Suggest(reader.Read(workbook.Path)).SuggestedWorksheet);
+
+        Assert.DoesNotContain(suggestion.Candidates, candidate => candidate.ColumnName == "B");
+        AssertRoles(
+            suggestion,
+            "C",
+            ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.StudentPromptPrimary);
+    }
+
+    [Fact]
     public void Sample_positions_and_Original_name_alone_do_not_force_unknown_headers()
     {
         using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
