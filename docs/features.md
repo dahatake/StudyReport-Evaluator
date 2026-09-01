@@ -11,7 +11,9 @@
 | 動的question / evaluator / criterion | 実装済み | [`QuantificationDesignViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/QuantificationDesignViewModel.cs#L594-L793) |
 | Knowledge / Custom Prompt | 実装済み。Knowledgeのsemantic coreはapp-owned | [`BuiltInPromptTemplates.cs`](../src/StudyReportEvaluator.Core/Prompting/BuiltInPromptTemplates.cs) |
 | immutable run snapshot | 実装済み | [`QuantificationSnapshot.cs`](../src/StudyReportEvaluator.Core/Domain/QuantificationSnapshot.cs) |
-| Copilot result schema / single tool | fake transportとschema testで実装確認。live smokeは`NOT_RUN` | [`EvaluationSchemaFactory.cs`](../src/StudyReportEvaluator.App/Copilot/EvaluationSchemaFactory.cs)、[`traceability.md`](../docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute) |
+| run開始前capacity preflight | Prompt、Config / Results layout、formula、実selected-row request、model 80% budget、retry込み20,000 attemptsを検査 | [`WorkbookExecutionPreflight.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/WorkbookExecutionPreflight.cs)、[`EvaluationRequestCapacityValidator.cs`](../src/StudyReportEvaluator.App/Copilot/EvaluationRequestCapacityValidator.cs) |
+| Copilot result schema / single tool | required fake transport/schema testに加え、固定合成payloadのoptional live smoke `PASS`。実データ品質の証明ではない | [`EvaluationSchemaFactory.cs`](../src/StudyReportEvaluator.App/Copilot/EvaluationSchemaFactory.cs)、[`traceability.md`](../docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute) |
+| token usage数値 | SDKが観測できたunitだけrun全体へ集計し、Run sheetへ保存 | [`EphemeralEvaluationRunner.cs`](../src/StudyReportEvaluator.App/Copilot/EphemeralEvaluationRunner.cs)、[`RunSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/RunSheetWriter.cs) |
 | raw → normalized → 3階層aggregate | Core previewとExcel formulaを実装 | [`WeightedScoreCalculator.cs`](../src/StudyReportEvaluator.Core/Scoring/WeightedScoreCalculator.cs)、[`FormulaExpression.cs`](../src/StudyReportEvaluator.Core/Formulas/FormulaExpression.cs) |
 | partial result after cancel | 実装済み | [`RunSummary.cs`](../src/StudyReportEvaluator.App/Workflow/RunSummary.cs#L117-L151) |
 | atomic separate output | 実装済み。既存fileは上書きしない | [`AtomicOutputCommitter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/AtomicOutputCommitter.cs) |
@@ -94,7 +96,7 @@ flowchart TD
 ## 非保証
 
 - KnowledgeのPromptは意味内容を評価するよう指示しますが、live AIの教育的品質を実証していません。
-- cached valueはCore previewであり、外部Excel／LibreOfficeが再計算した証拠ではありません。
+- cached valueのrequired根拠はCore previewです。加えて登録済みMicrosoft Excelによる固定合成workbookのoptional再計算smokeは`PASS`しましたが、全workbookや全環境を保証しません。
 - warningは確認を促す表示であり、mandatory human reviewや組織承認の代替ではありません。
 
 証跡: [`traceability.md`](../docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute)、[要求定義書 §15](requirements-definition.md#15-scope)。

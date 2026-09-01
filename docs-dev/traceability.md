@@ -13,9 +13,9 @@
 | Initial platform | Windows 11 x64 |
 | Required runtime input | standard response `.xlsx` 1 file |
 | Production projects / test projects | 2 / 2 |
-| Current implementation evidence | **GATE_ACCEPTANCE_RECORDED_WITH_POST_GATE_GAPS_OPEN** |
+| Current implementation evidence | **POST_GATE_GAPS_CLOSED_REQUIRED_CHECKS_PASS_PENDING_RECORD** |
 | Final gate | **PASS recorded for HEAD `62581a3` in generated evidence** |
-| Post-gate conformance audit | `IMPL-GAP-001` / `IMPL-GAP-002` open |
+| Post-gate conformance audit | `IMPL-GAP-001` / `IMPL-GAP-002` closed at `69e4b99` |
 | Supersedes | B-04の実装前 `PLANNED` / `PENDING_GATE` progress snapshot |
 | Record date | 2026-09-01 |
 
@@ -29,6 +29,7 @@
 | `PASS_REQUIRED_OPTIONAL_NOT_RUN` | Required fake/oracle testはPASS。関連するoptional advisory smokeは明示的に`NOT_RUN`で、required PASSへ算入していない。 |
 | `PENDING_FINAL_GATE` | E-TRまでのrequired evidenceは揃ったが、後続のGATE-ACCEPTANCE自体はまだ実行していない。 |
 | `PASS_RECORDED_POST_GATE_GAP_OPEN` | Gate-time required checksはPASSしたが、後続監査で未解決のrequirement conformance gapを確認した。新しいfinal acceptanceにはgap closureと再評価が必要。 |
+| `CLOSED_PENDING_NEW_ACCEPTANCE` | post-gate gapのcode/test closureと独立レビューは完了。文書同期と全required rerun後の新gate recordを待つ。 |
 | `PROHIBITED_BY_CURRENT_SCOPE` | 現要求と矛盾する旧behaviorであり、negative testで不在を確認する。 |
 | `NOT_REQUIRED` | 初版scope外。提供、承認、検証、普遍的な不要性を意味しない。 |
 
@@ -79,8 +80,10 @@
 | D-01 | PASS | `10576398fb02c54d01f2811b87222a76ea43c039` | documentation 9/9; solution 452/452; generated review record promotion-safe; unsupported screenshot/quality/signing/platform claims absent |
 | E-TR | PASS | `62581a3081f94ee9da7ec0585c17046cfe1223df` | final AC/TR/surface mapping committed |
 | GATE-ACCEPTANCE | PASS at gate time | generated `artifacts/test/gate-acceptance.json`; evaluation HEAD `62581a3081f94ee9da7ec0585c17046cfe1223df` | 452/452、required not-run 0、independent review promotion-safe |
-| Post-gate documentation/conformance audit | PASS_RECORDED_POST_GATE_GAP_OPEN | [`implementation-status.md`](implementation-status.md) | IMPL-GAP-001 / 002を新規確認。gate artifactはhistoryとして不変 |
-| Documentation refresh validation | PASS | current working tree、2026-09-01 | 文書契約test 2件とvisual documentation test 1件をpost-gate追加後、Release build、solution 455/455、failed 0、skipped 0。new gateではない |
+| Post-gate documentation/conformance audit | PASS_RECORDED_POST_GATE_GAP_OPEN | [`implementation-status.md`](implementation-status.md) | IMPL-GAP-001 / 002を新規確認。旧gate artifactはhistoryとして不変 |
+| Documentation refresh validation | PASS | `71e9d61`、2026-09-01 | 文書契約test 2件とvisual documentation test 1件をpost-gate追加後、Release build、solution 455/455、failed 0、skipped 0。new gateではない |
+| IMPL-GAP-001 / 002 closure | CLOSED_PENDING_NEW_ACCEPTANCE | `69e4b992711c243fe7c70b0defff5e6abf03865c` | Prompt fail-fast、shared workbook/formula dry-run、actual-row request / model / attempt admission、numeric usage、package docs。全非文書test 473/473、independent review blocker/high 0 |
+| Current required validation | PASS_PENDING_GENERATED_RECORD | current documentation candidate、2026-09-01 | locked restore、Release build、solution 485/485、failed 0、skipped 0、optional opt-inなし |
 
 ## Acceptance criteria mapping
 
@@ -104,7 +107,7 @@
 
 ## Mandatory requirement surfaces
 
-次表はgate-time evidenceを保持する。post-gate auditでintegration timing差分が判明したsurfaceは、単体／export-time PASSとopen gapを同じrowへ併記する。
+次表はgate-time evidenceを保持し、post-gate auditで判明したintegration timing差分にはclosure commit `69e4b99`のrun-admission evidenceを追記する。
 
 | Requirement surface | Passing verification | Result |
 |---|---|---|
@@ -113,11 +116,11 @@
 | Ordered dynamic hierarchy and enabled minima | `DefinitionCollectionTests`; `QuantificationDefinitionValidatorTests`; `QuantificationDesignViewTests` | PASS_REQUIRED |
 | Immutable canonical run snapshot and draft isolation | `QuantificationSnapshotTests`; `CanonicalDefinitionSerializerTests`; `QuantificationOrchestratorTests.Mid_run_draft_replacement_cannot_change_current_payload_validation_override_or_formula_layout_contract` | PASS_REQUIRED |
 | Knowledge app-owned semantic instruction | `BuiltInPromptTemplatesTests`; `SafeEvaluationPayloadBuilderTests`; `QuantificationDesignViewTests` | PASS_REQUIRED |
-| Custom Prompt six placeholders and opaque insertion | `PromptTemplateRendererTests`; `SafeEvaluationPayloadBuilderTests`; `QuantificationDesignViewTests` | PASS_REQUIRED at renderer / Design; `IMPL-GAP-001` open at run admission |
+| Custom Prompt six placeholders and opaque insertion | `PromptTemplateRendererTests`; `QuantificationDefinitionValidatorTests`; `SafeEvaluationPayloadBuilderTests`; `QuantificationDesignViewTests`; `ExecutionViewTests`; `QuantificationOrchestratorTests` | PASS_REQUIRED — Design、Execution、snapshot creationで同一検証。invalid時input / row / runner 0 |
 | Closed AI criterion result and same-row evidence binding | `QuantificationResultValidatorTests`; `EvaluationSchemaFactoryTests`; `SubmitQuantificationToolTests` | PASS_REQUIRED |
 | Three-level weights and rounded-child aggregate | `WeightedScoreCalculatorTests`; `FormulaSerializerTests`; `ResultsSheetWriterTests`; E-01 | PASS_REQUIRED |
 | Scorable/blank/override semantics | `WeightedScoreCalculatorTests`; `ResultsSheetWriterTests`; `QuantificationOrchestratorTests`; `ResultsOutputViewTests` | PASS_REQUIRED |
-| Formula allowlist/ref/DAG/length/function/column preflight | `FormulaSerializerTests`; `FormulaPreflightValidatorTests`; `OutputPackageValidatorTests` | PASS_REQUIRED at export; `IMPL-GAP-002` open at run admission |
+| Formula allowlist/ref/DAG/length/function/column preflight | `FormulaSerializerTests`; `FormulaPreflightValidatorTests`; `WorkbookExecutionPreflightTests`; `ConfigAndRunSheetWriterTests`; `OutputPackageValidatorTests` | PASS_REQUIRED at run admission and export — same layout / AST / validator |
 | Cached preview and Office-independent required tests | `FormulaCellWriterTests`; `ResultsSheetWriterTests`; `OutputPackageValidatorTests`; E-01/P-01 | PASS_REQUIRED_OPTIONAL_NOT_RUN — external recalculation is `NOT_RUN` |
 | Unique Config/Results/Run sheets and preserved originals | `AppOwnedSheetNameResolverTests`; `ConfigAndRunSheetWriterTests`; `ResultsSheetWriterTests`; E-01 | PASS_REQUIRED |
 | Target-local temp、reopen validation、input recheck、atomic rename | `WorkingPackageTests`; `OutputPackageValidatorTests`; `AtomicOutputCommitterFaultTests`; E-01/E-02 | PASS_REQUIRED |
@@ -125,7 +128,7 @@
 | Selected-source capability and no-content logging | `SafeEvaluationPayloadBuilderTests`; `QuantificationResultValidatorTests`; `CapabilityBoundaryTests`; `SafeLoggerCanaryTests`; `HostileInputAndFailureTests` | PASS_REQUIRED |
 | Persistent warning with zero processing dependency | `EthicsWarningTests`; `MainWindowTests`; `PrimaryJourneyAccessibilityTests`; GATE-APP negative checks | PASS_REQUIRED |
 | Four-step keyboard/focus/200% UI and dynamic editor | `MainWindowTests`; `InputViewTests`; `QuantificationDesignViewTests`; `ExecutionViewTests`; `ResultsOutputViewTests`; `PrimaryJourneyAccessibilityTests` | PASS_REQUIRED |
-| Limits、Windows E2E、publish/package、documentation | boundary/unit tests; `SyntheticSpecificationContractTests`; E-01/E-02; `WindowsPublishPackageTests`; `DocumentationContractTests` | PASS_REQUIRED for tested boundaries; `IMPL-GAP-002` open for pre-run aggregate capacity |
+| Limits、Windows E2E、publish/package、documentation | boundary/unit tests; `SyntheticSpecificationContractTests`; `EvaluationRequestCapacityValidatorTests`; `WorkbookExecutionPreflightTests`; E-01/E-02; `WindowsPublishPackageTests`; `DocumentationContractTests` | PASS_REQUIRED — pre-run request 65,536 scalars、model 80%、attempt 20,000、Excel/formula capacityを含む |
 
 ## Test requirement mapping
 
@@ -134,11 +137,11 @@
 | TR-01 sample identity/sheet/dimension/header-role suggestions | B-02 profile; `WorkbookMetadataReaderTests`; `ColumnMappingSuggesterTests`; `SampleWorkbookStructuralTests` | PASS_REQUIRED |
 | TR-02 dynamic 1/2/10 questions、1/2/5 evaluators、1/4/20 criteria | `SyntheticSpecificationContractTests.Definition_matrix_builds_all_27_dynamic_shapes_as_valid_deterministic_snapshots`; definition/UI collection and enabled-minimum tests | PASS_REQUIRED |
 | TR-03 Knowledge points/semantic instruction/schema | `BuiltInPromptTemplatesTests`; `SafeEvaluationPayloadBuilderTests`; `EvaluationSchemaFactoryTests`; design UI tests | PASS_REQUIRED |
-| TR-04 Custom arbitrary primary/Prompt/brace/supporting | `PromptTemplateRendererTests`; `SafeEvaluationPayloadBuilderTests`; mapping tests; E-01 J/K path | PASS_REQUIRED at renderer / valid journey; `IMPL-GAP-001` open for invalid-Prompt run admission |
+| TR-04 Custom arbitrary primary/Prompt/brace/supporting | `PromptTemplateRendererTests`; `QuantificationDefinitionValidatorTests`; `SafeEvaluationPayloadBuilderTests`; `QuantificationOrchestratorTests`; mapping tests; E-01 J/K path | PASS_REQUIRED — invalid Promptはinput capture / row read / runner前に拒否 |
 | TR-05 range/weight/override/blank/midpoint hand calculation | `WeightedScoreCalculatorTests`; `SyntheticSpecificationContractTests.Result_oracles_match_the_independent_hand_calculation_contract`; writer/orchestrator override tests | PASS_REQUIRED |
 | TR-06 criterion→evaluator→question→overall formula/cached/blank | `FormulaSerializerTests`; `FormulaCellWriterTests`; `ResultsSheetWriterTests`; `OutputPackageValidatorTests`; E-01 reopen/cached oracle | PASS_REQUIRED |
 | TR-07 empty/invalid AI/auth/network/cancel/input/output failures | definition/result validators; Copilot auth/runner/retry tests; orchestrator cancellation/input-drift tests; atomic/output validation tests; `HostileInputAndFailureTests` | PASS_REQUIRED |
-| TR-08 formula injection/external/cycle/formula/cell limits | `FormulaSerializerTests`; `FormulaPreflightValidatorTests`; `UntrustedStringCellWriterTests`; `FileFormatClassifierTests`; `OutputPackageValidatorTests`; `HostileInputAndFailureTests` | PASS_REQUIRED at writer/export; `IMPL-GAP-002` open for pre-run capacity integration |
+| TR-08 formula injection/external/cycle/formula/cell limits | `FormulaSerializerTests`; `FormulaPreflightValidatorTests`; `WorkbookExecutionPreflightTests`; `UntrustedStringCellWriterTests`; `FileFormatClassifierTests`; `OutputPackageValidatorTests`; `HostileInputAndFailureTests` | PASS_REQUIRED at run admission and writer/export |
 | TR-09 input identity/copy preservation/atomic faults | `InputSnapshotServiceTests`; `WorkingPackageTests`; `AtomicOutputCommitterFaultTests`; E-01/E-02 | PASS_REQUIRED |
 | TR-10 selected source/evidence/row isolation/no-content/capability | `SafeEvaluationPayloadBuilderTests`; `QuantificationResultValidatorTests`; `SubmitQuantificationToolTests`; `CapabilityBoundaryTests`; `SafeLoggerCanaryTests`; hostile E2E | PASS_REQUIRED |
 | TR-11 warning visible and nonblocking | `EthicsWarningTests`; `MainWindowTests`; `PrimaryJourneyAccessibilityTests`; GATE-APP required check | PASS_REQUIRED |
@@ -153,25 +156,25 @@ Gate-time artifactの生成後、current documentationとproduction call pathを
 
 | Gap | Requirement surface | Production evidence | Current result |
 |---|---|---|---|
-| `IMPL-GAP-001` | Custom Prompt syntaxはrun開始前に拒否 | Designで検出するがExecution startへ未結合。payload build exceptionはunit-level `AI_RUNTIME_FAILED`。AI dispatchは行わない | OPEN |
-| `IMPL-GAP-002` | Results column / formula / request capacityはrun前に拒否 | column / formula preflightはexport時。Prompt/context/worst-case retry budgetはrun admissionへ未結合 | OPEN |
+| `IMPL-GAP-001` | Custom Prompt syntaxはrun開始前に拒否 | Core validatorをDesign / Execution / snapshotへ共有。invalid時input capture、row read、runner call 0 | CLOSED at `69e4b99` |
+| `IMPL-GAP-002` | Results column / formula / request capacityはrun前に拒否 | shared dry-run layout / formula AST、actual-row Prompt/schema、SDK model 80%、最大20,000 attemptsをAI dispatch前に検査 | CLOSED at `69e4b99` |
 
 正確なcall path、impact、closure conditionは[`implementation-status.md`](implementation-status.md)を正本とする。この追補は過去のgenerated gate artifactを書き換えず、post-gate findingとして時間順に追加する。
 
 影響するtraceability interpretation:
 
-- AC-004 / TR-04のPrompt renderer単体とDesign validationはPASSだが、run admission integrationは未完了。
-- AC-008 / TR-06 / TR-08のformula writerとexport-time rejectionはPASSだが、要求するrun前capacity timingは未完了。
-- 新しいrelease acceptanceを主張する前に、両gapのcode/test closure、全required rerun、independent reviewを必要とする。
+- AC-004 / TR-04はPrompt renderer、Core definition、Execution、orchestrator fail-fastへ接続した。
+- AC-008 / TR-06 / TR-08はformula writerと同じlayout / AST / validatorをrun admissionへ接続した。
+- 両gapのcode/test closureと独立レビューは完了。新しいrelease acceptanceを主張する前に、文書同期後の全required rerunと新generated recordを必要とする。
 
 ## Optional advisory evidence — never a required substitute
 
 | Optional evidence | Status | Required evidence that independently passed | Disposition |
 |---|---|---|---|
-| Authenticated live Copilot smoke | `NOT_RUN` | A-01〜A-03 fake authentication、schema、single-tool、retry、timeout、cancel、cleanup、capability tests | Visible advisory only; no live quality or authentication claim |
-| External spreadsheet recalculation | `NOT_RUN` | Core hand oracle、closed formula AST、cached values、Open XML reopen validation、calculation properties | Visible advisory only; no Excel/LibreOffice execution claim |
+| Authenticated live Copilot smoke | `PASS` — fixed synthetic payload、`content_data_included=false` | A-01〜A-03 fake authentication、schema、single-tool、retry、timeout、cancel、cleanup、capability tests | Visible advisory only; no real-data quality、education、fairness claim |
+| Microsoft Excel recalculation | `PASS` — fixed synthetic workbook、EffectiveRaw 5 / 4 aggregate levels 50 | Core hand oracle、closed formula AST、cached values、Open XML reopen validation、calculation properties | Visible advisory only; no all-workbook / all-environment claim |
 
-`NOT_RUN`はPASSでもfailureでもなく、required gateを決定しない。GATE-AIとGATE-EXCELのPASSはそれぞれfake runtimeとformula/cached oracleだけで決定済みである。
+optional `PASS`もrequired gateを決定しない。GATE-AIとGATE-EXCELのrequired PASSはそれぞれfake runtimeとformula/cached oracleだけで独立に決定する。
 
 ## Prohibited or non-required former behavior
 
@@ -214,12 +217,15 @@ flowchart LR
     GA --> GU
     GU --> ET[E-01 / E-02 / P-01 / D-01 / E-TR]
     ET --> GE[GATE-ACCEPTANCE PASS at 62581a3]
-    GE --> PA[Post-gate audit\nIMPL-GAP-001 / 002 OPEN]
+    GE --> PA[Post-gate audit\nIMPL-GAP-001 / 002 found]
+    PA --> CL[Gap closure 69e4b99\nCLOSED]
+    CL --> RV[Required rerun\n485 / 485 PASS]
+    RV --> NG[New generated record\npending]
 ```
 
 - AC-001〜015、18 mandatory surfaces、TR-01〜15はすべてpassing required evidenceへ接続した。
 - FoundationからD-01までのtask reviewはunresolved blocker/high 0でpromotion-safeとなった。Reviewの推測や再現しない指摘はdefectへ数えず、再現したfindingだけを修正後のrequired testで閉じた。
 - D-01完了時のRelease solution testは452/452、failed 0、skipped 0だった。この値は過去gate件数との合計ではない。
-- Optional live Copilot smokeとexternal recalculation smokeはともに`NOT_RUN`であり、required PASSへ昇格していない。
+- Optional live Copilot smokeとMicrosoft Excel recalculation smokeは固定合成データで`PASS`したが、required PASSへ昇格していない。
 - GATE-ACCEPTANCEはHEAD `62581a3`へPASSを記録した。artifactはgenerated ignored evidenceであり、commit済み証明ではない。
-- post-gate auditでIMPL-GAP-001 / 002を確認したため、これらを閉じずに同じPASSを将来releaseへ流用しない。
+- post-gate auditで確認したIMPL-GAP-001 / 002は`69e4b99`でclosedした。旧PASSは履歴として保持し、新acceptanceの代用にはしない。

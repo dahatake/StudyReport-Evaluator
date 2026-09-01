@@ -10,7 +10,7 @@ flowchart LR
     DEF[question / Prompt / criteria\nrange / IDs] --> APP
     APP -->|同一行の選択済みcell値\n+ definition / schema metadata| COPILOT[Copilot CLI / GitHub Copilot]
     COPILOT -->|criterion raw / reason / evidence / source| APP
-    APP -->|入力全体のbyte-copy\n+ Config / Results / Run| OUT[出力 .xlsx]
+    APP -->|入力全体のbyte-copy\n+ Config / Results / Run\n+ 観測済みusage数値| OUT[出力 .xlsx]
     APP -.->|本文を記録しない| LOG[code + safe dimensions only]
 ```
 
@@ -51,6 +51,8 @@ flowchart LR
 
 production loggerの項目はevent code、severity、attempt、limit、concurrency、failure category、生成session IDに限定されます。回答、Prompt、reason、evidence、path、token、credentialを受け取るfree-text parameterはありません。
 
+SDKから取得できたinput / output / reasoning / cache tokenの**件数値**はlogへ出さず、完成workbookの`Quantification_Run`へ観測unit数とともに保存します。取得不能なunitを0 tokenと断定しません。token文字列、credential、本文は保存しません。
+
 根拠: [`SafeLogger.cs`](../src/StudyReportEvaluator.App/Logging/SafeLogger.cs)、検証: [`SafeLoggerCanaryTests.cs`](../tests/StudyReportEvaluator.App.Tests/Logging/SafeLoggerCanaryTests.cs)。
 
 ## output workbookは入力と同等以上に機密
@@ -65,7 +67,7 @@ production loggerの項目はevent code、severity、attempt、limit、concurren
 - source mapping、range、weight、rounding
 - canonical definition snapshotとSHA-256
 
-`Quantification_Results`にはAI raw、override、reason、evidence、status、formulaが追加されます。
+`Quantification_Results`にはAI raw、override、reason、evidence、status、formulaが追加されます。`Quantification_Run`にはSDKが観測できたunitのtoken usage集計値が追加されます。
 
 根拠: [`WorkingPackage.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/WorkingPackage.cs#L105-L155)、[`ConfigSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/ConfigSheetWriter.cs#L129-L249)、[`ResultsSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/ResultsSheetWriter.cs#L157-L171)。
 
@@ -80,10 +82,10 @@ production loggerの項目はevent code、severity、attempt、limit、concurren
 
 アプリ固有OAuth app、client ID、client secret、PATを入力・保存しません。別途導入済みCopilot CLIのlogged-in userを使用します。根拠: [`CopilotClientFactory.cs`](../src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs#L258-L270)。
 
-## 検証できていない境界
+## optional検証と非保証境界
 
-- authenticated live Copilot smoke: `NOT_RUN`
-- external Excel / LibreOffice recalculation: `NOT_RUN`
-- AI scoreの教育的品質、公平性、法的適合性、組織policy適合性: 非保証
+- authenticated live Copilot smoke: `PASS`。固定合成payload 1件だけを使用し、実在学生データは送信していません。
+- external Microsoft Excel recalculation: `PASS`。固定合成workbookだけを使用しました。
+- 上記はrequired fake/oracle testの代替ではなく、AI scoreの教育的品質、公平性、法的適合性、組織policy適合性は引き続き非保証です。
 
 証跡: [`traceability.md`](../docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute)。

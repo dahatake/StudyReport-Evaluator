@@ -101,7 +101,7 @@ JSON schemaやtool call手順をtemplateへ追加する必要はありません�
 | `MALFORMED_PLACEHOLDER` | nested opening brace | nested braceを除去 |
 | `UNMATCHED_CLOSING_BRACE` | 単独の`}` | literalなら`}}`へ修正 |
 
-Design画面の**snapshot preflightが有効になるまでrunを開始しないでください**。現行実装ではDesign validationをExecution開始条件で再検査しない既知差分があります。[`implementation-status.md` IMPL-GAP-001](../docs-dev/implementation-status.md#impl-gap-001--custom-promptをrun開始前に再検査しない)
+Design画面の**snapshot preflightが有効になるまでrunを開始できません**。同じPrompt ownership / placeholder検証をExecutionとsnapshot作成でも再実行し、不正Promptではinput capture、row read、Copilot session、runner callを開始しません。実装状態は[`implementation-status.md`](../docs-dev/implementation-status.md)を参照してください。
 
 ## AI出力と人手確認
 

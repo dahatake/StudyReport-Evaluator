@@ -98,7 +98,7 @@ Custom evaluatorでは次の編集欄を使用します。
 | 説明 | `活用例が具体的で、説明の流れが論理的か。` | criterionの判断観点 |
 
 > [!IMPORTANT]
-> 現行実装には、Designで検出した不正Custom PromptをExecution開始条件で再検査しない既知差分があります。Designのsnapshot preflightがinvalidのまま次へ進まないでください。詳細は[実装状態 IMPL-GAP-001](../docs-dev/implementation-status.md#impl-gap-001--custom-promptをrun開始前に再検査しない)を参照してください。
+> Custom Promptのplaceholder構文はDesignだけでなく、Execution開始条件とimmutable snapshot作成時にも同じCore validatorで再検査されます。invalidのままstepを移動できてもrunは開始されず、入力本文の読取やCopilot session作成は行われません。
 
 UI根拠: [`QuantificationDesignView.axaml`](../src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml#L52-L216)、[`QuantificationDesignViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/QuantificationDesignViewModel.cs#L1187-L1261)。
 

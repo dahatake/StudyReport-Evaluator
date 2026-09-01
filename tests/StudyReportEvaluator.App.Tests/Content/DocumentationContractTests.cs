@@ -110,8 +110,10 @@ public sealed class DocumentationContractTests
             "solution tests 452件成功",
             "test runごとに再測定",
             "固定保証値ではない",
-            "optional live Copilot smoke | `NOT_RUN`",
-            "optional external recalculation smoke | `NOT_RUN`",
+            "optional live Copilot smoke | `PASS`",
+            "optional external recalculation smoke | `PASS`",
+            "固定合成payload 1件だけ",
+            "固定合成workbook",
             "合成100名 × 2設問から7枚を生成",
             "[標準xlsxのpath、sheet、行範囲を設定する入力画面](images/01-input-workbook.png)",
             "[Auto、concurrency 2、200 evaluation unitsを示す実行画面](images/05-execution-auto.png)",
@@ -120,13 +122,17 @@ public sealed class DocumentationContractTests
             "question text、criterion ID",
             "## 100名 × 2設問のトークン計画値（Auto）",
             "200 evaluation units",
-            "実測済みのexact token総数はありません",
+            "このケースの実測済みexact token総数はありません",
             "240,000",
             "480,000",
             "528,000",
             "1,440,000",
             "全unitが最大3 attempts",
             "token数自体を10%減らすという意味ではありません",
+            "Quantification_Run`へ数値だけを保存",
+            "65,536 scalars以下",
+            "model prompt/context上限の80%以内",
+            "ZIPには`RELEASE-NOTES.txt`に加えて、本`README.md`、利用者向け`docs/`、合成画面の`images/`を同梱",
             "Usage and billing",
             "Auto model selection",
             "IMPL-GAP-001",
@@ -165,10 +171,12 @@ public sealed class DocumentationContractTests
             "app-owned database と cloud backend はありません",
             "native pickerではなくfull pathのTextBox",
             "Reason / Evidence / Question scoreはworkbookだけ",
-            "IMPL-GAP-001",
-            "IMPL-GAP-002",
-            "optional live Copilot smoke は `NOT_RUN`",
-            "optional external spreadsheet recalculation smoke も `NOT_RUN`");
+            "IMPL-GAP-001 / 002",
+            "run admission",
+            "最大20,000 attempts",
+            "observed numeric usage",
+            "optional live Copilot smokeとoptional Microsoft Excel recalculation smokeは、固定合成データだけで`PASS`",
+            "required test、実在データ品質、全環境保証へ読み替えません");
     }
 
     [Fact]
@@ -214,7 +222,8 @@ public sealed class DocumentationContractTests
             "AI run開始前",
             "入力と同等以上に機密",
             "Working with formulas",
-            "現在の状態は `NOT_RUN`");
+            "advisoryなoptional smokeとして`PASS`",
+            "required oracleや全環境保証を代替しません");
     }
 
     [Fact]
@@ -255,7 +264,7 @@ public sealed class DocumentationContractTests
             "UNMATCHED_CLOSING_BRACE",
             "AIへaggregateを要求しないでください",
             "mandatory human review",
-            "IMPL-GAP-001");
+            "input capture、row read、Copilot session、runner callを開始しません");
     }
 
     [Fact]
@@ -295,8 +304,9 @@ public sealed class DocumentationContractTests
             troubleshooting,
             "100 MiB",
             "InvalidRelationship",
-            "IMPL-GAP-001",
-            "IMPL-GAP-002",
+            "REQUEST_SCALAR_LIMIT_EXCEEDED",
+            "REQUEST_CONTEXT_BUDGET_EXCEEDED",
+            "ATTEMPT_BUDGET_TOO_LARGE",
             "Excel specifications and limits");
 
         string imageManifest = Read("images/README.md");
@@ -307,6 +317,7 @@ public sealed class DocumentationContractTests
             "personal/student data: なし",
             "01-input-workbook.png",
             "07-output-export.png",
+            "retry込み最大600 attempts",
             "STUDY_REPORT_EVALUATOR_GENERATE_DOC_IMAGES");
     }
 
@@ -328,16 +339,20 @@ public sealed class DocumentationContractTests
             "## 19. Traceability summary");
         AssertContainsAll(
             implementationStatus,
-            "GATE-ACCEPTANCE record | `PASS`",
+            "Historical GATE-ACCEPTANCE record | `PASS`",
             "Documentation refresh validation | post-gateで文書契約test 2件とvisual documentation test 1件を追加後、Release build PASS、455 passed / 0 failed / 0 skipped",
-            "Post-gate conformance gaps | 2 open",
-            "## IMPL-GAP-001",
-            "## IMPL-GAP-002");
+            "Gap closure non-document validation | Release build PASS、473 passed / 0 failed / 0 skipped",
+            "Current required validation | locked restore PASS、Release build PASS、485 passed / 0 failed / 0 skipped",
+            "Post-gate conformance gaps | 0 open / 2 closed",
+            "## IMPL-GAP-001 — CLOSED",
+            "## IMPL-GAP-002 — CLOSED");
         AssertContainsAll(
             traceability,
             "PASS recorded for HEAD `62581a3`",
             "PASS_RECORDED_POST_GATE_GAP_OPEN",
-            "GATE-ACCEPTANCE PASS at 62581a3");
+            "GATE-ACCEPTANCE PASS at 62581a3",
+            "CLOSED_PENDING_NEW_ACCEPTANCE",
+            "IMPL-GAP-001 / 002 closure");
         AssertContainsAll(
             developerIndex,
             "## 現行正本",
@@ -385,8 +400,6 @@ public sealed class DocumentationContractTests
             "macOS 対応",
             "Linux 対応",
             "Windows Arm64 対応",
-            "live Copilot smoke | `PASS`",
-            "external recalculation smoke | `PASS`",
             "教育的妥当性を保証します",
             "教育的妥当性は保証済み",
             "公平性を保証します",
@@ -395,6 +408,11 @@ public sealed class DocumentationContractTests
             "法的適合性は保証済み",
             "品質を保証します",
             "品質は保証済み");
+        AssertContainsAll(
+            allDocuments,
+            "fixed synthetic payload",
+            "required substitute false",
+            "固定合成workbook");
     }
 
     private static void AssertContainsAll(string content, params string[] expectedFragments)

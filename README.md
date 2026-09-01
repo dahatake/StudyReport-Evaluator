@@ -5,7 +5,7 @@ Excel の学習レポートの採点を数値化・定量化するツールで�
 StudyReport Evaluator は、標準 `.xlsx` の回答を読み取り、動的に設定した Knowledge / Custom evaluator で評価項目ごとの数値を取得し、重み付き集計式を持つ別の `.xlsx` を作るローカルデスクトップアプリです。
 
 > [!IMPORTANT]
-> 現在の実装はHEAD `62581a3`でGATE-ACCEPTANCE `PASS`を記録していますが、後続監査でrun開始前validationの既知差分を2件確認しています。利用前に[現在の実装状態](docs-dev/implementation-status.md)を確認してください。gate artifactは再生成されるGit管理外の証跡です。
+> HEAD `62581a3`向けのGATE-ACCEPTANCEは履歴として保持されています。後続監査で確認したrun開始前validationの2件は実装commit `69e4b99`で閉じ、現在は新しい全required acceptanceを再評価中です。最新状態は[現在の実装状態](docs-dev/implementation-status.md)を確認してください。gate artifactは再生成されるGit管理外の証跡です。
 
 ## 読者別の入口
 
@@ -52,7 +52,7 @@ StudyReport Evaluator は、標準 `.xlsx` の回答を読み取り、動的に�
 
 1. **入力** — `.xlsx`のfull pathを入力し、sheet、見出し行、データ行、質問ごとの主回答列と補助列を選びます。現在のUIにnative file pickerはありません。
 2. **定量化設計** — Knowledge の知識ポイント、Custom Prompt、評価項目、range、criterion / evaluator / question の weight を設定し、snapshot preflightが有効であることを確認します。
-3. **実行** — Copilot CLI のログイン状態と model を確認し、immutable snapshot に固定した評価を開始します。進捗確認と cancel ができます。
+3. **実行** — Copilot CLI のログイン状態と model を確認します。開始前にCustom Prompt、Excel layout / formula、実際のselected-row request容量、model context budget、最大retry件数を検証し、immutable snapshot に固定した評価を開始します。進捗確認と cancel ができます。
 4. **結果・出力** — AI raw、任意の override、effective / normalized / aggregate preview を確認し、既存directory内の新規 `.xlsx` full pathへ出力します。Reason / Evidence / Question scoreは出力workbookで確認します。
 
 ```mermaid
@@ -87,7 +87,7 @@ $$
 100\ \text{名}\times 2\ \text{設問}\times 1\ \text{evaluator}=200\ \text{units}
 $$
 
-first attemptですべて成功すれば200 attemptsです。ただし、`Auto`はPromptの内容・複雑さ等からrequestごとに具体的なmodelを選ぶため、全runに共通する固定tokenizerや「1 unit = 固定token数」はありません。現在のアプリもSDKの`assistant.usage`／session usage metricsを収集・保存していないため、**実測済みのexact token総数はありません**。以下はsample回答をtoken化した実測値ではなく、capacity planning用の感度分析です。
+first attemptですべて成功すれば200 attemptsです。ただし、`Auto`はPromptの内容・複雑さ等からrequestごとに具体的なmodelを選ぶため、全runに共通する固定tokenizerや「1 unit = 固定token数」はありません。実装commit `69e4b99`以降はSDKのsession usage metricsをattemptごとに取得し、観測できた数値だけをrun全体へ集計します。まだこの100名 × 2設問をlive実行していないため、**このケースの実測済みexact token総数はありません**。以下はsample回答をtoken化した実測値ではなく、capacity planning用の感度分析です。
 
 ### 計画用の感度分析
 
@@ -111,7 +111,8 @@ $$
 - criterion数はunitsを増やしませんが、Prompt内のcriterion metadataと返却JSONが長くなるため、input / output tokensを増やします。
 - 空の主回答は`EMPTY`となりAIへdispatchしないため、そのunitのmodel tokensは0です。
 - schema不正は最大2 attempts、network / timeoutは最大3 attemptsです。200 unitsのtransient retry上限は600 attemptsです。
-- Autoで実際に選ばれたmodelとper-callの`inputTokens` / `outputTokens` / `reasoningTokens` / cache tokensはSDK usage eventで観測できますが、現行アプリはこのnumeric telemetryをRun sheetへ書きません。
+- SDKが返した`inputTokens` / `outputTokens` / `reasoningTokens` / cache read / cache write tokensは、観測できたunit数とともに`Quantification_Run`へ数値だけを保存します。SDK metricsを取得できないunitは0と断定せず、観測件数へ算入しません。
+- request admissionはapp-owned Prompt、JSON schema、tool contractのUnicode scalar数とUTF-8 byte数を測定し、65,536 scalars以下かつSDKが返すmodel prompt/context上限の80%以内となる保守的境界で判定します。UTF-8 byte数を実測model token数とは表記しません。
 
 token数と請求額は同じ指標ではありません。GitHubのusage-based billingでは、選択modelとtoken usageからAI Creditsが決まり、対応するpaid planでのAuto model selectionにはmodel costの10% discountがあります。これはtoken数自体を10%減らすという意味ではありません。
 
@@ -121,7 +122,8 @@ token数と請求額は同じ指標ではありません。GitHubのusage-based 
 - empty dispatch抑止: [`EvaluationScheduler.cs`](src/StudyReportEvaluator.App/Workflow/EvaluationScheduler.cs#L431-L451)
 - retry上限: [`RetryAndCleanupCoordinator.cs`](src/StudyReportEvaluator.App/Copilot/RetryAndCleanupCoordinator.cs#L113-L118)、[`RetryAndCleanupCoordinator.cs`](src/StudyReportEvaluator.App/Copilot/RetryAndCleanupCoordinator.cs#L439-L465)
 - Promptへ含む情報: [`SafeEvaluationPayloadBuilder.cs`](src/StudyReportEvaluator.Core/Prompting/SafeEvaluationPayloadBuilder.cs#L52-L87)
-- 現行Run sheetの保存field: [`RunSheetWriter.cs`](src/StudyReportEvaluator.App/Workbooks/Writing/RunSheetWriter.cs#L52-L81)
+- 現行Run sheetのusage field: [`RunSheetWriter.cs`](src/StudyReportEvaluator.App/Workbooks/Writing/RunSheetWriter.cs)
+- request capacity preflight: [`EvaluationRequestCapacityValidator.cs`](src/StudyReportEvaluator.App/Copilot/EvaluationRequestCapacityValidator.cs)
 - token usage API: GitHub [Usage and billing](https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/usage-and-billing)（2026-09-01確認）
 - Autoのmodel選択とdiscount: GitHub [Auto model selection](https://docs.github.com/en/copilot/concepts/models/auto-model-selection)（2026-09-01確認）
 - AI Credits: GitHub [Usage-based billing for individuals](https://docs.github.com/en/copilot/concepts/billing/usage-based-billing-for-individuals)（2026-09-01確認）
@@ -144,7 +146,7 @@ Expand-Archive -LiteralPath artifacts\package\StudyReportEvaluator-win-x64.zip -
 
 AI定量化を使う場合は、起動前に端末上の既存 Copilot CLI でログインを済ませてください。アプリ固有の OAuth app、client ID、client secret、PAT は入力しません。
 
-`copilot.exe`はZIPへ同梱されません。別途導入し、Windowsの`PATH`から解決できる状態にしてください。現在のZIPに利用者ガイド本体は同梱されず、`RELEASE-NOTES.txt`だけが追加されます。配布担当者は本READMEと`docs/`への到達手段を利用者へ提供してください。
+`copilot.exe`はZIPへ同梱されません。別途導入し、Windowsの`PATH`から解決できる状態にしてください。ZIPには`RELEASE-NOTES.txt`に加えて、本`README.md`、利用者向け`docs/`、合成画面の`images/`を同梱します。
 
 ## source から build / test / package
 
@@ -177,7 +179,7 @@ pwsh.exe -NoLogo -NoProfile -File scripts/package-windows.ps1
 
 - `Quantification_Config`: immutable definition snapshot、source mapping、range、weight、rounding digits、definition SHA-256。
 - `Quantification_Results`: literal の Scorable / AI raw / Override / Reason / Evidence / Status と、formula の Effective Raw / Normalized / Evaluator / Question / Overall score。
-- `Quantification_Run`: input identity、definition hash、app / SDK / CLI / model identity、開始・終了時刻、件数、実際に割り当てたsheet名。
+- `Quantification_Run`: input identity、definition hash、app / SDK / CLI / model identity、開始・終了時刻、件数、観測できたinput / output / reasoning / cache token数、実際に割り当てたsheet名。
 
 formula cell には式と Core preview の cached value を併記します。入力内に同名sheetがある場合は既存sheetを変更せず、`Quantification_Config (2)` のような一意名を使います。詳細は [Excel / formula 契約](docs-dev/excel-contract.md) を参照してください。
 
@@ -202,20 +204,21 @@ formula cell には式と Core preview の cached value を併記します。入
 | 対象 | 現在確認できる状態 | 出典 |
 |---|---|---|
 | repository sample | `sample/機械学習 サブフィールド PBL 2025 レポート - コピー.xlsx`。661,189 bytes、SHA-256 `446386E20BB4096561CB4AFD6D74B8EAA9D50EAE53C97F984BA7F70EBEAD0DE5`、3 sheetの構造と入力identity不変を確認 | [`sample-workbook-profile.md`](docs-dev/preflight/sample-workbook-profile.md) |
-| GATE-ACCEPTANCE | HEAD `62581a3`に対して`PASS`、solution tests 452件成功、失敗0、skip 0 | [tracked summary](docs-dev/implementation-status.md)、generated `artifacts/test/gate-acceptance.json` |
+| historical GATE-ACCEPTANCE | HEAD `62581a3`に対して`PASS`、solution tests 452件成功、失敗0、skip 0。gap検出前の履歴 | [tracked summary](docs-dev/implementation-status.md)、generated `artifacts/test/gate-acceptance.json` |
+| gap closure / current required validation | commit `69e4b99`でIMPL-GAP-001 / 002をclosed。文書同期とadvisory harness追加後のRelease solution tests 485件成功、失敗0、skip 0。新generated acceptance record作成待ち | [実装状態](docs-dev/implementation-status.md)、[traceability](docs-dev/traceability.md) |
 | Windows x64性能 | 3回測定の中央値が30秒以下かをtest runごとに再測定。固定保証値ではない | generated `artifacts/test/performance-windows-x64.json` |
-| optional live Copilot smoke | `NOT_RUN` | [traceability](docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute) |
-| optional external recalculation smoke | `NOT_RUN` | [traceability](docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute) |
+| optional live Copilot smoke | `PASS`。固定合成payload 1件だけをauthenticated Copilotへ送信し、closed resultを受理。実在データ・教育品質の証明ではない | generated `artifacts/test/live-copilot-smoke.json`、[traceability](docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute) |
+| optional external recalculation smoke | `PASS`。固定合成workbookを登録済みMicrosoft Excelでfull recalculationし、EffectiveRaw 5 / 4階層50を再読。required oracleの代替ではない | generated `artifacts/test/external-recalculation-smoke.json`、[traceability](docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute) |
 | 実画面 | 合成100名 × 2設問から7枚を生成。live login／実AI結果ではない | [`images/README.md`](images/README.md)、[`DocumentationScreenshotTests.cs`](tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs) |
 
 `artifacts/`はGit管理外で再生成されます。固定baselineやcommit済みrelease recordとして扱いません。
 
-## 既知の実装差分
+## run開始前の技術検証
 
-- **IMPL-GAP-001:** Designで検出した不正Custom PromptをExecution開始条件で再検査しません。AIへ不正Promptは送られませんが、run開始後にunitが`AI_RUNTIME_FAILED`となる可能性があります。
-- **IMPL-GAP-002:** Results列数、formula長、function argument数等の完全なcapacity preflightはrun前ではなくexport時です。Prompt/context budgetのrun admissionも未結合です。
+- **IMPL-GAP-001 CLOSED:** Custom / Knowledge Prompt所有権とplaceholder構文をCore definition validatorへ集約し、Executionとsnapshot作成の両方で拒否します。不正Promptではinput capture、row read、Copilot session、runner callは0件です。
+- **IMPL-GAP-002 CLOSED:** Config行、Results列、header cell、実formula ASTのlength / function arguments / reference / DAG、実selected-row request、model 80% budget、retry込み最大20,000 attemptsをAI dispatch前に検証します。超過時は本文を含めずfield、actual、limitだけを表示します。
 
-詳細、根拠、closure条件は[現在の実装状態](docs-dev/implementation-status.md)を参照してください。
+実装根拠と再受入状態は[現在の実装状態](docs-dev/implementation-status.md)を参照してください。
 
 ## 制限と非保証
 

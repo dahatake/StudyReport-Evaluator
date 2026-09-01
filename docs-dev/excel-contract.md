@@ -4,8 +4,8 @@
 |---|---|
 | Persona | workbook / formula実装者、Excel監査者、QA |
 | Normative baseline | requirements v3.0 / ADR-0011 |
-| Current implementation | Config / Results / Run、closed formula AST、cached Core preview、atomic output |
-| Known gap | 完全なcolumn / formula / request capacity preflightはrun前へ未結合（[IMPL-GAP-002](implementation-status.md#impl-gap-002--excel--request-capacityの完全なpreflightがrun前ではない)） |
+| Current implementation | Config / Results / Run、closed formula AST、cached Core preview、run admission、atomic output |
+| Known gap | なし（IMPL-GAP-002はcommit `69e4b99`でclosed、新acceptance再評価中） |
 
 ## 1. 入出力とapp-owned sheets
 
@@ -15,7 +15,7 @@
 |---|---|
 | `Quantification_Config` | canonical definition snapshot、質問 / evaluator / criterion、source mapping、enabled、raw weight、effective range、rounding、schema version、definition SHA-256 |
 | `Quantification_Results` | 行ごとのliteral結果、override、effective / normalized / aggregate formula、reason、evidence、source、status |
-| `Quantification_Run` | input identity、definition hash、app / SDK / CLI / model identity、開始・終了、planned / completed / error件数、実際の3 sheet名 |
+| `Quantification_Run` | input identity、definition hash、app / SDK / CLI / model identity、開始・終了、planned / completed / error件数、観測unit数、input / output / reasoning / cache token数、実際の3 sheet名 |
 
 同名sheetがある場合は既存sheetを変更せず、`Quantification_Config (2)`、`Quantification_Config (3)` のように最小の未使用suffixを割り当てます。suffixを含めて31文字に収まるようbaseを安全に切り詰め、実際の名前をformulaとRun sheetへ記録します。
 
@@ -141,15 +141,17 @@ external workbook reference、defined name、DDE、macro、raw user formula、�
 
 ### Current timing
 
-このpreflightは**working workbookへResults sheetを書き始める前**には実行されますが、**AI run開始前**には実行されません。
+同じpreflightを**AI run開始前**と**export時**の2段階で実行します。
 
-- column数は`ResultsSheetWriter.CreateLayout`でexport時に算出します。
-- formula length、function arguments、reference、DAGはformula AST構築後のexport時に検査します。
-- Prompt/request全体のUnicode scalar数、model context割合、worst-case retry budgetは現在のrun admissionへ結合されていません。
+- `ConfigSheetWriter.CreateAddressMap`はsnapshotから実Config row/address配置をI/Oなしで構築し、実writerと同じ参照mapになることをtestします。
+- `ResultsSheetWriter.Preflight`は実際のsheet名、Config address、最終source rowを使ってResults layoutとformula ASTを構築します。
+- run admissionとexportは同じ`FormulaExpressions` / `FormulaPreflightValidator`を共有するため、formula length、function arguments、reference、DAGの判定を二重実装しません。
+- 全selected rowのPrompt / schema / tool contractをAI dispatch前に測定し、65,536 Unicode scalarsとSDK model prompt/context上限の80%を検査します。保守的UTF-8 byte dimensionを実model token数とは表記しません。
+- evaluation units × 最大3 attemptsは20,000以下を要求し、上限超過を切り詰めません。
 
-したがって、requirements §9.6 / §14が求めるrun前capacity admissionとの間に[IMPL-GAP-002](implementation-status.md#impl-gap-002--excel--request-capacityの完全なpreflightがrun前ではない)があります。出力安全性は維持されますが、多数のAI unit完了後にexport不能となる可能性があります。
+input snapshot取得後にrequest preflightを行う必要があるため、完了直後にSHA-256 / size / last-write timeを再確認し、一致した場合だけAI dispatchします。export時の検証は最終防御として維持します。
 
-実装根拠: [`ExecutionViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs#L844-L944)、[`ResultsSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/ResultsSheetWriter.cs#L324-L358)、[`FormulaPreflightValidator.cs`](../src/StudyReportEvaluator.Core/Formulas/FormulaPreflightValidator.cs#L125-L183)。
+実装根拠: [`WorkbookExecutionPreflight.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/WorkbookExecutionPreflight.cs)、[`ResultsSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/ResultsSheetWriter.cs)、[`FormulaPreflightValidator.cs`](../src/StudyReportEvaluator.Core/Formulas/FormulaPreflightValidator.cs)、[`EvaluationRequestCapacityValidator.cs`](../src/StudyReportEvaluator.App/Copilot/EvaluationRequestCapacityValidator.cs)。
 
 ## 7. string / formula injection 防止
 
@@ -192,7 +194,7 @@ sequenceDiagram
 
 ## 9. Office-independent required path
 
-required のread、write、preview、reopen validation、formula / cached oracle、atomic fault testsにはMicrosoft Excel、Office、LibreOffice、COM automationを使用しません。外部spreadsheetによる再計算はadvisoryなoptional smokeであり、現在の状態は `NOT_RUN` です。required testsのPASSを代替せず、未実行をPASSとも表記しません。
+required のread、write、preview、reopen validation、formula / cached oracle、atomic fault testsにはMicrosoft Excel、Office、LibreOffice、COM automationを使用しません。登録済みMicrosoft Excelによる固定合成workbookの再計算はadvisoryなoptional smokeとして`PASS`しました。EffectiveRaw 5、Normalized / Evaluator / Question / Overall 50を保存後にOpen XMLで再読しましたが、required oracleや全環境保証を代替しません。
 
 Open XMLではformula textは`CellFormula`、cached valueは`CellValue`へ保存されます。外部仕様: Microsoft [Working with formulas](https://learn.microsoft.com/office/open-xml/spreadsheet/working-with-formulas)（2026-09-01確認）。本アプリのcached valueはCore previewであり、外部spreadsheetが再計算した値という意味ではありません。
 
@@ -206,6 +208,9 @@ Open XMLではformula textは`CellFormula`、cached valueは`CellValue`へ保存
 | formula | 8,191 characters以下 | [`FormulaPreflightValidator.cs`](../src/StudyReportEvaluator.Core/Formulas/FormulaPreflightValidator.cs#L61-L69) |
 | function arguments | 255以下 | 同上 |
 | sheet name | 31 characters以下 | 同上 |
+| app-owned request | 65,536 Unicode scalars以下 | [`EvaluationRequestCapacityValidator.cs`](../src/StudyReportEvaluator.App/Copilot/EvaluationRequestCapacityValidator.cs) |
+| model context admission | SDK prompt/context上限の80%以下（保守的UTF-8 dimension） | 同上 |
+| worst-case attempts / run | 20,000以下 | 同上 |
 
 Excel媒体上限の外部正本: Microsoft [Excel specifications and limits](https://support.microsoft.com/office/excel-specifications-and-limits-1672b34d-7043-467e-8e27-269d656771c3)（2026-09-01確認）。application contractは外部上限以下へさらに制限する場合があります。
 

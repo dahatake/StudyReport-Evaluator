@@ -50,7 +50,7 @@
 placeholder別の対処は[Custom evaluatorガイド](custom-evaluator-guide.md#validation-errors)を参照してください。
 
 > [!IMPORTANT]
-> Designのsnapshot preflightがinvalidでもstep navigation自体は次へ進めます。現在はExecution開始時にPromptを再検査しないため、必ずDesignへ戻り「設計は有効です」を確認してください。既知差分: [`implementation-status.md` IMPL-GAP-001](../docs-dev/implementation-status.md#impl-gap-001--custom-promptをrun開始前に再検査しない)。
+> Designのsnapshot preflightがinvalidでもstep navigation自体は次へ進めますが、Executionとsnapshot作成で同じPrompt検証を再実行するためrunは開始できません。Designへ戻り、該当fieldを修正してください。
 
 ## Copilotを利用できない
 
@@ -62,6 +62,7 @@ placeholder別の対処は[Custom evaluatorガイド](custom-evaluator-guide.md#
 | loginが必要 | Copilot CLI側で対話loginを行い、アプリで再確認 |
 | runtime確認失敗 | CLI fileが0 byteでないか、version情報を読めるか、15秒以内にstart/pingできるか |
 | modelがない | login/accountの利用条件をCLI側で確認。model IDを推測入力しない |
+| model prompt上限を取得できない | SDKのmodel一覧がprompt/context上限を返していません。別の利用可能modelを選ぶか、CLI / SDK状態を再確認。上限を推測入力して回避しない |
 
 アプリへtokenやpasswordを入力しないでください。実装根拠: [`CopilotClientFactory.cs`](../src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs)、[`CopilotAuthenticationService.cs`](../src/StudyReportEvaluator.App/Copilot/CopilotAuthenticationService.cs)。
 
@@ -94,11 +95,17 @@ placeholder別の対処は[Custom evaluatorガイド](custom-evaluator-guide.md#
 
 実装根拠: [`ResultsOutputViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs#L134-L177)、[`AtomicOutputCommitter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/AtomicOutputCommitter.cs#L5-L14)。
 
-## AI実行後にexportで上限エラーになる
+## run開始前にcapacity errorになる
 
-現行実装ではResults列数、formula長、function argument数の完全なpreflightはexport時です。run前に全capacityを拒否する要求との差分があり、多数unitのAI処理後にexport不能となる可能性があります。定義を小さく分割してください。
+| Code | 意味／対処 |
+|---|---|
+| `COLUMN_LIMIT_EXCEEDED` / `HEADER_CELL_LIMIT_EXCEEDED` | Results列数またはheaderがExcel上限を超過。question / evaluator / criterion数またはID長を減らす |
+| `FORMULA_LENGTH_EXCEEDED` / `FUNCTION_ARGUMENT_LIMIT_EXCEEDED` | 実際に生成するformulaが8,191文字または255引数を超過。enabled child数を減らす |
+| `REQUEST_SCALAR_LIMIT_EXCEEDED` | Prompt + schema + tool contractが65,536 Unicode scalarsを超過。Prompt、補助列、criterionを縮小する |
+| `REQUEST_CONTEXT_BUDGET_EXCEEDED` | app-owned requestの保守的UTF-8容量がSDK model上限の80%を超過。本文を切り詰めず、定義または選択列を見直す |
+| `ATTEMPT_BUDGET_TOO_LARGE` | evaluation units × 最大3 attemptsが20,000を超過。対象行またはenabled evaluatorを分割する |
 
-既知差分: [`implementation-status.md` IMPL-GAP-002](../docs-dev/implementation-status.md#impl-gap-002--excel--request-capacityの完全なpreflightがrun前ではない)。
+これらはAI dispatch前に全selected rowを測定し、本文をerrorへ表示しません。export時にも同じformula validatorを最終防御として再実行します。
 
 ## package版とsource版
 

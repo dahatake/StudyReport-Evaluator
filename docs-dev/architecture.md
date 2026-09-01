@@ -4,8 +4,8 @@
 |---|---|
 | Persona | 開発者、アーキテクト、QA、security reviewer |
 | Current scope | requirements v3.0 / ADR-0011 |
-| Audited implementation | HEAD `62581a3` |
-| Known implementation gaps | [IMPL-GAP-001 / 002](implementation-status.md) |
+| Gap closure implementation | commit `69e4b99` |
+| Known implementation gaps | なし（IMPL-GAP-001 / 002はclosed、新acceptance再評価中） |
 
 旧scopeの構成、署名record、ReportDefinition、cross-platform、mandatory reviewは[`docs-dev/README.md`](README.md)で履歴として分離します。本書はcurrent production sourceだけを説明します。
 
@@ -43,8 +43,9 @@ flowchart TD
     Input --> Mapping[sheet / row / column mapping]
     Mapping --> Draft[QuantificationDefinition draft]
     Draft --> DesignCheck[Design validation\nPromptを含む]
-    Draft --> Snapshot[run開始時 immutable snapshot\ncanonical JSON + SHA-256]
-    Snapshot --> Plan[rows × questions × evaluators]
+    DesignCheck --> Snapshot[run開始時 immutable snapshot\ncanonical JSON + SHA-256]
+    Snapshot --> Admission[run admission\nConfig / Results / formula\n全selected-row request / model 80%\n最大20,000 attempts]
+    Admission --> Plan[rows × questions × evaluators]
     Plan --> Prompt[app-owned Prompt renderer]
     Prompt --> CopilotSession[restricted ephemeral Copilot session]
     CopilotSession --> Validation[closed result validation]
@@ -58,10 +59,9 @@ flowchart TD
     Recheck --> Rename[no-overwrite atomic rename]
     Rename --> Output[別パスの完成 .xlsx]
     Draft -. 次回run .-> Snapshot
-    DesignCheck -. IMPL-GAP-001:\nExecution startへ未結合 .-> Snapshot
 ```
 
-現行のResults layout / formula capacity preflightはexport時です。要求するrun前admissionへは未結合で、[IMPL-GAP-002](implementation-status.md#impl-gap-002--excel--request-capacityの完全なpreflightがrun前ではない)として追跡します。実装根拠: [`ExecutionViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs#L844-L944)、[`ResultsSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/ResultsSheetWriter.cs#L324-L358)。
+run admissionは、exportと同じResults layout / formula AST / validatorをI/Oなしで実行します。続いて入力identityを取得し、全selected rowの実payload / JSON schemaを測定し、request 65,536 Unicode scalars、SDK model上限の80%、retry込み20,000 attemptsを検査します。合格後に入力identityを再確認してからだけAI dispatchへ進みます。実装根拠: [`WorkbookExecutionPreflight.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/WorkbookExecutionPreflight.cs)、[`EvaluationRequestCapacityValidator.cs`](../src/StudyReportEvaluator.App/Copilot/EvaluationRequestCapacityValidator.cs)、[`QuantificationOrchestrator.cs`](../src/StudyReportEvaluator.App/Workflow/QuantificationOrchestrator.cs)。
 
 ## 3. Prompt・result・capability 境界
 
@@ -72,7 +72,7 @@ flowchart TD
 - expected ID、全criterion、range、evidence provenanceをclosed schemaとCore validatorで確認します。partial result、unknown field、duplicate、range外を部分採用せず、0点にも変換しません。
 - evaluatorごとにrestricted ephemeral sessionを作り、公開toolは `submit_quantification` 1件だけです。shell、filesystem、GitHub write、MCP、ambient memoryやremote sessionを公開せず、permission requestを拒否します。
 - schema failureは最大1回、transient network / timeoutは最大2回だけ新sessionでretryします。各attemptは既定120秒、並列度は既定1・最大3です。cancel後に新規dispatchせず、sessionをabort / dispose / deleteします。
-- logはevent codeとsafe dimensionだけを保持し、回答、Prompt、reason、evidence、token、credentialを記録しません。
+- logはevent codeとsafe dimensionだけを保持し、回答、Prompt、reason、evidence、token文字列、credentialを記録しません。SDKが返したnumeric input / output / reasoning / cache token countsはlogではなくRunSummaryへ集計し、観測unit数とともにRun sheetへ保存します。
 
 ```mermaid
 flowchart LR
@@ -111,7 +111,7 @@ sequenceDiagram
         R->>C: retry with a new session within budget
     end
     R->>E: dispose / delete
-    R-->>S: status + accepted result or blank
+    R-->>S: status + accepted result or blank + observed numeric usage
 ```
 
 schema failureは最大2 attempts、network / timeoutは最大3 attemptsです。cleanup失敗時は後続retryを行いません。根拠: [`RetryAndCleanupCoordinator.cs`](../src/StudyReportEvaluator.App/Copilot/RetryAndCleanupCoordinator.cs#L113-L291)。
@@ -159,11 +159,12 @@ Copilot CLIはpackageへ同梱せず、Windowsでは`PATH`上の`copilot.exe`だ
 |---|---|---|
 | file classification / input snapshot | Input load | workbookをadoptしない |
 | mapping / structural definition | Input、Execution、snapshot creation | run開始をblock |
-| Custom Prompt syntax | Design UI | Designにはerror表示。ただしExecution startへ未結合（IMPL-GAP-001） |
+| Custom Prompt ownership / syntax | Design、Execution、snapshot creation | run開始をblock。input capture / row read / session / runner 0 |
 | empty primary | unit row read後 | AI dispatchせず`EMPTY` |
 | AI schema / range / evidence | tool handler + Core validator | payload全体を拒否 |
 | override | Results UI + output preparation | exportをblock |
-| Results column / formula capacity | export時 | workbook mutation前にblock（IMPL-GAP-002） |
+| Config / Results / formula capacity | Execution + orchestrator run admission、export | AI dispatch前にblockし、exportでも同じvalidatorを再実行 |
+| request / model context / retry capacity | orchestrator run admission | 全selected row測定後、AI dispatch前にblock |
 | package / formula / cached value | temp write後のread-only reopen | final renameをblock |
 | input identity | run後およびrename直前 | final renameをblock |
 
@@ -178,11 +179,12 @@ required pathはMicrosoft Excel、Office、LibreOffice、COM automationを必要
 | AI | fake authentication / schema / capability / retry / timeout / cleanup tests、GATE-AI `PASS` |
 | App | 4-step journey、warning nonblock、keyboard / 200%、cancel / partial output tests、GATE-APP `PASS` |
 | Windows delivery | Windows 11 x64 self-contained publish、unsigned ZIP、SHA-256 sidecar、layout / tamper tests |
-| Final generated gate | HEAD `62581a3`、solution tests 452/452、GATE-ACCEPTANCE `PASS` |
+| Historical generated gate | HEAD `62581a3`、solution tests 452/452、GATE-ACCEPTANCE `PASS` |
+| Gap closure / current validation | commit `69e4b99`、全非文書test 473/473、文書同期後のsolution 485/485、independent review blocker/high 0。新generated record作成待ち |
 
-optional live Copilot smoke は `NOT_RUN`、optional external spreadsheet recalculation smoke も `NOT_RUN` です。これらをrequired testのPASSへ読み替えません。
+optional live Copilot smokeとoptional Microsoft Excel recalculation smokeは、固定合成データだけで`PASS`しました。generated evidenceはそれぞれ`artifacts/test/live-copilot-smoke.json`と`artifacts/test/external-recalculation-smoke.json`です。どちらもrequired test、実在データ品質、全環境保証へ読み替えません。
 
-GATE-ACCEPTANCE後の監査でIMPL-GAP-001 / 002を確認したため、新たなfinal acceptanceを主張するには両gapのclosureとrequired checksの再実行が必要です。詳細: [`implementation-status.md`](implementation-status.md)。
+GATE-ACCEPTANCE後の監査で確認したIMPL-GAP-001 / 002はcommit `69e4b99`でclosedです。旧gate artifactは履歴として不変であり、新しいfinal acceptanceは文書同期と全required rerunの完了後に別証跡として記録します。詳細: [`implementation-status.md`](implementation-status.md)。
 
 ## 9. 外部仕様出典
 

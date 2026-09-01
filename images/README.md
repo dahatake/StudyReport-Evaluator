@@ -24,7 +24,7 @@
 | [`02-input-mapping.png`](02-input-mapping.png) | 入力mapping | question表示名、設問text、primary / supporting columns |
 | [`03-design-knowledge.png`](03-design-knowledge.png) | Knowledge設計 | evaluator名、weight、range、read-only semantic Prompt |
 | [`04-design-custom-prompt.png`](04-design-custom-prompt.png) | Custom設計 | editable Prompt、required placeholders、supporting column |
-| [`05-execution-auto.png`](05-execution-auto.png) | 実行準備 | fake login state、Auto、concurrency 2、200 units |
+| [`05-execution-auto.png`](05-execution-auto.png) | 実行準備 | fake login state、Auto、concurrency 2、200 units、retry込み最大600 attempts |
 | [`06-results-review.png`](06-results-review.png) | 結果review | synthetic raw、override、effective、normalized、aggregate |
 | [`07-output-export.png`](07-output-export.png) | output | safe synthetic output path、atomic output section |
 

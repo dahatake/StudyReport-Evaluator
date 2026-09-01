@@ -6,7 +6,7 @@
 
 | 文書 | Persona | 内容 |
 |---|---|---|
-| [実装状態](implementation-status.md) | 開発、QA、リリース | 現在の実装済みsurface、生成gate、post-gate既知差分 |
+| [実装状態](implementation-status.md) | 開発、QA、リリース | 現在の実装済みsurface、生成gate、post-gate gap closure |
 | [アーキテクチャ](architecture.md) | 開発、アーキテクト | dependency、run、Copilot、UI、output data flow |
 | [Excel / formula契約](excel-contract.md) | 開発、Excel監査、QA | sheet、formula、blank、preflight、atomic commit |
 | [Traceability](traceability.md) | QA、リリース | AC / TR / implementation / test / gate対応 |
@@ -24,7 +24,9 @@ flowchart LR
     V2 -->|superseded evaluation model| V3[requirements v3.0\nADR-0011]
     V3 --> IMPL[current source + deterministic tests]
     IMPL --> GATE[generated gate evidence]
-    GATE --> AUDIT[post-gate documentation audit\n2 implementation gaps open]
+    GATE --> AUDIT[post-gate conformance audit\n2 gaps found]
+    AUDIT --> CLOSE[commit 69e4b99\n2 gaps closed]
+    CLOSE --> REGATE[new required acceptance\nre-evaluation]
 ```
 
 次の文書は設計経緯・当時の証拠としてのみ参照します。
