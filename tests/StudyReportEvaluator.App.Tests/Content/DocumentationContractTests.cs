@@ -344,6 +344,8 @@ public sealed class DocumentationContractTests
             "Gap closure non-document validation | Release build PASS、473 passed / 0 failed / 0 skipped",
             "Current required validation | locked restore PASS、Release build PASS、485 passed / 0 failed / 0 skipped",
             "Post-gate conformance gaps | 0 open / 2 closed",
+            "New GATE-ACCEPTANCE | `PASS` for evaluation HEAD `3f4227e",
+            "gate-acceptance-3f4227e.json",
             "## IMPL-GAP-001 — CLOSED",
             "## IMPL-GAP-002 — CLOSED");
         AssertContainsAll(
@@ -352,7 +354,10 @@ public sealed class DocumentationContractTests
             "PASS_RECORDED_POST_GATE_GAP_OPEN",
             "GATE-ACCEPTANCE PASS at 62581a3",
             "CLOSED_PENDING_NEW_ACCEPTANCE",
-            "IMPL-GAP-001 / 002 closure");
+            "IMPL-GAP-001 / 002 closure",
+            "GATE_ACCEPTANCE_RERUN_PASS",
+            "GATE-ACCEPTANCE rerun | PASS",
+            "485/485");
         AssertContainsAll(
             developerIndex,
             "## 現行正本",

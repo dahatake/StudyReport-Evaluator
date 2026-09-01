@@ -26,7 +26,7 @@ flowchart LR
     IMPL --> GATE[generated gate evidence]
     GATE --> AUDIT[post-gate conformance audit\n2 gaps found]
     AUDIT --> CLOSE[commit 69e4b99\n2 gaps closed]
-    CLOSE --> REGATE[new required acceptance\nre-evaluation]
+    CLOSE --> REGATE[new GATE-ACCEPTANCE\nPASS at 3f4227e]
 ```
 
 次の文書は設計経緯・当時の証拠としてのみ参照します。

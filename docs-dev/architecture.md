@@ -5,7 +5,7 @@
 | Persona | 開発者、アーキテクト、QA、security reviewer |
 | Current scope | requirements v3.0 / ADR-0011 |
 | Gap closure implementation | commit `69e4b99` |
-| Known implementation gaps | なし（IMPL-GAP-001 / 002はclosed、新acceptance再評価中） |
+| Known implementation gaps | なし（IMPL-GAP-001 / 002はclosed、新acceptance `PASS`） |
 
 旧scopeの構成、署名record、ReportDefinition、cross-platform、mandatory reviewは[`docs-dev/README.md`](README.md)で履歴として分離します。本書はcurrent production sourceだけを説明します。
 
@@ -180,11 +180,11 @@ required pathはMicrosoft Excel、Office、LibreOffice、COM automationを必要
 | App | 4-step journey、warning nonblock、keyboard / 200%、cancel / partial output tests、GATE-APP `PASS` |
 | Windows delivery | Windows 11 x64 self-contained publish、unsigned ZIP、SHA-256 sidecar、layout / tamper tests |
 | Historical generated gate | HEAD `62581a3`、solution tests 452/452、GATE-ACCEPTANCE `PASS` |
-| Gap closure / current validation | commit `69e4b99`、全非文書test 473/473、文書同期後のsolution 485/485、independent review blocker/high 0。新generated record作成待ち |
+| Current generated gate | evaluation HEAD `3f4227e`、solution 485/485、independent review blocker/high/medium 0、GATE-ACCEPTANCE `PASS` |
 
 optional live Copilot smokeとoptional Microsoft Excel recalculation smokeは、固定合成データだけで`PASS`しました。generated evidenceはそれぞれ`artifacts/test/live-copilot-smoke.json`と`artifacts/test/external-recalculation-smoke.json`です。どちらもrequired test、実在データ品質、全環境保証へ読み替えません。
 
-GATE-ACCEPTANCE後の監査で確認したIMPL-GAP-001 / 002はcommit `69e4b99`でclosedです。旧gate artifactは履歴として不変であり、新しいfinal acceptanceは文書同期と全required rerunの完了後に別証跡として記録します。詳細: [`implementation-status.md`](implementation-status.md)。
+旧GATE-ACCEPTANCE後の監査で確認したIMPL-GAP-001 / 002はcommit `69e4b99`でclosedです。旧gate artifactは履歴として不変に保ち、新しいfinal acceptanceを評価HEAD `3f4227e`の別証跡`gate-acceptance-3f4227e.json`へ`PASS`として記録しました。詳細: [`implementation-status.md`](implementation-status.md)。
 
 ## 9. 外部仕様出典
 

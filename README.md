@@ -5,7 +5,7 @@ Excel の学習レポートの採点を数値化・定量化するツールで�
 StudyReport Evaluator は、標準 `.xlsx` の回答を読み取り、動的に設定した Knowledge / Custom evaluator で評価項目ごとの数値を取得し、重み付き集計式を持つ別の `.xlsx` を作るローカルデスクトップアプリです。
 
 > [!IMPORTANT]
-> HEAD `62581a3`向けのGATE-ACCEPTANCEは履歴として保持されています。後続監査で確認したrun開始前validationの2件は実装commit `69e4b99`で閉じ、現在は新しい全required acceptanceを再評価中です。最新状態は[現在の実装状態](docs-dev/implementation-status.md)を確認してください。gate artifactは再生成されるGit管理外の証跡です。
+> HEAD `62581a3`向けのGATE-ACCEPTANCEは履歴として保持されています。後続監査で確認したrun開始前validationの2件は実装commit `69e4b99`で閉じ、評価HEAD `3f4227e`に対する新GATE-ACCEPTANCEは485/485で`PASS`しました。最新状態は[現在の実装状態](docs-dev/implementation-status.md)を確認してください。gate artifactは再生成されるGit管理外の証跡です。
 
 ## 読者別の入口
 
@@ -205,7 +205,7 @@ formula cell には式と Core preview の cached value を併記します。入
 |---|---|---|
 | repository sample | `sample/機械学習 サブフィールド PBL 2025 レポート - コピー.xlsx`。661,189 bytes、SHA-256 `446386E20BB4096561CB4AFD6D74B8EAA9D50EAE53C97F984BA7F70EBEAD0DE5`、3 sheetの構造と入力identity不変を確認 | [`sample-workbook-profile.md`](docs-dev/preflight/sample-workbook-profile.md) |
 | historical GATE-ACCEPTANCE | HEAD `62581a3`に対して`PASS`、solution tests 452件成功、失敗0、skip 0。gap検出前の履歴 | [tracked summary](docs-dev/implementation-status.md)、generated `artifacts/test/gate-acceptance.json` |
-| gap closure / current required validation | commit `69e4b99`でIMPL-GAP-001 / 002をclosed。文書同期とadvisory harness追加後のRelease solution tests 485件成功、失敗0、skip 0。新generated acceptance record作成待ち | [実装状態](docs-dev/implementation-status.md)、[traceability](docs-dev/traceability.md) |
+| current GATE-ACCEPTANCE | evaluation HEAD `3f4227e`、IMPL-GAP-001 / 002 closed、locked restore / Release build / solution 485件成功、失敗0、skip 0、independent review promotion-safe | generated `artifacts/test/gate-acceptance-3f4227e.json`、[実装状態](docs-dev/implementation-status.md)、[traceability](docs-dev/traceability.md) |
 | Windows x64性能 | 3回測定の中央値が30秒以下かをtest runごとに再測定。固定保証値ではない | generated `artifacts/test/performance-windows-x64.json` |
 | optional live Copilot smoke | `PASS`。固定合成payload 1件だけをauthenticated Copilotへ送信し、closed resultを受理。実在データ・教育品質の証明ではない | generated `artifacts/test/live-copilot-smoke.json`、[traceability](docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute) |
 | optional external recalculation smoke | `PASS`。固定合成workbookを登録済みMicrosoft Excelでfull recalculationし、EffectiveRaw 5 / 4階層50を再読。required oracleの代替ではない | generated `artifacts/test/external-recalculation-smoke.json`、[traceability](docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute) |

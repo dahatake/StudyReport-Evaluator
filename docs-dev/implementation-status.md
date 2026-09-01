@@ -11,12 +11,12 @@
 | Gap closure non-document validation | Release build PASS、473 passed / 0 failed / 0 skipped（2026-09-01） |
 | Current required validation | locked restore PASS、Release build PASS、485 passed / 0 failed / 0 skipped（2026-09-01、external opt-inなし） |
 | Post-gate conformance gaps | 0 open / 2 closed |
-| New GATE-ACCEPTANCE | `READY_FOR_GENERATED_RECORD` |
+| New GATE-ACCEPTANCE | `PASS` for evaluation HEAD `3f4227e15d725d2a010b4c6a9a94eb78b20b8573` |
 | Optional live Copilot | `PASS` — fixed synthetic payload、content data included false、required substitute false |
 | Optional external recalculation | `PASS` — synthetic workbook / registered Microsoft Excel、required substitute false |
 | Audit date | 2026-09-01 |
 
-旧gate evidence pathは`artifacts/test/gate-acceptance.json`です。このfileはGit管理外であり、HEAD `62581a3`の履歴を保持します。新しいacceptanceはgap closure、文書同期、全required rerun、independent review後に別のgenerated evidenceとして記録します。tracked summaryは本書と[`traceability.md`](traceability.md)、永続するsource identityはcommitとtest sourceです。
+旧gate evidence pathは`artifacts/test/gate-acceptance.json`です。このfileはGit管理外であり、HEAD `62581a3`の履歴を保持します。新しいacceptanceは`artifacts/test/gate-acceptance-3f4227e.json`へ別recordとして保存し、gap closure、文書同期、全required rerun、independent reviewを`PASS`しました。tracked summaryは本書と[`traceability.md`](traceability.md)、永続するsource identityはcommitとtest sourceです。
 
 ## 実装済みsurface
 
@@ -79,4 +79,4 @@ Closure commit: `69e4b992711c243fe7c70b0defff5e6abf03865c`。
 
 ## Evidence boundary
 
-旧GATE-ACCEPTANCE artifactは上記2差分を検出する前に生成されたため、artifact自体を書き換えません。2差分のcode/test closure、独立レビュー、文書同期後のlocked restore / Release build / 485 testsは完了し、現在は固定HEADに対する新しいgenerated acceptance record作成待ちです。完了までは過去のPASSを新HEADへ流用しません。
+旧GATE-ACCEPTANCE artifactは上記2差分を検出する前に生成されたため、artifact自体を書き換えていません。2差分のcode/test closure、独立レビュー、文書同期後のlocked restore / Release build / 485 testsを評価HEAD `3f4227e`で再実行し、新しいgenerated recordは`PASS`です。optional 2件も固定合成データで`PASS`しましたがrequired判定へ算入していません。

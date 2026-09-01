@@ -13,8 +13,9 @@
 | Initial platform | Windows 11 x64 |
 | Required runtime input | standard response `.xlsx` 1 file |
 | Production projects / test projects | 2 / 2 |
-| Current implementation evidence | **POST_GATE_GAPS_CLOSED_REQUIRED_CHECKS_PASS_PENDING_RECORD** |
-| Final gate | **PASS recorded for HEAD `62581a3` in generated evidence** |
+| Current implementation evidence | **GATE_ACCEPTANCE_RERUN_PASS** |
+| Current final gate | **PASS for evaluation HEAD `3f4227e` in generated evidence** |
+| Historical final gate | **PASS recorded for HEAD `62581a3` before post-gate gap discovery** |
 | Post-gate conformance audit | `IMPL-GAP-001` / `IMPL-GAP-002` closed at `69e4b99` |
 | Supersedes | B-04の実装前 `PLANNED` / `PENDING_GATE` progress snapshot |
 | Record date | 2026-09-01 |
@@ -82,8 +83,8 @@
 | GATE-ACCEPTANCE | PASS at gate time | generated `artifacts/test/gate-acceptance.json`; evaluation HEAD `62581a3081f94ee9da7ec0585c17046cfe1223df` | 452/452、required not-run 0、independent review promotion-safe |
 | Post-gate documentation/conformance audit | PASS_RECORDED_POST_GATE_GAP_OPEN | [`implementation-status.md`](implementation-status.md) | IMPL-GAP-001 / 002を新規確認。旧gate artifactはhistoryとして不変 |
 | Documentation refresh validation | PASS | `71e9d61`、2026-09-01 | 文書契約test 2件とvisual documentation test 1件をpost-gate追加後、Release build、solution 455/455、failed 0、skipped 0。new gateではない |
-| IMPL-GAP-001 / 002 closure | CLOSED_PENDING_NEW_ACCEPTANCE | `69e4b992711c243fe7c70b0defff5e6abf03865c` | Prompt fail-fast、shared workbook/formula dry-run、actual-row request / model / attempt admission、numeric usage、package docs。全非文書test 473/473、independent review blocker/high 0 |
-| Current required validation | PASS_PENDING_GENERATED_RECORD | current documentation candidate、2026-09-01 | locked restore、Release build、solution 485/485、failed 0、skipped 0、optional opt-inなし |
+| IMPL-GAP-001 / 002 closure | PASS_REQUIRED | `69e4b992711c243fe7c70b0defff5e6abf03865c` | Prompt fail-fast、shared workbook/formula dry-run、actual-row request / model / attempt admission、numeric usage、package docs。全非文書test 473/473 |
+| GATE-ACCEPTANCE rerun | PASS | generated `artifacts/test/gate-acceptance-3f4227e.json`; evaluation HEAD `3f4227e15d725d2a010b4c6a9a94eb78b20b8573` | clean worktree、locked restore、Release build、solution 485/485、failed 0、skipped 0、sample unchanged、performance PASS、package PASS、independent review promotion-safe |
 
 ## Acceptance criteria mapping
 
@@ -220,7 +221,7 @@ flowchart LR
     GE --> PA[Post-gate audit\nIMPL-GAP-001 / 002 found]
     PA --> CL[Gap closure 69e4b99\nCLOSED]
     CL --> RV[Required rerun\n485 / 485 PASS]
-    RV --> NG[New generated record\npending]
+    RV --> NG[New GATE-ACCEPTANCE\nPASS at 3f4227e]
 ```
 
 - AC-001〜015、18 mandatory surfaces、TR-01〜15はすべてpassing required evidenceへ接続した。
@@ -228,4 +229,4 @@ flowchart LR
 - D-01完了時のRelease solution testは452/452、failed 0、skipped 0だった。この値は過去gate件数との合計ではない。
 - Optional live Copilot smokeとMicrosoft Excel recalculation smokeは固定合成データで`PASS`したが、required PASSへ昇格していない。
 - GATE-ACCEPTANCEはHEAD `62581a3`へPASSを記録した。artifactはgenerated ignored evidenceであり、commit済み証明ではない。
-- post-gate auditで確認したIMPL-GAP-001 / 002は`69e4b99`でclosedした。旧PASSは履歴として保持し、新acceptanceの代用にはしない。
+- post-gate auditで確認したIMPL-GAP-001 / 002は`69e4b99`でclosedした。旧PASSは履歴として保持し、評価HEAD `3f4227e`の新GATE-ACCEPTANCEを別recordで`PASS`した。

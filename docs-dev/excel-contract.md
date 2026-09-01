@@ -5,7 +5,7 @@
 | Persona | workbook / formula実装者、Excel監査者、QA |
 | Normative baseline | requirements v3.0 / ADR-0011 |
 | Current implementation | Config / Results / Run、closed formula AST、cached Core preview、run admission、atomic output |
-| Known gap | なし（IMPL-GAP-002はcommit `69e4b99`でclosed、新acceptance再評価中） |
+| Known gap | なし（IMPL-GAP-002はcommit `69e4b99`でclosed、evaluation HEAD `3f4227e`の新acceptance `PASS`） |
 
 ## 1. 入出力とapp-owned sheets
 
