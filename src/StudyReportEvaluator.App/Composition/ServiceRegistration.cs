@@ -20,7 +20,12 @@ public sealed class ServiceRegistration
     public WorkflowNavigator WorkflowNavigator { get; }
 
     public MainWindowViewModel CreateMainWindowViewModel() =>
-        new(WorkflowNavigator);
+        new(
+            WorkflowNavigator,
+            new InputViewModel(),
+            new QuantificationDesignViewModel(),
+            new ExecutionViewModel(),
+            new ResultsOutputViewModel());
 
     public MainWindow CreateMainWindow() =>
         new(CreateMainWindowViewModel());

@@ -29,13 +29,20 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private readonly DelegateCommand navigateCommand;
     private readonly DelegateCommand nextCommand;
     private readonly DelegateCommand previousCommand;
+    private readonly ExecutionViewModel executionViewModel;
+    private readonly ResultsOutputViewModel resultsOutputViewModel;
     private ImmutableArray<WorkflowStepPresentation> stepPresentations;
     private QuantificationDesignViewModel designViewModel;
     private WorkflowStep previousStep;
     private bool disposed;
 
     public MainWindowViewModel(WorkflowNavigator navigator)
-        : this(navigator, new InputViewModel(), new QuantificationDesignViewModel())
+        : this(
+            navigator,
+            new InputViewModel(),
+            new QuantificationDesignViewModel(),
+            new ExecutionViewModel(),
+            new ResultsOutputViewModel())
     {
     }
 
@@ -43,10 +50,29 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         WorkflowNavigator navigator,
         InputViewModel inputViewModel,
         QuantificationDesignViewModel designViewModel)
+        : this(
+            navigator,
+            inputViewModel,
+            designViewModel,
+            new ExecutionViewModel(),
+            new ResultsOutputViewModel())
+    {
+    }
+
+    public MainWindowViewModel(
+        WorkflowNavigator navigator,
+        InputViewModel inputViewModel,
+        QuantificationDesignViewModel designViewModel,
+        ExecutionViewModel executionViewModel,
+        ResultsOutputViewModel resultsOutputViewModel)
     {
         this.navigator = navigator ?? throw new ArgumentNullException(nameof(navigator));
         InputViewModel = inputViewModel ?? throw new ArgumentNullException(nameof(inputViewModel));
         this.designViewModel = designViewModel ?? throw new ArgumentNullException(nameof(designViewModel));
+        this.executionViewModel = executionViewModel
+            ?? throw new ArgumentNullException(nameof(executionViewModel));
+        this.resultsOutputViewModel = resultsOutputViewModel
+            ?? throw new ArgumentNullException(nameof(resultsOutputViewModel));
         previousStep = navigator.CurrentStep;
         stepPresentations = BuildStepPresentations();
         navigateCommand = new DelegateCommand(
@@ -59,6 +85,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             _ => this.navigator.MovePrevious(),
             _ => this.navigator.CanMovePrevious);
         this.navigator.CurrentStepChanged += HandleCurrentStepChanged;
+        this.executionViewModel.RunCompleted += HandleRunCompleted;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -69,13 +96,19 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public QuantificationDesignViewModel DesignViewModel => designViewModel;
 
+    public ExecutionViewModel ExecutionViewModel => executionViewModel;
+
+    public ResultsOutputViewModel ResultsOutputViewModel => resultsOutputViewModel;
+
     public WorkflowStep CurrentStep => navigator.CurrentStep;
 
     public UiObservableObject? CurrentEditorViewModel => CurrentStep switch
     {
         WorkflowStep.Input => InputViewModel,
         WorkflowStep.Design => DesignViewModel,
-        _ => null,
+        WorkflowStep.Execution => ExecutionViewModel,
+        WorkflowStep.Results => ResultsOutputViewModel,
+        _ => throw new ArgumentOutOfRangeException(nameof(CurrentStep), CurrentStep, "Unknown workflow step."),
     };
 
     public bool HasEditorContent => CurrentEditorViewModel is not null;
@@ -132,6 +165,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
         disposed = true;
         navigator.CurrentStepChanged -= HandleCurrentStepChanged;
+        executionViewModel.RunCompleted -= HandleRunCompleted;
+        executionViewModel.Dispose();
+        resultsOutputViewModel.Dispose();
     }
 
     private bool CanNavigate(object? parameter) =>
@@ -185,7 +221,28 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         {
             designViewModel = new QuantificationDesignViewModel(InputViewModel.DefinitionDraft);
         }
+
+        if (to == WorkflowStep.Execution
+            && from != WorkflowStep.Results
+            && !executionViewModel.IsRunning)
+        {
+            if (InputViewModel.HasLoadedWorkbook
+                && InputViewModel.Metadata is { } metadata)
+            {
+                executionViewModel.Configure(
+                    InputViewModel.DefinitionDraft,
+                    metadata,
+                    InputViewModel.FilePath);
+            }
+            else
+            {
+                executionViewModel.ClearConfiguration();
+            }
+        }
     }
+
+    private void HandleRunCompleted(object? sender, ExecutionRunCompletedEventArgs e) =>
+        resultsOutputViewModel.Load(e.Context);
 
     private ImmutableArray<WorkflowStepPresentation> BuildStepPresentations() =>
         [

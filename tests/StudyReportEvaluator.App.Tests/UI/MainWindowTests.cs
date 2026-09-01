@@ -12,6 +12,8 @@ using StudyReportEvaluator.App.Navigation;
 using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.App.ViewModels;
 using StudyReportEvaluator.App.Views;
+using StudyReportEvaluator.App.Workflow;
+using StudyReportEvaluator.Core.Domain;
 using Xunit;
 
 [assembly: AvaloniaTestApplication(typeof(StudyReportEvaluator.App.Tests.UI.U02TestAppBuilder))]
@@ -148,13 +150,19 @@ public sealed class MainWindowTests
             Assert.True(next.Focus(NavigationMethod.Tab, KeyModifiers.None));
             Press(window, Key.Enter);
             Assert.Equal(WorkflowStep.Execution, window.ViewModel.CurrentStep);
+            ExecutionView executionView = Assert.Single(
+                window.GetVisualDescendants().OfType<ExecutionView>());
+            Assert.Same(window.ViewModel.ExecutionViewModel, executionView.DataContext);
             Press(window, Key.Enter);
             Assert.Equal(WorkflowStep.Results, window.ViewModel.CurrentStep);
+            ResultsOutputView resultsView = Assert.Single(
+                window.GetVisualDescendants().OfType<ResultsOutputView>());
+            Assert.Same(window.ViewModel.ResultsOutputViewModel, resultsView.DataContext);
             Assert.Equal("完了", window.ViewModel.ExecutionStep.StatusText);
             Assert.Contains("現在", window.ViewModel.ResultsStep.StatusText, StringComparison.Ordinal);
             Assert.False(next.IsEffectivelyEnabled);
             Assert.True(Required<Border>(window, "EthicsWarningBanner").IsVisible);
-            Assert.True(Required<Border>(window, "CurrentStepPlaceholder").IsVisible);
+            Assert.False(Required<Grid>(window, "CurrentStepPlaceholderHost").IsVisible);
         }
         finally
         {
@@ -242,6 +250,134 @@ public sealed class MainWindowTests
             Assert.Equal(3, viewModel.DesignViewModel.Draft.FirstDataRow);
             Assert.Single(window.GetVisualDescendants().OfType<QuantificationDesignView>());
             Assert.False(Required<Grid>(window, "CurrentStepPlaceholderHost").IsVisible);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Shell_configures_execution_and_hands_the_completed_run_context_to_results()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
+            "Original",
+            1,
+            2,
+            2,
+            new X02Header(1, "Answer"),
+            new X02Header(2, "Rationale"));
+        InputViewModel input = new();
+        await input.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        QuantificationDefinition definition = input.DefinitionDraft;
+        RunSummary summary = await U04TestSupport.CreateSummaryAsync(
+            definition,
+            input.Metadata ?? throw new InvalidOperationException("Workbook metadata is required."));
+        RecordingRunBoundary runner = new((_, progress, _) =>
+        {
+            progress?.Invoke(new EvaluationProgress(1, 1, 0, EvaluationProgressStatus.Completed));
+            return Task.FromResult(summary);
+        });
+        ExecutionViewModel execution = new(
+            new RecordingAuthenticationBoundary(
+                new ExecutionAuthenticationSnapshot(
+                    ExecutionAuthenticationState.Available,
+                    ["model-test"],
+                    U04TestSupport.RuntimeIdentity())),
+            runner);
+        RecordingOutputBoundary output = new();
+        ResultsOutputViewModel results = new(output);
+        MainWindowViewModel viewModel = new(
+            new WorkflowNavigator(),
+            input,
+            new QuantificationDesignViewModel(definition),
+            execution,
+            results);
+        MainWindow window = new(viewModel);
+
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+            viewModel.NextCommand.Execute(null);
+            viewModel.NextCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(WorkflowStep.Execution, viewModel.CurrentStep);
+            Assert.True(execution.IsConfigured);
+            Assert.Single(window.GetVisualDescendants().OfType<ExecutionView>());
+            await execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+            await execution.StartAsync(TestContext.Current.CancellationToken);
+
+            QuantificationRunRequest request = Assert.IsType<QuantificationRunRequest>(runner.LastRequest);
+            Assert.Equal(workbook.Path, request.InputPath);
+            Assert.Equal(definition.Name, request.DraftDefinition.Name);
+            Assert.True(results.IsLoaded);
+            Assert.Equal(summary.CompletedEvaluationCount, results.CompletedEvaluationCount);
+
+            viewModel.NextCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(WorkflowStep.Results, viewModel.CurrentStep);
+            ResultsOutputView resultsView = Assert.Single(
+                window.GetVisualDescendants().OfType<ResultsOutputView>());
+            Assert.Same(results, resultsView.DataContext);
+            Assert.True(Required<Border>(window, "EthicsWarningBanner").IsVisible);
+            await results.ExportAsync(TestContext.Current.CancellationToken);
+            Assert.Same(execution.LastRunContext, output.LastRequest?.Context);
+
+            ExecutionRunContext completedContext = execution.LastRunContext
+                ?? throw new InvalidOperationException("Completed run context is required.");
+            viewModel.PreviousCommand.Execute(null);
+
+            Assert.Equal(WorkflowStep.Execution, viewModel.CurrentStep);
+            Assert.Same(completedContext, execution.LastRunContext);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Shell_does_not_reuse_previous_execution_configuration_after_input_is_unloaded()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
+            "Original",
+            1,
+            2,
+            2,
+            new X02Header(1, "Answer"));
+        InputViewModel input = new();
+        await input.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        ExecutionViewModel execution = U04TestSupport.ConfiguredExecutionViewModel(
+            input.DefinitionDraft,
+            input.Metadata ?? throw new InvalidOperationException("Workbook metadata is required."),
+            new RecordingRunBoundary((_, _, _) => throw new InvalidOperationException("must not run")));
+        MainWindowViewModel viewModel = new(
+            new WorkflowNavigator(),
+            input,
+            new QuantificationDesignViewModel(input.DefinitionDraft),
+            execution,
+            new ResultsOutputViewModel(new RecordingOutputBoundary()));
+        MainWindow window = new(viewModel);
+
+        try
+        {
+            window.Show();
+            viewModel.NextCommand.Execute(null);
+            viewModel.NextCommand.Execute(null);
+            Assert.True(execution.IsConfigured);
+
+            viewModel.NavigateCommand.Execute(WorkflowStep.Input);
+            input.SetFilePath(string.Empty);
+            viewModel.NavigateCommand.Execute(WorkflowStep.Execution);
+
+            Assert.False(execution.IsConfigured);
+            Assert.False(execution.CanStart);
+            Assert.Contains(
+                execution.TechnicalErrors,
+                error => error.Code == "EXECUTION_CONFIGURATION_REQUIRED");
         }
         finally
         {

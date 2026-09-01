@@ -310,6 +310,12 @@
               <DataTemplate DataType="{x:Type viewModels:QuantificationDesignViewModel}" x:DataType="viewModels:QuantificationDesignViewModel">
                 <views:QuantificationDesignView DataContext="{Binding}" />
               </DataTemplate>
+              <DataTemplate DataType="{x:Type viewModels:ExecutionViewModel}" x:DataType="viewModels:ExecutionViewModel">
+                <views:ExecutionView DataContext="{Binding}" />
+              </DataTemplate>
+              <DataTemplate DataType="{x:Type viewModels:ResultsOutputViewModel}" x:DataType="viewModels:ResultsOutputViewModel">
+                <views:ResultsOutputView DataContext="{Binding}" />
+              </DataTemplate>
             </ContentControl.DataTemplates>
           </ContentControl>
 

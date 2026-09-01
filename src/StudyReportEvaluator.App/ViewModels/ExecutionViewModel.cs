@@ -541,6 +541,28 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         Revalidate();
     }
 
+    internal void ClearConfiguration()
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        if (IsRunning)
+        {
+            throw new InvalidOperationException("An active run configuration cannot be cleared.");
+        }
+
+        definition = null;
+        workbookMetadata = null;
+        inputPath = string.Empty;
+        runtimeErrorCode = null;
+        LastRunContext = null;
+        ResetProgress();
+        OnPropertiesChanged(
+            nameof(IsConfigured),
+            nameof(PlannedEvaluationCount),
+            nameof(PlanSummary),
+            nameof(RunStatusText));
+        Revalidate();
+    }
+
     public async Task CheckAuthenticationAsync(
         CancellationToken cancellationToken = default)
     {
