@@ -1,5 +1,8 @@
 # ADR-0006: 署名 record と checkpoint 暗号 profile
 
+> [!WARNING]
+> **HISTORICAL / SUPERSEDED:** signed recordとencrypted checkpointを含む旧requirements v1.xの設計です。production trust inputは当時も未確定で、現行初版scopeには含まれません。現行状態は[`implementation-status.md`](../implementation-status.md)を参照してください。
+
 | 項目 | 内容 |
 |---|---|
 | 状態 | **承認済み・G-06完了・要求v1.2へG-RB反映済み（G-12実運用入力待ち）** |

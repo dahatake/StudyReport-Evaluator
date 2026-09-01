@@ -1,5 +1,8 @@
 # Runtime ReportDefinition preflight contract
 
+> [!WARNING]
+> **HISTORICAL PREFLIGHT:** requirements v1.xのReportDefinition contractです。現行v3の`QuantificationDefinition`には`target_language`、missing flags、reason policy等を実装しません。現行decisionは[ADR-0011](../adr/0011-dynamic-quantification-excel-formulas.md)を参照してください。
+
 | 項目 | 内容 |
 |---|---|
 | 状態 | **G-10完了（production実装はGATE-0待ち）** |

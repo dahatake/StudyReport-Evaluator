@@ -1,5 +1,12 @@
 # Excel / formula 契約
 
+| 項目 | 内容 |
+|---|---|
+| Persona | workbook / formula実装者、Excel監査者、QA |
+| Normative baseline | requirements v3.0 / ADR-0011 |
+| Current implementation | Config / Results / Run、closed formula AST、cached Core preview、atomic output |
+| Known gap | 完全なcolumn / formula / request capacity preflightはrun前へ未結合（[IMPL-GAP-002](implementation-status.md#impl-gap-002--excel--request-capacityの完全なpreflightがrun前ではない)） |
+
 ## 1. 入出力とapp-owned sheets
 
 入力は標準 `.xlsx` 1ファイルだけです。入力workbookはread-onlyで扱い、元sheetを保持したcopyへ次の3 sheetを追加し、入力とは異なるpathの `.xlsx` として完成させます。
@@ -11,6 +18,9 @@
 | `Quantification_Run` | input identity、definition hash、app / SDK / CLI / model identity、開始・終了、planned / completed / error件数、実際の3 sheet名 |
 
 同名sheetがある場合は既存sheetを変更せず、`Quantification_Config (2)`、`Quantification_Config (3)` のように最小の未使用suffixを割り当てます。suffixを含めて31文字に収まるようbaseを安全に切り詰め、実際の名前をformulaとRun sheetへ記録します。
+
+> [!CAUTION]
+> outputは入力の全sheet・全cellを保持するbyte-copyです。さらにConfigへquestion、Custom Prompt、criterion、mappingを、Resultsへreason / evidence等を追加します。匿名化・最小化copyではなく、入力と同等以上に機密なworkbookです。実装根拠: [`WorkingPackage.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/WorkingPackage.cs#L105-L155)、[`ConfigSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/ConfigSheetWriter.cs#L129-L249)。
 
 ## 2. Config cell reference
 
@@ -38,6 +48,8 @@ formulaが参照する主要列は `RawWeight`（R列）、`EffectiveMinimum`（
 | `.Status` | literal string | `SUCCESS`、`EMPTY`、技術的failure / cancel code |
 
 各enabled evaluatorの末尾へ `.Evaluator_Score`、各enabled questionの末尾へ `.Question_Score`、行の末尾へ `Overall_Score` のformula列を追加します。disabled nodeと子孫はResults列、AI dispatch、COUNT、分子、分母から除外します。
+
+Results UIはこの全列を表示しません。Reason、Evidence、Evidence source、Question scoreはoutput workbookで確認します。画面／workbook差分は[利用者向け機能リファレンス](../docs/features.md#画面とworkbookの項目差)を参照してください。
 
 ## 4. effective raw とblank / override semantics
 
@@ -93,6 +105,25 @@ $$
 
 Core previewは `decimal` と `MidpointRounding.AwayFromZero` を使い、Excel `ROUND` のmidpoint away-from-zeroへ合わせます。rounding digitsは0〜6です。formula cellには式と同時にCore previewの最終丸め値を **cached value** として書き、workbookをautomatic / force full calculation / full calculation on loadに設定します。
 
+```mermaid
+flowchart LR
+	S[Scorable literal] --> E[Effective Raw formula]
+	A[AI Raw literal] --> E
+	O[Override literal] --> E
+	C1[Config min / max] --> E
+	E --> N[Normalized formula]
+	C1 --> N
+	C2[Config rounding] --> N
+	N --> ES[Evaluator weighted formula]
+	W1[Criterion weights] --> ES
+	ES --> QS[Question weighted formula]
+	W2[Evaluator weights] --> QS
+	QS --> OS[Overall weighted formula]
+	W3[Question weights] --> OS
+```
+
+実装根拠: [`FormulaExpression.cs`](../src/StudyReportEvaluator.Core/Formulas/FormulaExpression.cs#L85-L173)、[`ResultsSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/ResultsSheetWriter.cs#L838-L920)。
+
 ## 6. formula allowlist とpreflight
 
 formulaはraw textを組み立てず、closed formula ASTからserializeします。function allowlistは正確に `IF`, `IFERROR`, `ISNUMBER`, `COUNT`, `SUM`, `SUMPRODUCT`, `ROUND` です。operatorは比較と四則演算、operandは数値、blank、app-owned sheetのverified cell / rangeだけです。
@@ -108,6 +139,18 @@ write前のpreflightで次を検証します。
 
 external workbook reference、defined name、DDE、macro、raw user formula、未検証cell、循環参照は許可しません。
 
+### Current timing
+
+このpreflightは**working workbookへResults sheetを書き始める前**には実行されますが、**AI run開始前**には実行されません。
+
+- column数は`ResultsSheetWriter.CreateLayout`でexport時に算出します。
+- formula length、function arguments、reference、DAGはformula AST構築後のexport時に検査します。
+- Prompt/request全体のUnicode scalar数、model context割合、worst-case retry budgetは現在のrun admissionへ結合されていません。
+
+したがって、requirements §9.6 / §14が求めるrun前capacity admissionとの間に[IMPL-GAP-002](implementation-status.md#impl-gap-002--excel--request-capacityの完全なpreflightがrun前ではない)があります。出力安全性は維持されますが、多数のAI unit完了後にexport不能となる可能性があります。
+
+実装根拠: [`ExecutionViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs#L844-L944)、[`ResultsSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/ResultsSheetWriter.cs#L324-L358)、[`FormulaPreflightValidator.cs`](../src/StudyReportEvaluator.Core/Formulas/FormulaPreflightValidator.cs#L125-L183)。
+
 ## 7. string / formula injection 防止
 
 回答、Prompt、reason、evidence、source ID、status、display nameなどのuntrusted textはOpen XMLのinline string cellとして保存します。先頭が `=`, `+`, `-`, `@` でもformula cellへ昇格させません。1 string cellは32,767文字以下とし、超過時は内容をerrorへechoせずwrite前に拒否します。
@@ -115,6 +158,8 @@ external workbook reference、defined name、DDE、macro、raw user formula、�
 formula cellはapp-owned ASTからだけ生成し、Config / Resultsのverified referenceだけを使います。overrideはapp側で有限数とrangeを検証し、Resultsのdata validationに加えてformula自身でもrangeを再検査します。
 
 ## 8. atomic commit
+
+![合成output pathとatomic output操作を示すResults画面](../images/07-output-export.png)
 
 1. final pathが入力と異なる標準 `.xlsx` で、既存fileではないことを確認します。
 2. final pathと同じdirectory / volumeに一意な **target-local** working `.xlsx` を `CreateNew` し、入力をcopyしてdiskへflushします。
@@ -125,6 +170,43 @@ formula cellはapp-owned ASTからだけ生成し、Config / Resultsのverified 
 
 rename critical sectionより前のcancel、validation failure、I/O failureでは完成名を作らず、tempをbest effortで削除します。critical section開始後のcancelはvalid finalまたはfinalなしの安全点まで遅延します。既存finalを黙って上書きしません。
 
+```mermaid
+sequenceDiagram
+	participant I as input .xlsx
+	participant A as App
+	participant T as target-local working .xlsx
+	participant F as final .xlsx
+	A->>I: read-only snapshot
+	A->>T: CreateNew + byte-copy + disk flush
+	A->>T: Config / Results / Run + calc properties
+	A->>T: close / read-only reopen / validate
+	A->>I: SHA-256 / size / mtime recheck
+	alt valid and final absent
+		A->>F: File.Move overwrite:false
+	else invalid / changed / cancelled
+		A->>T: best-effort delete
+	end
+```
+
+実装根拠: [`AtomicOutputCommitter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/AtomicOutputCommitter.cs#L105-L243)。
+
 ## 9. Office-independent required path
 
 required のread、write、preview、reopen validation、formula / cached oracle、atomic fault testsにはMicrosoft Excel、Office、LibreOffice、COM automationを使用しません。外部spreadsheetによる再計算はadvisoryなoptional smokeであり、現在の状態は `NOT_RUN` です。required testsのPASSを代替せず、未実行をPASSとも表記しません。
+
+Open XMLではformula textは`CellFormula`、cached valueは`CellValue`へ保存されます。外部仕様: Microsoft [Working with formulas](https://learn.microsoft.com/office/open-xml/spreadsheet/working-with-formulas)（2026-09-01確認）。本アプリのcached valueはCore previewであり、外部spreadsheetが再計算した値という意味ではありません。
+
+## 10. 媒体上限と出典
+
+| Limit | Current application contract | Source |
+|---|---:|---|
+| worksheet row | 1,048,576 | [`QuantificationDefinitionValidator.cs`](../src/StudyReportEvaluator.Core/Validation/QuantificationDefinitionValidator.cs#L35-L38) |
+| worksheet column | 16,384 | 同上 |
+| string cell | 32,767 characters | [`UntrustedStringCellWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/UntrustedStringCellWriter.cs#L8-L25) |
+| formula | 8,191 characters以下 | [`FormulaPreflightValidator.cs`](../src/StudyReportEvaluator.Core/Formulas/FormulaPreflightValidator.cs#L61-L69) |
+| function arguments | 255以下 | 同上 |
+| sheet name | 31 characters以下 | 同上 |
+
+Excel媒体上限の外部正本: Microsoft [Excel specifications and limits](https://support.microsoft.com/office/excel-specifications-and-limits-1672b34d-7043-467e-8e27-269d656771c3)（2026-09-01確認）。application contractは外部上限以下へさらに制限する場合があります。
+
+画面画像の生成条件と非保証範囲は[`images/README.md`](../images/README.md)を参照してください。

@@ -1,5 +1,8 @@
 # ADR-0008: Platform、行単位印刷、OS別package候補
 
+> [!WARNING]
+> **HISTORICAL / SUPERSEDED:** cross-platform、print、signed package候補を扱う旧requirements v1.xの設計です。現行初版はWindows 11 x64のunsigned ZIPだけを対象とします。現行状態は[`implementation-status.md`](../implementation-status.md)を参照してください。
+
 | 項目 | 内容 |
 |---|---|
 | 状態 | **承認済み・G-08完了・要求v1.2へG-RB反映済み（DEC-15/16/20最終選択はG-17待ち）** |

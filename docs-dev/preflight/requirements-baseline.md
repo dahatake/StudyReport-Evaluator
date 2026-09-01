@@ -1,5 +1,8 @@
 # Requirements baseline integration record
 
+> [!NOTE]
+> **BASELINE SNAPSHOT:** B-03時点のidentityとdependency boundaryです。末尾の`pending`は当時の進捗であり、現在の実装状態ではありません。現在状態は[`docs-dev/implementation-status.md`](../implementation-status.md)を参照してください。
+
 | 項目 | 値 |
 |---|---|
 | Task | B-03 |

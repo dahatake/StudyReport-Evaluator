@@ -1,5 +1,8 @@
 # ADR-0004: 数式、状態、類似度区分の契約
 
+> [!WARNING]
+> **HISTORICAL / SUPERSEDED:** mandatory review status、similarity、calibrationを含む旧requirements v1.xの設計です。現行v3ではvalid AI rawをoptional overrideなしでも使用し、similarityを実装しません。現行契約は[ADR-0011](0011-dynamic-quantification-excel-formulas.md)を参照してください。
+
 | 項目 | 内容 |
 |---|---|
 | 状態 | **承認済み・G-04完了・要求v1.2へG-RB反映済み（ADR-0009 launcher訂正、G-16 ROUND sentinel訂正を含む）** |

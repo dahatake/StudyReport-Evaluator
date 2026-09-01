@@ -4,6 +4,21 @@ Excel の学習レポートの採点を数値化・定量化するツールで�
 
 StudyReport Evaluator は、標準 `.xlsx` の回答を読み取り、動的に設定した Knowledge / Custom evaluator で評価項目ごとの数値を取得し、重み付き集計式を持つ別の `.xlsx` を作るローカルデスクトップアプリです。
 
+> [!IMPORTANT]
+> 現在の実装はHEAD `62581a3`でGATE-ACCEPTANCE `PASS`を記録していますが、後続監査でrun開始前validationの既知差分を2件確認しています。利用前に[現在の実装状態](docs-dev/implementation-status.md)を確認してください。gate artifactは再生成されるGit管理外の証跡です。
+
+## 読者別の入口
+
+| 読者 | 文書 |
+|---|---|
+| 初めて利用する教員・採点者 | [はじめに](docs/getting-started.md) |
+| 機能とscoreの意味を確認する人 | [機能リファレンス](docs/features.md) |
+| Custom Promptを設計する人 | [Custom evaluatorガイド](docs/custom-evaluator-guide.md) |
+| 情報管理・運用担当 | [データとprivacy](docs/privacy-and-data-handling.md) |
+| エラーを解決する人 | [トラブルシューティング](docs/troubleshooting.md) |
+| 要求所有者・QA | [要求定義書](docs/requirements-definition.md) |
+| 開発者・保守担当 | [開発ドキュメント](docs-dev/README.md) |
+
 ## 対応範囲
 
 | 項目 | 初版の契約 |
@@ -17,12 +32,15 @@ StudyReport Evaluator は、標準 `.xlsx` の回答を読み取り、動的に�
 
 `.xls`、CSV、PDF、macro-enabled workbook、暗号化または権利保護された workbook は対象外です。AIを使わない読込、定義編集、既存結果の表示には Copilot CLI ログインを要求しません。
 
+ここでいう「既存結果」は、同一アプリプロセス内で完了またはcancelされたrunの結果です。保存済みoutput workbookをアプリへ再importする機能はありません。標準`.xlsx`でも、resource安全上限やexternal relationshipを含むpackageは拒否します。詳細は[トラブルシューティング](docs/troubleshooting.md)を参照してください。
+
 ## 文書
 
-- [要求定義書](docs/requirements-definition.md) — サンプル Excel の確認結果、機能・非機能要求、受入基準、調査出典をまとめています。
+- [利用者ドキュメント](docs/README.md) — tutorial、機能、Custom evaluator、privacy、troubleshootingへの入口です。
+- [要求定義書](docs/requirements-definition.md) — gateでhash固定したv3.0規範baselineです。本文の「実装前」はbaseline作成時点を表し、現在状態は[実装状態](docs-dev/implementation-status.md)で確認します。
 - [アーキテクチャ](docs-dev/architecture.md) — project 境界、依存方向、run と workbook のデータフローを説明します。
 - [Excel / formula 契約](docs-dev/excel-contract.md) — Config / Results / Run sheet、式、空欄、丸め、atomic output の契約です。
-- [Custom evaluator ガイド](docs-dev/custom-evaluator-guide.md) — 任意列、Prompt placeholder、range、weight、validation の利用方法です。
+- [Traceability](docs-dev/traceability.md) — 要求、実装、test、gate、post-gate gapを対応付けます。
 
 ## 教育倫理上の注意
 
@@ -32,10 +50,81 @@ StudyReport Evaluator は、標準 `.xlsx` の回答を読み取り、動的に�
 
 ## 4ステップの操作
 
-1. **入力** — `.xlsx`、sheet、見出し行、データ行、質問ごとの主回答列と補助列を選びます。
-2. **定量化設計** — Knowledge の知識ポイント、Custom Prompt、評価項目、range、criterion / evaluator / question の weight を設定します。
+1. **入力** — `.xlsx`のfull pathを入力し、sheet、見出し行、データ行、質問ごとの主回答列と補助列を選びます。現在のUIにnative file pickerはありません。
+2. **定量化設計** — Knowledge の知識ポイント、Custom Prompt、評価項目、range、criterion / evaluator / question の weight を設定し、snapshot preflightが有効であることを確認します。
 3. **実行** — Copilot CLI のログイン状態と model を確認し、immutable snapshot に固定した評価を開始します。進捗確認と cancel ができます。
-4. **結果・出力** — AI raw、任意の override、effective / normalized / aggregate preview を確認し、入力とは別の `.xlsx` へ出力します。
+4. **結果・出力** — AI raw、任意の override、effective / normalized / aggregate preview を確認し、既存directory内の新規 `.xlsx` full pathへ出力します。Reason / Evidence / Question scoreは出力workbookで確認します。
+
+```mermaid
+flowchart LR
+	I[入力pathとmapping] --> D[Knowledge / Custom設計]
+	D --> R[Copilot実行・cancel]
+	R --> O[結果確認・override]
+	O --> X[検証済み別workbook]
+```
+
+画面どおりの詳細手順は[はじめに](docs/getting-started.md)を参照してください。
+
+## 画面プレビュー
+
+次はproduction XAML / ViewModelを、100名 × 2設問の**合成データ**でheadless Skia renderした実画面です。Copilot loginはfake boundary、scoreはfake runnerの合成値であり、live serviceや実在学生の結果ではありません。全7枚の説明と再生成方法は[`images/README.md`](images/README.md)を参照してください。
+
+| 入力・mapping | 定量化設計 |
+|---|---|
+| ![標準xlsxのpath、sheet、行範囲を設定する入力画面](images/01-input-workbook.png) | ![Custom Prompt、range、weightを設定する定量化設計画面](images/04-design-custom-prompt.png) |
+
+| Autoで実行 | 結果review |
+|---|---|
+| ![Auto、concurrency 2、200 evaluation unitsを示す実行画面](images/05-execution-auto.png) | ![合成raw score、override、normalized scoreを示す結果画面](images/06-results-review.png) |
+
+## 100名 × 2設問のトークン計画値（Auto）
+
+### 結論
+
+実行画面のmodel一覧に`Auto`が表示され、それを選択した前提です。各設問にenabled evaluatorを1件ずつ設定し、100名の2設問がすべて非空の場合、アプリは次の **200 evaluation units** を作ります。
+
+$$
+100\ \text{名}\times 2\ \text{設問}\times 1\ \text{evaluator}=200\ \text{units}
+$$
+
+first attemptですべて成功すれば200 attemptsです。ただし、`Auto`はPromptの内容・複雑さ等からrequestごとに具体的なmodelを選ぶため、全runに共通する固定tokenizerや「1 unit = 固定token数」はありません。現在のアプリもSDKの`assistant.usage`／session usage metricsを収集・保存していないため、**実測済みのexact token総数はありません**。以下はsample回答をtoken化した実測値ではなく、capacity planning用の感度分析です。
+
+### 計画用の感度分析
+
+各attemptのusageを仮に $T_{in}$ input tokens、$T_{out}$ output tokensとすると、表の合計は次で計算します。ここでは分かりやすさのため、別フィールドで報告され得るreasoning／cache tokensを含めず、input + outputだけを示します。
+
+$$
+T_{total}=N_{attempts}\times(T_{in}+T_{out})
+$$
+
+| 1 attemptあたりの仮定 | retryなし<br>200 attempts | 10%追加retry<br>220 attempts | 全unitが最大3 attempts<br>600 attempts |
+|---|---:|---:|---:|
+| input 1,000 + output 200 = **1,200 tokens** | **240,000** | **264,000** | **720,000** |
+| input 2,000 + output 400 = **2,400 tokens** | **480,000** | **528,000** | **1,440,000** |
+| input 4,000 + output 800 = **4,800 tokens** | **960,000** | **1,056,000** | **2,880,000** |
+
+便宜上、中央行の仮定を暫定計画値として使う場合は、retryなしで **約48万 input + output tokens**、10%の追加retryを見込むと **約52.8万 tokens** です。これは実測値でも保証値でもありません。実際の回答長、設問文、Custom Prompt、補助列、criterion数、Autoが選んだmodel、reason / evidenceの長さで増減します。
+
+### 増減要因
+
+- evaluatorを各設問2件にするとunitsは400件となり、同じper-attempt仮定では表の値も概ね2倍です。
+- criterion数はunitsを増やしませんが、Prompt内のcriterion metadataと返却JSONが長くなるため、input / output tokensを増やします。
+- 空の主回答は`EMPTY`となりAIへdispatchしないため、そのunitのmodel tokensは0です。
+- schema不正は最大2 attempts、network / timeoutは最大3 attemptsです。200 unitsのtransient retry上限は600 attemptsです。
+- Autoで実際に選ばれたmodelとper-callの`inputTokens` / `outputTokens` / `reasoningTokens` / cache tokensはSDK usage eventで観測できますが、現行アプリはこのnumeric telemetryをRun sheetへ書きません。
+
+token数と請求額は同じ指標ではありません。GitHubのusage-based billingでは、選択modelとtoken usageからAI Creditsが決まり、対応するpaid planでのAuto model selectionにはmodel costの10% discountがあります。これはtoken数自体を10%減らすという意味ではありません。
+
+出典:
+
+- evaluation unitの生成規則: [`EvaluationPlanBuilder.cs`](src/StudyReportEvaluator.App/Workflow/EvaluationPlanBuilder.cs#L537-L578)
+- empty dispatch抑止: [`EvaluationScheduler.cs`](src/StudyReportEvaluator.App/Workflow/EvaluationScheduler.cs#L431-L451)
+- retry上限: [`RetryAndCleanupCoordinator.cs`](src/StudyReportEvaluator.App/Copilot/RetryAndCleanupCoordinator.cs#L113-L118)、[`RetryAndCleanupCoordinator.cs`](src/StudyReportEvaluator.App/Copilot/RetryAndCleanupCoordinator.cs#L439-L465)
+- Promptへ含む情報: [`SafeEvaluationPayloadBuilder.cs`](src/StudyReportEvaluator.Core/Prompting/SafeEvaluationPayloadBuilder.cs#L52-L87)
+- 現行Run sheetの保存field: [`RunSheetWriter.cs`](src/StudyReportEvaluator.App/Workbooks/Writing/RunSheetWriter.cs#L52-L81)
+- token usage API: GitHub [Usage and billing](https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/usage-and-billing)（2026-09-01確認）
+- Autoのmodel選択とdiscount: GitHub [Auto model selection](https://docs.github.com/en/copilot/concepts/models/auto-model-selection)（2026-09-01確認）
+- AI Credits: GitHub [Usage-based billing for individuals](https://docs.github.com/en/copilot/concepts/billing/usage-based-billing-for-individuals)（2026-09-01確認）
 
 ## unsigned ZIP から実行
 
@@ -55,9 +144,11 @@ Expand-Archive -LiteralPath artifacts\package\StudyReportEvaluator-win-x64.zip -
 
 AI定量化を使う場合は、起動前に端末上の既存 Copilot CLI でログインを済ませてください。アプリ固有の OAuth app、client ID、client secret、PAT は入力しません。
 
+`copilot.exe`はZIPへ同梱されません。別途導入し、Windowsの`PATH`から解決できる状態にしてください。現在のZIPに利用者ガイド本体は同梱されず、`RELEASE-NOTES.txt`だけが追加されます。配布担当者は本READMEと`docs/`への到達手段を利用者へ提供してください。
+
 ## source から build / test / package
 
-リポジトリルートで PowerShell 7（`pwsh.exe`、PSEdition Core）を使います。次の restore、build、test は順番に実行します。
+リポジトリルートで、`global.json`が選択する.NET SDK 10.0.400 feature bandとPowerShell 7（`pwsh.exe`、PSEdition Core）を使います。次の restore、build、test は順番に実行します。
 
 ```powershell
 dotnet restore StudyReportEvaluator.slnx --locked-mode
@@ -78,6 +169,8 @@ pwsh.exe -NoLogo -NoProfile -File scripts/publish-windows.ps1
 pwsh.exe -NoLogo -NoProfile -File scripts/package-windows.ps1
 ```
 
+固定dependency versionは[`Directory.Packages.props`](Directory.Packages.props)、SDK選択は[`global.json`](global.json)を正本とします。.NET self-contained deploymentの外部仕様はMicrosoft [.NET application publishing overview](https://learn.microsoft.com/dotnet/core/deploying/#publish-as-self-contained)を参照してください（2026-09-01確認）。
+
 ## 出力 workbook
 
 入力 workbook 自体は変更しません。target directory 内の一意な一時 `.xlsx` へ入力をcopyし、write、flush、close、reopen、検証、入力identity再確認を終えた後だけ、既存fileを上書きしない atomic rename で完成名へ移します。
@@ -88,27 +181,42 @@ pwsh.exe -NoLogo -NoProfile -File scripts/package-windows.ps1
 
 formula cell には式と Core preview の cached value を併記します。入力内に同名sheetがある場合は既存sheetを変更せず、`Quantification_Config (2)` のような一意名を使います。詳細は [Excel / formula 契約](docs-dev/excel-contract.md) を参照してください。
 
+> [!CAUTION]
+> 出力は入力workbook全体のbyte-copyです。選択しなかったsheet、管理列、氏名、回答等も入力に存在すれば保持され、さらにPrompt、criterion、range、weight、AI resultが追加されます。入力と同等以上に機密なfileとして扱ってください。
+
 ## privacy / security
 
 **このリポジトリへ実在する学生の回答・氏名・メールアドレス等を追加しないでください。** sample workbook の検証では回答本文をartifactやlogへ出さず、構造metadataと入力identityだけを扱います。
 
-- AIへ送るのは、利用者が選んだ同じ行の主回答列と補助列だけです。他行、非選択列、workbook path は送りません。
+- workbook由来でAIへ送る値は、利用者が選んだ同じ行の主回答列と補助列だけです。他行、非選択列、workbook pathは送りません。
+- Prompt全体には、question text、criterion ID／表示名／description／range、CustomまたはKnowledge template、evaluator ID、許可source ID、app-owned structured-output contractも含まれます。
 - 回答本文、Prompt、reason、evidence、token、credential をアプリlogへ記録しません。
 - untrusted text は Excel の string cell として保存し、raw user formula として実行しません。
 - app-owned database と cloud backend はありません。外部通信は、AI実行時に既存 Copilot CLI / GitHub Copilot を利用する経路だけです。
 - 入力の SHA-256、size、last-write time を最終rename直前に完全一致で再確認します。
 
+完全なdata flowとoutputの取扱いは[データとprivacy](docs/privacy-and-data-handling.md)を参照してください。
+
 ## 検証済み証跡
 
-| 対象 | 状態 / 実測 |
-|---|---|
-| repository sample の構造 | `sample/機械学習 サブフィールド PBL 2025 レポート - コピー.xlsx` を read-only で確認。661,189 bytes、SHA-256 `446386E20BB4096561CB4AFD6D74B8EAA9D50EAE53C97F984BA7F70EBEAD0DE5`、`Old!A1:AF531`、`Original!A1:L531`、`Final!A1:AD531`、入力identity不変、回答値のartifact出力なし。 |
-| P-01完了時点（D-01文書テスト追加前） | Release solution tests は 443件すべて成功、失敗0、skip 0。 |
-| Windows x64 性能記録 | 本D-01作業セッションで提示された E-02 の `synthetic-531-row-read-write-validation` 3回の記録は中央値 **3.279264 秒**。AI待機とfixture生成を除外し、classification / metadata / mapping / copy / write / reopen-validation / atomic-commit / input-recheck を測定した値で、端末や再実行に依存するため保証値ではありません。 |
-| optional live Copilot smoke | `NOT_RUN` — required fake-transport tests だけが GATE-AI の PASS を決定。 |
-| optional external recalculation smoke | `NOT_RUN` — required formula oracle / cached-value reopen tests だけが GATE-EXCEL の PASS を決定。 |
-| 実画面 | この作業では実画面を取得していないため掲載していません。 |
+| 対象 | 現在確認できる状態 | 出典 |
+|---|---|---|
+| repository sample | `sample/機械学習 サブフィールド PBL 2025 レポート - コピー.xlsx`。661,189 bytes、SHA-256 `446386E20BB4096561CB4AFD6D74B8EAA9D50EAE53C97F984BA7F70EBEAD0DE5`、3 sheetの構造と入力identity不変を確認 | [`sample-workbook-profile.md`](docs-dev/preflight/sample-workbook-profile.md) |
+| GATE-ACCEPTANCE | HEAD `62581a3`に対して`PASS`、solution tests 452件成功、失敗0、skip 0 | [tracked summary](docs-dev/implementation-status.md)、generated `artifacts/test/gate-acceptance.json` |
+| Windows x64性能 | 3回測定の中央値が30秒以下かをtest runごとに再測定。固定保証値ではない | generated `artifacts/test/performance-windows-x64.json` |
+| optional live Copilot smoke | `NOT_RUN` | [traceability](docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute) |
+| optional external recalculation smoke | `NOT_RUN` | [traceability](docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute) |
+| 実画面 | 合成100名 × 2設問から7枚を生成。live login／実AI結果ではない | [`images/README.md`](images/README.md)、[`DocumentationScreenshotTests.cs`](tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs) |
+
+`artifacts/`はGit管理外で再生成されます。固定baselineやcommit済みrelease recordとして扱いません。
+
+## 既知の実装差分
+
+- **IMPL-GAP-001:** Designで検出した不正Custom PromptをExecution開始条件で再検査しません。AIへ不正Promptは送られませんが、run開始後にunitが`AI_RUNTIME_FAILED`となる可能性があります。
+- **IMPL-GAP-002:** Results列数、formula長、function argument数等の完全なcapacity preflightはrun前ではなくexport時です。Prompt/context budgetのrun admissionも未結合です。
+
+詳細、根拠、closure条件は[現在の実装状態](docs-dev/implementation-status.md)を参照してください。
 
 ## 制限と非保証
 
-初版は Windows 11 x64 のみを対象とします。macOS、Linux、Windows Arm64、installer、code signing / notarization はサポート対象外です。AI出力や本ツールについて、採点品質、教育的妥当性、公平性、組織方針への適合性、法的適合性を保証しません。warning は確認を促す案内であり、mandatory human review、倫理承認、合否判定のgateではありません。
+初版は Windows 11 x64 のみを対象とします。macOS、Linux、Windows Arm64、installer、code signing / notarization はサポート対象外です。native file picker、definition profileの独立save/load、保存済みoutputの再importも提供しません。AI出力や本ツールについて、採点品質、教育的妥当性、公平性、組織方針への適合性、法的適合性を保証しません。warning は確認を促す案内であり、mandatory human review、倫理承認、合否判定のgateではありません。

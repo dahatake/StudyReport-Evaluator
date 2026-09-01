@@ -1,5 +1,8 @@
 # G-13 governance input metadata register
 
+> [!WARNING]
+> **HISTORICAL / OUTSIDE CURRENT SCOPE:** requirements v1.xのreal-data governance gateです。本文の`BLOCKED`は当時の旧scopeに対する状態であり、現行v3初版のruntime gateではありません。法的・組織的承認が存在するという意味にも読み替えません。
+
 | 項目 | 内容 |
 |---|---|
 | Task | G-13 |

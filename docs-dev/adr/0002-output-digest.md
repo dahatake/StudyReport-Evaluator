@@ -1,5 +1,8 @@
 # ADR-0002: 出力 digest と detached completion record
 
+> [!WARNING]
+> **HISTORICAL / SUPERSEDED:** signed completion recordを含む旧requirements v1.xの設計です。現行実装はこの`.completion.jws` contractを実装しません。現行output契約は[ADR-0011](0011-dynamic-quantification-excel-formulas.md)と[`excel-contract.md`](../excel-contract.md)を参照してください。
+
 | 項目 | 内容 |
 |---|---|
 | 状態 | **承認済み・G-02完了・要求v1.2へG-RB反映済み** |

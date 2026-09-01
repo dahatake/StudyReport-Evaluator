@@ -1,5 +1,8 @@
 # Implementation task file map — plan v4.0
 
+> [!NOTE]
+> **OWNERSHIP SNAPSHOT:** exact path ownershipの記録として有効です。本文の`future`、`pending`、phase開始条件はtask実行前の時間的snapshotであり、現在の実装進捗ではありません。現在状態は[`docs-dev/implementation-status.md`](../implementation-status.md)を参照してください。
+
 | 項目 | 内容 |
 |---|---|
 | 状態 | **CURRENT NORMATIVE PATH MAP** |

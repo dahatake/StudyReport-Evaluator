@@ -1,5 +1,8 @@
 # ADR-0005: Copilot result tool と出力 protocol
 
+> [!WARNING]
+> **HISTORICAL / SUPERSEDED:** `submit_evaluation`、explicit token、旧ReportDefinitionを扱うrequirements v1.xの設計です。現行実装は既存CLI loginと`submit_quantification`を使用します。現行境界は[ADR-0011](0011-dynamic-quantification-excel-formulas.md)と[`architecture.md`](../architecture.md)を参照してください。
+
 | 項目 | 内容 |
 |---|---|
 | 状態 | **改版承認済み・G-05 完了（DEC-07/08維持、DEC-09をruntime ReportDefinition方式で解決）** |

@@ -1,5 +1,8 @@
 # ADR-0003: Open XML 変更許可リストと `Eval` 投影契約
 
+> [!WARNING]
+> **HISTORICAL / SUPERSEDED:** `Eval` / `Evaluation_Config` / `Evaluation_Run`を用いる旧requirements v1.xの設計です。現行は`Quantification_Config` / `Quantification_Results` / `Quantification_Run`を使用します。現行契約は[ADR-0011](0011-dynamic-quantification-excel-formulas.md)を参照してください。
+
 | 項目 | 内容 |
 |---|---|
 | 状態 | **承認済み・G-03完了・要求v1.2へG-RB反映済み** |

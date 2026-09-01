@@ -1,5 +1,8 @@
 # ADR-0010: 単一Excel入力・Windows local初版scope
 
+> [!WARNING]
+> **PARTIALLY SUPERSEDED:** 単一`.xlsx`、Windows local、既存CLI login、入力不変はADR-0011へcarry forwardされています。固定preset、send-preview、PII candidate detection、mandatory human adoptionは現行v3でsupersedeされています。現行decisionは[ADR-0011](0011-dynamic-quantification-excel-formulas.md)を参照してください。
+
 | 項目 | 内容 |
 |---|---|
 | 状態 | **承認済み** |

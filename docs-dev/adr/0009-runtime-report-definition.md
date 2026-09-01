@@ -1,5 +1,8 @@
 # ADR-0009: 起動後のReportDefinitionとlauncher identity境界
 
+> [!WARNING]
+> **HISTORICAL / SUPERSEDED:** `target_language`、missing flags、reason policy等を持つ旧ReportDefinitionの設計です。現行v3の`QuantificationDefinition` contractではありません。現行decisionは[ADR-0011](0011-dynamic-quantification-excel-formulas.md)を参照してください。
+
 | 項目 | 内容 |
 |---|---|
 | 状態 | **要求所有者訂正を反映・承認済み** |

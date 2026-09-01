@@ -1,5 +1,8 @@
 # Revised GATE-0 result — dynamic Excel quantification
 
+> [!NOTE]
+> **GATE-TIME SNAPSHOT:** production sourceが0件だったGATE-0評価時点の記録です。現在の実装・最終gate状態は[`docs-dev/implementation-status.md`](../implementation-status.md)とgenerated `artifacts/test/gate-acceptance.json`を参照してください。
+
 | 項目 | 値 |
 |---|---|
 | Gate | GATE-0 |

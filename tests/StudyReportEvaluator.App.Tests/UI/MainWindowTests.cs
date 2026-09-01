@@ -24,7 +24,11 @@ public sealed class U02TestAppBuilder
 {
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()
-            .UseHeadless(new AvaloniaHeadlessPlatformOptions());
+            .UseSkia()
+            .UseHeadless(new AvaloniaHeadlessPlatformOptions
+            {
+                UseHeadlessDrawing = false,
+            });
 }
 
 public sealed class MainWindowTests

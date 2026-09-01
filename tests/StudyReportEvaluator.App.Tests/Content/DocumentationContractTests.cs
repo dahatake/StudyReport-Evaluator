@@ -4,12 +4,22 @@ namespace StudyReportEvaluator.App.Tests.Content;
 
 public sealed class DocumentationContractTests
 {
-    private static readonly string[] D01DocumentPaths =
+    private static readonly string[] CurrentDocumentPaths =
     [
         "README.md",
+        "docs/README.md",
+        "docs/getting-started.md",
+        "docs/features.md",
+        "docs/custom-evaluator-guide.md",
+        "docs/privacy-and-data-handling.md",
+        "docs/troubleshooting.md",
+        "docs/requirements-definition.md",
+        "docs-dev/README.md",
+        "docs-dev/implementation-status.md",
         "docs-dev/architecture.md",
         "docs-dev/excel-contract.md",
-        "docs-dev/custom-evaluator-guide.md",
+        "docs-dev/traceability.md",
+        "images/README.md",
     ];
 
     [Fact]
@@ -17,7 +27,7 @@ public sealed class DocumentationContractTests
     {
         string root = FindRepositoryRoot();
 
-        foreach (string relativePath in D01DocumentPaths)
+        foreach (string relativePath in CurrentDocumentPaths)
         {
             string path = Resolve(root, relativePath);
             Assert.True(File.Exists(path), $"Missing D-01 source document: {relativePath}");
@@ -33,10 +43,15 @@ public sealed class DocumentationContractTests
         AssertContainsAll(
             readme,
             "Excel の学習レポートの採点を数値化・定量化するツールです。",
+            "[はじめに](docs/getting-started.md)",
+            "[機能リファレンス](docs/features.md)",
+            "[Custom evaluatorガイド](docs/custom-evaluator-guide.md)",
+            "[データとprivacy](docs/privacy-and-data-handling.md)",
+            "[トラブルシューティング](docs/troubleshooting.md)",
             "[要求定義書](docs/requirements-definition.md)",
             "[アーキテクチャ](docs-dev/architecture.md)",
             "[Excel / formula 契約](docs-dev/excel-contract.md)",
-            "[Custom evaluator ガイド](docs-dev/custom-evaluator-guide.md)",
+            "[現在の実装状態](docs-dev/implementation-status.md)",
             "このリポジトリへ実在する学生の回答・氏名・メールアドレス等を追加しないでください。");
 
         AssertDoesNotContainAny(
@@ -59,6 +74,9 @@ public sealed class DocumentationContractTests
             "標準 `.xlsx` 1ファイルのみ",
             "AI定量化を実行するときだけ、既存の GitHub Copilot CLI ログインを使用",
             "Microsoft Excel / Office / LibreOffice / COM automation は不要",
+            "現在のUIにnative file pickerはありません",
+            "`copilot.exe`はZIPへ同梱されません",
+            "Windowsの`PATH`から解決できる状態",
             "1. **入力**",
             "2. **定量化設計**",
             "3. **実行**",
@@ -89,17 +107,34 @@ public sealed class DocumentationContractTests
             "app-owned database と cloud backend はありません",
             "sample/機械学習 サブフィールド PBL 2025 レポート - コピー.xlsx",
             "446386E20BB4096561CB4AFD6D74B8EAA9D50EAE53C97F984BA7F70EBEAD0DE5",
-            "P-01完了時点（D-01文書テスト追加前）",
-            "443件すべて成功",
-            "3回の記録は中央値",
-            "3.279264 秒",
-            "AI待機とfixture生成を除外",
-            "保証値ではありません",
+            "solution tests 452件成功",
+            "test runごとに再測定",
+            "固定保証値ではない",
             "optional live Copilot smoke | `NOT_RUN`",
             "optional external recalculation smoke | `NOT_RUN`",
-            "実画面を取得していないため掲載していません");
+            "合成100名 × 2設問から7枚を生成",
+            "[標準xlsxのpath、sheet、行範囲を設定する入力画面](images/01-input-workbook.png)",
+            "[Auto、concurrency 2、200 evaluation unitsを示す実行画面](images/05-execution-auto.png)",
+            "入力workbook全体のbyte-copy",
+            "入力と同等以上に機密",
+            "question text、criterion ID",
+            "## 100名 × 2設問のトークン計画値（Auto）",
+            "200 evaluation units",
+            "実測済みのexact token総数はありません",
+            "240,000",
+            "480,000",
+            "528,000",
+            "1,440,000",
+            "全unitが最大3 attempts",
+            "token数自体を10%減らすという意味ではありません",
+            "Usage and billing",
+            "Auto model selection",
+            "IMPL-GAP-001",
+            "IMPL-GAP-002");
 
         Assert.DoesNotContain("ZIP は commit 済み", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("443件すべて成功", readme, StringComparison.Ordinal);
+        Assert.DoesNotContain("3.279264 秒", readme, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -120,6 +155,7 @@ public sealed class DocumentationContractTests
             "GitHub.Copilot.SDK",
             "flowchart LR",
             "flowchart TD",
+            "sequenceDiagram",
             "immutable snapshot",
             "canonical JSON",
             "SHA-256",
@@ -127,6 +163,10 @@ public sealed class DocumentationContractTests
             "target-local",
             "no-overwrite atomic rename",
             "app-owned database と cloud backend はありません",
+            "native pickerではなくfull pathのTextBox",
+            "Reason / Evidence / Question scoreはworkbookだけ",
+            "IMPL-GAP-001",
+            "IMPL-GAP-002",
             "optional live Copilot smoke は `NOT_RUN`",
             "optional external spreadsheet recalculation smoke も `NOT_RUN`");
     }
@@ -170,13 +210,17 @@ public sealed class DocumentationContractTests
             "no-overwrite atomic rename",
             "SHA-256、size、last-write time",
             "Office-independent required path",
+            "Current timing",
+            "AI run開始前",
+            "入力と同等以上に機密",
+            "Working with formulas",
             "現在の状態は `NOT_RUN`");
     }
 
     [Fact]
     public void Custom_guide_has_exactly_six_placeholders_and_safe_rendering_contract()
     {
-        string guide = Read("docs-dev/custom-evaluator-guide.md");
+        string guide = Read("docs/custom-evaluator-guide.md");
         string[] catalog = guide
             .Split('\n')
             .Select(line => line.TrimEnd('\r'))
@@ -211,7 +255,99 @@ public sealed class DocumentationContractTests
             "UNMATCHED_CLOSING_BRACE",
             "AIへaggregateを要求しないでください",
             "mandatory human review",
-            "倫理gate");
+            "IMPL-GAP-001");
+    }
+
+    [Fact]
+    public void User_documents_describe_actual_path_entry_result_surface_and_data_boundary()
+    {
+        string gettingStarted = Read("docs/getting-started.md");
+        string features = Read("docs/features.md");
+        string privacy = Read("docs/privacy-and-data-handling.md");
+        string troubleshooting = Read("docs/troubleshooting.md");
+
+        AssertContainsAll(
+            gettingStarted,
+            "現在のUIにnative file pickerはありません",
+            "Reason、Evidence、Evidence source、Question score",
+            "同一プロセス内で完了またはcancelされたrun",
+            "../images/01-input-workbook.png",
+            "../images/02-input-mapping.png",
+            "../images/03-design-knowledge.png",
+            "../images/04-design-custom-prompt.png",
+            "../images/05-execution-auto.png",
+            "../images/06-results-review.png",
+            "../images/07-output-export.png",
+            "sequenceDiagram");
+        AssertContainsAll(
+            features,
+            "保存済み結果の再import",
+            "reusable definition profile",
+            "画面とworkbookの項目差",
+            "AI_RUNTIME_FAILED");
+        AssertContainsAll(
+            privacy,
+            "definition由来",
+            "question text",
+            "入力と同等以上に機密",
+            "他行、非選択列、workbook path");
+        AssertContainsAll(
+            troubleshooting,
+            "100 MiB",
+            "InvalidRelationship",
+            "IMPL-GAP-001",
+            "IMPL-GAP-002",
+            "Excel specifications and limits");
+
+        string imageManifest = Read("images/README.md");
+        AssertContainsAll(
+            imageManifest,
+            "Avalonia 12.1.1 Headless + Skia",
+            "fake authentication boundary",
+            "personal/student data: なし",
+            "01-input-workbook.png",
+            "07-output-export.png",
+            "STUDY_REPORT_EVALUATOR_GENERATE_DOC_IMAGES");
+    }
+
+    [Fact]
+    public void Frozen_requirement_current_status_and_historical_documents_are_explicitly_separated()
+    {
+        string requirements = Read("docs/requirements-definition.md");
+        string implementationStatus = Read("docs-dev/implementation-status.md");
+        string traceability = Read("docs-dev/traceability.md");
+        string developerIndex = Read("docs-dev/README.md");
+        string historicalAdr = Read("docs-dev/adr/0005-copilot-result-protocol.md");
+        string historicalPreflight = Read("docs-dev/preflight/governance-inputs.md");
+        string historicalRelease = Read("docs-dev/release/p1-disposition.md");
+
+        AssertContainsAll(
+            requirements,
+            "| 文書版 | 3.0 |",
+            "動的Prompt定量化・Excel加重計算版（実装前）",
+            "## 19. Traceability summary");
+        AssertContainsAll(
+            implementationStatus,
+            "GATE-ACCEPTANCE record | `PASS`",
+            "Documentation refresh validation | post-gateで文書契約test 2件とvisual documentation test 1件を追加後、Release build PASS、455 passed / 0 failed / 0 skipped",
+            "Post-gate conformance gaps | 2 open",
+            "## IMPL-GAP-001",
+            "## IMPL-GAP-002");
+        AssertContainsAll(
+            traceability,
+            "PASS recorded for HEAD `62581a3`",
+            "PASS_RECORDED_POST_GATE_GAP_OPEN",
+            "GATE-ACCEPTANCE PASS at 62581a3");
+        AssertContainsAll(
+            developerIndex,
+            "## 現行正本",
+            "## 履歴文書",
+            "Source of truthの優先順位",
+            "exact-byte固定したv3.0規範baseline",
+            "実装後のstatusと差分を`implementation-status.md`へ分離");
+        Assert.Contains("HISTORICAL / SUPERSEDED", historicalAdr, StringComparison.Ordinal);
+        Assert.Contains("HISTORICAL / OUTSIDE CURRENT SCOPE", historicalPreflight, StringComparison.Ordinal);
+        Assert.Contains("HISTORICAL / SUPERSEDED", historicalRelease, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -224,7 +360,7 @@ public sealed class DocumentationContractTests
         {
             "README.md",
             "docs-dev/architecture.md",
-            "docs-dev/custom-evaluator-guide.md",
+            "docs/custom-evaluator-guide.md",
         })
         {
             string content = Read(relativePath);
@@ -238,7 +374,7 @@ public sealed class DocumentationContractTests
     {
         string allDocuments = string.Join(
             Environment.NewLine,
-            D01DocumentPaths.Select(Read));
+            CurrentDocumentPaths.Select(Read));
 
         AssertDoesNotContainAny(
             allDocuments,
@@ -258,11 +394,7 @@ public sealed class DocumentationContractTests
             "法的適合性を保証します",
             "法的適合性は保証済み",
             "品質を保証します",
-            "品質は保証済み",
-            "![",
-            ".png",
-            ".jpg",
-            ".jpeg");
+            "品質は保証済み");
     }
 
     private static void AssertContainsAll(string content, params string[] expectedFragments)

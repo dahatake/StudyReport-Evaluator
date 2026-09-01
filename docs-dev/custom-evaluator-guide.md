@@ -1,5 +1,8 @@
 # Custom evaluator ガイド
 
+> [!IMPORTANT]
+> **利用者向け正本は[`docs/custom-evaluator-guide.md`](../docs/custom-evaluator-guide.md)へ移動しました。** 以下はD-01時点のcompatibility snapshotです。新しい説明、既知差分、実装出典は利用者向け正本を参照してください。
+
 ## 1. Knowledge と Custom の使い分け
 
 | 種別 | 適した用途 | Prompt ownership |

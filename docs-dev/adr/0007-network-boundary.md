@@ -1,5 +1,8 @@
 # ADR-0007: 実行時ネットワーク境界と endpoint manifest
 
+> [!WARNING]
+> **HISTORICAL / SUPERSEDED:** signed endpoint manifestを含む旧requirements v1.xの設計です。現行実装のCopilot boundaryを表す文書ではありません。現行境界は[`architecture.md`](../architecture.md)を参照してください。
+
 | 項目 | 内容 |
 |---|---|
 | 状態 | **承認済み・G-07完了・要求v1.2へG-RB反映済み（G-12/G-15実manifest待ち）** |

@@ -1,5 +1,8 @@
 # P1 disposition — initial release
 
+> [!WARNING]
+> **HISTORICAL / SUPERSEDED:** requirements v1.2のP1候補です。ここで`IMPLEMENT`とされたrepeated evaluation、named ranges、review copy等は現行requirements v3.0の実装済みfeatureではありません。現行scopeは[要求定義書](../../docs/requirements-definition.md)と[ADR-0011](../adr/0011-dynamic-quantification-excel-formulas.md)を参照してください。
+
 | 項目 | 内容 |
 |---|---|
 | 状態 | **既定案承認済み・G-09 完了** |
