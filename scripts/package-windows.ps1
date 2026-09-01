@@ -23,7 +23,8 @@ $ReleaseNotes = @(
     'Signing: UNSIGNED',
     'Symbols: EXCLUDED',
     'Office dependency: NONE',
-    'GitHub Copilot CLI login is required only for AI evaluation.'
+    'GitHub Copilot CLI login is required only for AI evaluation.',
+    'User guide: README.md and docs/getting-started.md'
 ) -join "`n"
 $ReleaseNotes += "`n"
 
@@ -354,6 +355,47 @@ foreach ($file in @(Get-ChildItem -LiteralPath $PublishedDirectory -File -Force 
         [pscustomobject]@{
             Length = $file.Length
             LastWriteTimeUtc = $file.LastWriteTimeUtc
+        })
+    $relativeNames.Add($normalized)
+}
+
+$documentationItems = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
+$rootReadme = Get-Item -LiteralPath (Join-Path $repositoryRoot 'README.md') -Force
+$documentationItems.Add($rootReadme)
+foreach ($documentationRootName in @('docs', 'images')) {
+    $documentationRoot = Join-Path $repositoryRoot $documentationRootName
+    if (-not (Test-Path -LiteralPath $documentationRoot -PathType Container)) {
+        throw "Required documentation directory is missing: $documentationRootName"
+    }
+
+    foreach ($documentationItem in @(Get-ChildItem -LiteralPath $documentationRoot -Force -Recurse)) {
+        Assert-NotReparsePoint -Item $documentationItem
+        if (-not $documentationItem.PSIsContainer) {
+            $documentationItems.Add($documentationItem)
+        }
+    }
+}
+
+foreach ($documentationFile in $documentationItems) {
+    Assert-NotReparsePoint -Item $documentationFile
+    $relative = [System.IO.Path]::GetRelativePath($repositoryRoot, $documentationFile.FullName)
+    Assert-SafeRelativePath -RelativePath $relative
+    $normalized = $relative.Replace('\', '/')
+    $extension = [System.IO.Path]::GetExtension($documentationFile.Name)
+    if (($extension -cne '.md' -and $extension -cne '.png') -or $documentationFile.Length -le 0) {
+        throw "Documentation package input must be a nonempty Markdown or PNG file: $normalized"
+    }
+
+    if ($fileMap.ContainsKey($normalized)) {
+        throw "Documentation package path collides with publish input: $normalized"
+    }
+
+    $fileMap.Add($normalized, $documentationFile.FullName)
+    $fileSnapshots.Add(
+        $normalized,
+        [pscustomobject]@{
+            Length = $documentationFile.Length
+            LastWriteTimeUtc = $documentationFile.LastWriteTimeUtc
         })
     $relativeNames.Add($normalized)
 }

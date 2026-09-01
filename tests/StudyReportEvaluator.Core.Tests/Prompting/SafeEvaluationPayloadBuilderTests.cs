@@ -77,24 +77,12 @@ public sealed class SafeEvaluationPayloadBuilderTests
     }
 
     [Fact]
-    public void Knowledge_dispatch_always_uses_app_owned_semantic_and_structured_instructions()
+    public void Valid_knowledge_dispatch_uses_app_owned_semantic_and_structured_instructions()
     {
         QuantificationDefinition source = C02TestDefinitions.CreateValid();
-        EvaluatorDefinition knowledge = source.Questions[0].Evaluators[0] with
-        {
-            CustomPromptTemplate = "USER-ATTEMPTED-REPLACEMENT {回答} {評価項目}",
-        };
-        QuantificationDefinition definition = source with
-        {
-            Questions =
-            [
-                source.Questions[0] with { Evaluators = [knowledge, source.Questions[0].Evaluators[1]] },
-                source.Questions[1],
-            ],
-        };
 
         SafeEvaluationPayload payload = _builder.Build(
-            QuantificationSnapshot.Create(definition),
+            QuantificationSnapshot.Create(source),
             "Q1",
             "E1",
             new Dictionary<string, string?> { ["G"] = "answer", ["K"] = "", ["L"] = "" });
@@ -103,7 +91,6 @@ public sealed class SafeEvaluationPayloadBuilderTests
         Assert.Contains("関係", payload.RenderedPrompt, StringComparison.Ordinal);
         Assert.Contains("適用", payload.RenderedPrompt, StringComparison.Ordinal);
         Assert.Contains("APP-OWNED STRUCTURED OUTPUT CONTRACT", payload.RenderedPrompt, StringComparison.Ordinal);
-        Assert.DoesNotContain("USER-ATTEMPTED-REPLACEMENT", payload.RenderedPrompt, StringComparison.Ordinal);
     }
 
     [Fact]

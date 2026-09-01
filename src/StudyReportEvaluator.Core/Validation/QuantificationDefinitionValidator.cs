@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using StudyReportEvaluator.Core.Domain;
+using StudyReportEvaluator.Core.Prompting;
 
 namespace StudyReportEvaluator.Core.Validation;
 
@@ -41,6 +42,17 @@ public sealed class QuantificationDefinitionValidator
     public const int MaximumSelectedRows = 20_000;
     public const int MaximumExcelRow = 1_048_576;
     public const int MaximumExcelColumn = 16_384;
+    public const int MaximumCellCharacters = 32_767;
+
+    private static readonly PromptRenderContext PromptValidationContext = new(
+        "question",
+        "answer",
+        "support",
+        "criteria",
+        "0",
+        "1");
+
+    private readonly PromptTemplateRenderer promptRenderer = new();
 
     public DefinitionValidationResult Validate(QuantificationDefinition definition)
     {
@@ -87,7 +99,7 @@ public sealed class QuantificationDefinitionValidator
         return new DefinitionValidationResult(errors.ToImmutable());
     }
 
-    private static void ValidateQuestion(
+    private void ValidateQuestion(
         QuestionDefinition question,
         string path,
         ImmutableArray<DefinitionValidationError>.Builder errors,
@@ -121,7 +133,7 @@ public sealed class QuantificationDefinitionValidator
         }
     }
 
-    private static void ValidateEvaluator(
+    private void ValidateEvaluator(
         EvaluatorDefinition evaluator,
         string path,
         ImmutableArray<DefinitionValidationError>.Builder errors,
@@ -136,6 +148,10 @@ public sealed class QuantificationDefinitionValidator
         if (!Enum.IsDefined(typeof(EvaluatorType), evaluator.Type))
         {
             Add(errors, "INVALID_EVALUATOR_TYPE", path, "Evaluator", evaluator.Id, evaluator.DisplayName, "Type", Invariant((int)evaluator.Type));
+        }
+        else
+        {
+            ValidatePromptConfiguration(evaluator, path, errors);
         }
 
         ImmutableArray<CriterionDefinition> criteria = DefinitionCollectionOperations.Normalize(evaluator.Criteria);
@@ -155,6 +171,102 @@ public sealed class QuantificationDefinitionValidator
             }
 
             ValidateCriterion(criterion, criterionPath, errors, knownIds);
+        }
+    }
+
+    private void ValidatePromptConfiguration(
+        EvaluatorDefinition evaluator,
+        string path,
+        ImmutableArray<DefinitionValidationError>.Builder errors)
+    {
+        bool customPromptWithinCellLimit = ValidateOptionalTextCapacity(
+            errors,
+            path,
+            "Evaluator",
+            evaluator.Id,
+            evaluator.DisplayName,
+            "CustomPromptTemplate",
+            evaluator.CustomPromptTemplate);
+        _ = ValidateOptionalTextCapacity(
+            errors,
+            path,
+            "Evaluator",
+            evaluator.Id,
+            evaluator.DisplayName,
+            "BuiltInTemplateVersion",
+            evaluator.BuiltInTemplateVersion);
+
+        if (evaluator.Type == EvaluatorType.KnowledgeCoverage)
+        {
+            if (!string.Equals(
+                evaluator.BuiltInTemplateVersion,
+                BuiltInPromptTemplates.KnowledgeTemplateVersion,
+                StringComparison.Ordinal))
+            {
+                Add(
+                    errors,
+                    "KNOWLEDGE_TEMPLATE_VERSION_INVALID",
+                    path,
+                    "Evaluator",
+                    evaluator.Id,
+                    evaluator.DisplayName,
+                    "BuiltInTemplateVersion",
+                    SafeScalar(evaluator.BuiltInTemplateVersion ?? string.Empty));
+            }
+
+            if (!string.IsNullOrEmpty(evaluator.CustomPromptTemplate))
+            {
+                Add(
+                    errors,
+                    "KNOWLEDGE_CUSTOM_TEMPLATE_FORBIDDEN",
+                    path,
+                    "Evaluator",
+                    evaluator.Id,
+                    evaluator.DisplayName,
+                    "CustomPromptTemplate",
+                    SafeLength(evaluator.CustomPromptTemplate));
+            }
+
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(evaluator.BuiltInTemplateVersion))
+        {
+            Add(
+                errors,
+                "CUSTOM_BUILT_IN_TEMPLATE_FORBIDDEN",
+                path,
+                "Evaluator",
+                evaluator.Id,
+                evaluator.DisplayName,
+                "BuiltInTemplateVersion",
+                SafeScalar(evaluator.BuiltInTemplateVersion));
+        }
+
+        if (!customPromptWithinCellLimit)
+        {
+            return;
+        }
+
+        try
+        {
+            _ = promptRenderer.Render(
+                evaluator.CustomPromptTemplate ?? string.Empty,
+                PromptValidationContext);
+        }
+        catch (PromptConfigurationException exception)
+        {
+            Add(
+                errors,
+                exception.Code,
+                path,
+                "Evaluator",
+                evaluator.Id,
+                evaluator.DisplayName,
+                "CustomPromptTemplate",
+                exception.Position is int position
+                    ? $"position={position.ToString(CultureInfo.InvariantCulture)}"
+                    : SafeLength(evaluator.CustomPromptTemplate));
         }
     }
 
@@ -334,6 +446,44 @@ public sealed class QuantificationDefinitionValidator
         {
             Add(errors, "REQUIRED", path, nodeKind, nodeId, displayName, field, body ? "<blank-body>" : "<blank>");
         }
+        else if (value.Length > MaximumCellCharacters)
+        {
+            Add(
+                errors,
+                "CELL_TEXT_LIMIT_EXCEEDED",
+                path,
+                nodeKind,
+                nodeId,
+                displayName,
+                field,
+                value.Length.ToString(CultureInfo.InvariantCulture));
+        }
+    }
+
+    private static bool ValidateOptionalTextCapacity(
+        ImmutableArray<DefinitionValidationError>.Builder errors,
+        string path,
+        string nodeKind,
+        string? nodeId,
+        string? displayName,
+        string field,
+        string? value)
+    {
+        if (value is null || value.Length <= MaximumCellCharacters)
+        {
+            return true;
+        }
+
+        Add(
+            errors,
+            "CELL_TEXT_LIMIT_EXCEEDED",
+            path,
+            nodeKind,
+            nodeId,
+            displayName,
+            field,
+            value.Length.ToString(CultureInfo.InvariantCulture));
+        return false;
     }
 
     private static void RegisterId(
@@ -378,6 +528,9 @@ public sealed class QuantificationDefinitionValidator
     private static string SafeScalar(string value) => value.Length <= 64
         ? value
         : $"{value[..64]}…(length={value.Length.ToString(CultureInfo.InvariantCulture)})";
+
+    private static string SafeLength(string? value) =>
+        $"length={(value?.Length ?? 0).ToString(CultureInfo.InvariantCulture)}";
 
     private static string Invariant(decimal value) => value.ToString("G29", CultureInfo.InvariantCulture);
 

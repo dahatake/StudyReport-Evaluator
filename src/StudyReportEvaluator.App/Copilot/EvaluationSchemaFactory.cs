@@ -12,6 +12,7 @@ namespace StudyReportEvaluator.App.Copilot;
 public sealed class EvaluationSchemaFactory
 {
     public const string ToolName = "submit_quantification";
+    public const string ToolDescription = "Submit the complete criterion-level quantification result exactly once.";
 
     private const int MaximumCellCharacters = 32_767;
 
@@ -87,7 +88,7 @@ public sealed class EvaluationSchemaFactory
             new AIFunctionFactoryOptions
             {
                 Name = ToolName,
-                Description = "Submit the complete criterion-level quantification result exactly once.",
+                Description = ToolDescription,
                 ExcludeResultSchema = true,
             });
 

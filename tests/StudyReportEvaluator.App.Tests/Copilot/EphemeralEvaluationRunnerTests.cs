@@ -26,6 +26,7 @@ public sealed class EphemeralEvaluationRunnerTests
         Assert.Equal("SUCCESS", result.StatusCode);
         Assert.Equal(1, result.AttemptCount);
         Assert.Equal("E1", Assert.IsType<QuantificationResult>(result.AcceptedResult).EvaluatorId);
+        Assert.False(result.TokenUsage.IsAvailable);
 
         FakeTransport transport = Assert.Single(factory.Transports);
         SessionConfig config = Assert.Single(transport.SessionConfigs);
@@ -71,6 +72,43 @@ public sealed class EphemeralEvaluationRunnerTests
                 transport.Operations);
         });
         Assert.DoesNotContain(normalBody, result.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Numeric_usage_is_aggregated_across_schema_retry_without_content()
+    {
+        int invocation = 0;
+        FakeTransportFactory factory = new(
+            async (session, options, token) =>
+            {
+                if (Interlocked.Increment(ref invocation) == 2)
+                {
+                    await session.InvokeValidToolAsync(options, token);
+                }
+            },
+            tokenUsage: new EvaluationTokenUsage(
+                true,
+                inputTokens: 100,
+                outputTokens: 20,
+                reasoningTokens: 5,
+                cacheReadTokens: 7,
+                cacheWriteTokens: 3));
+        EphemeralEvaluationRunner runner = CreateRunner(factory);
+
+        EphemeralEvaluationResult result = await runner.EvaluateAsync(
+            CreatePayload(),
+            "model-test",
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.AttemptCount);
+        Assert.True(result.TokenUsage.IsAvailable);
+        Assert.Equal(200, result.TokenUsage.InputTokens);
+        Assert.Equal(40, result.TokenUsage.OutputTokens);
+        Assert.Equal(10, result.TokenUsage.ReasoningTokens);
+        Assert.Equal(14, result.TokenUsage.CacheReadTokens);
+        Assert.Equal(6, result.TokenUsage.CacheWriteTokens);
+        Assert.DoesNotContain("PRIVATE PROMPT CANARY", result.TokenUsage.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -247,7 +285,8 @@ public sealed class EphemeralEvaluationRunnerTests
 
     private sealed class FakeTransportFactory(
         Func<FakeSession, MessageOptions, CancellationToken, Task> send,
-        string normalAssistantBody = "") : IEphemeralCopilotTransportFactory
+        string normalAssistantBody = "",
+        EvaluationTokenUsage? tokenUsage = null) : IEphemeralCopilotTransportFactory
     {
         public bool IsAuthenticated { get; init; } = true;
 
@@ -255,7 +294,11 @@ public sealed class EphemeralEvaluationRunnerTests
 
         public IEphemeralCopilotTransport Create()
         {
-            FakeTransport transport = new(send, normalAssistantBody, IsAuthenticated);
+            FakeTransport transport = new(
+                send,
+                normalAssistantBody,
+                IsAuthenticated,
+                tokenUsage ?? EvaluationTokenUsage.Unavailable);
             Transports.Add(transport);
             return transport;
         }
@@ -264,7 +307,8 @@ public sealed class EphemeralEvaluationRunnerTests
     private sealed class FakeTransport(
         Func<FakeSession, MessageOptions, CancellationToken, Task> send,
         string normalAssistantBody,
-        bool isAuthenticated) : IEphemeralCopilotTransport
+        bool isAuthenticated,
+        EvaluationTokenUsage tokenUsage) : IEphemeralCopilotTransport
     {
         public List<string> Operations { get; } = [];
 
@@ -295,7 +339,7 @@ public sealed class EphemeralEvaluationRunnerTests
             ArgumentNullException.ThrowIfNull(config);
             Record("create", cancellationToken);
             SessionConfigs.Add(config);
-            FakeSession session = new(config, send, Operations);
+            FakeSession session = new(config, send, Operations, tokenUsage);
             Sessions.Add(session);
             return Task.FromResult<IEphemeralCopilotSession>(session);
         }
@@ -329,7 +373,8 @@ public sealed class EphemeralEvaluationRunnerTests
     private sealed class FakeSession(
         SessionConfig config,
         Func<FakeSession, MessageOptions, CancellationToken, Task> send,
-        ICollection<string> operations) : IEphemeralCopilotSession
+        ICollection<string> operations,
+        EvaluationTokenUsage tokenUsage) : IEphemeralCopilotSession
     {
         public string SessionId { get; } = config.SessionId
             ?? throw new InvalidOperationException("A test session ID is required.");
@@ -350,6 +395,12 @@ public sealed class EphemeralEvaluationRunnerTests
             operations.Add("abort");
             cancellationToken.ThrowIfCancellationRequested();
             return Task.CompletedTask;
+        }
+
+        public Task<EvaluationTokenUsage> GetUsageAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(tokenUsage);
         }
 
         public ValueTask DisposeAsync()

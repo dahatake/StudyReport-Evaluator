@@ -70,6 +70,8 @@ public sealed class SyntheticQuantificationJourneyTests
                 WorkbookMetadata = metadata,
                 InputPath = workbook.Path,
                 ModelId = ModelId,
+                MaximumPromptTokens = 64_000,
+                MaximumContextWindowTokens = 128_000,
                 MaxConcurrency = 3,
             },
             progress.Add,
@@ -88,11 +90,11 @@ public sealed class SyntheticQuantificationJourneyTests
         Assert.Equal(0, summary.FailureCount);
         Assert.Equal(0, summary.CancelledCount);
         Assert.False(summary.IsPartial);
-        Assert.Equal(expectedPlanCount, rowSource.Reads.Length);
+        Assert.Equal(expectedPlanCount + SyntheticWorkbookFactory.DataRowCount, rowSource.Reads.Length);
         Assert.Equal(expectedCallCount, fakeCopilot.Calls.Length);
         Assert.InRange(fakeCopilot.MaximumObservedConcurrency, 1, 3);
         Assert.Equal(
-            [["F", "H"], ["J", "K"]],
+            [["F", "H", "J", "K"], ["F", "H"], ["J", "K"]],
             rowSource.Reads
                 .Select(item => item.SelectedColumns)
                 .Distinct(ImmutableArraySequenceComparer.Instance)

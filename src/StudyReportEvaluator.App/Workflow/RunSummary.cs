@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.App.Workbooks.Mapping;
 using StudyReportEvaluator.App.Workbooks.Writing;
@@ -179,6 +180,12 @@ public sealed class RunSummary
         ResultsStatusCodes.Cancelled));
 
     public int FailureCount => Units.Length - SucceededCount - EmptyCount - CancelledCount;
+
+    public int UsageObservedUnitCount => Units.Count(unit => unit.TokenUsage.IsAvailable);
+
+    public EvaluationTokenUsage TokenUsage => Units.Aggregate(
+        EvaluationTokenUsage.Unavailable,
+        (total, unit) => total.Add(unit.TokenUsage));
 
     public bool IsPartial => CancelledCount > 0;
 

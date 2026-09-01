@@ -21,12 +21,12 @@ public sealed class CopilotAuthenticationServiceTests
     }
 
     [Fact]
-    public async Task Authenticated_runtime_returns_safe_distinct_model_ids_and_identity()
+    public async Task Authenticated_runtime_returns_safe_distinct_model_capacities_and_identity()
     {
         FakeAuthenticationRuntime runtime = new()
         {
             AuthenticationState = CopilotRuntimeAuthenticationState.Authenticated,
-            ModelIds = ["model-b", "", "model-a", "model-b", "bad\nmodel"],
+            Models = [Model("model-b", 64_000, 128_000), Model("model-a", 32_000, 64_000), Model("model-b", 1, 1)],
         };
         CopilotRuntimeIdentity identity = CreateIdentity();
         FakeAuthenticationRuntimeFactory factory = new(
@@ -37,6 +37,8 @@ public sealed class CopilotAuthenticationServiceTests
 
         Assert.Equal(CopilotAuthenticationStatus.Available, result.Status);
         Assert.Equal(["model-b", "model-a"], result.AvailableModelIds);
+        Assert.Equal(64_000, result.AvailableModels[0].EffectivePromptTokenLimit);
+        Assert.Equal(128_000, result.AvailableModels[0].MaximumContextWindowTokens);
         Assert.Same(identity, result.Identity);
         Assert.Equal(["start", "ping", "auth", "models", "stop", "dispose"], runtime.Operations);
         Assert.True(factory.ReceivedCancelableToken);
@@ -210,12 +212,32 @@ public sealed class CopilotAuthenticationServiceTests
         Assert.NotEqual(Timeout.InfiniteTimeSpan, CopilotAuthenticationService.DefaultCheckTimeout);
     }
 
+    [Fact]
+    public void Model_capacity_requires_a_safe_identity_and_never_invents_missing_limits()
+    {
+        Assert.Throws<ArgumentException>(() => new CopilotModelAvailability(" invalid ", 1, 1));
+        Assert.Throws<ArgumentException>(() => new CopilotModelAvailability("bad\nmodel", 1, 1));
+
+        CopilotModelAvailability unknown = new("model-unknown", null, 0);
+
+        Assert.Null(unknown.MaximumPromptTokens);
+        Assert.Null(unknown.MaximumContextWindowTokens);
+        Assert.Null(unknown.EffectivePromptTokenLimit);
+        Assert.Contains("<redacted>", unknown.ToString(), StringComparison.Ordinal);
+    }
+
     private static CopilotRuntimeIdentity CreateIdentity() =>
         new(
             Path.GetFullPath(typeof(CopilotAuthenticationServiceTests).Assembly.Location),
             "1.2.3",
             new string('A', 64),
             "1.0.11+test");
+
+    private static CopilotModelAvailability Model(
+        string id,
+        int maximumPromptTokens = 64_000,
+        int maximumContextWindowTokens = 128_000) =>
+        new(id, maximumPromptTokens, maximumContextWindowTokens);
 
     public enum FailurePoint
     {
@@ -232,7 +254,7 @@ public sealed class CopilotAuthenticationServiceTests
         public CopilotRuntimeAuthenticationState AuthenticationState { get; init; } =
             CopilotRuntimeAuthenticationState.Authenticated;
 
-        public IReadOnlyList<string> ModelIds { get; init; } = ["model-default"];
+        public IReadOnlyList<CopilotModelAvailability> Models { get; init; } = [Model("model-default")];
 
         public FailurePoint FailurePoint { get; init; }
 
@@ -275,11 +297,12 @@ public sealed class CopilotAuthenticationServiceTests
             return Task.FromResult(AuthenticationState);
         }
 
-        public Task<IReadOnlyList<string>> ListModelIdsAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<CopilotModelAvailability>> ListModelsAsync(
+            CancellationToken cancellationToken)
         {
             Record("models", cancellationToken);
             ThrowIf(FailurePoint.Models);
-            return Task.FromResult(ModelIds);
+            return Task.FromResult(Models);
         }
 
         public Task StopAsync(CancellationToken cancellationToken)

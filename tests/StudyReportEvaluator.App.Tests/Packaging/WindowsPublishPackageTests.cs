@@ -34,6 +34,20 @@ public sealed class WindowsPublishPackageTests
         "System.Private.CoreLib.dll",
     ];
 
+    private static readonly string[] RequiredDocumentationFiles =
+    [
+        "README.md",
+        "docs/README.md",
+        "docs/getting-started.md",
+        "docs/features.md",
+        "docs/custom-evaluator-guide.md",
+        "docs/privacy-and-data-handling.md",
+        "docs/troubleshooting.md",
+        "images/README.md",
+        "images/01-input-workbook.png",
+        "images/07-output-export.png",
+    ];
+
     private static readonly string[] RequiredDependencyPrefixes =
     [
         "StudyReportEvaluator.App/",
@@ -518,6 +532,11 @@ public sealed class WindowsPublishPackageTests
             Assert.Contains(PackageRootName + "/" + requiredFile, entryNames);
         }
 
+        foreach (string requiredFile in RequiredDocumentationFiles)
+        {
+            Assert.Contains(PackageRootName + "/" + requiredFile, entryNames);
+        }
+
         ZipArchiveEntry releaseNotesEntry = Assert.Single(
             entries,
             entry => entry.FullName == PackageRootName + "/RELEASE-NOTES.txt");
@@ -529,6 +548,7 @@ public sealed class WindowsPublishPackageTests
         Assert.Contains("Signing: UNSIGNED\n", releaseNotes, StringComparison.Ordinal);
         Assert.Contains("Deployment: .NET 10 self-contained folder\n", releaseNotes, StringComparison.Ordinal);
         Assert.Contains("Symbols: EXCLUDED\n", releaseNotes, StringComparison.Ordinal);
+        Assert.Contains("User guide: README.md and docs/getting-started.md\n", releaseNotes, StringComparison.Ordinal);
         Assert.DoesNotContain("Signing: SIGNED", releaseNotes, StringComparison.Ordinal);
     }
 

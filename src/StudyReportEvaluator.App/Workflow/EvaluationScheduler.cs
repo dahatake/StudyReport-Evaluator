@@ -16,7 +16,8 @@ public sealed class EvaluationRunnerResult
     public EvaluationRunnerResult(
         string statusCode,
         QuantificationResult? acceptedResult,
-        int attemptCount = 0)
+        int attemptCount = 0,
+        EvaluationTokenUsage? tokenUsage = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(statusCode);
         if (!ResultsStatusCodes.IsDefined(statusCode)
@@ -41,6 +42,7 @@ public sealed class EvaluationRunnerResult
         StatusCode = statusCode;
         AcceptedResult = acceptedResult;
         AttemptCount = attemptCount;
+        TokenUsage = tokenUsage ?? EvaluationTokenUsage.Unavailable;
     }
 
     public string StatusCode { get; }
@@ -49,6 +51,8 @@ public sealed class EvaluationRunnerResult
 
     public int AttemptCount { get; }
 
+    public EvaluationTokenUsage TokenUsage { get; }
+
     public bool IsSuccess => string.Equals(
         StatusCode,
         ResultsStatusCodes.Success,
@@ -56,13 +60,15 @@ public sealed class EvaluationRunnerResult
 
     public static EvaluationRunnerResult Succeeded(
         QuantificationResult acceptedResult,
-        int attemptCount = 1) =>
-        new(ResultsStatusCodes.Success, acceptedResult, attemptCount);
+        int attemptCount = 1,
+        EvaluationTokenUsage? tokenUsage = null) =>
+        new(ResultsStatusCodes.Success, acceptedResult, attemptCount, tokenUsage);
 
     public static EvaluationRunnerResult Failed(
         string statusCode,
-        int attemptCount = 1) =>
-        new(statusCode, null, attemptCount);
+        int attemptCount = 1,
+        EvaluationTokenUsage? tokenUsage = null) =>
+        new(statusCode, null, attemptCount, tokenUsage);
 
     public override string ToString() =>
         $"{nameof(EvaluationRunnerResult)} {{ StatusCode = {StatusCode}, AttemptCount = {AttemptCount.ToString(CultureInfo.InvariantCulture)}, Content = <redacted> }}";
@@ -101,7 +107,8 @@ public sealed class EphemeralEvaluationRunnerAdapter : IEvaluationRunner
         return new EvaluationRunnerResult(
             result.StatusCode,
             result.AcceptedResult,
-            result.AttemptCount);
+            result.AttemptCount,
+            result.TokenUsage);
     }
 
     public override string ToString() =>
@@ -185,7 +192,8 @@ public sealed class EvaluationUnitResult
         QuantificationResult? acceptedResult,
         int attemptCount,
         bool scorable,
-        bool scorableKnown)
+        bool scorableKnown,
+        EvaluationTokenUsage tokenUsage)
     {
         Item = item;
         StatusCode = statusCode;
@@ -193,6 +201,7 @@ public sealed class EvaluationUnitResult
         AttemptCount = attemptCount;
         Scorable = scorable;
         ScorableKnown = scorableKnown;
+        TokenUsage = tokenUsage ?? throw new ArgumentNullException(nameof(tokenUsage));
     }
 
     public EvaluationPlanItem Item { get; }
@@ -206,6 +215,8 @@ public sealed class EvaluationUnitResult
     public bool Scorable { get; }
 
     public bool ScorableKnown { get; }
+
+    public EvaluationTokenUsage TokenUsage { get; }
 
     public bool HasCompletedPayload =>
         string.Equals(StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal)
@@ -449,7 +460,8 @@ public sealed class EvaluationScheduler
                 null,
                 attemptCount: 0,
                 scorable: false,
-                scorableKnown: true);
+                scorableKnown: true,
+                EvaluationTokenUsage.Unavailable);
         }
 
         if (cancellationToken.IsCancellationRequested)
@@ -517,7 +529,8 @@ public sealed class EvaluationScheduler
                 null,
                 runnerResult.AttemptCount,
                 scorable: true,
-                scorableKnown: true);
+                scorableKnown: true,
+                runnerResult.TokenUsage);
         }
 
         try
@@ -533,7 +546,8 @@ public sealed class EvaluationScheduler
                     null,
                     runnerResult.AttemptCount,
                     scorable: true,
-                    scorableKnown: true);
+                    scorableKnown: true,
+                    runnerResult.TokenUsage);
             }
 
             return new EvaluationUnitResult(
@@ -542,11 +556,16 @@ public sealed class EvaluationScheduler
                 validation.AcceptedResult,
                 runnerResult.AttemptCount,
                 scorable: true,
-                scorableKnown: true);
+                scorableKnown: true,
+                runnerResult.TokenUsage);
         }
         catch
         {
-            return RuntimeFailure(item, scorable: true, scorableKnown: true);
+            return RuntimeFailure(
+                item,
+                scorable: true,
+                scorableKnown: true,
+                runnerResult.TokenUsage);
         }
     }
 
@@ -578,19 +597,22 @@ public sealed class EvaluationScheduler
             null,
             attemptCount: 0,
             scorable,
-            scorableKnown: true);
+            scorableKnown: true,
+            EvaluationTokenUsage.Unavailable);
 
     private static EvaluationUnitResult RuntimeFailure(
         EvaluationPlanItem item,
         bool scorable = false,
-        bool scorableKnown = false) =>
+        bool scorableKnown = false,
+        EvaluationTokenUsage? tokenUsage = null) =>
         new(
             item,
             ResultsStatusCodes.AiRuntimeFailed,
             null,
             attemptCount: 0,
             scorable,
-            scorableKnown);
+            scorableKnown,
+            tokenUsage ?? EvaluationTokenUsage.Unavailable);
 
     private static EvaluationUnitResult Cancelled(
         EvaluationPlanItem item,
@@ -602,7 +624,8 @@ public sealed class EvaluationScheduler
             null,
             attemptCount: 0,
             scorable,
-            scorableKnown);
+            scorableKnown,
+            EvaluationTokenUsage.Unavailable);
 
     private static void ReportSafely(
         Action<EvaluationProgress>? progress,

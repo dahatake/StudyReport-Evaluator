@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Tests.Workflow;
 using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
@@ -27,7 +28,7 @@ public sealed class ExecutionViewTests
         RecordingAuthenticationBoundary authentication = new(
             new ExecutionAuthenticationSnapshot(
                 ExecutionAuthenticationState.Available,
-                ["model-a", "model-b", "model-a", " invalid "],
+                [U04TestSupport.Model("model-a"), U04TestSupport.Model("model-b"), U04TestSupport.Model("model-a")],
                 identity));
         RecordingRunBoundary runner = new((request, progress, _) =>
         {
@@ -39,6 +40,8 @@ public sealed class ExecutionViewTests
         viewModel.Configure(definition, metadata, inputPath);
 
         Assert.Equal(2, viewModel.PlannedEvaluationCount);
+        Assert.Equal(6, viewModel.WorstCaseAttemptCount);
+        Assert.Contains("最大 6 attempts", viewModel.PlanSummary, StringComparison.Ordinal);
         Assert.False(viewModel.CanStart);
         Assert.Contains(viewModel.TechnicalErrors, error => error.Code == "AUTH_CHECK_REQUIRED");
 
@@ -61,6 +64,8 @@ public sealed class ExecutionViewTests
 
         QuantificationRunRequest request = Assert.IsType<QuantificationRunRequest>(runner.LastRequest);
         Assert.Equal("model-b", request.ModelId);
+        Assert.Equal(64_000, request.MaximumPromptTokens);
+        Assert.Equal(128_000, request.MaximumContextWindowTokens);
         Assert.Equal(3, request.MaxConcurrency);
         Assert.NotSame(definition, request.DraftDefinition);
         Assert.Equal(partial.DefinitionSha256, viewModel.LastRunContext?.Summary.DefinitionSha256);
@@ -176,6 +181,112 @@ public sealed class ExecutionViewTests
     }
 
     [Fact]
+    public void Workbook_capacity_error_blocks_start_before_authentication_or_run_boundary()
+    {
+        const int criterionCount = 256;
+        QuantificationDefinition single = U04TestSupport.Definition(2, 2);
+        ImmutableArray<CriterionDefinition> criteria = Enumerable.Range(1, criterionCount)
+            .Select(index => new CriterionDefinition
+            {
+                Id = $"C{index.ToString(CultureInfo.InvariantCulture)}",
+                DisplayName = $"Criterion {index.ToString(CultureInfo.InvariantCulture)}",
+                Description = "Synthetic capacity criterion",
+                Weight = 1m,
+                Enabled = true,
+            })
+            .ToImmutableArray();
+        QuantificationDefinition definition = single with
+        {
+            Questions =
+            [
+                single.Questions[0] with
+                {
+                    Evaluators =
+                    [
+                        single.Questions[0].Evaluators[0] with { Criteria = criteria },
+                    ],
+                },
+            ],
+        };
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RecordingRunBoundary runner = new((_, _, _) => throw new InvalidOperationException("must not run"));
+        ExecutionViewModel viewModel = new(
+            new RecordingAuthenticationBoundary(
+                new ExecutionAuthenticationSnapshot(ExecutionAuthenticationState.AuthRequired)),
+            runner);
+
+        viewModel.Configure(
+            definition,
+            metadata,
+            Path.Combine(Path.GetTempPath(), "PRIVATE-CAPACITY-INPUT-CANARY.xlsx"));
+
+        ExecutionTechnicalError error = Assert.Single(
+            viewModel.TechnicalErrors,
+            item => item.Code == "FUNCTION_ARGUMENT_LIMIT_EXCEEDED");
+        Assert.Equal("Evaluator_Score", error.Field);
+        Assert.Contains("256", error.Message, StringComparison.Ordinal);
+        Assert.Contains("255", error.Message, StringComparison.Ordinal);
+        Assert.False(viewModel.CanStart);
+        Assert.Equal(0, runner.CallCount);
+    }
+
+    [Fact]
+    public async Task Model_without_sdk_prompt_limit_is_visible_but_cannot_start()
+    {
+        QuantificationDefinition definition = U04TestSupport.Definition(2, 2);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RecordingRunBoundary runner = new((_, _, _) => throw new InvalidOperationException("must not run"));
+        ExecutionViewModel viewModel = new(
+            new RecordingAuthenticationBoundary(
+                new ExecutionAuthenticationSnapshot(
+                    ExecutionAuthenticationState.Available,
+                    [new CopilotModelAvailability("model-unknown", null, 128_000)],
+                    U04TestSupport.RuntimeIdentity())),
+            runner);
+        viewModel.Configure(
+            definition,
+            metadata,
+            Path.Combine(Path.GetTempPath(), "PRIVATE-MODEL-LIMIT-CANARY.xlsx"));
+
+        await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["model-unknown"], viewModel.AvailableModelIds);
+        Assert.Equal("model-unknown", viewModel.SelectedModelId);
+        Assert.Contains(
+            viewModel.TechnicalErrors,
+            error => error.Code == "MODEL_PROMPT_LIMIT_UNAVAILABLE");
+        Assert.False(viewModel.CanStart);
+        Assert.Equal(0, runner.CallCount);
+    }
+
+    [Fact]
+    public void Worst_case_retry_budget_over_twenty_thousand_blocks_start()
+    {
+        QuantificationDefinition definition = U04TestSupport.Definition(2, 6_668);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RecordingRunBoundary runner = new((_, _, _) => throw new InvalidOperationException("must not run"));
+        ExecutionViewModel viewModel = new(
+            new RecordingAuthenticationBoundary(
+                new ExecutionAuthenticationSnapshot(ExecutionAuthenticationState.AuthRequired)),
+            runner);
+
+        viewModel.Configure(
+            definition,
+            metadata,
+            Path.Combine(Path.GetTempPath(), "PRIVATE-ATTEMPT-BUDGET-CANARY.xlsx"));
+
+        Assert.Equal(6_667, viewModel.PlannedEvaluationCount);
+        Assert.Equal(20_001, viewModel.WorstCaseAttemptCount);
+        ExecutionTechnicalError error = Assert.Single(
+            viewModel.TechnicalErrors,
+            item => item.Code == "ATTEMPT_BUDGET_TOO_LARGE");
+        Assert.Contains("20001", error.Message, StringComparison.Ordinal);
+        Assert.Contains("20000", error.Message, StringComparison.Ordinal);
+        Assert.False(viewModel.CanStart);
+        Assert.Equal(0, runner.CallCount);
+    }
+
+    [Fact]
     public void Public_execution_contract_has_no_secret_or_warning_gate_input()
     {
         string[] prohibited =
@@ -218,6 +329,9 @@ internal static class U04TestSupport
             new string('B', 64),
             "1.0.11");
 
+    internal static CopilotModelAvailability Model(string id) =>
+        new(id, maximumPromptTokens: 64_000, maximumContextWindowTokens: 128_000);
+
     internal static ExecutionRunContext Context(RunSummary summary, string? inputPath = null) =>
         new(
             summary,
@@ -234,7 +348,7 @@ internal static class U04TestSupport
             new RecordingAuthenticationBoundary(
                 new ExecutionAuthenticationSnapshot(
                     ExecutionAuthenticationState.Available,
-                    ["model-test"],
+                    [Model("model-test")],
                     RuntimeIdentity())),
             runBoundary);
         viewModel.Configure(
@@ -280,6 +394,8 @@ internal static class U04TestSupport
                     WorkbookMetadata = metadata,
                     InputPath = Path.Combine(Path.GetTempPath(), "PRIVATE-U04-SUMMARY-CANARY.xlsx"),
                     ModelId = "model-test",
+                    MaximumPromptTokens = 64_000,
+                    MaximumContextWindowTokens = 128_000,
                     MaxConcurrency = 1,
                 },
                 cancellationToken: cancellation.Token);

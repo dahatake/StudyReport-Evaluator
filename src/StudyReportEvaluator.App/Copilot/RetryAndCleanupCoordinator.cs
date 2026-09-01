@@ -78,9 +78,81 @@ public sealed class EvaluationCleanupException : EvaluationAttemptException
     }
 }
 
+public sealed class EvaluationTokenUsage
+{
+    public EvaluationTokenUsage(
+        bool isAvailable,
+        long inputTokens,
+        long outputTokens,
+        long reasoningTokens,
+        long cacheReadTokens,
+        long cacheWriteTokens)
+    {
+        if (inputTokens < 0
+            || outputTokens < 0
+            || reasoningTokens < 0
+            || cacheReadTokens < 0
+            || cacheWriteTokens < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(inputTokens));
+        }
+
+        IsAvailable = isAvailable;
+        InputTokens = inputTokens;
+        OutputTokens = outputTokens;
+        ReasoningTokens = reasoningTokens;
+        CacheReadTokens = cacheReadTokens;
+        CacheWriteTokens = cacheWriteTokens;
+    }
+
+    public static EvaluationTokenUsage Unavailable { get; } = new(false, 0, 0, 0, 0, 0);
+
+    public bool IsAvailable { get; }
+
+    public long InputTokens { get; }
+
+    public long OutputTokens { get; }
+
+    public long ReasoningTokens { get; }
+
+    public long CacheReadTokens { get; }
+
+    public long CacheWriteTokens { get; }
+
+    public EvaluationTokenUsage Add(EvaluationTokenUsage other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        if (!other.IsAvailable)
+        {
+            return this;
+        }
+
+        if (!IsAvailable)
+        {
+            return other;
+        }
+
+        return new EvaluationTokenUsage(
+            true,
+            SaturatingAdd(InputTokens, other.InputTokens),
+            SaturatingAdd(OutputTokens, other.OutputTokens),
+            SaturatingAdd(ReasoningTokens, other.ReasoningTokens),
+            SaturatingAdd(CacheReadTokens, other.CacheReadTokens),
+            SaturatingAdd(CacheWriteTokens, other.CacheWriteTokens));
+    }
+
+    public override string ToString() =>
+        $"{nameof(EvaluationTokenUsage)} {{ IsAvailable = {IsAvailable}, InputTokens = {InputTokens}, OutputTokens = {OutputTokens}, ReasoningTokens = {ReasoningTokens}, CacheReadTokens = {CacheReadTokens}, CacheWriteTokens = {CacheWriteTokens}, Content = <redacted> }}";
+
+    private static long SaturatingAdd(long left, long right) =>
+        left > long.MaxValue - right ? long.MaxValue : left + right;
+}
+
 public interface IEphemeralEvaluationAttempt
 {
     string SessionId { get; }
+
+    EvaluationTokenUsage TokenUsage => EvaluationTokenUsage.Unavailable;
 
     Task<QuantificationResult> ExecuteAsync(CancellationToken cancellationToken);
 
@@ -108,11 +180,13 @@ public sealed class EphemeralEvaluationResult
     private EphemeralEvaluationResult(
         EphemeralEvaluationStatus status,
         int attemptCount,
-        QuantificationResult? acceptedResult)
+        QuantificationResult? acceptedResult,
+        EvaluationTokenUsage tokenUsage)
     {
         Status = status;
         AttemptCount = attemptCount;
         AcceptedResult = acceptedResult;
+        TokenUsage = tokenUsage;
     }
 
     public EphemeralEvaluationStatus Status { get; }
@@ -134,6 +208,8 @@ public sealed class EphemeralEvaluationResult
 
     public QuantificationResult? AcceptedResult { get; }
 
+    public EvaluationTokenUsage TokenUsage { get; }
+
     public bool IsSuccess =>
         Status == EphemeralEvaluationStatus.Succeeded
         && AcceptedResult is not null;
@@ -143,19 +219,29 @@ public sealed class EphemeralEvaluationResult
 
     internal static EphemeralEvaluationResult Succeeded(
         int attemptCount,
-        QuantificationResult acceptedResult) =>
-        new(EphemeralEvaluationStatus.Succeeded, attemptCount, acceptedResult);
+        QuantificationResult acceptedResult,
+        EvaluationTokenUsage? tokenUsage = null) =>
+        new(
+            EphemeralEvaluationStatus.Succeeded,
+            attemptCount,
+            acceptedResult,
+            tokenUsage ?? EvaluationTokenUsage.Unavailable);
 
     internal static EphemeralEvaluationResult Failed(
         EphemeralEvaluationStatus status,
-        int attemptCount)
+        int attemptCount,
+        EvaluationTokenUsage? tokenUsage = null)
     {
         if (status == EphemeralEvaluationStatus.Succeeded)
         {
             throw new ArgumentOutOfRangeException(nameof(status));
         }
 
-        return new EphemeralEvaluationResult(status, attemptCount, null);
+        return new EphemeralEvaluationResult(
+            status,
+            attemptCount,
+            null,
+            tokenUsage ?? EvaluationTokenUsage.Unavailable);
     }
 }
 
@@ -193,6 +279,7 @@ public sealed class RetryAndCleanupCoordinator
         int attemptCount = 0;
         int schemaRetryCount = 0;
         int transientRetryCount = 0;
+        EvaluationTokenUsage tokenUsage = EvaluationTokenUsage.Unavailable;
         HashSet<string> observedSessionIds = new(StringComparer.Ordinal);
 
         while (true)
@@ -207,7 +294,10 @@ public sealed class RetryAndCleanupCoordinator
                     maxConcurrency,
                     SafeLogFailureCategory.Cancelled,
                     identity: null);
-                return EphemeralEvaluationResult.Failed(EphemeralEvaluationStatus.Cancelled, attemptCount);
+                return EphemeralEvaluationResult.Failed(
+                    EphemeralEvaluationStatus.Cancelled,
+                    attemptCount,
+                    tokenUsage);
             }
 
             attemptCount++;
@@ -227,7 +317,10 @@ public sealed class RetryAndCleanupCoordinator
                     maxConcurrency,
                     SafeLogFailureCategory.Fatal,
                     identity: null);
-                return EphemeralEvaluationResult.Failed(EphemeralEvaluationStatus.Fatal, attemptCount);
+                return EphemeralEvaluationResult.Failed(
+                    EphemeralEvaluationStatus.Fatal,
+                    attemptCount,
+                    tokenUsage);
             }
 
             SafeLogIdentity? identity = SafeLogIdentity.TryCreateSession(attempt.SessionId, out SafeLogIdentity? safeIdentity)
@@ -307,6 +400,15 @@ public sealed class RetryAndCleanupCoordinator
                 attempt,
                 abortRequired,
                 cleanupTimeout).ConfigureAwait(false);
+            try
+            {
+                tokenUsage = tokenUsage.Add(attempt.TokenUsage);
+            }
+            catch
+            {
+                // Numeric usage is advisory and cannot alter evaluation or cleanup semantics.
+            }
+
             if (!cleanupSucceeded)
             {
                 Log(
@@ -319,7 +421,8 @@ public sealed class RetryAndCleanupCoordinator
                     identity);
                 return EphemeralEvaluationResult.Failed(
                     EphemeralEvaluationStatus.CleanupFailed,
-                    attemptCount);
+                    attemptCount,
+                    tokenUsage);
             }
 
             if (acceptedResult is not null)
@@ -332,7 +435,10 @@ public sealed class RetryAndCleanupCoordinator
                     maxConcurrency,
                     SafeLogFailureCategory.None,
                     identity);
-                return EphemeralEvaluationResult.Succeeded(attemptCount, acceptedResult);
+                return EphemeralEvaluationResult.Succeeded(
+                    attemptCount,
+                    acceptedResult,
+                    tokenUsage);
             }
 
             EvaluationAttemptFailureKind terminalFailure = failureKind ?? EvaluationAttemptFailureKind.Fatal;
@@ -349,7 +455,8 @@ public sealed class RetryAndCleanupCoordinator
                     identity);
                 return EphemeralEvaluationResult.Failed(
                     EphemeralEvaluationStatus.Cancelled,
-                    attemptCount);
+                    attemptCount,
+                    tokenUsage);
             }
 
             Log(
@@ -380,7 +487,8 @@ public sealed class RetryAndCleanupCoordinator
 
             return EphemeralEvaluationResult.Failed(
                 MapTerminalStatus(terminalFailure),
-                attemptCount);
+                attemptCount,
+                tokenUsage);
         }
     }
 

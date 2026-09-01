@@ -27,7 +27,18 @@ public sealed class ExecutionAuthenticationSnapshot
 {
     public ExecutionAuthenticationSnapshot(
         ExecutionAuthenticationState state,
-        IEnumerable<string>? modelIds = null,
+        IEnumerable<string>? modelIds,
+        CopilotRuntimeIdentity? runtimeIdentity = null)
+        : this(
+            state,
+            modelIds?.Select(id => new CopilotModelAvailability(id, null, null)),
+            runtimeIdentity)
+    {
+    }
+
+    public ExecutionAuthenticationSnapshot(
+        ExecutionAuthenticationState state,
+        IEnumerable<CopilotModelAvailability>? models = null,
         CopilotRuntimeIdentity? runtimeIdentity = null)
     {
         if (state is ExecutionAuthenticationState.NotChecked or ExecutionAuthenticationState.Checking)
@@ -35,20 +46,16 @@ public sealed class ExecutionAuthenticationSnapshot
             throw new ArgumentOutOfRangeException(nameof(state));
         }
 
-        List<string> normalized = [];
+        List<CopilotModelAvailability> normalized = [];
         HashSet<string> seen = new(StringComparer.Ordinal);
-        foreach (string? modelId in modelIds ?? [])
+        foreach (CopilotModelAvailability? model in models ?? [])
         {
-            if (modelId is null
-                || modelId.Length is 0 or > 256
-                || !string.Equals(modelId, modelId.Trim(), StringComparison.Ordinal)
-                || modelId.Any(char.IsControl)
-                || !seen.Add(modelId))
+            if (model is null || !seen.Add(model.Id))
             {
                 continue;
             }
 
-            normalized.Add(modelId);
+            normalized.Add(model);
         }
 
         if (state == ExecutionAuthenticationState.Available && runtimeIdentity is null)
@@ -59,13 +66,16 @@ public sealed class ExecutionAuthenticationSnapshot
         }
 
         State = state;
-        ModelIds = normalized.AsReadOnly();
+        Models = normalized.AsReadOnly();
+        ModelIds = Array.AsReadOnly(normalized.Select(model => model.Id).ToArray());
         RuntimeIdentity = runtimeIdentity;
     }
 
     public ExecutionAuthenticationState State { get; }
 
     public IReadOnlyList<string> ModelIds { get; }
+
+    public IReadOnlyList<CopilotModelAvailability> Models { get; }
 
     public CopilotRuntimeIdentity? RuntimeIdentity { get; }
 
@@ -108,7 +118,7 @@ public sealed class CopilotExecutionAuthenticationBoundary : IExecutionAuthentic
                 CopilotAuthenticationStatus.Cancelled => ExecutionAuthenticationState.Cancelled,
                 _ => ExecutionAuthenticationState.RuntimeFailed,
             },
-            result.AvailableModelIds,
+            result.AvailableModels,
             result.Identity);
     }
 
@@ -227,7 +237,9 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     private readonly IQuantificationRunBoundary runBoundary;
     private readonly QuantificationDefinitionValidator definitionValidator = new();
     private readonly ColumnMappingValidator mappingValidator = new();
+    private readonly WorkbookExecutionPreflight workbookPreflight = new();
     private readonly ObservableCollection<string> modelItems = [];
+    private readonly Dictionary<string, CopilotModelAvailability> modelsById = new(StringComparer.Ordinal);
     private readonly ObservableCollection<ExecutionTechnicalError> technicalErrorItems = [];
     private readonly ViewModelCommand checkAuthenticationCommand;
     private readonly ViewModelCommand startCommand;
@@ -239,6 +251,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     private CopilotRuntimeIdentity? runtimeIdentity;
     private ExecutionAuthenticationState authenticationState = ExecutionAuthenticationState.NotChecked;
     private string? runtimeErrorCode;
+    private ImmutableArray<ExecutionTechnicalError> runPreflightErrors = [];
     private int maxConcurrency = EvaluationSchedulerOptions.DefaultMaxConcurrency;
     private bool isCheckingAuthentication;
     private bool isRunning;
@@ -335,6 +348,8 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             string? next = value;
             if (SetProperty(ref selectedModelId, next))
             {
+                runtimeErrorCode = null;
+                runPreflightErrors = [];
                 Revalidate();
             }
         }
@@ -347,6 +362,8 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         {
             if (SetProperty(ref maxConcurrency, value))
             {
+                runtimeErrorCode = null;
+                runPreflightErrors = [];
                 Revalidate();
                 OnPropertyChanged(nameof(ConcurrencyText));
             }
@@ -383,8 +400,23 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     }
 
     public string PlanSummary => IsConfigured
-        ? $"{PlannedEvaluationCount.ToString("N0", CultureInfo.InvariantCulture)} evaluation units · snapshot は実行開始時に固定"
+        ? $"{PlannedEvaluationCount.ToString("N0", CultureInfo.InvariantCulture)} evaluation units · retry込み最大 {WorstCaseAttemptCount.ToString("N0", CultureInfo.InvariantCulture)} attempts · snapshot は実行開始時に固定"
         : "入力と定量化設計を完了してください。";
+
+    public long WorstCaseAttemptCount
+    {
+        get
+        {
+            try
+            {
+                return checked(PlannedEvaluationCount * RetryAndCleanupCoordinator.MaximumTransientAttempts);
+            }
+            catch (OverflowException)
+            {
+                return long.MaxValue;
+            }
+        }
+    }
 
     public bool IsCheckingAuthentication
     {
@@ -531,11 +563,13 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         workbookMetadata = metadata;
         inputPath = configuredInputPath;
         runtimeErrorCode = null;
+        runPreflightErrors = [];
         LastRunContext = null;
         ResetProgress();
         OnPropertiesChanged(
             nameof(IsConfigured),
             nameof(PlannedEvaluationCount),
+            nameof(WorstCaseAttemptCount),
             nameof(PlanSummary),
             nameof(RunStatusText));
         Revalidate();
@@ -553,11 +587,13 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         workbookMetadata = null;
         inputPath = string.Empty;
         runtimeErrorCode = null;
+        runPreflightErrors = [];
         LastRunContext = null;
         ResetProgress();
         OnPropertiesChanged(
             nameof(IsConfigured),
             nameof(PlannedEvaluationCount),
+            nameof(WorstCaseAttemptCount),
             nameof(PlanSummary),
             nameof(RunStatusText));
         Revalidate();
@@ -583,6 +619,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         modelItems.Clear();
         selectedModelId = null;
         runtimeErrorCode = null;
+        runPreflightErrors = [];
         OnPropertiesChanged(
             nameof(AvailableModelIds),
             nameof(SelectedModelId),
@@ -640,6 +677,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         QuantificationDefinition runDefinition = InputViewModel.CloneDefinition(definition);
         string runInputPath = inputPath;
         string runModelId = selectedModelId;
+        CopilotModelAvailability runModel = modelsById[runModelId];
         CopilotRuntimeIdentity runRuntimeIdentity = runtimeIdentity;
         QuantificationRunRequest request = new()
         {
@@ -647,6 +685,9 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             WorkbookMetadata = workbookMetadata,
             InputPath = runInputPath,
             ModelId = runModelId,
+            MaximumPromptTokens = runModel.EffectivePromptTokenLimit!.Value,
+            MaximumContextWindowTokens = runModel.MaximumContextWindowTokens
+                ?? runModel.EffectivePromptTokenLimit.Value,
             MaxConcurrency = MaxConcurrency,
         };
 
@@ -656,6 +697,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         CancellationToken token = runCancellation.Token;
         SynchronizationContext? observerContext = SynchronizationContext.Current;
         runtimeErrorCode = null;
+        runPreflightErrors = [];
         LastRunContext = null;
         ResetProgress();
         IsCancelling = false;
@@ -689,6 +731,13 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         catch (QuantificationDefinitionValidationException)
         {
             runtimeErrorCode = "DEFINITION_INVALID";
+        }
+        catch (QuantificationRunPreflightException exception)
+        {
+            runtimeErrorCode = null;
+            runPreflightErrors = exception.Errors
+                .Select(CapacityTechnicalError)
+                .ToImmutableArray();
         }
         catch (QuantificationRunException exception)
         {
@@ -747,9 +796,11 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         AuthenticationState = result.State;
         runtimeIdentity = result.RuntimeIdentity;
         modelItems.Clear();
-        foreach (string modelId in result.ModelIds)
+        modelsById.Clear();
+        foreach (CopilotModelAvailability model in result.Models)
         {
-            modelItems.Add(modelId);
+            modelItems.Add(model.Id);
+            modelsById.Add(model.Id, model);
         }
 
         selectedModelId = result.State == ExecutionAuthenticationState.Available
@@ -886,6 +937,18 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                     error.Field,
                     "入力 workbook と列 mapping を一致させてください。"));
             }
+
+            if (definitionResult.IsValid && mappingResult.IsValid)
+            {
+                QuantificationSnapshot snapshot = QuantificationSnapshot.Create(definition);
+                WorkbookExecutionPreflightResult capacity = workbookPreflight.Validate(
+                    snapshot,
+                    workbookMetadata);
+                foreach (ExecutionCapacityError error in capacity.Errors)
+                {
+                    AddError(errors, CapacityTechnicalError(error));
+                }
+            }
         }
 
         if (PlannedEvaluationCount > int.MaxValue)
@@ -895,6 +958,14 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 "Evaluation plan",
                 "評価単位数が実行可能な上限を超えています。"));
         }
+
+            if (WorstCaseAttemptCount > EvaluationRequestCapacityValidator.MaximumWorstCaseAttemptsPerRun)
+            {
+                AddError(errors, new ExecutionTechnicalError(
+                "ATTEMPT_BUDGET_TOO_LARGE",
+                "Evaluation plan",
+                $"retry込み最大attempt数 {WorstCaseAttemptCount.ToString(CultureInfo.InvariantCulture)} がrun上限 {EvaluationRequestCapacityValidator.MaximumWorstCaseAttemptsPerRun.ToString(CultureInfo.InvariantCulture)} を超えています。"));
+            }
 
         if (MaxConcurrency is < EvaluationSchedulerOptions.DefaultMaxConcurrency
             or > EvaluationSchedulerOptions.MaximumMaxConcurrency)
@@ -932,6 +1003,15 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                     "Model",
                     "利用可能な model を選択してください。"));
                 break;
+            case ExecutionAuthenticationState.Available when !modelsById.TryGetValue(
+                    SelectedModelId,
+                    out CopilotModelAvailability? selectedModel)
+                || selectedModel.EffectivePromptTokenLimit is null:
+                AddError(errors, new ExecutionTechnicalError(
+                    "MODEL_PROMPT_LIMIT_UNAVAILABLE",
+                    "Model",
+                    "SDKからmodelのprompt上限を取得できないため、安全なrequest preflightを実行できません。"));
+                break;
             case ExecutionAuthenticationState.AuthRequired:
                 AddError(errors, new ExecutionTechnicalError(
                     ResultsStatusCodes.AuthRequired,
@@ -960,6 +1040,11 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 RunFailureMessage(runtimeErrorCode)));
         }
 
+            foreach (ExecutionTechnicalError error in runPreflightErrors)
+            {
+                AddError(errors, error);
+            }
+
         technicalErrorItems.Clear();
         foreach (ExecutionTechnicalError error in errors.Values)
         {
@@ -978,6 +1063,13 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         IDictionary<string, ExecutionTechnicalError> errors,
         ExecutionTechnicalError error) =>
         errors.TryAdd($"{error.Code}|{error.Field}", error);
+
+    private static ExecutionTechnicalError CapacityTechnicalError(
+        ExecutionCapacityError error) =>
+        new(
+            error.Code,
+            error.Field,
+            $"実測値 {error.ActualDimension} は上限 {error.Limit} を満たしません。定量化設計を縮小してください。");
 
     private static string RunFailureMessage(string code) => code switch
     {

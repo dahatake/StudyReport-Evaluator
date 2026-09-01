@@ -28,6 +28,44 @@ public enum CopilotRuntimeAuthenticationState
     Unauthenticated,
 }
 
+public sealed class CopilotModelAvailability
+{
+    public CopilotModelAvailability(
+        string id,
+        int? maximumPromptTokens,
+        int? maximumContextWindowTokens)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        if (id.Length > 256
+            || !string.Equals(id, id.Trim(), StringComparison.Ordinal)
+            || id.Any(char.IsControl))
+        {
+            throw new ArgumentException("The model identity is invalid.", nameof(id));
+        }
+
+        Id = id;
+        MaximumPromptTokens = PositiveOrNull(maximumPromptTokens);
+        MaximumContextWindowTokens = PositiveOrNull(maximumContextWindowTokens);
+    }
+
+    public string Id { get; }
+
+    public int? MaximumPromptTokens { get; }
+
+    public int? MaximumContextWindowTokens { get; }
+
+    public int? EffectivePromptTokenLimit => MaximumPromptTokens is int prompt
+        ? MaximumContextWindowTokens is int context
+            ? Math.Min(prompt, context)
+            : prompt
+        : null;
+
+    public override string ToString() =>
+        $"{nameof(CopilotModelAvailability)} {{ Id = {Id}, PromptLimitKnown = {MaximumPromptTokens is not null}, ContextLimitKnown = {MaximumContextWindowTokens is not null}, Content = <redacted> }}";
+
+    private static int? PositiveOrNull(int? value) => value is > 0 ? value : null;
+}
+
 public interface ICopilotAuthenticationRuntime : IAsyncDisposable
 {
     CopilotRuntimeState State { get; }
@@ -38,7 +76,18 @@ public interface ICopilotAuthenticationRuntime : IAsyncDisposable
 
     Task<CopilotRuntimeAuthenticationState> GetAuthenticationStatusAsync(CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<string>> ListModelIdsAsync(CancellationToken cancellationToken);
+    async Task<IReadOnlyList<CopilotModelAvailability>> ListModelsAsync(
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<string> modelIds = await ListModelIdsAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return modelIds
+            .Select(id => new CopilotModelAvailability(id, null, null))
+            .ToArray();
+    }
+
+    Task<IReadOnlyList<string>> ListModelIdsAsync(CancellationToken cancellationToken) =>
+        throw new NotSupportedException("The runtime must provide model IDs or model capacity descriptors.");
 
     Task StopAsync(CancellationToken cancellationToken);
 }
@@ -90,11 +139,12 @@ public sealed class CopilotAuthenticationResult
 {
     private CopilotAuthenticationResult(
         CopilotAuthenticationStatus status,
-        IReadOnlyList<string> availableModelIds,
+        IReadOnlyList<CopilotModelAvailability> availableModels,
         CopilotRuntimeIdentity? identity)
     {
         Status = status;
-        AvailableModelIds = availableModelIds;
+        AvailableModels = availableModels;
+        AvailableModelIds = Array.AsReadOnly(availableModels.Select(model => model.Id).ToArray());
         Identity = identity;
     }
 
@@ -102,15 +152,17 @@ public sealed class CopilotAuthenticationResult
 
     public IReadOnlyList<string> AvailableModelIds { get; }
 
+    public IReadOnlyList<CopilotModelAvailability> AvailableModels { get; }
+
     public CopilotRuntimeIdentity? Identity { get; }
 
     public override string ToString() =>
         $"{Status}; models={AvailableModelIds.Count}; runtime={(Identity is null ? "none" : Identity.ToString())}";
 
     internal static CopilotAuthenticationResult Available(
-        IEnumerable<string> modelIds,
+        IEnumerable<CopilotModelAvailability> models,
         CopilotRuntimeIdentity identity) =>
-        new(CopilotAuthenticationStatus.Available, NormalizeModelIds(modelIds), identity);
+        new(CopilotAuthenticationStatus.Available, NormalizeModels(models), identity);
 
     internal static CopilotAuthenticationResult FromStatus(
         CopilotAuthenticationStatus status,
@@ -121,27 +173,27 @@ public sealed class CopilotAuthenticationResult
             throw new ArgumentOutOfRangeException(nameof(status));
         }
 
-        return new CopilotAuthenticationResult(status, Array.Empty<string>(), identity);
+        return new CopilotAuthenticationResult(
+            status,
+            Array.Empty<CopilotModelAvailability>(),
+            identity);
     }
 
-    private static IReadOnlyList<string> NormalizeModelIds(IEnumerable<string> modelIds)
+    private static IReadOnlyList<CopilotModelAvailability> NormalizeModels(
+        IEnumerable<CopilotModelAvailability> models)
     {
-        ArgumentNullException.ThrowIfNull(modelIds);
+        ArgumentNullException.ThrowIfNull(models);
 
-        List<string> normalized = [];
+        List<CopilotModelAvailability> normalized = [];
         HashSet<string> seen = new(StringComparer.Ordinal);
-        foreach (string? modelId in modelIds)
+        foreach (CopilotModelAvailability? model in models)
         {
-            if (modelId is null
-                || modelId.Length is 0 or > 256
-                || !string.Equals(modelId, modelId.Trim(), StringComparison.Ordinal)
-                || modelId.Any(char.IsControl)
-                || !seen.Add(modelId))
+            if (model is null || !seen.Add(model.Id))
             {
                 continue;
             }
 
-            normalized.Add(modelId);
+            normalized.Add(model);
         }
 
         return normalized.AsReadOnly();
@@ -304,14 +356,14 @@ public sealed class CopilotAuthenticationService
         CopilotRuntimeIdentity identity,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<string> modelIds = await runtime
-            .ListModelIdsAsync(cancellationToken)
+        IReadOnlyList<CopilotModelAvailability> models = await runtime
+            .ListModelsAsync(cancellationToken)
             .WaitAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return modelIds is null
+        return models is null
             ? CopilotAuthenticationResult.FromStatus(CopilotAuthenticationStatus.RuntimeFailed, identity)
-            : CopilotAuthenticationResult.Available(modelIds, identity);
+            : CopilotAuthenticationResult.Available(models, identity);
     }
 
     private async Task<bool> TryCleanupAsync(ICopilotAuthenticationRuntime runtime)
@@ -449,21 +501,32 @@ internal sealed class SdkCopilotAuthenticationRuntime : ICopilotAuthenticationRu
             : CopilotRuntimeAuthenticationState.Unauthenticated;
     }
 
-    public async Task<IReadOnlyList<string>> ListModelIdsAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<CopilotModelAvailability>> ListModelsAsync(
+        CancellationToken cancellationToken)
     {
         EnsureReady();
         IList<ModelInfo> models = await _client.ListModelsAsync(cancellationToken).ConfigureAwait(false);
-        List<string> modelIds = [];
+        List<CopilotModelAvailability> available = [];
         foreach (ModelInfo model in models)
         {
             if (model.Id is not null)
             {
-                modelIds.Add(model.Id);
+                ModelLimits? limits = model.Capabilities?.Limits;
+                available.Add(new CopilotModelAvailability(
+                    model.Id,
+                    limits?.MaxPromptTokens,
+                    limits?.MaxContextWindowTokens));
             }
         }
 
-        return modelIds.AsReadOnly();
+        return available.AsReadOnly();
     }
+
+    public async Task<IReadOnlyList<string>> ListModelIdsAsync(
+        CancellationToken cancellationToken) =>
+        (await ListModelsAsync(cancellationToken).ConfigureAwait(false))
+            .Select(model => model.Id)
+            .ToArray();
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {

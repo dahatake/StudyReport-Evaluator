@@ -221,6 +221,140 @@ public sealed class QuantificationDefinitionValidatorTests
         Assert.Equal(roundingDigits.ToString(System.Globalization.CultureInfo.InvariantCulture), error.SafeOffendingValue);
     }
 
+    [Theory]
+    [InlineData("{回答} {評価項目", "UNCLOSED_PLACEHOLDER")]
+    [InlineData("{回答 {評価項目}", "MALFORMED_PLACEHOLDER")]
+    [InlineData("{回答} {未知}", "UNKNOWN_PLACEHOLDER")]
+    [InlineData("{回答} {評価項目} }", "UNMATCHED_CLOSING_BRACE")]
+    [InlineData("{{回答}} {評価項目}", "ANSWER_PLACEHOLDER_REQUIRED")]
+    [InlineData("{回答} {{評価項目}}", "CRITERIA_PLACEHOLDER_REQUIRED")]
+    public void Custom_prompt_syntax_is_rejected_by_snapshot_validation(
+        string template,
+        string expectedCode)
+    {
+        QuantificationDefinition source = C02TestDefinitions.CreateValid();
+        QuestionDefinition question = source.Questions[0];
+        EvaluatorDefinition custom = question.Evaluators.Single(
+            evaluator => evaluator.Type == EvaluatorType.CustomPrompt);
+        QuantificationDefinition definition = source with
+        {
+            Questions =
+            [
+                question with
+                {
+                    Evaluators = question.Evaluators
+                        .Select(evaluator => evaluator.Id == custom.Id
+                            ? evaluator with { CustomPromptTemplate = template }
+                            : evaluator)
+                        .ToImmutableArray(),
+                },
+            ],
+        };
+
+        DefinitionValidationResult result = _validator.Validate(definition);
+
+        DefinitionValidationError error = Assert.Single(
+            result.Errors,
+            item => item.Code == expectedCode);
+        Assert.Equal(custom.Id, error.NodeId);
+        Assert.Equal("CustomPromptTemplate", error.Field);
+        Assert.DoesNotContain(template, error.ToString(), StringComparison.Ordinal);
+        Assert.Throws<QuantificationDefinitionValidationException>(
+            () => QuantificationSnapshot.Create(definition));
+    }
+
+    [Fact]
+    public void Evaluator_type_specific_prompt_ownership_is_validated_in_core()
+    {
+        QuantificationDefinition source = C02TestDefinitions.CreateValid();
+        QuestionDefinition question = source.Questions[0];
+        EvaluatorDefinition knowledge = question.Evaluators.Single(
+            evaluator => evaluator.Type == EvaluatorType.KnowledgeCoverage);
+        EvaluatorDefinition custom = question.Evaluators.Single(
+            evaluator => evaluator.Type == EvaluatorType.CustomPrompt);
+        QuantificationDefinition definition = source with
+        {
+            Questions =
+            [
+                question with
+                {
+                    Evaluators =
+                    [
+                        knowledge with
+                        {
+                            BuiltInTemplateVersion = "unsupported",
+                            CustomPromptTemplate = "PRIVATE-KNOWLEDGE-PROMPT-CANARY",
+                        },
+                        custom with { BuiltInTemplateVersion = "knowledge-v1" },
+                    ],
+                },
+            ],
+        };
+
+        DefinitionValidationResult result = _validator.Validate(definition);
+
+        Assert.Contains(result.Errors, error => error.Code == "KNOWLEDGE_TEMPLATE_VERSION_INVALID");
+        Assert.Contains(result.Errors, error => error.Code == "KNOWLEDGE_CUSTOM_TEMPLATE_FORBIDDEN");
+        Assert.Contains(result.Errors, error => error.Code == "CUSTOM_BUILT_IN_TEMPLATE_FORBIDDEN");
+        Assert.DoesNotContain(
+            "PRIVATE-KNOWLEDGE-PROMPT-CANARY",
+            string.Concat(result.Errors),
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("QuestionText")]
+    [InlineData("CustomPromptTemplate")]
+    [InlineData("Description")]
+    public void Excel_cell_text_limit_is_rejected_before_snapshot_creation(string field)
+    {
+        string oversized = new('X', QuantificationDefinitionValidator.MaximumCellCharacters + 1);
+        QuantificationDefinition source = C02TestDefinitions.CreateValid();
+        QuestionDefinition question = source.Questions[0];
+        EvaluatorDefinition custom = question.Evaluators.Single(
+            evaluator => evaluator.Type == EvaluatorType.CustomPrompt);
+        QuantificationDefinition definition = source with
+        {
+            Questions =
+            [
+                question with
+                {
+                    QuestionText = field == "QuestionText" ? oversized : question.QuestionText,
+                    Evaluators = question.Evaluators
+                        .Select(evaluator => evaluator.Id == custom.Id
+                            ? evaluator with
+                            {
+                                CustomPromptTemplate = field == "CustomPromptTemplate"
+                                    ? oversized
+                                    : evaluator.CustomPromptTemplate,
+                                Criteria = evaluator.Criteria
+                                    .Select(criterion => criterion with
+                                    {
+                                        Description = field == "Description"
+                                            ? oversized
+                                            : criterion.Description,
+                                    })
+                                    .ToImmutableArray(),
+                            }
+                            : evaluator)
+                        .ToImmutableArray(),
+                },
+            ],
+        };
+
+        DefinitionValidationResult result = _validator.Validate(definition);
+
+        DefinitionValidationError error = Assert.Single(
+            result.Errors,
+            item => item.Code == "CELL_TEXT_LIMIT_EXCEEDED" && item.Field == field);
+        Assert.Equal(
+            oversized.Length.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            error.SafeOffendingValue);
+        Assert.DoesNotContain(oversized, error.ToString(), StringComparison.Ordinal);
+        Assert.Throws<QuantificationDefinitionValidationException>(
+            () => QuantificationSnapshot.Create(definition));
+    }
+
     [Fact]
     public void Validation_error_never_echoes_question_or_prompt_bodies()
     {

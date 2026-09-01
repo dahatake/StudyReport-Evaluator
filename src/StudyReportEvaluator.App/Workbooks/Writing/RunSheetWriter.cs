@@ -30,6 +30,18 @@ public sealed record RunSheetMetadata
 
     public int ErrorCount { get; init; }
 
+    public int UsageObservedUnitCount { get; init; }
+
+    public long InputTokenCount { get; init; }
+
+    public long OutputTokenCount { get; init; }
+
+    public long ReasoningTokenCount { get; init; }
+
+    public long CacheReadTokenCount { get; init; }
+
+    public long CacheWriteTokenCount { get; init; }
+
     public required AppOwnedSheetNames SheetNames { get; init; }
 
     public override string ToString() =>
@@ -81,6 +93,12 @@ public sealed class RunSheetWriter
         AppendNumberRecord(sheetData, ref rowNumber, "PlannedEvaluationCount", metadata.PlannedEvaluationCount);
         AppendNumberRecord(sheetData, ref rowNumber, "CompletedEvaluationCount", metadata.CompletedEvaluationCount);
         AppendNumberRecord(sheetData, ref rowNumber, "ErrorCount", metadata.ErrorCount);
+        AppendNumberRecord(sheetData, ref rowNumber, "UsageObservedUnitCount", metadata.UsageObservedUnitCount);
+        AppendNumberRecord(sheetData, ref rowNumber, "InputTokenCount", metadata.InputTokenCount);
+        AppendNumberRecord(sheetData, ref rowNumber, "OutputTokenCount", metadata.OutputTokenCount);
+        AppendNumberRecord(sheetData, ref rowNumber, "ReasoningTokenCount", metadata.ReasoningTokenCount);
+        AppendNumberRecord(sheetData, ref rowNumber, "CacheReadTokenCount", metadata.CacheReadTokenCount);
+        AppendNumberRecord(sheetData, ref rowNumber, "CacheWriteTokenCount", metadata.CacheWriteTokenCount);
         AppendInlineRecord(sheetData, ref rowNumber, "ConfigSheetName", metadata.SheetNames.ConfigSheetName);
         AppendInlineRecord(sheetData, ref rowNumber, "ResultsSheetName", metadata.SheetNames.ResultsSheetName);
         AppendInlineRecord(sheetData, ref rowNumber, "RunSheetName", metadata.SheetNames.RunSheetName);
@@ -122,6 +140,21 @@ public sealed class RunSheetWriter
         if (metadata.ErrorCount < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(metadata.ErrorCount));
+        }
+
+        if (metadata.UsageObservedUnitCount < 0
+            || metadata.UsageObservedUnitCount > metadata.CompletedEvaluationCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(metadata.UsageObservedUnitCount));
+        }
+
+        if (metadata.InputTokenCount < 0
+            || metadata.OutputTokenCount < 0
+            || metadata.ReasoningTokenCount < 0
+            || metadata.CacheReadTokenCount < 0
+            || metadata.CacheWriteTokenCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(metadata), "Token usage counts must be nonnegative.");
         }
     }
 

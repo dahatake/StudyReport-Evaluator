@@ -98,7 +98,7 @@ public sealed class DocumentationScreenshotTests
             "1.0.11");
         ExecutionAuthenticationSnapshot authenticationSnapshot = new(
             ExecutionAuthenticationState.Available,
-            ["Auto", "gpt-5"],
+            [U04TestSupport.Model("Auto"), U04TestSupport.Model("gpt-5")],
             runtimeIdentity);
         RunSummary? preparedSummary = null;
         RecordingRunBoundary runBoundary = new((_, progress, _) =>
@@ -281,6 +281,8 @@ public sealed class DocumentationScreenshotTests
                     WorkbookMetadata = metadata,
                     InputPath = SafeInputPath,
                     ModelId = "Auto",
+                    MaximumPromptTokens = 64_000,
+                    MaximumContextWindowTokens = 128_000,
                     MaxConcurrency = 2,
                 },
                 cancellationToken: TestContext.Current.CancellationToken);

@@ -85,6 +85,33 @@ public sealed class ConfigAndRunSheetWriterTests
     }
 
     [Fact]
+    public void Dry_run_config_address_map_matches_the_writer_layout_exactly()
+    {
+        QuantificationSnapshot snapshot = QuantificationSnapshot.Create(CreateDefinition());
+        using TemporaryWorkbook input = X01SyntheticWorkbookFactory.Create();
+        using SpreadsheetDocument document = SpreadsheetDocument.Open(input.Path, true);
+        AppOwnedSheetNames names = new AppOwnedSheetNameResolver().Resolve(document);
+        ConfigSheetWriter writer = new();
+
+        ConfigCellAddressMap planned = writer.CreateAddressMap(snapshot, names.ConfigSheetName);
+        ConfigCellAddressMap written = writer.Write(document, snapshot, names);
+
+        Assert.Equal(planned.SheetName, written.SheetName);
+        Assert.Equal(planned.RoundingDigitsCell, written.RoundingDigitsCell);
+        Assert.Equal(planned.QuestionWeightCells, written.QuestionWeightCells);
+        Assert.Equal(planned.EvaluatorWeightCells, written.EvaluatorWeightCells);
+        Assert.Equal(planned.EvaluatorMinimumCells, written.EvaluatorMinimumCells);
+        Assert.Equal(planned.EvaluatorMaximumCells, written.EvaluatorMaximumCells);
+        Assert.Equal(planned.CriterionWeightCells, written.CriterionWeightCells);
+        Assert.Equal(planned.CriterionMinimumCells, written.CriterionMinimumCells);
+        Assert.Equal(planned.CriterionMaximumCells, written.CriterionMaximumCells);
+        Assert.Equal(planned.VerifiedCells, written.VerifiedCells);
+        Assert.Equal(
+            GetWorksheet(document, names.ConfigSheetName).Descendants<Row>().LongCount(),
+            writer.CalculateRequiredRowCount(snapshot));
+    }
+
+    [Fact]
     public void Run_metadata_validation_happens_before_a_sheet_is_added_and_ToString_is_redacted()
     {
         using TemporaryWorkbook input = X01SyntheticWorkbookFactory.Create();
@@ -127,6 +154,12 @@ public sealed class ConfigAndRunSheetWriterTests
             PlannedEvaluationCount = 1,
             CompletedEvaluationCount = 0,
             ErrorCount = 2,
+            UsageObservedUnitCount = 0,
+            InputTokenCount = 0,
+            OutputTokenCount = 0,
+            ReasoningTokenCount = 0,
+            CacheReadTokenCount = 0,
+            CacheWriteTokenCount = 0,
         };
 
         new RunSheetWriter().Write(document, metadata);
@@ -245,6 +278,12 @@ public sealed class ConfigAndRunSheetWriterTests
         Assert.Equal("6", records["PlannedEvaluationCount"].InnerText);
         Assert.Equal("5", records["CompletedEvaluationCount"].InnerText);
         Assert.Equal("1", records["ErrorCount"].InnerText);
+        Assert.Equal("5", records["UsageObservedUnitCount"].InnerText);
+        Assert.Equal("1234", records["InputTokenCount"].InnerText);
+        Assert.Equal("234", records["OutputTokenCount"].InnerText);
+        Assert.Equal("34", records["ReasoningTokenCount"].InnerText);
+        Assert.Equal("12", records["CacheReadTokenCount"].InnerText);
+        Assert.Equal("6", records["CacheWriteTokenCount"].InnerText);
         Assert.Equal(names.ConfigSheetName, records["ConfigSheetName"].InnerText);
         Assert.Equal(names.ResultsSheetName, records["ResultsSheetName"].InnerText);
         Assert.Equal(names.RunSheetName, records["RunSheetName"].InnerText);
@@ -290,6 +329,12 @@ public sealed class ConfigAndRunSheetWriterTests
             PlannedEvaluationCount = 6,
             CompletedEvaluationCount = 5,
             ErrorCount = 1,
+            UsageObservedUnitCount = 5,
+            InputTokenCount = 1234,
+            OutputTokenCount = 234,
+            ReasoningTokenCount = 34,
+            CacheReadTokenCount = 12,
+            CacheWriteTokenCount = 6,
             SheetNames = names,
         };
 

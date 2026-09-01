@@ -91,7 +91,8 @@ public sealed record ResultsSheetValidationError(
     string NodeId,
     string DisplayName,
     string Field,
-    string SafeOffendingValue)
+    string SafeOffendingValue,
+    string? Limit = null)
 {
     public override string ToString() =>
         $"{nameof(ResultsSheetValidationError)} {{ Code = {Code}, SourceRowNumber = {SourceRowNumber?.ToString(CultureInfo.InvariantCulture) ?? "<none>"}, Field = {Field}, Content = <redacted> }}";
@@ -152,6 +153,30 @@ public sealed class ResultsSheetWriteResult
 
     public override string ToString() =>
         $"{nameof(ResultsSheetWriteResult)} {{ DataRowCount = {DataRowCount}, ColumnCount = {ColumnCount}, FormulaCount = {FormulaCells.Length}, Content = <redacted> }}";
+}
+
+public sealed class ResultsSheetPreflightResult
+{
+    internal ResultsSheetPreflightResult(
+        int columnCount,
+        int formulaCount,
+        ImmutableArray<ResultsSheetValidationError> errors)
+    {
+        ColumnCount = columnCount;
+        FormulaCount = formulaCount;
+        Errors = errors;
+    }
+
+    public int ColumnCount { get; }
+
+    public int FormulaCount { get; }
+
+    public ImmutableArray<ResultsSheetValidationError> Errors { get; }
+
+    public bool IsValid => Errors.IsEmpty;
+
+    public override string ToString() =>
+        $"{nameof(ResultsSheetPreflightResult)} {{ ColumnCount = {ColumnCount.ToString(CultureInfo.InvariantCulture)}, FormulaCount = {FormulaCount.ToString(CultureInfo.InvariantCulture)}, ErrorCount = {Errors.Length.ToString(CultureInfo.InvariantCulture)}, Content = <redacted> }}";
 }
 
 public sealed class ResultsSheetWriter
@@ -215,6 +240,52 @@ public sealed class ResultsSheetWriter
             prepared.FormulaCells);
     }
 
+    public ResultsSheetPreflightResult Preflight(
+        QuantificationSnapshot snapshot,
+        AppOwnedSheetNames sheetNames,
+        ConfigCellAddressMap configCells)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(sheetNames);
+        ArgumentNullException.ThrowIfNull(configCells);
+
+        List<ResultsSheetValidationError> errors = [];
+        if (!snapshot.HasValidHash())
+        {
+            AddError(errors, "SNAPSHOT_HASH_INVALID", null, "Definition", snapshot.Definition.Id, snapshot.Definition.Name, "Sha256", "invalid");
+        }
+
+        if (!AppOwnedSheetNameResolver.IsValidWorksheetName(sheetNames.ResultsSheetName))
+        {
+            AddError(errors, "RESULTS_SHEET_NAME_INVALID", null, "Definition", snapshot.Definition.Id, snapshot.Definition.Name, "ResultsSheetName", "invalid");
+        }
+
+        if (!string.Equals(configCells.SheetName, sheetNames.ConfigSheetName, StringComparison.Ordinal))
+        {
+            AddError(errors, "CONFIG_BINDING_MISMATCH", null, "Definition", snapshot.Definition.Id, snapshot.Definition.Name, "ConfigSheetName", "mismatch");
+        }
+
+        ResultsLayout layout = CreateLayout(snapshot.Definition, errors);
+        ValidateConfigReferences(layout, configCells, sheetNames, errors);
+        if (errors.Count > 0)
+        {
+            return new ResultsSheetPreflightResult(layout.ColumnCount, 0, errors.ToImmutableArray());
+        }
+
+        ImmutableArray<int> representativeRows = [snapshot.Definition.LastDataRow];
+        ImmutableArray<FormulaCellDefinition> formulas = BuildFormulas(
+            snapshot.Definition,
+            layout,
+            representativeRows,
+            sheetNames,
+            configCells);
+        ValidateFormulas(layout, representativeRows, formulas, sheetNames, configCells, errors);
+        return new ResultsSheetPreflightResult(
+            layout.ColumnCount,
+            formulas.Length,
+            errors.ToImmutableArray());
+    }
+
     public override string ToString() =>
         $"{nameof(ResultsSheetWriter)} {{ Content = <redacted> }}";
 
@@ -240,10 +311,16 @@ public sealed class ResultsSheetWriter
         ImmutableArray<FormulaCellDefinition> formulas = BuildFormulas(
             snapshot.Definition,
             layout,
-            preparedRows,
+            preparedRows.Select(row => row.SourceRowNumber).ToImmutableArray(),
             sheetNames,
             configCells);
-        ValidateFormulas(layout, preparedRows, formulas, sheetNames, configCells, errors);
+        ValidateFormulas(
+            layout,
+            preparedRows.Select(row => row.SourceRowNumber).ToImmutableArray(),
+            formulas,
+            sheetNames,
+            configCells,
+            errors);
         ThrowIfErrors(errors);
 
         Dictionary<FormulaCellAddress, FormulaCellDefinition> formulasByTarget = formulas.ToDictionary(
@@ -347,7 +424,8 @@ public sealed class ResultsSheetWriter
                 definition.Id,
                 definition.Name,
                 "ResultsColumns",
-                requiredColumns.ToString(CultureInfo.InvariantCulture));
+                requiredColumns.ToString(CultureInfo.InvariantCulture),
+                FormulaPreflightValidator.MaximumExcelColumn.ToString(CultureInfo.InvariantCulture));
             return new ResultsLayout(
                 [],
                 Column(1, OverallScoreHeader),
@@ -407,7 +485,8 @@ public sealed class ResultsSheetWriter
                     definition.Id,
                     definition.Name,
                     "ResultsHeader",
-                    column.Header.Length.ToString(CultureInfo.InvariantCulture));
+                    column.Header.Length.ToString(CultureInfo.InvariantCulture),
+                    UntrustedStringCellWriter.MaximumCellCharacters.ToString(CultureInfo.InvariantCulture));
             }
         }
 
@@ -840,79 +919,79 @@ public sealed class ResultsSheetWriter
     private static ImmutableArray<FormulaCellDefinition> BuildFormulas(
         QuantificationDefinition definition,
         ResultsLayout layout,
-        ImmutableArray<PreparedRow> rows,
+        ImmutableArray<int> sourceRows,
         AppOwnedSheetNames sheetNames,
         ConfigCellAddressMap configCells)
     {
         ImmutableArray<FormulaCellDefinition>.Builder formulas = ImmutableArray.CreateBuilder<FormulaCellDefinition>();
-        foreach (PreparedRow row in rows)
+        foreach (int sourceRow in sourceRows)
         {
-            foreach (PreparedQuestion question in row.Questions)
+            foreach (QuestionLayout question in layout.Questions)
             {
-                foreach (PreparedEvaluator evaluator in question.Evaluators)
+                foreach (EvaluatorLayout evaluator in question.Evaluators)
                 {
-                    foreach (PreparedCriterion criterion in evaluator.Criteria)
+                    foreach (CriterionLayout criterion in evaluator.Criteria)
                     {
                         FormulaIdentity effectiveIdentity = new(
                             "Criterion",
-                            criterion.Layout.Definition.Id,
-                            criterion.Layout.Definition.DisplayName,
+                            criterion.Definition.Id,
+                            criterion.Definition.DisplayName,
                             EffectiveRawSuffix);
-                        FormulaCellAddress effectiveTarget = Address(sheetNames.ResultsSheetName, criterion.Layout.EffectiveRaw, row.SourceRowNumber);
+                        FormulaCellAddress effectiveTarget = Address(sheetNames.ResultsSheetName, criterion.EffectiveRaw, sourceRow);
                         formulas.Add(new FormulaCellDefinition(
                             effectiveTarget,
                             effectiveIdentity,
                             FormulaExpressions.EffectiveRaw(
-                                Ref(Address(sheetNames.ResultsSheetName, criterion.Layout.Scorable, row.SourceRowNumber)),
-                                Ref(Address(sheetNames.ResultsSheetName, criterion.Layout.AiRaw, row.SourceRowNumber)),
-                                Ref(Address(sheetNames.ResultsSheetName, criterion.Layout.Override, row.SourceRowNumber)),
-                                Ref(configCells.CriterionMinimumCells[criterion.Layout.Definition.Id], absolute: true),
-                                Ref(configCells.CriterionMaximumCells[criterion.Layout.Definition.Id], absolute: true))));
+                                Ref(Address(sheetNames.ResultsSheetName, criterion.Scorable, sourceRow)),
+                                Ref(Address(sheetNames.ResultsSheetName, criterion.AiRaw, sourceRow)),
+                                Ref(Address(sheetNames.ResultsSheetName, criterion.Override, sourceRow)),
+                                Ref(configCells.CriterionMinimumCells[criterion.Definition.Id], absolute: true),
+                                Ref(configCells.CriterionMaximumCells[criterion.Definition.Id], absolute: true))));
                         formulas.Add(new FormulaCellDefinition(
-                            Address(sheetNames.ResultsSheetName, criterion.Layout.Normalized, row.SourceRowNumber),
+                            Address(sheetNames.ResultsSheetName, criterion.Normalized, sourceRow),
                             effectiveIdentity with { Field = NormalizedSuffix },
                             FormulaExpressions.Normalized(
                                 Ref(effectiveTarget),
-                                Ref(configCells.CriterionMinimumCells[criterion.Layout.Definition.Id], absolute: true),
-                                Ref(configCells.CriterionMaximumCells[criterion.Layout.Definition.Id], absolute: true),
+                                Ref(configCells.CriterionMinimumCells[criterion.Definition.Id], absolute: true),
+                                Ref(configCells.CriterionMaximumCells[criterion.Definition.Id], absolute: true),
                                 Ref(configCells.RoundingDigitsCell, absolute: true))));
                     }
 
                     formulas.Add(new FormulaCellDefinition(
-                        Address(sheetNames.ResultsSheetName, evaluator.Layout.Score, row.SourceRowNumber),
+                        Address(sheetNames.ResultsSheetName, evaluator.Score, sourceRow),
                         new FormulaIdentity(
                             "Evaluator",
-                            evaluator.Layout.Definition.Id,
-                            evaluator.Layout.Definition.DisplayName,
+                            evaluator.Definition.Id,
+                            evaluator.Definition.DisplayName,
                             EvaluatorScoreSuffix),
                         FormulaExpressions.Aggregate(
                             evaluator.Criteria.Select(criterion => new WeightedFormulaChild(
-                                Ref(Address(sheetNames.ResultsSheetName, criterion.Layout.Normalized, row.SourceRowNumber)),
-                                Ref(configCells.CriterionWeightCells[criterion.Layout.Definition.Id], absolute: true))),
+                                Ref(Address(sheetNames.ResultsSheetName, criterion.Normalized, sourceRow)),
+                                Ref(configCells.CriterionWeightCells[criterion.Definition.Id], absolute: true))),
                             Ref(configCells.RoundingDigitsCell, absolute: true))));
                 }
 
                 formulas.Add(new FormulaCellDefinition(
-                    Address(sheetNames.ResultsSheetName, question.Layout.Score, row.SourceRowNumber),
+                    Address(sheetNames.ResultsSheetName, question.Score, sourceRow),
                     new FormulaIdentity(
                         "Question",
-                        question.Layout.Definition.Id,
-                        question.Layout.Definition.DisplayName,
+                        question.Definition.Id,
+                        question.Definition.DisplayName,
                         QuestionScoreSuffix),
                     FormulaExpressions.Aggregate(
                         question.Evaluators.Select(evaluator => new WeightedFormulaChild(
-                            Ref(Address(sheetNames.ResultsSheetName, evaluator.Layout.Score, row.SourceRowNumber)),
-                            Ref(configCells.EvaluatorWeightCells[evaluator.Layout.Definition.Id], absolute: true))),
+                            Ref(Address(sheetNames.ResultsSheetName, evaluator.Score, sourceRow)),
+                            Ref(configCells.EvaluatorWeightCells[evaluator.Definition.Id], absolute: true))),
                         Ref(configCells.RoundingDigitsCell, absolute: true))));
             }
 
             formulas.Add(new FormulaCellDefinition(
-                Address(sheetNames.ResultsSheetName, layout.Overall, row.SourceRowNumber),
+                Address(sheetNames.ResultsSheetName, layout.Overall, sourceRow),
                 new FormulaIdentity("Definition", definition.Id, definition.Name, OverallScoreHeader),
                 FormulaExpressions.Aggregate(
-                    row.Questions.Select(question => new WeightedFormulaChild(
-                        Ref(Address(sheetNames.ResultsSheetName, question.Layout.Score, row.SourceRowNumber)),
-                        Ref(configCells.QuestionWeightCells[question.Layout.Definition.Id], absolute: true))),
+                    layout.Questions.Select(question => new WeightedFormulaChild(
+                        Ref(Address(sheetNames.ResultsSheetName, question.Score, sourceRow)),
+                        Ref(configCells.QuestionWeightCells[question.Definition.Id], absolute: true))),
                     Ref(configCells.RoundingDigitsCell, absolute: true))));
         }
 
@@ -921,18 +1000,18 @@ public sealed class ResultsSheetWriter
 
     private static void ValidateFormulas(
         ResultsLayout layout,
-        ImmutableArray<PreparedRow> rows,
+        ImmutableArray<int> sourceRows,
         ImmutableArray<FormulaCellDefinition> formulas,
         AppOwnedSheetNames sheetNames,
         ConfigCellAddressMap configCells,
         List<ResultsSheetValidationError> errors)
     {
         HashSet<FormulaCellAddress> verified = configCells.VerifiedCells.ToHashSet();
-        foreach (PreparedRow row in rows)
+        foreach (int sourceRow in sourceRows)
         {
             foreach (ColumnLayout column in layout.AllColumns)
             {
-                verified.Add(Address(sheetNames.ResultsSheetName, column, row.SourceRowNumber));
+                verified.Add(Address(sheetNames.ResultsSheetName, column, sourceRow));
             }
         }
 
@@ -949,7 +1028,8 @@ public sealed class ResultsSheetWriter
                 error.Identity.NodeId,
                 error.Identity.DisplayName,
                 error.Identity.Field,
-                error.ActualDimension);
+                error.ActualDimension,
+                error.Limit);
         }
     }
 
@@ -1158,7 +1238,8 @@ public sealed class ResultsSheetWriter
         string nodeId,
         string displayName,
         string field,
-        string safeOffendingValue)
+        string safeOffendingValue,
+        string? limit = null)
     {
         errors?.Add(new ResultsSheetValidationError(
             code,
@@ -1167,7 +1248,8 @@ public sealed class ResultsSheetWriter
             nodeId,
             displayName,
             field,
-            safeOffendingValue));
+                safeOffendingValue,
+                limit));
     }
 
     private sealed record ColumnLayout(int Number, string Name, string Header);

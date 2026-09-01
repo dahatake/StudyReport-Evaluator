@@ -1,9 +1,12 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.App.Workbooks.Mapping;
 using StudyReportEvaluator.App.Workbooks.Reading;
+using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
+using StudyReportEvaluator.Core.Prompting;
 
 namespace StudyReportEvaluator.App.Workflow;
 
@@ -64,6 +67,32 @@ public sealed class QuantificationRunException : Exception
         $"{nameof(QuantificationRunException)} {{ Code = {Code}, Content = <redacted> }}";
 }
 
+public sealed class QuantificationRunPreflightException : Exception
+{
+    public QuantificationRunPreflightException(IEnumerable<ExecutionCapacityError> errors)
+        : this(errors?.ToImmutableArray()
+            ?? throw new ArgumentNullException(nameof(errors)))
+    {
+    }
+
+    private QuantificationRunPreflightException(
+        ImmutableArray<ExecutionCapacityError> errors)
+        : base($"The quantification run has {errors.Length.ToString(CultureInfo.InvariantCulture)} capacity preflight error(s).")
+    {
+        if (errors.IsEmpty)
+        {
+            throw new ArgumentException("At least one capacity preflight error is required.", nameof(errors));
+        }
+
+        Errors = errors;
+    }
+
+    public ImmutableArray<ExecutionCapacityError> Errors { get; }
+
+    public override string ToString() =>
+        $"{nameof(QuantificationRunPreflightException)} {{ ErrorCount = {Errors.Length.ToString(CultureInfo.InvariantCulture)}, Content = <redacted> }}";
+}
+
 public sealed record QuantificationRunRequest
 {
     public required QuantificationDefinition DraftDefinition { get; init; }
@@ -74,6 +103,10 @@ public sealed record QuantificationRunRequest
 
     public required string ModelId { get; init; }
 
+    public int MaximumPromptTokens { get; init; }
+
+    public int MaximumContextWindowTokens { get; init; }
+
     public int MaxConcurrency { get; init; } = EvaluationSchedulerOptions.DefaultMaxConcurrency;
 
     public override string ToString() =>
@@ -82,9 +115,13 @@ public sealed record QuantificationRunRequest
 
 public sealed class QuantificationOrchestrator
 {
+    private readonly IEvaluationRowSource rowSource;
     private readonly IInputSnapshotBoundary inputSnapshots;
     private readonly EvaluationPlanBuilder planBuilder;
     private readonly ColumnMappingValidator mappingValidator;
+    private readonly WorkbookExecutionPreflight workbookPreflight;
+    private readonly SafeEvaluationPayloadBuilder payloadBuilder;
+    private readonly EvaluationRequestCapacityValidator requestCapacityValidator;
     private readonly EvaluationScheduler scheduler;
     private readonly TimeProvider timeProvider;
 
@@ -107,11 +144,15 @@ public sealed class QuantificationOrchestrator
     {
         ArgumentNullException.ThrowIfNull(rowSource);
         ArgumentNullException.ThrowIfNull(runner);
+        this.rowSource = rowSource;
         this.inputSnapshots = inputSnapshots
             ?? throw new ArgumentNullException(nameof(inputSnapshots));
         this.timeProvider = timeProvider ?? TimeProvider.System;
         planBuilder = new EvaluationPlanBuilder();
         mappingValidator = new ColumnMappingValidator();
+        workbookPreflight = new WorkbookExecutionPreflight();
+        payloadBuilder = new SafeEvaluationPayloadBuilder();
+        requestCapacityValidator = new EvaluationRequestCapacityValidator();
         scheduler = new EvaluationScheduler(rowSource, runner);
     }
 
@@ -139,6 +180,17 @@ public sealed class QuantificationOrchestrator
             throw new QuantificationMappingValidationException(mappingValidation.Errors);
         }
 
+        WorkbookExecutionPreflightResult capacity = workbookPreflight.Validate(
+            snapshot,
+            request.WorkbookMetadata);
+        if (!capacity.IsValid)
+        {
+            throw new QuantificationRunPreflightException(capacity.Errors);
+        }
+
+        EvaluationPlan plan = planBuilder.Build(snapshot, mappingValidation.Mapping);
+        ValidateStaticRequestCapacity(request, plan);
+
         InputSnapshot inputSnapshot;
         try
         {
@@ -154,7 +206,26 @@ public sealed class QuantificationOrchestrator
             throw new QuantificationRunException("INPUT_SNAPSHOT_FAILED");
         }
 
-        EvaluationPlan plan = planBuilder.Build(snapshot, mappingValidation.Mapping);
+        await ValidateRequestCapacityAsync(
+            plan,
+            request.MaximumPromptTokens,
+            request.MaximumContextWindowTokens,
+            cancellationToken).ConfigureAwait(false);
+        if (!SafeInputRecheck(request.InputPath, inputSnapshot))
+        {
+            throw new QuantificationRunPreflightException(
+            [
+                new ExecutionCapacityError(
+                    "INPUT_CHANGED_BEFORE_DISPATCH",
+                    "Definition",
+                    snapshot.Definition.Id,
+                    snapshot.Definition.Name,
+                    "InputIdentity",
+                    "changed",
+                    "exact snapshot match"),
+            ]);
+        }
+
         EvaluationScheduleResult schedule = await scheduler
             .RunAsync(
                 plan,
@@ -194,6 +265,203 @@ public sealed class QuantificationOrchestrator
             startedAtUtc,
             endedAtUtc);
     }
+
+    private static void ValidateStaticRequestCapacity(
+        QuantificationRunRequest request,
+        EvaluationPlan plan)
+    {
+        ImmutableArray<ExecutionCapacityError>.Builder errors =
+            ImmutableArray.CreateBuilder<ExecutionCapacityError>();
+        if (request.MaximumPromptTokens <= 0)
+        {
+            errors.Add(new ExecutionCapacityError(
+                "MODEL_PROMPT_LIMIT_UNAVAILABLE",
+                "Definition",
+                plan.Snapshot.Definition.Id,
+                plan.Snapshot.Definition.Name,
+                "MaximumPromptTokens",
+                request.MaximumPromptTokens.ToString(CultureInfo.InvariantCulture),
+                "positive SDK model limit"));
+        }
+
+        if (request.MaximumContextWindowTokens <= 0)
+        {
+            errors.Add(new ExecutionCapacityError(
+                "MODEL_CONTEXT_LIMIT_UNAVAILABLE",
+                "Definition",
+                plan.Snapshot.Definition.Id,
+                plan.Snapshot.Definition.Name,
+                "MaximumContextWindowTokens",
+                request.MaximumContextWindowTokens.ToString(CultureInfo.InvariantCulture),
+                "positive SDK model limit"));
+        }
+
+        long worstCaseAttempts;
+        try
+        {
+            worstCaseAttempts = checked(
+                (long)plan.TotalCount * RetryAndCleanupCoordinator.MaximumTransientAttempts);
+        }
+        catch (OverflowException)
+        {
+            worstCaseAttempts = long.MaxValue;
+        }
+
+        if (worstCaseAttempts > EvaluationRequestCapacityValidator.MaximumWorstCaseAttemptsPerRun)
+        {
+            errors.Add(new ExecutionCapacityError(
+                "ATTEMPT_BUDGET_TOO_LARGE",
+                "Definition",
+                plan.Snapshot.Definition.Id,
+                plan.Snapshot.Definition.Name,
+                "WorstCaseAttempts",
+                worstCaseAttempts.ToString(CultureInfo.InvariantCulture),
+                EvaluationRequestCapacityValidator.MaximumWorstCaseAttemptsPerRun.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new QuantificationRunPreflightException(errors.ToImmutable());
+        }
+    }
+
+    private async Task ValidateRequestCapacityAsync(
+        EvaluationPlan plan,
+        int maximumPromptTokens,
+        int maximumContextWindowTokens,
+        CancellationToken cancellationToken)
+    {
+        ImmutableArray<ExecutionCapacityError>.Builder errors =
+            ImmutableArray.CreateBuilder<ExecutionCapacityError>();
+        foreach (IGrouping<int, EvaluationPlanItem> rowItems in plan.Items.GroupBy(
+                     item => item.SourceRowNumber))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            EvaluationPlanItem[] items = rowItems.ToArray();
+            string[] selectedColumns = items
+                .SelectMany(item => item.SelectedSourceColumns)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            EvaluationRowData row;
+            try
+            {
+                EvaluationRowRequest rowRequest = new(
+                    plan.Snapshot.Definition.SourceSheet,
+                    rowItems.Key,
+                    selectedColumns);
+                Task<EvaluationRowData> readTask = rowSource.ReadAsync(
+                    rowRequest,
+                    cancellationToken)
+                    ?? throw new InvalidOperationException("The row source returned no task.");
+                row = await readTask.ConfigureAwait(false)
+                    ?? throw new InvalidOperationException("The row source returned no row.");
+                if (row.SourceRowNumber != rowItems.Key)
+                {
+                    throw new InvalidDataException("The row source returned a different row.");
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                throw new QuantificationRunPreflightException(
+                [
+                    new ExecutionCapacityError(
+                        "REQUEST_PREFLIGHT_ROW_READ_FAILED",
+                        "Definition",
+                        plan.Snapshot.Definition.Id,
+                        plan.Snapshot.Definition.Name,
+                        "SourceRowNumber",
+                        rowItems.Key.ToString(CultureInfo.InvariantCulture),
+                        "readable selected row"),
+                ]);
+            }
+
+            foreach (EvaluationPlanItem item in items)
+            {
+                Dictionary<string, string?> selectedCells = new(StringComparer.OrdinalIgnoreCase);
+                foreach (string column in item.SelectedSourceColumns)
+                {
+                    selectedCells[column] = row.Cells.TryGetValue(column, out string? value)
+                        ? value
+                        : string.Empty;
+                }
+
+                if (string.IsNullOrWhiteSpace(selectedCells[item.PrimarySourceColumn]))
+                {
+                    continue;
+                }
+
+                SafeEvaluationPayload payload;
+                try
+                {
+                    payload = payloadBuilder.Build(
+                        plan.Snapshot,
+                        item.QuestionId,
+                        item.EvaluatorId,
+                        selectedCells);
+                }
+                catch
+                {
+                    throw new QuantificationRunPreflightException(
+                    [
+                        new ExecutionCapacityError(
+                            "REQUEST_PREFLIGHT_BUILD_FAILED",
+                            "Evaluator",
+                            item.EvaluatorId,
+                            EvaluatorDisplayName(plan.Snapshot.Definition, item),
+                            "RequestPayload",
+                            "invalid",
+                            "renderable closed payload"),
+                    ]);
+                }
+
+                EvaluationRequestCapacityResult capacity = requestCapacityValidator.Validate(
+                    payload,
+                    maximumPromptTokens,
+                    maximumContextWindowTokens);
+                foreach (EvaluationRequestCapacityError error in capacity.Errors)
+                {
+                    errors.Add(new ExecutionCapacityError(
+                        error.Code,
+                        "Evaluator",
+                        item.EvaluatorId,
+                        EvaluatorDisplayName(plan.Snapshot.Definition, item),
+                        error.Field,
+                        error.ActualDimension.ToString(CultureInfo.InvariantCulture),
+                        error.Limit.ToString(CultureInfo.InvariantCulture)));
+                }
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new QuantificationRunPreflightException(errors.ToImmutable());
+        }
+    }
+
+    private bool SafeInputRecheck(string inputPath, InputSnapshot expected)
+    {
+        try
+        {
+            return inputSnapshots.IsUnchanged(inputPath, expected);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string EvaluatorDisplayName(
+        QuantificationDefinition definition,
+        EvaluationPlanItem item) =>
+        definition.Questions
+            .Single(question => string.Equals(question.Id, item.QuestionId, StringComparison.Ordinal))
+            .Evaluators
+            .Single(evaluator => string.Equals(evaluator.Id, item.EvaluatorId, StringComparison.Ordinal))
+            .DisplayName;
 
     public override string ToString() =>
         $"{nameof(QuantificationOrchestrator)} {{ Content = <redacted> }}";

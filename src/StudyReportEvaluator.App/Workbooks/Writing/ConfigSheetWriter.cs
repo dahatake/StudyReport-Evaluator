@@ -69,6 +69,7 @@ public sealed class ConfigSheetWriter
 {
     public const int MaximumCellCharacters = 32_767;
     public const int SnapshotChunkCharacters = 30_000;
+    public const int MaximumExcelRows = 1_048_576;
 
     private const string RecordTypeColumn = "A";
     private const string PathColumn = "B";
@@ -274,6 +275,125 @@ public sealed class ConfigSheetWriter
             verifiedCells);
     }
 
+    public long CalculateRequiredRowCount(QuantificationSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (!snapshot.HasValidHash())
+        {
+            throw new ArgumentException("The quantification snapshot hash is invalid.", nameof(snapshot));
+        }
+
+        long rows = checked(2L + Chunk(snapshot.CanonicalJson).LongCount());
+        foreach (QuestionDefinition question in snapshot.Definition.Questions)
+        {
+            rows = checked(rows + 1L + question.SupportingSourceColumns.Length);
+            foreach (EvaluatorDefinition evaluator in question.Evaluators)
+            {
+                rows = checked(rows + 1L + evaluator.Criteria.Length);
+            }
+        }
+
+        return rows;
+    }
+
+    public ConfigCellAddressMap CreateAddressMap(
+        QuantificationSnapshot snapshot,
+        string sheetName)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sheetName);
+        if (!snapshot.HasValidHash())
+        {
+            throw new ArgumentException("The quantification snapshot hash is invalid.", nameof(snapshot));
+        }
+
+        if (!AppOwnedSheetNameResolver.IsValidWorksheetName(sheetName))
+        {
+            throw new ArgumentException("The Config worksheet name is invalid.", nameof(sheetName));
+        }
+
+        long requiredRows = CalculateRequiredRowCount(snapshot);
+        if (requiredRows > MaximumExcelRows)
+        {
+            throw new InvalidDataException("The Config worksheet exceeds the Excel row limit.");
+        }
+
+        uint rowNumber = 1;
+        _ = TakeRow(ref rowNumber);
+        uint definitionRowNumber = TakeRow(ref rowNumber);
+        foreach (string chunk in Chunk(snapshot.CanonicalJson))
+        {
+            _ = chunk;
+            TakeRow(ref rowNumber);
+        }
+
+        Dictionary<string, FormulaCellAddress> questionWeights = new(StringComparer.Ordinal);
+        Dictionary<string, FormulaCellAddress> evaluatorWeights = new(StringComparer.Ordinal);
+        Dictionary<string, FormulaCellAddress> evaluatorMinimums = new(StringComparer.Ordinal);
+        Dictionary<string, FormulaCellAddress> evaluatorMaximums = new(StringComparer.Ordinal);
+        Dictionary<string, FormulaCellAddress> criterionWeights = new(StringComparer.Ordinal);
+        Dictionary<string, FormulaCellAddress> criterionMinimums = new(StringComparer.Ordinal);
+        Dictionary<string, FormulaCellAddress> criterionMaximums = new(StringComparer.Ordinal);
+        List<FormulaCellAddress> verifiedCells =
+        [
+            Address(sheetName, RoundingDigitsColumn, definitionRowNumber),
+        ];
+
+        foreach (QuestionDefinition question in snapshot.Definition.Questions)
+        {
+            uint questionRowNumber = TakeRow(ref rowNumber);
+            FormulaCellAddress questionWeight = Address(sheetName, RawWeightColumn, questionRowNumber);
+            questionWeights.Add(question.Id, questionWeight);
+            verifiedCells.Add(questionWeight);
+
+            foreach (string column in question.SupportingSourceColumns)
+            {
+                _ = column;
+                TakeRow(ref rowNumber);
+            }
+
+            foreach (EvaluatorDefinition evaluator in question.Evaluators)
+            {
+                uint evaluatorRowNumber = TakeRow(ref rowNumber);
+                FormulaCellAddress evaluatorWeight = Address(sheetName, RawWeightColumn, evaluatorRowNumber);
+                FormulaCellAddress evaluatorMinimum = Address(sheetName, EffectiveMinimumColumn, evaluatorRowNumber);
+                FormulaCellAddress evaluatorMaximum = Address(sheetName, EffectiveMaximumColumn, evaluatorRowNumber);
+                evaluatorWeights.Add(evaluator.Id, evaluatorWeight);
+                evaluatorMinimums.Add(evaluator.Id, evaluatorMinimum);
+                evaluatorMaximums.Add(evaluator.Id, evaluatorMaximum);
+                verifiedCells.Add(evaluatorWeight);
+                verifiedCells.Add(evaluatorMinimum);
+                verifiedCells.Add(evaluatorMaximum);
+
+                foreach (CriterionDefinition criterion in evaluator.Criteria)
+                {
+                    uint criterionRowNumber = TakeRow(ref rowNumber);
+                    FormulaCellAddress criterionWeight = Address(sheetName, RawWeightColumn, criterionRowNumber);
+                    FormulaCellAddress criterionMinimum = Address(sheetName, EffectiveMinimumColumn, criterionRowNumber);
+                    FormulaCellAddress criterionMaximum = Address(sheetName, EffectiveMaximumColumn, criterionRowNumber);
+                    criterionWeights.Add(criterion.Id, criterionWeight);
+                    criterionMinimums.Add(criterion.Id, criterionMinimum);
+                    criterionMaximums.Add(criterion.Id, criterionMaximum);
+                    verifiedCells.Add(criterionWeight);
+                    verifiedCells.Add(criterionMinimum);
+                    verifiedCells.Add(criterionMaximum);
+                }
+            }
+        }
+
+        return new ConfigCellAddressMap(
+            sheetName,
+            Address(sheetName, RoundingDigitsColumn, definitionRowNumber),
+            questionWeights,
+            evaluatorWeights,
+            evaluatorMinimums,
+            evaluatorMaximums,
+            criterionWeights,
+            criterionMinimums,
+            criterionMaximums,
+            verifiedCells);
+    }
+
     private static Row CreateHeaderRow(uint rowNumber)
     {
         Row row = NewRow(rowNumber);
@@ -365,9 +485,19 @@ public sealed class ConfigSheetWriter
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported evaluator type."),
     };
 
+    private static uint TakeRow(ref uint nextRow)
+    {
+        if (nextRow is 0 or > MaximumExcelRows)
+        {
+            throw new InvalidDataException("The Config worksheet exceeds the Excel row limit.");
+        }
+
+        return nextRow++;
+    }
+
     private static Row NewRow(uint rowNumber)
     {
-        if (rowNumber is 0 or > 1_048_576)
+        if (rowNumber is 0 or > MaximumExcelRows)
         {
             throw new InvalidDataException("The Config worksheet exceeds the Excel row limit.");
         }

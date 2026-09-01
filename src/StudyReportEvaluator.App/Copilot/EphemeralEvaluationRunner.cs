@@ -72,6 +72,9 @@ public interface IEphemeralCopilotSession : IAsyncDisposable
         MessageOptions options,
         CancellationToken cancellationToken);
 
+    Task<EvaluationTokenUsage> GetUsageAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(EvaluationTokenUsage.Unavailable);
+
     Task AbortAsync(CancellationToken cancellationToken);
 }
 
@@ -159,6 +162,7 @@ internal sealed class CopilotEvaluationAttempt : IEphemeralEvaluationAttempt
     private readonly MessageOptions _messageOptions;
     private IEphemeralCopilotSession? _session;
     private string? _createdSessionId;
+    private EvaluationTokenUsage _tokenUsage = EvaluationTokenUsage.Unavailable;
 
     internal CopilotEvaluationAttempt(
         IEphemeralCopilotTransport transport,
@@ -189,6 +193,8 @@ internal sealed class CopilotEvaluationAttempt : IEphemeralEvaluationAttempt
 
     public string SessionId { get; }
 
+    public EvaluationTokenUsage TokenUsage => Volatile.Read(ref _tokenUsage);
+
     public async Task<QuantificationResult> ExecuteAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -214,6 +220,19 @@ internal sealed class CopilotEvaluationAttempt : IEphemeralEvaluationAttempt
 
         cancellationToken.ThrowIfCancellationRequested();
         await session.SendAndWaitAsync(_messageOptions, cancellationToken).ConfigureAwait(false);
+        EvaluationTokenUsage usage;
+        try
+        {
+            usage = await session
+                .GetUsageAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            usage = EvaluationTokenUsage.Unavailable;
+        }
+
+        Volatile.Write(ref _tokenUsage, usage ?? EvaluationTokenUsage.Unavailable);
 
         if (_collector.TryGetAcceptedResult(out QuantificationResult? acceptedResult))
         {
@@ -509,5 +528,51 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
     public Task AbortAsync(CancellationToken cancellationToken) =>
         _session.AbortAsync(cancellationToken);
 
+    public async Task<EvaluationTokenUsage> GetUsageAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var metrics = await _session.Rpc.Usage
+                .GetMetricsAsync(cancellationToken)
+                .ConfigureAwait(false);
+            EvaluationTokenUsage total = EvaluationTokenUsage.Unavailable;
+            if (metrics.ModelMetrics is not null)
+            {
+                foreach (var metric in metrics.ModelMetrics.Values)
+                {
+                    if (metric?.Usage is null)
+                    {
+                        continue;
+                    }
+
+                    total = total.Add(new EvaluationTokenUsage(
+                        true,
+                        NonNegative(metric.Usage.InputTokens),
+                        NonNegative(metric.Usage.OutputTokens),
+                        NonNegative(metric.Usage.ReasoningTokens ?? 0),
+                        NonNegative(metric.Usage.CacheReadTokens),
+                        NonNegative(metric.Usage.CacheWriteTokens)));
+                }
+            }
+
+            return total.IsAvailable
+                ? total
+                : new EvaluationTokenUsage(
+                    true,
+                    NonNegative(metrics.LastCallInputTokens),
+                    NonNegative(metrics.LastCallOutputTokens),
+                    0,
+                    0,
+                    0);
+        }
+        catch
+        {
+            return EvaluationTokenUsage.Unavailable;
+        }
+    }
+
     public ValueTask DisposeAsync() => _session.DisposeAsync();
+
+    private static long NonNegative(long value) => Math.Max(0, value);
 }

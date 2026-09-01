@@ -293,6 +293,12 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
             PlannedEvaluationCount = summary.PlannedEvaluationCount,
             CompletedEvaluationCount = summary.CompletedEvaluationCount,
             ErrorCount = summary.FailureCount,
+            UsageObservedUnitCount = summary.UsageObservedUnitCount,
+            InputTokenCount = summary.TokenUsage.InputTokens,
+            OutputTokenCount = summary.TokenUsage.OutputTokens,
+            ReasoningTokenCount = summary.TokenUsage.ReasoningTokens,
+            CacheReadTokenCount = summary.TokenUsage.CacheReadTokens,
+            CacheWriteTokenCount = summary.TokenUsage.CacheWriteTokens,
             SheetNames = sheetNames,
         };
     }

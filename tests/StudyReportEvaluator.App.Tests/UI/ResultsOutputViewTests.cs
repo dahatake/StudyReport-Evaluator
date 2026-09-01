@@ -239,6 +239,8 @@ public sealed class ResultsOutputViewTests
                     WorkbookMetadata = metadata,
                     InputPath = workbook.Path,
                     ModelId = "model-test",
+                    MaximumPromptTokens = 64_000,
+                    MaximumContextWindowTokens = 128_000,
                     MaxConcurrency = 1,
                 },
                 cancellationToken: TestContext.Current.CancellationToken);

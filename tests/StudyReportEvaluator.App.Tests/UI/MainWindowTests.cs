@@ -286,7 +286,7 @@ public sealed class MainWindowTests
             new RecordingAuthenticationBoundary(
                 new ExecutionAuthenticationSnapshot(
                     ExecutionAuthenticationState.Available,
-                    ["model-test"],
+                    [U04TestSupport.Model("model-test")],
                     U04TestSupport.RuntimeIdentity())),
             runner);
         RecordingOutputBoundary output = new();

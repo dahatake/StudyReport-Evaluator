@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Globalization;
+using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Workflow;
 using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.App.Workbooks.Reading;
@@ -28,7 +30,14 @@ public sealed class QuantificationOrchestratorTests
         {
             events.Add("runner:" + payload.EvaluatorId);
             return Task.FromResult(EvaluationRunnerResult.Succeeded(
-                U01TestSupport.ValidResult(payload, _ => 4m)));
+                U01TestSupport.ValidResult(payload, _ => 4m),
+                tokenUsage: new EvaluationTokenUsage(
+                    true,
+                    inputTokens: 10,
+                    outputTokens: 2,
+                    reasoningTokens: 1,
+                    cacheReadTokens: 3,
+                    cacheWriteTokens: 4)));
         });
 
         RunSummary summary = await new QuantificationOrchestrator(
@@ -39,7 +48,7 @@ public sealed class QuantificationOrchestratorTests
                 cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(
-            ["capture", "row:2", "runner:E1", "row:3", "runner:E1", "recheck"],
+            ["capture", "row:2", "row:3", "recheck", "row:2", "runner:E1", "row:3", "runner:E1", "recheck"],
             events);
         Assert.Equal(QuantificationRunStatusCodes.Success, summary.StatusCode);
         Assert.True(summary.IsExportReady);
@@ -52,6 +61,12 @@ public sealed class QuantificationOrchestratorTests
         Assert.Equal(2, summary.CompletedEvaluationCount);
         Assert.Equal(2, summary.SucceededCount);
         Assert.Equal(0, summary.FailureCount);
+        Assert.Equal(2, summary.UsageObservedUnitCount);
+        Assert.Equal(20, summary.TokenUsage.InputTokens);
+        Assert.Equal(4, summary.TokenUsage.OutputTokens);
+        Assert.Equal(2, summary.TokenUsage.ReasoningTokens);
+        Assert.Equal(6, summary.TokenUsage.CacheReadTokens);
+        Assert.Equal(8, summary.TokenUsage.CacheWriteTokens);
         Assert.Equal(TimeSpan.Zero, summary.StartedAtUtc.Offset);
         Assert.Equal(TimeSpan.Zero, summary.EndedAtUtc.Offset);
         Assert.True(summary.EndedAtUtc >= summary.StartedAtUtc);
@@ -104,6 +119,95 @@ public sealed class QuantificationOrchestratorTests
     }
 
     [Fact]
+    public async Task Invalid_custom_prompt_fails_before_input_capture_row_read_or_AI_dispatch()
+    {
+        const string promptCanary = "PRIVATE-PROMPT-CANARY {回答} {未知}";
+        QuantificationDefinition valid = OneQuestionDefinition(2, 2);
+        QuantificationDefinition invalidPrompt = valid with
+        {
+            Questions =
+            [
+                valid.Questions[0] with
+                {
+                    Evaluators =
+                    [
+                        valid.Questions[0].Evaluators[0] with
+                        {
+                            CustomPromptTemplate = promptCanary,
+                        },
+                    ],
+                },
+            ],
+        };
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(valid).Metadata;
+        ScriptedInputSnapshots input = new(U01TestSupport.InputSnapshot());
+        ScriptedRowSource rows = new((_, _) => throw new InvalidOperationException("must not read"));
+        ScriptedRunner runner = new((_, _, _) => throw new InvalidOperationException("must not dispatch"));
+
+        QuantificationDefinitionValidationException exception = await Assert.ThrowsAsync<QuantificationDefinitionValidationException>(() =>
+            new QuantificationOrchestrator(rows, runner, input).RunAsync(
+                Request(invalidPrompt, metadata),
+                cancellationToken: TestContext.Current.CancellationToken));
+
+        DefinitionValidationError error = Assert.Single(
+            exception.Errors,
+            item => item.Code == "UNKNOWN_PLACEHOLDER");
+        Assert.Equal("CustomPromptTemplate", error.Field);
+        Assert.Equal(0, input.CaptureCount);
+        Assert.Equal(0, input.RecheckCount);
+        Assert.Empty(rows.Requests);
+        Assert.Empty(runner.Payloads);
+        Assert.DoesNotContain(promptCanary, exception.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(promptCanary, error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Workbook_capacity_failure_stops_before_input_capture_row_read_and_AI_dispatch()
+    {
+        const int criterionCount = 256;
+        QuantificationDefinition single = OneQuestionDefinition(2, 2);
+        ImmutableArray<CriterionDefinition> criteria = Enumerable.Range(1, criterionCount)
+            .Select(index => new CriterionDefinition
+            {
+                Id = $"C{index.ToString(CultureInfo.InvariantCulture)}",
+                DisplayName = $"Criterion {index.ToString(CultureInfo.InvariantCulture)}",
+                Description = "Synthetic capacity criterion",
+                Weight = 1m,
+                Enabled = true,
+            })
+            .ToImmutableArray();
+        QuantificationDefinition definition = single with
+        {
+            Questions =
+            [
+                single.Questions[0] with
+                {
+                    Evaluators =
+                    [
+                        single.Questions[0].Evaluators[0] with { Criteria = criteria },
+                    ],
+                },
+            ],
+        };
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        ScriptedInputSnapshots input = new(U01TestSupport.InputSnapshot());
+        ScriptedRowSource rows = new((_, _) => throw new InvalidOperationException("must not read"));
+        ScriptedRunner runner = new((_, _, _) => throw new InvalidOperationException("must not dispatch"));
+
+        QuantificationRunPreflightException exception = await Assert.ThrowsAsync<QuantificationRunPreflightException>(() =>
+            new QuantificationOrchestrator(rows, runner, input).RunAsync(
+                Request(definition, metadata),
+                cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Contains(exception.Errors, error => error.Code == "FUNCTION_ARGUMENT_LIMIT_EXCEEDED");
+        Assert.Equal(0, input.CaptureCount);
+        Assert.Equal(0, input.RecheckCount);
+        Assert.Empty(rows.Requests);
+        Assert.Empty(runner.Payloads);
+        Assert.Contains("<redacted>", exception.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Exact_input_drift_or_recheck_failure_marks_INPUT_CHANGED_and_blocks_export_ready_data()
     {
         QuantificationDefinition definition = OneQuestionDefinition(2, 2);
@@ -111,7 +215,10 @@ public sealed class QuantificationOrchestratorTests
         ScriptedRowSource rows = new((request, _) => Task.FromResult(Row(request, "answer", "support")));
         ScriptedRunner runner = new((payload, _, _) => Task.FromResult(
             EvaluationRunnerResult.Succeeded(U01TestSupport.ValidResult(payload))));
-        ScriptedInputSnapshots changed = new(U01TestSupport.InputSnapshot(), unchanged: false);
+        ScriptedInputSnapshots changed = new(U01TestSupport.InputSnapshot())
+        {
+            RecheckOutcomes = new Queue<bool>([true, false]),
+        };
 
         RunSummary drift = await new QuantificationOrchestrator(rows, runner, changed).RunAsync(
             Request(definition, metadata),
@@ -128,14 +235,97 @@ public sealed class QuantificationOrchestratorTests
         {
             ThrowOnRecheck = true,
         };
-        RunSummary failure = await new QuantificationOrchestrator(
+        ScriptedRunner blockedRunner = new((_, _, _) => throw new InvalidOperationException("must not dispatch"));
+        QuantificationRunPreflightException failure = await Assert.ThrowsAsync<QuantificationRunPreflightException>(() => new QuantificationOrchestrator(
             rows,
-            runner,
+            blockedRunner,
             failedRecheck).RunAsync(
                 Request(definition, metadata),
-                cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal(QuantificationRunStatusCodes.InputChanged, failure.StatusCode);
-        Assert.False(failure.PrepareOutput().IsExportReady);
+                cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Contains(failure.Errors, error => error.Code == "INPUT_CHANGED_BEFORE_DISPATCH");
+        Assert.Empty(blockedRunner.Payloads);
+    }
+
+    [Fact]
+    public async Task Request_capacity_excess_is_measured_for_actual_rows_and_blocks_all_AI_dispatch()
+    {
+        const string privateAnswer = "PRIVATE-LONG-ANSWER-CANARY-日本語-😀";
+        QuantificationDefinition definition = OneQuestionDefinition(2, 2);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        ScriptedInputSnapshots input = new(U01TestSupport.InputSnapshot());
+        ScriptedRowSource rows = new((request, _) => Task.FromResult(Row(request, privateAnswer, "support")));
+        ScriptedRunner runner = new((_, _, _) => throw new InvalidOperationException("must not dispatch"));
+        QuantificationRunRequest request = Request(definition, metadata) with
+        {
+            MaximumPromptTokens = 100,
+            MaximumContextWindowTokens = 200,
+        };
+
+        QuantificationRunPreflightException exception = await Assert.ThrowsAsync<QuantificationRunPreflightException>(() =>
+            new QuantificationOrchestrator(rows, runner, input).RunAsync(
+                request,
+                cancellationToken: TestContext.Current.CancellationToken));
+
+        ExecutionCapacityError error = Assert.Single(
+            exception.Errors,
+            item => item.Code == "REQUEST_CONTEXT_BUDGET_EXCEEDED");
+        Assert.Equal("AppOwnedRequestUtf8Bytes", error.Field);
+        Assert.True(long.Parse(error.ActualDimension, CultureInfo.InvariantCulture) > 100);
+        Assert.Equal("80", error.Limit);
+        Assert.Equal(1, input.CaptureCount);
+        Assert.Equal(0, input.RecheckCount);
+        Assert.Single(rows.Requests);
+        Assert.Empty(runner.Payloads);
+        Assert.DoesNotContain(privateAnswer, exception.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(privateAnswer, error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Worst_case_retry_budget_over_twenty_thousand_stops_before_input_access()
+    {
+        QuantificationDefinition definition = OneQuestionDefinition(2, 6_668);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        ScriptedInputSnapshots input = new(U01TestSupport.InputSnapshot());
+        ScriptedRowSource rows = new((_, _) => throw new InvalidOperationException("must not read"));
+        ScriptedRunner runner = new((_, _, _) => throw new InvalidOperationException("must not dispatch"));
+
+        QuantificationRunPreflightException exception = await Assert.ThrowsAsync<QuantificationRunPreflightException>(() =>
+            new QuantificationOrchestrator(rows, runner, input).RunAsync(
+                Request(definition, metadata),
+                cancellationToken: TestContext.Current.CancellationToken));
+
+        ExecutionCapacityError error = Assert.Single(
+            exception.Errors,
+            item => item.Code == "ATTEMPT_BUDGET_TOO_LARGE");
+        Assert.Equal("20001", error.ActualDimension);
+        Assert.Equal("20000", error.Limit);
+        Assert.Equal(0, input.CaptureCount);
+        Assert.Empty(rows.Requests);
+        Assert.Empty(runner.Payloads);
+    }
+
+    [Fact]
+    public async Task Missing_model_prompt_limit_fails_before_input_or_row_access()
+    {
+        QuantificationDefinition definition = OneQuestionDefinition(2, 2);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        ScriptedInputSnapshots input = new(U01TestSupport.InputSnapshot());
+        ScriptedRowSource rows = new((_, _) => throw new InvalidOperationException("must not read"));
+        ScriptedRunner runner = new((_, _, _) => throw new InvalidOperationException("must not dispatch"));
+        QuantificationRunRequest request = Request(definition, metadata) with
+        {
+            MaximumPromptTokens = 0,
+        };
+
+        QuantificationRunPreflightException exception = await Assert.ThrowsAsync<QuantificationRunPreflightException>(() =>
+            new QuantificationOrchestrator(rows, runner, input).RunAsync(
+                request,
+                cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Contains(exception.Errors, error => error.Code == "MODEL_PROMPT_LIMIT_UNAVAILABLE");
+        Assert.Equal(0, input.CaptureCount);
+        Assert.Empty(rows.Requests);
+        Assert.Empty(runner.Payloads);
     }
 
     [Fact]
@@ -460,6 +650,8 @@ public sealed class QuantificationOrchestratorTests
             WorkbookMetadata = metadata,
             InputPath = "C:\\PRIVATE\\input.xlsx",
             ModelId = "model-test",
+            MaximumPromptTokens = 64_000,
+            MaximumContextWindowTokens = 128_000,
             MaxConcurrency = 1,
         };
 
@@ -499,6 +691,8 @@ internal sealed class ScriptedInputSnapshots(
 
     internal bool ThrowOnRecheck { get; init; }
 
+    internal Queue<bool> RecheckOutcomes { get; init; } = new();
+
     internal int CaptureCount { get; private set; }
 
     internal int RecheckCount { get; private set; }
@@ -525,6 +719,8 @@ internal sealed class ScriptedInputSnapshots(
             throw new IOException("PRIVATE-RECHECK-CANARY");
         }
 
-        return Unchanged;
+        return RecheckOutcomes.Count > 0
+            ? RecheckOutcomes.Dequeue()
+            : Unchanged;
     }
 }
