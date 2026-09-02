@@ -2,17 +2,17 @@
 
 | 項目 | 内容 |
 |---|---|
-| 文書版 | 4.0 |
-| 基準日 | 2026-09-01 |
-| 状態 | 要求所有者承認済み baseline |
+| 文書版 | 4.1 |
+| 基準日 | 2026-09-02 |
+| 状態 | 正式公開scope同期済み baseline |
 | 入力 | Microsoft Forms または Google Forms から export した標準 `.xlsx` 1ファイル |
 | 出力 | 入力を変更せず作成する別の標準 `.xlsx` 1ファイル |
-| 対応環境 | Windows 11 x64、macOS arm64、macOS x64 |
+| 対応環境 | Windows 11 x64 |
 | UI / Runtime | Avalonia / .NET 10 self-contained |
 | AI | GitHub Copilot SDK for .NET。通常評価は利用者選択model、参照回答と類似度は `auto` |
-| 旧版 | v3.0は本版により全面的に supersede |
+| 旧版 | v4.0のplatform scopeを本版でsupersede。v3.0はv4.0により全面的にsupersede済み |
 
-> 本版は、2026-09-01の要求所有者指示と、その後の「不明点は提示済みdefault planを採用する」という明示指示を反映する。
+> 本版は、2026-09-01の要求所有者指示と、その後のdefault plan採用指示に加え、2026-09-02の正式公開README実装指示を反映する。platform scopeは[ADR-0013](../dev/docs/adr/0013-windows-only-public-release.md)に基づき、実packageと実行証跡があるWindows 11 x64へ限定する。
 >
 > 本書の「AI評価」は成績を確定する自動判定ではない。AIは定量化候補を作り、最終的な評点と利用判断の責任は利用者が負う。
 
@@ -27,7 +27,7 @@
 5. ベース点、設問配点、固有設定配点、類似度減点はExcel数式で計算する。
 6. 元本全体を保持した別workbookを作成し、元本は一切変更しない。
 7. 長時間処理の進捗を表示し、プロセス終了後もcheckpointから再開できるようにする。
-8. WindowsとmacOSで、言語runtimeやSDKを別途導入せず利用できる配布物を提供する。
+8. Windows 11 x64で、言語runtimeやSDKを別途導入せず利用できる配布物を提供する。
 
 ## 2. 対象利用者と基本原則
 
@@ -109,21 +109,22 @@ Microsoft Excel、Office、LibreOffice、COM automationはrequired runtimeでは
 
 repository内の現行サンプル正本は次とする。
 
-`sample/機械学習 サブフィールド PBL 2025 レポート - コピー.xlsx`
+`sample/SampleReport.xlsx`
 
-2026-09-01に回答本文を出力せず構造だけを確認した既存profileを継承する。
+2026-09-02に回答本文を出力せず、production readerで構造とheader由来mapping候補だけを再確認したprofileを使用する。
 
 | 項目 | 実測値 |
 |---|---|
-| Bytes | 661,189 |
-| SHA-256 | `446386E20BB4096561CB4AFD6D74B8EAA9D50EAE53C97F984BA7F70EBEAD0DE5` |
-| `Original` | `A1:L531` |
-| 初期通常回答候補 | F、I |
-| 学生Prompt候補 | G、J |
-| Prompt作成上の注意候補 | K |
-| 初期対象外 | A〜E、L、`Old`、`Final` |
+| Bytes | 469,995 |
+| SHA-256 | `F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D` |
+| `Sheet2` | `A1:J531` |
+| 初期primary候補 | D、E、F、G、H |
+| 学生Prompt primary候補 | E、H |
+| supporting候補 | F、I |
+| Hの初期supporting候補 | I |
+| 初期対象外 | A〜C、J |
 
-F/GおよびI/J/Kの関係は候補であり、列位置だけで固定しない。特にG/J/Kは設問固有項目として設定できる。
+D〜Iの役割はheader semanticsから得た候補であり、列位置だけで固定しない。利用者は実際のheaderと授業設計を確認し、通常Questionまたは固有評価のprimary/supportingを画面で変更する。
 
 ### 4.5 元本不変
 
@@ -576,27 +577,22 @@ run開始時、完成名に対応する次のfileを作る。
 
 - end-user packageは.NET 10 self-containedとし、利用端末への.NET Runtime／SDK導入を不要にする。
 - GitHub Copilot SDKと互換なCLI runtimeをpackageへ同梱する。
-- install scriptはOSとarchitectureを検査し、対応外ではfail closedする。
 - source build用SDKを一般利用者端末へ導入しない。
 - GitHub loginは利用者本人の対話が必要であり、scriptがcredentialを収集しない。
 
 ### 13.2 Windows
 
 - Windows 11 x64 packageを作る。
-- install scriptはappを利用者local directoryへ配置し、Start Menu shortcutを作成できる。
-- administrator権限を必須にしない。
-- package hashを検証してからinstallする。
-- PowerShell版scriptを実行する場合はPowerShell 7以上だけを使用し、Windows PowerShell 5.1へfallbackしない。
+- .NET 10 self-containedのunsigned ZIPとSHA-256 sidecarを作る。
+- ZIPを展開したdirectoryから起動し、administrator権限、.NET Runtime、.NET SDKを要求しない。
+- publish/package scriptを実行する場合はPowerShell 7以上だけを使用し、Windows PowerShell 5.1へfallbackしない。
+- installer、Start Menu shortcut、code signing済みpackageが存在するとは表示しない。
 
-### 13.3 macOS
+### 13.3 非対応platformと将来変更
 
-- macOS arm64とx64を別packageとして作る。universal binary化は行わない。
-- `.app` bundleを作り、Developer ID Applicationで署名し、Apple notary serviceへ提出し、ticketをstapleする。
-- release packageは署名・notarization検証に成功した場合だけ公開可能とする。
-- install scriptはarchitectureに合うpackageを検査し、既定では`~/Applications`へ配置する。
-- macOS GUI appがshellのPATHを継承しない前提でも、同梱CLIをabsolute pathで起動する。
-
-Apple Developer credential、notary access、macOS runnerは外部release前提である。存在しない環境で署名済みと称してはならない。
+- macOS、Linux、Windows Arm64は初版正式公開の対応対象外とし、package、起動、署名、notarizationを提供済みと表示しない。
+- 将来対応する場合は要求を改版し、対象OS/architectureごとのself-contained package、bundled CLI、実runner launch、署名・notarization等の必要証跡を別途定義する。
+- WindowsのbuildまたはAvalonia/.NETの一般的なcross-platform対応を、他platformでの本製品動作証跡として代用しない。
 
 ## 14. privacy・security・安全境界
 
@@ -641,10 +637,9 @@ Apple Developer credential、notary access、macOS runnerは外部release前提�
 
 ## 17. Scope
 
-### 17.1 v4.0 required scope
+### 17.1 v4.1 required scope
 
 - Windows 11 x64
-- macOS arm64 / x64
 - .NET 10 self-contained app
 - bundled compatible Copilot CLI runtime
 - standard `.xlsx` from Microsoft Forms or Google Forms
@@ -654,13 +649,12 @@ Apple Developer credential、notary access、macOS runnerは外部release前提�
 - Excel-owned formulas
 - per-student-row `.partial.xlsx` checkpoint and process-restart resume
 - GUI prefill from input/Prompt text command-line options
-- Windows install scripts
-- signed and notarized macOS release pipeline
+- unsigned Windows ZIPとSHA-256 sidecar
 - teacher, operator, engineer documentation and actual synthetic screenshots
 
 ### 17.2 out of scope
 
-- Linux、Windows Arm64 support claim
+- macOS、Linux、Windows Arm64 support claim
 - `.xls`、CSV、PDF、macro、encrypted workbook
 - Microsoft Forms API、Google Forms API、LMS API
 - cloud database、server backend、multi-user service
@@ -671,7 +665,7 @@ Apple Developer credential、notary access、macOS runnerは外部release前提�
 - institutional policy、legal、fairness approval enforcement
 - automated credential collection
 - automatic AI run from command-line arguments
-- universal macOS binary
+- installer、code signing、notarization
 
 ## 18. Acceptance criteria
 
@@ -696,8 +690,8 @@ Apple Developer credential、notary access、macOS runnerは外部release前提�
 | AC-017 | 指定警告文を全stepで常時nonblocking表示する。 |
 | AC-018 | `--input`と複数`--prompt`でGUIを事前入力し、利用者操作なしにAI実行しない。 |
 | AC-019 | selected same-row dataだけをAIへ送り、本文／Prompt／reason／evidence／credentialをlogへ残さない。 |
-| AC-020 | Windows 11 x64 self-contained packageとinstall scriptがclean user環境で起動する。 |
-| AC-021 | macOS arm64/x64 package、install script、署名・notarization pipelineを提供し、検証成功時だけrelease可能とする。 |
+| AC-020 | Windows 11 x64 self-contained unsigned ZIPがcleanな展開先で起動し、SHA-256 sidecarとbundled CLI identityを検証できる。 |
+| AC-021 | macOS、Linux、Windows Arm64、installer、code signing、notarizationを初版対応として表示せず、packageにも存在すると主張しない。 |
 | AC-022 | README、教師tutorial、Prompt例、install、privacy、troubleshooting、開発設計、実画面screenshotsを現行UIと同期する。 |
 
 ## 19. Test requirements
@@ -720,9 +714,9 @@ Apple Developer credential、notary access、macOS runnerは外部release前提�
 16. selected-column／same-row isolation、literal string、no-content log test。
 17. 4-step UI、warning exact text/nonblock、progress、resume、completion、keyboard、200% scale test。
 18. CLI option parser、UTF-8 Prompt file、複数Prompt、明示適用、no-auto-run test。
-19. Windows x64 publish/package/install layout、bundled CLI、clean launch test。
-20. macOS arm64/x64 bundle layout、absolute CLI path、architecture、sign/notary fail-closed test。
-21. macOS実runnerでのlaunch、codesign、notary staple検証。credential未提供時は`NOT_RUN_EXTERNAL_PREREQUISITE`と明示し、PASSと称しない。
+19. Windows x64 publish/package layout、bundled CLI、clean launch test。
+20. unsigned ZIP、SHA-256 sidecar、safe layout、再現可能な再package test。
+21. README、利用者文書、package契約がmacOS、Linux、Windows Arm64、installer、code signing、notarizationを対応済みと主張しないtest。
 22. documentation link、screenshot provenance、unsupported claim、Prompt examples contract test。
 23. fixed-seed 531-row synthetic end-to-end、resume end-to-end、input hash不変test。
 24. optional authenticated synthetic Copilot smokeとexternal spreadsheet recalculation smoke。required deterministic testの代替にしない。
@@ -736,7 +730,6 @@ Apple Developer credential、notary access、macOS runnerは外部release前提�
 - GitHub Copilot SDK: [Session persistence](https://github.com/github/copilot-sdk/blob/main/docs/features/session-persistence.md)
 - Avalonia: [File dialogs](https://github.com/AvaloniaUI/avalonia-docs/blob/main/docs/services/file-dialogs.md)
 - Microsoft: [.NET application publishing overview](https://learn.microsoft.com/dotnet/core/deploying/)
-- Microsoft: [Publish .NET apps for macOS](https://learn.microsoft.com/dotnet/core/deploying/macos)
 - Microsoft: [Working with formulas](https://learn.microsoft.com/office/open-xml/spreadsheet/working-with-formulas)
 - Microsoft: [Excel specifications and limits](https://support.microsoft.com/office/excel-specifications-and-limits-1672b34d-7043-467e-8e27-269d656771c3)
 
@@ -752,8 +745,8 @@ Apple Developer credential、notary access、macOS runnerは外部release前提�
 | Checkpoint/resume | App workflow + workbook adapter |
 | Prompt-file launch | App composition + Design UI |
 | Warning/progress/results | App UI |
-| Windows/macOS delivery | scripts + packaging tests/CI |
-| User/developer documentation | docs + docs-dev + screenshot tests |
+| Windows delivery | scripts + packaging tests |
+| User/developer documentation | docs + dev/docs + screenshot tests |
 
 ## 22. Approval record
 
@@ -762,5 +755,6 @@ Apple Developer credential、notary access、macOS runnerは外部release前提�
 | Approver | 本repositoryの要求所有者 |
 | Initial requirement source | 2026-09-01の本セッションで提示されたアプリケーション要件 |
 | Default-decision approval source | 同日の後続指示「不明点はデフォルトのプランを採用してください。全てのタスクを実行してください」 |
-| Approved scope | 本書§1〜§21。base／special／similarity、checkpoint再開、Prompt起動、Windows/macOS配布を含む |
+| Release-scope update source | 2026-09-02の正式公開README実装指示とADR-0013 |
+| Approved scope | 本書§1〜§21。base／special／similarity、checkpoint再開、Prompt起動、Windows 11 x64配布を含む |
 | Meaning | repository要求baselineの承認記録。組織の法務・教育・security承認または電子署名を意味しない |

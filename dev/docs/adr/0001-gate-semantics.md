@@ -1,7 +1,7 @@
 # ADR-0001: 実装開始 gate の意味
 
 > [!WARNING]
-> **HISTORICAL / SUPERSEDED:** requirements v1.xのdecision recordです。現行機能・gateにはrequirements v3.0と[ADR-0011](0011-dynamic-quantification-excel-formulas.md)を使用してください。状態の読み方は[`docs-dev/README.md`](../README.md)を参照してください。
+> **HISTORICAL / SUPERSEDED:** requirements v1.xのdecision recordです。現行機能・gateにはrequirements v3.0と[ADR-0011](0011-dynamic-quantification-excel-formulas.md)を使用してください。状態の読み方は[`dev/docs/README.md`](../README.md)を参照してください。
 
 | 項目 | 内容 |
 |---|---|

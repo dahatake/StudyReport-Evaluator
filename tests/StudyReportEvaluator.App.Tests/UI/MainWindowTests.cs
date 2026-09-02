@@ -99,6 +99,7 @@ public sealed class MainWindowTests
             InputView inputView = Assert.Single(window.GetVisualDescendants().OfType<InputView>());
             Assert.Same(window.ViewModel.InputViewModel, inputView.DataContext);
             Assert.False(Required<Grid>(window, "CurrentStepPlaceholderHost").IsVisible);
+            AssertNoDevelopmentTaskText(window);
         }
         finally
         {
@@ -136,6 +137,7 @@ public sealed class MainWindowTests
             Assert.Contains("current", input.Classes);
             Assert.Contains("upcoming", execution.Classes);
             Assert.Single(window.GetVisualDescendants().OfType<InputView>());
+            AssertNoDevelopmentTaskText(window);
 
             Assert.True(input.Focus(NavigationMethod.Tab, KeyModifiers.None));
             Press(window, Key.Tab);
@@ -150,6 +152,7 @@ public sealed class MainWindowTests
             QuantificationDesignView designView = Assert.Single(
                 window.GetVisualDescendants().OfType<QuantificationDesignView>());
             Assert.Same(window.ViewModel.DesignViewModel, designView.DataContext);
+            AssertNoDevelopmentTaskText(window);
 
             Assert.True(next.Focus(NavigationMethod.Tab, KeyModifiers.None));
             Press(window, Key.Enter);
@@ -157,6 +160,7 @@ public sealed class MainWindowTests
             ExecutionView executionView = Assert.Single(
                 window.GetVisualDescendants().OfType<ExecutionView>());
             Assert.Same(window.ViewModel.ExecutionViewModel, executionView.DataContext);
+            AssertNoDevelopmentTaskText(window);
             Press(window, Key.Enter);
             Assert.Equal(WorkflowStep.Results, window.ViewModel.CurrentStep);
             ResultsOutputView resultsView = Assert.Single(
@@ -167,6 +171,7 @@ public sealed class MainWindowTests
             Assert.False(next.IsEffectivelyEnabled);
             Assert.True(Required<Border>(window, "EthicsWarningBanner").IsVisible);
             Assert.False(Required<Grid>(window, "CurrentStepPlaceholderHost").IsVisible);
+            AssertNoDevelopmentTaskText(window);
         }
         finally
         {
@@ -390,6 +395,12 @@ public sealed class MainWindowTests
     private static T Required<T>(Control root, string name)
         where T : Control =>
         Assert.IsType<T>(root.FindControl<T>(name));
+
+    private static void AssertNoDevelopmentTaskText(Control root) =>
+        Assert.DoesNotContain(
+            root.GetVisualDescendants().OfType<TextBlock>(),
+            textBlock => textBlock.Text?.Contains("U-03", StringComparison.Ordinal) == true
+                || textBlock.Text?.Contains("U-04", StringComparison.Ordinal) == true);
 
     private static void Press(TopLevel window, Key key)
     {

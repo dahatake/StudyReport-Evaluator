@@ -1,112 +1,128 @@
 # トラブルシューティング
 
-対象読者は利用者と一次サポート担当です。error本文へ回答やPrompt本文を転記せず、code、field、件数、file形式だけで切り分けてください。
+回答やPrompt本文をerror report、issue、chatへ貼らず、表示されたcode、field、件数、file形式だけで切り分けてください。
 
-## 入力fileを読み込めない
+## ZIPを起動できない
 
-| 状態／code | 意味 | 対処 |
-|---|---|---|
-| `UnsupportedExtension` | `.xlsx`以外 | 標準 `.xlsx`を指定 |
-| `LegacyBinaryWorkbook` | `.xls` / `.xlsb` | `.xlsx`へ安全に変換したcopyを用意 |
-| `CommaSeparatedValues` / `PortableDocumentFormat` | CSV / PDF | 標準 `.xlsx`を用意 |
-| `MacroEnabledWorkbook` | `.xlsm`等 | macroを含まない標準 `.xlsx`を用意 |
-| `EncryptedOrRightsProtected` | password／rights protectionまたは暗号化container | 復号済みcopyの利用可否を組織規則に従って判断。アプリは復号しない |
-| `InvalidZipSignature` / `CorruptPackage` | Open XML packageとして読めない | 元systemから再exportする |
-| `UnsafePackage` | resource安全上限を超過 | file構造とsizeを確認し、内容を黙って切り詰めない |
-| `InvalidRelationship` | external／不正relationship等 | 外部link等を除いた安全なcopyを別途作成する |
+| 状況 | 対処 |
+|---|---|
+| SHA-256がsidecarと違う | 起動せず、入手元からZIPとsidecarを再取得 |
+| Windowsが発行元warningを表示 | packageはunsigned。入手元とhashを確認できなければ実行しない |
+| `.exe`が見つからない | ZIP全体を新しいdirectoryへ展開し、package rootの`StudyReportEvaluator.App.exe`を確認 |
+| .NETのinstallを求められる | 正しいself-contained `win-x64` packageか確認。source build outputと混同しない |
+| Windows 11 x64以外 | 初版対応対象外。互換性を推測して実行しない |
 
-実装根拠: [`FileFormatClassifier.cs`](../src/StudyReportEvaluator.App/Workbooks/Intake/FileFormatClassifier.cs#L8-L24)、UI message: [`InputViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/InputViewModel.cs#L1324-L1367)。
+## 入力を読み込めない
 
-### package安全上限
+| 表示／分類 | 意味・対処 |
+|---|---|
+| `UnsupportedExtension` | 標準`.xlsx`を指定 |
+| `LegacyBinaryWorkbook` | `.xls` / `.xlsb`。元systemから標準`.xlsx`を再export |
+| `CommaSeparatedValues` / `PortableDocumentFormat` | CSV / PDF。標準`.xlsx`を用意 |
+| `MacroEnabledWorkbook` | `.xlsm`等。macroなしの標準`.xlsx`を用意 |
+| `EncryptedOrRightsProtected` | appは復号しない。組織規則に従い復号済みcopyの利用可否を判断 |
+| `InvalidZipSignature` / `CorruptPackage` | Open XML packageとして読めない。元systemから再export |
+| `UnsafePackage` | resource上限超過。内容を切り詰めず、file構造とsizeを確認 |
+| `InvalidRelationship` | external/unsafe relationship等を除いた別copyを用意 |
 
-| Dimension | 現行上限 |
-|---|---:|
-| 入力file | 100 MiB |
-| 展開総量 | 1 GiB |
-| 1 ZIP entry | 256 MiB |
-| ZIP entry数 | 10,000 |
-| 圧縮率 | 100:1 |
-| 1 partの文字数 | 64 Mi characters |
+native pickerが開かない場合はfull pathを直接入力できます。picker取消時は現在の入力状態を変更しません。
 
-根拠: [`FileFormatClassifier.cs`](../src/StudyReportEvaluator.App/Workbooks/Intake/FileFormatClassifier.cs#L58-L65)。Excelのworksheet、cell、sheet name等の媒体上限はMicrosoftの[Excel specifications and limits](https://support.microsoft.com/office/excel-specifications-and-limits-1672b34d-7043-467e-8e27-269d656771c3)も参照してください（2026-09-01確認）。
-
-## mapping／設計を完了できない
+## mappingを完了できない
 
 | Code | 対処 |
 |---|---|
 | `SOURCE_SHEET_NOT_FOUND` | 読込済みsheetから選択し直す |
-| `HEADER_METADATA_MISMATCH` | 見出し行を再読込する |
-| `SELECTED_ROW_LIMIT_EXCEEDED` | 回答行を20,000以下へ分割する |
-| `PRIMARY_COLUMN_REUSED` | 同じ質問のprimaryをsupportingから外す |
-| `DUPLICATE_SUPPORTING_COLUMN` | 重複supportingを1件にする |
-| `WEIGHT_MUST_BE_POSITIVE` | enabled nodeのweightを0より大きくする |
+| `HEADER_METADATA_MISMATCH` | 質問文の行を1または2から選び、見出しを再読込 |
+| `SELECTED_ROW_LIMIT_EXCEEDED` | 回答rowを20,000以下へ分ける |
+| `PRIMARY_COLUMN_REUSED` | 同じ項目の主列を補助列から外す |
+| `DUPLICATE_SUPPORTING_COLUMN` | 重複補助列を1件にする |
+
+候補mappingは確定値ではありません。実際の見出しと授業設計に合わせて変更してください。
+
+## 設計がinvalid
+
+| 状況／Code | 対処 |
+|---|---|
+| Base/Special/Question pointsが範囲外 | 0〜100の有限値へ戻す |
+| `ALLOCATION_TOTAL_INVALID` | `Base + Special + enabled Question points = 100`へ合わせる |
+| `SPECIAL_ITEMS_REQUIRED` | Special pointsを0へ戻すかenabled固有評価を追加 |
+| `SIMILARITY_WEIGHT_OUT_OF_RANGE` | 0〜1へ戻す |
+| `WEIGHT_MUST_BE_POSITIVE` | enabled criterion/evaluator weightを0より大きくする |
 | `SCORE_RANGE_INVALID` | minimumをmaximumより小さくする |
 | `ROUNDING_OUT_OF_RANGE` | 0〜6へ戻す |
+| Prompt error | [Custom evaluator](custom-evaluator-guide.md#主なvalidation)を確認 |
 
-根拠: [`QuantificationDefinitionValidator.cs`](../src/StudyReportEvaluator.Core/Validation/QuantificationDefinitionValidator.cs)、[`ColumnMappingValidator.cs`](../src/StudyReportEvaluator.App/Workbooks/Mapping/ColumnMappingValidator.cs)。
-
-## Custom Promptがinvalid
-
-placeholder別の対処は[Custom evaluatorガイド](custom-evaluator-guide.md#validation-errors)を参照してください。
-
-> [!IMPORTANT]
-> Designのsnapshot preflightがinvalidでもstep navigation自体は次へ進めますが、Executionとsnapshot作成で同じPrompt検証を再実行するためrunは開始できません。Designへ戻り、該当fieldを修正してください。
+step移動ができても、技術検証がinvalidな状態ではrunを開始できません。
 
 ## Copilotを利用できない
 
-![Copilot状態、Auto model、concurrency、evaluation planを確認する実行画面。認証状態はfake](../images/05-execution-auto.png)
+CLIはZIPへ同梱され、manifestでpath、RID、version、SHA-256を固定しています。PATH上の別`copilot.exe`は使いません。
 
-| 表示 | 確認事項 |
+| 表示 | 確認 |
 |---|---|
-| CLI unavailable | `copilot.exe`が導入済みでWindowsの`PATH`から解決できるか |
-| loginが必要 | Copilot CLI側で対話loginを行い、アプリで再確認 |
-| runtime確認失敗 | CLI fileが0 byteでないか、version情報を読めるか、15秒以内にstart/pingできるか |
-| modelがない | login/accountの利用条件をCLI側で確認。model IDを推測入力しない |
-| model prompt上限を取得できない | SDKのmodel一覧がprompt/context上限を返していません。別の利用可能modelを選ぶか、CLI / SDK状態を再確認。上限を推測入力して回避しない |
+| CLI unavailable | ZIPを一部だけ移動していないか確認し、package全体を再展開 |
+| runtime確認失敗 | `copilot-runtime.json`または`runtimes\win-x64\native\copilot.exe`の欠落・変更が考えられる。hash確認済みZIPから再展開 |
+| loginが必要 | 同梱CLIの対話loginを完了し、**Copilot 状態を確認**を再実行 |
+| modelがない | accountで利用できるmodelを確認。model IDを推測入力しない |
+| `auto`がない | Reference/Similarityに必要。別modelへfallbackせず、CLI/account状態を確認 |
+| model容量を取得できない | 別の列挙済みmodelを選ぶかruntime状態を再確認。上限を推測して回避しない |
 
-アプリへtokenやpasswordを入力しないでください。実装根拠: [`CopilotClientFactory.cs`](../src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs)、[`CopilotAuthenticationService.cs`](../src/StudyReportEvaluator.App/Copilot/CopilotAuthenticationService.cs)。
+アプリへtoken、password、client secretを入力しないでください。
+
+## capacity error
+
+| Code | 対処 |
+|---|---|
+| `COLUMN_LIMIT_EXCEEDED` / `HEADER_CELL_LIMIT_EXCEEDED` | enabled Question/evaluator/criterion数またはID長を減らす |
+| `FORMULA_LENGTH_EXCEEDED` / `FUNCTION_ARGUMENT_LIMIT_EXCEEDED` | enabled child数を減らす |
+| `REQUEST_SCALAR_LIMIT_EXCEEDED` | Prompt、補助列、criterionを縮小 |
+| `REQUEST_CONTEXT_BUDGET_EXCEEDED` | contentを黙って切らず、定義または選択列を見直す |
+| `ATTEMPT_BUDGET_TOO_LARGE` | 対象rowまたはenabled evaluatorを分割 |
+
+これらは新しいAI送信前に検査されます。
 
 ## run status
 
-| Status | 意味 | score |
+| Status | 意味 | scoreへの影響 |
 |---|---|---|
-| `EMPTY` | primaryが空白 | blank。override不可 |
-| `AI_OUTPUT_INVALID` | schema、ID、range、evidence等が不正 | valid overrideがなければblank |
-| `AI_TIMEOUT` | retry上限後もtimeout | 同上 |
-| `NETWORK_FAILED` | retry上限後もnetwork failure | 同上 |
-| `AUTH_REQUIRED` | 認証不可 | 同上 |
-| `CANCELLED` | 未完了unit | 同上。部分出力可 |
-| `CLEANUP_FAILED` | ephemeral session cleanup failure | 同上 |
-| `AI_RUNTIME_FAILED` | その他のruntime failure | 同上 |
+| `SUCCESS` | valid result | 数値を使用 |
+| `EMPTY` | 主値が空 | AI callなし、0相当 |
+| `NOT_RUN_ZERO_BUDGET` | Special pointsが0 | 固有評価callなし、Special earned 0 |
+| `AI_OUTPUT_INVALID` | schema、ID、range、source等が不正 | 対象値blank |
+| `AI_TIMEOUT` | retry後もtimeout | 対象値blank |
+| `NETWORK_FAILED` | retry後もnetwork failure | 対象値blank |
+| `AUTH_REQUIRED` | login利用不可 | 対象値blank |
+| `CANCELLED` | 未完了operation | 対象値blank、保存済みpartialは保持 |
+| `CLEANUP_FAILED` | sessionまたはfile cleanup失敗 | 表示されたcauseとpathを確認 |
+| `AI_RUNTIME_FAILED` | その他runtime failure | 対象値blank |
 
-根拠: [`ResultsStatusCodes`](../src/StudyReportEvaluator.App/Workbooks/Writing/ResultsSheetWriter.cs#L11-L40)、[`EvaluationScheduler.cs`](../src/StudyReportEvaluator.App/Workflow/EvaluationScheduler.cs#L516-L586)。
+空回答の0と技術的失敗のblankを混同しないでください。
 
-## outputできない
+## checkpointから再開できない
 
-| 表示／code | 対処 |
+再開時は次を完全一致で検証します。
+
+- checkpoint schema
+- input path、SHA-256、size、last-write time
+- definition SHA-256
+- normal modelと`auto`
+- app schema compatibility
+- CLI version/SHA-256とSDK identity
+
+不一致時はpartialを変更せず、同じ入力・設計・model・packageで再試行するか、新規runを開始します。保存済みfinalはcheckpointとして指定できません。
+
+## finalが作られない
+
+| 表示／Code | 対処 |
 |---|---|
-| output path invalid | 入力と異なる `.xlsx`、既存directory、未使用の完成名を指定 |
-| `TARGET_EXISTS` | 既存fileを削除せず、別名を指定 |
-| `OVERRIDE_INVALID` | 不正overrideをrange内数値へ直すかclear |
-| `INPUT_CHANGED` | 入力の編集を完了後、最初からread-onlyで再読込してrunする |
-| `OUTPUT_INVALID` | package/formula検証失敗。完成名は作られない |
-| `CANCELLED` | final commit前に取消済み |
-| `CLEANUP_FAILED` | target directoryに`.study-report-evaluator-*.working.xlsx`が残っていないか、内容を開かず管理者へ連絡 |
+| `TARGET_EXISTS` | 既存fileを削除せず、新規runなら次のsuffix、override出力なら別名を使う |
+| `INPUT_CHANGED` | 入力編集を完了してから最初から読み直す |
+| `OUTPUT_INVALID` | partialを保持し、package/formula検証のsafe codeを確認 |
+| `CANCELLED` | partial pathを確認し、条件が一致する場合は再開 |
+| `PARTIAL_CLEANUP_FAILED` | finalがvalidならfinalは保持される。表示されたpartialを内容を開かず管理 |
 
-実装根拠: [`ResultsOutputViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs#L134-L177)、[`AtomicOutputCommitter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/AtomicOutputCommitter.cs#L5-L14)。
+新規runのfinalは全処理成功時に自動作成されます。Resultsのoverride反映版だけが任意の別名出力です。
 
-## run開始前にcapacity errorになる
+## outputを扱うとき
 
-| Code | 意味／対処 |
-|---|---|
-| `COLUMN_LIMIT_EXCEEDED` / `HEADER_CELL_LIMIT_EXCEEDED` | Results列数またはheaderがExcel上限を超過。question / evaluator / criterion数またはID長を減らす |
-| `FORMULA_LENGTH_EXCEEDED` / `FUNCTION_ARGUMENT_LIMIT_EXCEEDED` | 実際に生成するformulaが8,191文字または255引数を超過。enabled child数を減らす |
-| `REQUEST_SCALAR_LIMIT_EXCEEDED` | Prompt + schema + tool contractが65,536 Unicode scalarsを超過。Prompt、補助列、criterionを縮小する |
-| `REQUEST_CONTEXT_BUDGET_EXCEEDED` | app-owned requestの保守的UTF-8容量がSDK model上限の80%を超過。本文を切り詰めず、定義または選択列を見直す |
-| `ATTEMPT_BUDGET_TOO_LARGE` | evaluation units × 最大3 attemptsが20,000を超過。対象行またはenabled evaluatorを分割する |
-
-これらはAI dispatch前に全selected rowを測定し、本文をerrorへ表示しません。export時にも同じformula validatorを最終防御として再実行します。
-
-## package版とsource版
-
-self-contained package版は.NET runtimeを同梱するため、利用端末へ.NETを別途導入する必要はありません。source buildには`global.json`で選択される.NET SDK 10.0.400 feature bandが必要です。外部仕様: Microsoft [.NET application publishing overview](https://learn.microsoft.com/dotnet/core/deploying/#publish-as-self-contained)（2026-09-01確認）。repository根拠: [`global.json`](../global.json)、[`scripts/publish-windows.ps1`](../scripts/publish-windows.ps1)。
+final/partialは入力全体、Prompt、Reference、AI resultを含み得ます。issueへ添付せず、必要な場合は機密本文を含まないcode・件数・basenameだけを共有してください。詳しくは[データとprivacy](privacy-and-data-handling.md)を参照してください。

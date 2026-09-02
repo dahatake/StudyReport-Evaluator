@@ -288,25 +288,25 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     {
         WorkflowStep.Input => new(
             "入力を準備する",
-            "評価対象の Excel と範囲を選び、質問ごとの回答列を結び付ける入口です。U-03 で実際のファイル選択とマッピングを接続します。",
+            "評価対象の Excel と範囲を選び、質問ごとの回答列を結び付けます。",
             "Excel ファイルとシートを選択",
             "見出し行・回答行を確認",
             "主回答列と補助列をマッピング"),
         WorkflowStep.Design => new(
             "定量化を設計する",
-            "Knowledge / Custom の評価方法、評価項目、range、3 階層の重みを組み立てます。件数を固定しない編集画面は U-03 で接続します。",
+            "Knowledge / Custom の評価方法、評価項目、range、配点を組み立てます。",
             "質問と評価方法を構成",
             "Prompt・知識ポイントを編集",
             "range と重みを確認"),
         WorkflowStep.Execution => new(
             "定量化を実行する",
-            "Copilot の状態、model、進捗、cancel、技術的エラーを扱う実行面です。snapshot に固定した処理を U-04 で接続します。",
+            "Copilot の状態とmodelを確認し、snapshotに固定した処理の進捗、cancel、技術的エラーを扱います。",
             "ログインと model を確認",
             "評価単位と進捗を表示",
             "cancel と技術的失敗を安全に処理"),
         WorkflowStep.Results => new(
             "結果を確認して出力する",
-            "AI raw、任意 override、Excel 計算 preview を確認し、入力を変えず別ファイルへ出力する画面を U-04 で接続します。",
+            "AI raw、任意override、Excel計算previewを確認し、入力を変えず別ファイルへ出力します。",
             "raw 値と式 preview を確認",
             "必要な値だけ任意で上書き",
             "入力とは別の Excel へ出力"),

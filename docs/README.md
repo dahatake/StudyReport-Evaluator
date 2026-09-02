@@ -1,34 +1,45 @@
-# StudyReport Evaluator 利用者ドキュメント
+# StudyReport Evaluator 利用者ガイド
 
-このディレクトリは、StudyReport Evaluatorを利用する教員・評価設計者・運用担当者向けの正本です。要求所有者・QA向けの規範は[要求定義書](requirements-definition.md)、実装・保守情報は[`docs-dev/`](../docs-dev/README.md)を参照してください。
+StudyReport Evaluatorは、標準`.xlsx`の回答をGitHub Copilotで定量化し、入力を変更せず別の`.xlsx`へ結果を作成するWindowsデスクトップアプリです。
 
-## 読者別の入口
+> [!WARNING]
+> 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません
 
-| 読者 | 最初に読む文書 | 目的 |
+## 読者別ガイド
+
+| 読者 | ガイド | 内容 |
 |---|---|---|
-| 初めて利用する教員・採点者 | [はじめに](getting-started.md) | `.xlsx`の読込から別workbook出力までを順に実行する |
-| 評価方法を設計する人 | [機能リファレンス](features.md)、[Custom evaluatorガイド](custom-evaluator-guide.md) | Knowledge / Custom、range、weight、blank、overrideを理解する |
-| GitHub Copilotから起動したい教員・採点者 | [GitHub CopilotからPromptで起動する](prompt-launch.md) | copy-paste用の起動依頼、評価Prompt、sample mapping、pilot／resume手順を使う |
-| 情報管理・運用担当 | [データとprivacy](privacy-and-data-handling.md) | Copilotへ送る情報とoutput workbookの機密性を確認する |
-| 問題を解決したい利用者 | [トラブルシューティング](troubleshooting.md) | file、Prompt、認証、run、outputの技術エラーを切り分ける |
-| 要求所有者・QA | [要求定義書](requirements-definition.md)、[実装状態](../docs-dev/implementation-status.md) | frozen規範baselineとcurrent conformanceを分けて確認する |
-| 画面を一覧したい人 | [スクリーンショット一覧](../images/README.md) | 7枚の合成画面と生成条件を確認する |
+| 初めて利用する教員・採点者 | [はじめに](getting-started.md) | ZIPの確認、起動、4stepの操作、出力と再開 |
+| 評価方法を設計する人 | [機能と点数](features.md) | 配点、4つのAI処理、status、Excel出力 |
+| 独自の評価観点を作る人 | [Custom evaluator](custom-evaluator-guide.md) | 通常Custom評価と固有評価のPrompt |
+| Promptファイルで準備する人 | [Promptファイルから起動](prompt-launch.md) | `--input`、複数`--prompt`、明示適用 |
+| 情報管理・運用担当 | [データとprivacy](privacy-and-data-handling.md) | AIへ送る情報、log、final/partialの機密性 |
+| 問題を解決したい人 | [トラブルシューティング](troubleshooting.md) | 入力、設計、Copilot、checkpoint、出力 |
+| 画面を確認したい人 | [画面一覧](../images/README.md) | synthetic dataで生成した現行画面 |
 
-> [!NOTE]
-> `requirements-definition.md` v3.0はGATE-0でexact bytesとhashを固定したbaselineです。本文の「実装前」は作成時点を表すため変更しません。現在の実装状態、最終gate、post-gate gapは[`docs-dev/implementation-status.md`](../docs-dev/implementation-status.md)を正本とします。baseline identityの出典は[`requirements-baseline.md`](../docs-dev/preflight/requirements-baseline.md#artifact-identity)です。
+## 対応範囲
 
-## 現在の境界
+- **OS:** Windows 11 x64
+- **配布:** .NET 10 self-containedのunsigned ZIPとSHA-256 sidecar
+- **入力:** 標準Office Open XML `.xlsx` 1file
+- **出力:** 入力を保持した別の標準`.xlsx`
+- **AI runtime:** ZIPへ同梱したGitHub Copilot CLI。PATH上の別CLIへfallbackしません
+- **Spreadsheet runtime:** Microsoft Excel、Office、LibreOfficeはアプリ実行の必須条件ではありません
 
-- 初版対応はWindows 11 x64、標準 `.xlsx` 1ファイル、別pathの `.xlsx` 1ファイルです。macOS、Linux、Windows Arm64、installer、code signingは対象外です。根拠: [要求定義書 §15](requirements-definition.md#15-scope)。
-- AI評価には別途導入され、`PATH`から解決できる`copilot.exe`と、既存のCopilot CLI loginが必要です。Excel読込・設計編集自体にはloginを要求しません。実装根拠: [`CopilotClientFactory.cs`](../src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs#L15-L57)。
-- authenticated live Copilot smokeと外部spreadsheet再計算smokeは未実行です。決定的なfake/oracle testのPASSをlive品質の証明へ読み替えません。証跡: [`traceability.md`](../docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute)。
-- GATE-ACCEPTANCEはHEAD `62581a3`に対してPASSを記録していますが、後続の文書監査でrun前validationの既知差分を2件確認しています。詳細: [実装状態](../docs-dev/implementation-status.md)。
+AI処理には、利用者本人のGitHub Copilot loginが必要です。アプリはPAT、password、client secretを入力・保存しません。loginできない場合も、アプリ起動、workbook読込、mapping、設計編集は利用できますが、新しいAI処理は開始できません。
 
-## 証拠の読み方
+## 対応しないもの
 
-1. 現在の動作はproduction sourceを第一根拠とします。
-2. deterministic testを検証根拠とします。
-3. `artifacts/`のgate、performance、packageは再生成されるGit管理外の証跡です。固定baselineとして扱いません。
-4. 旧要求scopeのADR・preflightは履歴であり、現行機能の説明には使用しません。
+- `.xls`、`.xlsb`、CSV、PDF、`.xlsm`等のmacro-enabled file
+- password、暗号化、rights-protected、unsafe relationshipを含むworkbook
+- macOS、Linux、Windows Arm64
+- installer、code signing、notarization
+- 保存済みfinal workbookのアプリへの再import
+- definition profileだけの独立save/load
+- AI品質、公平性、法的・組織policy適合性、不正行為の判定
 
-根拠: [`docs-dev/traceability.md`](../docs-dev/traceability.md#evidence-integrity-and-storage)、[`docs-dev/adr/0011-dynamic-quantification-excel-formulas.md`](../docs-dev/adr/0011-dynamic-quantification-excel-formulas.md#supersession-semantics)。
+類似度は不正行為の証明ではなく、低い類似度も回答品質を保証しません。最終的な評点と利用判断は利用者が行います。
+
+## ライセンス
+
+本ソフトウェアは[MIT License](../LICENSE)で提供されます。

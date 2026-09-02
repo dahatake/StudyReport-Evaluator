@@ -3,7 +3,7 @@
 | 項目 | 内容 |
 |---|---|
 | 要求正本 | `docs/requirements-definition.md` v4.0 |
-| 設計正本 | `docs-dev/detailed-design.md` / ADR-0012 |
+| 設計正本 | `dev/docs/detailed-design.md` / ADR-0012 |
 | 作成日 | 2026-09-01 |
 | Baseline | HEAD `b7b0c0ac91148c42c4aa61e04f1dab4efbb0fc98`、Release 485/485 PASS |
 | 方針 | 2 production project維持、taskごとdirect test + 敵対的review + follow-up |
@@ -78,10 +78,10 @@ flowchart LR
 | ID | Depends | Owned files | Direct verification |
 |---|---|---|---|
 | B-01 Requirement | none | `docs/requirements-definition.md` | exact defaults/formulas/AC review |
-| B-02 ADR | B-01 | `docs-dev/adr/0012-*` | decision consistency review |
-| B-03 Detailed design | B-02 | `docs-dev/detailed-design.md` | calculation/checkpoint/platform review |
-| B-04 Current dev docs | B-03 | `docs-dev/architecture.md`, `excel-contract.md`, `README.md` | cross-document review |
-| B-05 Plan/trace | B-04 | this file, `docs-dev/traceability.md` | every AC/task/file mapped |
+| B-02 ADR | B-01 | `dev/docs/adr/0012-*` | decision consistency review |
+| B-03 Detailed design | B-02 | `dev/docs/detailed-design.md` | calculation/checkpoint/platform review |
+| B-04 Current dev docs | B-03 | `dev/docs/architecture.md`, `excel-contract.md`, `README.md` | cross-document review |
+| B-05 Plan/trace | B-04 | this file, `dev/docs/traceability.md` | every AC/task/file mapped |
 | B-06 Documentation contract | B-05 | `tests/.../Content/DocumentationContractTests.cs` | target test |
 | GATE-B | B-01..06 | none | docs target + Release build + adversarial review |
 

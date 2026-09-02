@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using GitHub.Copilot;
 using StudyReportEvaluator.App.Copilot;
@@ -11,10 +12,13 @@ namespace StudyReportEvaluator.App.Tests.Copilot;
 
 public sealed class CopilotClientFactoryTests
 {
-    [Fact]
-    public async Task Bundled_resolver_accepts_only_the_current_rid_manifest_and_matching_binary()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Bundled_resolver_accepts_only_the_current_rid_manifest_and_matching_binary(
+        bool writeUtf8Bom)
     {
-        using TemporaryBundledCli bundle = TemporaryBundledCli.Create();
+        using TemporaryBundledCli bundle = TemporaryBundledCli.Create(writeUtf8Bom: writeUtf8Bom);
         BundledCopilotCliPathResolver resolver = new(bundle.Directory);
 
         string? result = await resolver.ResolveAsync(TestContext.Current.CancellationToken);
@@ -235,7 +239,9 @@ public sealed class CopilotClientFactoryTests
 
         public string CliPath { get; }
 
-        public static TemporaryBundledCli Create(string? cliSha256 = null)
+        public static TemporaryBundledCli Create(
+            string? cliSha256 = null,
+            bool writeUtf8Bom = false)
         {
             string runtimeIdentifier = CurrentRuntimeIdentifier();
             string binaryName = OperatingSystem.IsWindows() ? "copilot.exe" : "copilot";
@@ -260,6 +266,7 @@ public sealed class CopilotClientFactoryTests
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
                 ?.InformationalVersion
                 ?? throw new InvalidOperationException("The SDK has no informational version.");
+            sdkVersion = sdkVersion.Split('+', 2)[0];
             string manifest = JsonSerializer.Serialize(new
             {
                 schemaVersion = 1,
@@ -269,7 +276,17 @@ public sealed class CopilotClientFactoryTests
                 sdkVersion,
                 cliRelativePath = $"runtimes/{runtimeIdentifier}/native/{binaryName}",
             });
-            File.WriteAllText(Path.Combine(directory, BundledCopilotCliPathResolver.ManifestFileName), manifest);
+            string manifestPath = Path.Combine(directory, BundledCopilotCliPathResolver.ManifestFileName);
+            if (writeUtf8Bom)
+            {
+                File.WriteAllBytes(
+                    manifestPath,
+                    [.. Encoding.UTF8.Preamble, .. Encoding.UTF8.GetBytes(manifest)]);
+            }
+            else
+            {
+                File.WriteAllText(manifestPath, manifest);
+            }
             return new TemporaryBundledCli(directory, cliPath);
         }
 

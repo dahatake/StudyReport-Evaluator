@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
+using DocumentFormat.OpenXml.Validation;
 using StudyReportEvaluator.App.Tests.Evidence;
 using StudyReportEvaluator.App.Tests.Workbooks.Intake;
 using StudyReportEvaluator.App.Workbooks.Intake;
@@ -59,9 +60,24 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
         try
         {
             using TemporaryWorkbook workbook = CreateSyntheticFormulaWorkbook();
-            if (!RecalculateWithExcel(excelType, workbook.Path))
+            FileFormatClassificationResult classification = new FileFormatClassifier().Classify(workbook.Path);
+            if (!classification.IsAccepted)
             {
-                return new AdvisoryResult("FAILED_ADVISORY", "external_recalculation_failed");
+                return new AdvisoryResult("FAILED_ADVISORY", "synthetic_workbook_classification_failed");
+            }
+
+            using (SpreadsheetDocument validationDocument = SpreadsheetDocument.Open(workbook.Path, false))
+            {
+                if (new OpenXmlValidator().Validate(validationDocument).Any())
+                {
+                    return new AdvisoryResult("FAILED_ADVISORY", "synthetic_workbook_schema_invalid");
+                }
+            }
+
+            RecalculationResult recalculation = RecalculateWithExcel(excelType, workbook.Path);
+            if (!recalculation.IsSuccess)
+            {
+                return new AdvisoryResult("FAILED_ADVISORY", recalculation.Rationale);
             }
 
             using SpreadsheetDocument reopened = SpreadsheetDocument.Open(workbook.Path, false);
@@ -81,7 +97,7 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
                 .Descendants<Cell>()
                 .Where(cell => cell.CellFormula is not null)
                 .ToArray();
-            if (formulas.Length != 5)
+            if (formulas.Length != 11)
             {
                 return new AdvisoryResult("FAILED_ADVISORY", "formula_count_mismatch");
             }
@@ -99,8 +115,21 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
                 }
             }
 
-            if (values.Count(value => value == 5m) != 1
-                || values.Count(value => value == 50m) != 4)
+            decimal[] expectedValues =
+            [
+                5m,
+                50m,
+                50m,
+                50m,
+                0.5m,
+                20m,
+                0m,
+                60m,
+                0m,
+                80m,
+                80m,
+            ];
+            if (!values.Order().SequenceEqual(expectedValues.Order()))
             {
                 return new AdvisoryResult("FAILED_ADVISORY", "formula_value_mismatch");
             }
@@ -123,6 +152,20 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
             using SpreadsheetDocument document = SpreadsheetDocument.Open(workbook.Path, true);
             AppOwnedSheetNames names = new AppOwnedSheetNameResolver().Resolve(document);
             ConfigCellAddressMap config = new ConfigSheetWriter().Write(document, snapshot, names);
+            new ReferenceAnswersSheetWriter().Write(
+                document,
+                snapshot,
+                names,
+                [
+                    new ReferenceAnswerSheetRow
+                    {
+                        QuestionId = "Q1",
+                        ModelId = "auto",
+                        Answer = "Synthetic reference answer",
+                        StatusCode = ResultsStatusCodes.Success,
+                        GeneratedAtUtc = DateTimeOffset.UtcNow,
+                    },
+                ]);
             _ = new ResultsSheetWriter().Write(
                 document,
                 snapshot,
@@ -158,10 +201,10 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
     }
 
     [SupportedOSPlatform("windows")]
-    private static bool RecalculateWithExcel(Type excelType, string workbookPath)
+    private static RecalculationResult RecalculateWithExcel(Type excelType, string workbookPath)
     {
         using ManualResetEventSlim completed = new(false);
-        bool succeeded = false;
+        RecalculationResult result = new(false, "excel_start_failed");
         int processId = 0;
         Thread thread = new(() =>
         {
@@ -172,6 +215,7 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
             {
                 applicationObject = Activator.CreateInstance(excelType)
                     ?? throw new InvalidOperationException("Excel automation could not start.");
+                result = new RecalculationResult(false, "excel_configuration_failed");
                 dynamic application = applicationObject;
                 application.Visible = false;
                 application.DisplayAlerts = false;
@@ -183,25 +227,33 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
                 processId = checked((int)createdProcessId);
                 workbooksObject = application.Workbooks;
                 dynamic workbooks = workbooksObject;
+                result = new RecalculationResult(false, "workbook_open_failed");
                 workbookObject = workbooks.Open(
                     workbookPath,
                     UpdateLinks: 0,
                     ReadOnly: false,
                     IgnoreReadOnlyRecommended: true,
-                    AddToMru: false,
-                    Local: true,
-                    CorruptLoad: 0);
+                    AddToMru: false);
                 dynamic workbook = workbookObject;
+                result = new RecalculationResult(false, "full_recalculation_failed");
                 application.CalculateFullRebuild();
+                result = new RecalculationResult(false, "workbook_save_failed");
                 workbook.Save();
+                result = new RecalculationResult(false, "workbook_close_failed");
                 workbook.Close(SaveChanges: false);
                 workbookObject = null;
+                result = new RecalculationResult(false, "excel_quit_failed");
                 application.Quit();
-                succeeded = true;
+                result = new RecalculationResult(true, "excel_recalculation_completed");
+            }
+            catch (COMException exception)
+            {
+                result = new RecalculationResult(
+                    false,
+                    result.Rationale + "_hresult_" + unchecked((uint)exception.HResult).ToString("x8", CultureInfo.InvariantCulture));
             }
             catch
             {
-                succeeded = false;
             }
             finally
             {
@@ -231,7 +283,7 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
         if (completed.Wait(TimeSpan.FromSeconds(90)))
         {
             thread.Join();
-            return succeeded;
+            return result;
         }
 
         if (processId > 0)
@@ -247,7 +299,7 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
             }
         }
 
-        return false;
+        return new RecalculationResult(false, "external_recalculation_timed_out");
     }
 
     private static QuantificationDefinition CreateDefinition() =>
@@ -260,6 +312,9 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
             HeaderRow = 1,
             FirstDataRow = 2,
             LastDataRow = 2,
+            BasePoints = 60m,
+            SpecialPoints = 0m,
+            SimilarityPenaltyWeight = 0.1m,
             RoundingDigits = 1,
             Questions =
             [
@@ -269,7 +324,7 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
                     DisplayName = "Synthetic question",
                     QuestionText = "Synthetic question",
                     PrimarySourceColumn = "A",
-                    Points = 1m,
+                    Points = 40m,
                     Evaluators =
                     [
                         new EvaluatorDefinition
@@ -330,6 +385,12 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
                             },
                         },
                     ],
+                    Similarity = new SimilarityResultInput
+                    {
+                        AiRaw = 0m,
+                        Reason = string.Empty,
+                        Status = ResultsStatusCodes.Success,
+                    },
                 },
             ],
         };
@@ -349,4 +410,6 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
 #pragma warning restore SYSLIB1054
 
     private sealed record AdvisoryResult(string Status, string Rationale);
+
+    private sealed record RecalculationResult(bool IsSuccess, string Rationale);
 }

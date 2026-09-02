@@ -196,7 +196,7 @@ G-17 evidence完成後、OSごとに次の順で判定する。
 
 ## G-17 evidence contract
 
-`docs-dev/preflight/platform-matrix.md` と `eng/platform-matrix.json` は少なくとも次を各行に持つ。
+`dev/docs/preflight/platform-matrix.md` と `eng/platform-matrix.json` は少なくとも次を各行に持つ。
 
 - immutable case ID、candidate ID、OS edition/build、arch、physical/VM、display/compositor/backend。
 - app/.NET/Avalonia/CLI/ICU exact versionとartifact SHA-256。

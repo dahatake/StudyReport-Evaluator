@@ -13,9 +13,12 @@ using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.App.ViewModels;
 using StudyReportEvaluator.App.Views;
 using StudyReportEvaluator.App.Workflow;
+using StudyReportEvaluator.App.Workbooks.Checkpoint;
 using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.App.Workbooks.Reading;
+using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
+using StudyReportEvaluator.Core.Prompting;
 using Xunit;
 
 namespace StudyReportEvaluator.App.Tests.UI;
@@ -92,10 +95,10 @@ public sealed class DocumentationScreenshotTests
         input.Questions[1].SetSupportingColumn("D", selected: true);
 
         CopilotRuntimeIdentity runtimeIdentity = new(
-            @"C:\Synthetic\copilot.exe",
-            "1.0.82",
+            @"C:\Synthetic\StudyReportEvaluator-win-x64\runtimes\win-x64\native\copilot.exe",
+            "1.0.79",
             new string('B', 64),
-            "1.0.11");
+            "1.0.11+synthetic");
         ExecutionAuthenticationSnapshot authenticationSnapshot = new(
             ExecutionAuthenticationState.Available,
             [U04TestSupport.Model("Auto"), U04TestSupport.Model("gpt-5")],
@@ -132,6 +135,8 @@ public sealed class DocumentationScreenshotTests
         {
             window.Show();
             Render();
+            Assert.True(Required<Button>(Assert.Single(
+                window.GetVisualDescendants().OfType<InputView>()), "PickFileButton").IsVisible);
             Capture(window, imageDirectory, ScreenshotFileNames[0]);
 
             InputView inputView = Assert.Single(
@@ -146,12 +151,26 @@ public sealed class DocumentationScreenshotTests
             design.DefinitionName = "100名・2設問 レポート定量化";
             design.Revision = "2026-09";
             design.RoundingDigits = 1;
+            design.BasePoints = 60m;
+            design.SpecialPoints = 0m;
+            design.SimilarityPenaltyWeight = 0.1m;
             ConfigureKnowledgeQuestion(design.Questions[0]);
             ConfigureCustomQuestion(design.Questions[1]);
+            Assert.True(design.IsAllocationValid);
 
             QuestionDesignItemViewModel knowledgeQuestion = design.Questions[0];
             design.SelectedQuestion = knowledgeQuestion;
-            knowledgeQuestion.SelectedEvaluator = knowledgeQuestion.Evaluators[0];
+            EvaluatorDesignItemViewModel knowledgeEvaluator = knowledgeQuestion.Evaluators[0];
+            knowledgeQuestion.SelectedEvaluator = knowledgeEvaluator;
+            QuantificationDesignView designView = Assert.Single(
+                window.GetVisualDescendants().OfType<QuantificationDesignView>());
+            TextBox knowledgePrompt = window.GetVisualDescendants()
+                .OfType<TextBox>()
+                .Single(control => string.Equals(
+                    AutomationProperties.GetAutomationId(control),
+                    knowledgeEvaluator.KnowledgePromptPreviewAutomationId,
+                    StringComparison.Ordinal));
+            knowledgePrompt.BringIntoView();
             Render();
             Capture(window, imageDirectory, ScreenshotFileNames[2]);
 
@@ -175,15 +194,22 @@ public sealed class DocumentationScreenshotTests
             await execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
             execution.MaxConcurrency = 2;
             Assert.Equal("Auto", execution.SelectedModelId);
-            Assert.Equal(200, execution.PlannedEvaluationCount);
+            Assert.Equal(402, execution.PlannedEvaluationCount);
+            ExecutionView executionView = Assert.Single(
+                window.GetVisualDescendants().OfType<ExecutionView>());
+            Assert.True(Required<CheckBox>(executionView, "ResumeModeCheckBox").IsVisible);
+            Assert.True(Required<TextBox>(executionView, "OutputDirectoryTextBox").IsVisible);
+            ResetScroll(Required<ScrollViewer>(window, "ShellScrollViewer"));
+            ResetScroll(Required<ScrollViewer>(executionView, "ExecutionScrollViewer"));
             Render();
             Capture(window, imageDirectory, ScreenshotFileNames[4]);
 
             WorkbookMetadata metadata = input.Metadata
                 ?? throw new InvalidOperationException("Synthetic workbook metadata is missing.");
-            preparedSummary = await CreateSummaryAsync(
+            preparedSummary = await CreateDurableSummaryAsync(
                 input.DefinitionDraft,
-                metadata);
+                metadata,
+                runtimeIdentity);
             await execution.StartAsync(TestContext.Current.CancellationToken);
             Assert.True(results.IsLoaded);
             viewModel.NextCommand.Execute(null);
@@ -191,10 +217,17 @@ public sealed class DocumentationScreenshotTests
             ResultsCriterionViewModel firstResult = results.Results[0];
             firstResult.OverrideText = "9";
             Render();
-            Capture(window, imageDirectory, ScreenshotFileNames[5]);
 
             ResultsOutputView resultsView = Assert.Single(
                 window.GetVisualDescendants().OfType<ResultsOutputView>());
+            Assert.True(results.IsAutomaticOutput);
+            Assert.EndsWith("eval-20260902-1200.xlsx", results.FinalPath, StringComparison.Ordinal);
+            ResetScroll(Required<ScrollViewer>(window, "ShellScrollViewer"));
+            ResetScroll(Required<ScrollViewer>(resultsView, "ResultsOutputScrollViewer"));
+            Render();
+            Capture(window, imageDirectory, ScreenshotFileNames[5]);
+
+            results.OutputPath = @"C:\Synthetic\result\eval-20260902-1200-reviewed.xlsx";
             Required<TextBox>(resultsView, "OutputPathTextBox").BringIntoView();
             Render();
             Capture(window, imageDirectory, ScreenshotFileNames[6]);
@@ -209,7 +242,7 @@ public sealed class DocumentationScreenshotTests
     {
         question.DisplayName = "設問1：機械学習の基礎";
         question.QuestionText = "機械学習とルールベースの違いを説明してください。";
-        question.Weight = 1m;
+        question.Points = 20m;
         EvaluatorDesignItemViewModel evaluator = question.Evaluators[0];
         evaluator.DisplayName = "Knowledge coverage";
         evaluator.Minimum = 0m;
@@ -224,7 +257,7 @@ public sealed class DocumentationScreenshotTests
     {
         question.DisplayName = "設問2：活用方法の説明";
         question.QuestionText = "学習した手法の活用例を説明してください。";
-        question.Weight = 1m;
+        question.Points = 20m;
         EvaluatorDesignItemViewModel evaluator = question.Evaluators[0];
         evaluator.Type = EvaluatorType.CustomPrompt;
         evaluator.DisplayName = "説明品質";
@@ -248,9 +281,10 @@ public sealed class DocumentationScreenshotTests
         criterion.Weight = 1m;
     }
 
-    private static async Task<RunSummary> CreateSummaryAsync(
+    private static async Task<RunSummary> CreateDurableSummaryAsync(
         QuantificationDefinition definition,
-        WorkbookMetadata metadata)
+        WorkbookMetadata metadata,
+        CopilotRuntimeIdentity runtimeIdentity)
     {
         ScriptedRowSource rows = new((request, _) =>
         {
@@ -268,14 +302,25 @@ public sealed class DocumentationScreenshotTests
                 request.SourceRowNumber,
                 cells));
         });
-        ScriptedRunner runner = new((payload, _, _) => Task.FromResult(
+        ScriptedRunner normalRunner = new((payload, _, _) => Task.FromResult(
             EvaluationRunnerResult.Succeeded(
                 U01TestSupport.ValidResult(payload, _ => 8m))));
-        return await new QuantificationOrchestrator(
+        DurableQuantificationOrchestrator orchestrator = new(
             rows,
-            runner,
-            new ScriptedInputSnapshots(U01TestSupport.InputSnapshot())).RunAsync(
-                new QuantificationRunRequest
+            normalRunner,
+            new ScreenshotReferenceRunner(),
+            new ScreenshotSpecialRunner(),
+            new ScreenshotSimilarityRunner(),
+            new ScriptedInputSnapshots(U01TestSupport.InputSnapshot()),
+            new ScreenshotCheckpointStore(),
+            new ScreenshotPathPlanner(),
+            new ScreenshotFinalizer(),
+            new ScreenshotCleaner(),
+            new ScreenshotTimeProvider());
+        return await orchestrator.RunAsync(
+            new DurableQuantificationRunRequest
+            {
+                Run = new QuantificationRunRequest
                 {
                     DraftDefinition = definition,
                     WorkbookMetadata = metadata,
@@ -285,7 +330,142 @@ public sealed class DocumentationScreenshotTests
                     MaximumContextWindowTokens = 128_000,
                     MaxConcurrency = 2,
                 },
-                cancellationToken: TestContext.Current.CancellationToken);
+                Runtime = new CheckpointRuntimeIdentity
+                {
+                    ApplicationIdentity = "StudyReportEvaluator.App/4.1-synthetic",
+                    CliVersion = runtimeIdentity.CliVersion,
+                    CliSha256 = runtimeIdentity.CliSha256,
+                    SdkInformationalVersion = runtimeIdentity.SdkInformationalVersion,
+                },
+                OutputDirectory = @"C:\Synthetic\result",
+            },
+            cancellationToken: TestContext.Current.CancellationToken);
+    }
+
+    private sealed class ScreenshotReferenceRunner : IReferenceAnswerOperationRunner
+    {
+        public Task<AuxiliaryOperationResult<ReferenceAnswerResult>> EvaluateAsync(
+            SafeReferenceAnswerPayload payload,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(AuxiliaryOperationResult<ReferenceAnswerResult>.Succeeded(
+                new ReferenceAnswerResult
+                {
+                    QuestionId = payload.QuestionId,
+                    Answer = "合成参照回答",
+                }));
+        }
+    }
+
+    private sealed class ScreenshotSpecialRunner : ISpecialEvaluationOperationRunner
+    {
+        public Task<AuxiliaryOperationResult<SpecialQuantificationResult>> EvaluateAsync(
+            SafeSpecialEvaluationPayload payload,
+            string modelId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(AuxiliaryOperationResult<SpecialQuantificationResult>.Succeeded(
+                new SpecialQuantificationResult
+                {
+                    SpecialEvaluationId = payload.SpecialEvaluationId,
+                    Score = 0.8m,
+                    Reason = "合成固有評価",
+                    Evidence = string.Empty,
+                    EvidenceSource = EvidenceSourceKind.None,
+                    EvidenceSourceColumnId = string.Empty,
+                }));
+        }
+    }
+
+    private sealed class ScreenshotSimilarityRunner : ISimilarityEvaluationOperationRunner
+    {
+        public Task<AuxiliaryOperationResult<SimilarityQuantificationResult>> EvaluateAsync(
+            SafeSimilarityPayload payload,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(AuxiliaryOperationResult<SimilarityQuantificationResult>.Succeeded(
+                new SimilarityQuantificationResult
+                {
+                    QuestionId = payload.QuestionId,
+                    Similarity = 0.2m,
+                    Reason = "合成類似度",
+                }));
+        }
+    }
+
+    private sealed class ScreenshotCheckpointStore : ICheckpointStore
+    {
+        private CheckpointEnvelope? current;
+
+        public CheckpointSaveResult Create(
+            CheckpointEnvelope envelope,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            current = envelope;
+            return CheckpointSaveResult.Succeeded(createdNew: true);
+        }
+
+        public CheckpointSaveResult Update(
+            CheckpointEnvelope envelope,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            current = envelope;
+            return CheckpointSaveResult.Succeeded(createdNew: false);
+        }
+
+        public CheckpointLoadResult Load(
+            string partialPath,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return current is null
+                ? CheckpointLoadResult.Failed(CheckpointStatusCodes.Invalid)
+                : CheckpointLoadResult.Succeeded(current);
+        }
+    }
+
+    private sealed class ScreenshotPathPlanner : IOutputPathPlanner
+    {
+        public OutputPathReservation Reserve(
+            string inputPath,
+            DateTimeOffset localTime,
+            string? outputDirectory = null) =>
+            OutputPathReservation.Create(
+                @"C:\Synthetic\result",
+                @"C:\Synthetic\result\eval-20260902-1200.xlsx",
+                @"C:\Synthetic\result\eval-20260902-1200.partial.xlsx");
+    }
+
+    private sealed class ScreenshotFinalizer : IDurableRunFinalizer
+    {
+        public DurableFinalizationResult Finalize(
+            RunSummary summary,
+            CheckpointEnvelope checkpoint,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return DurableFinalizationResult.Succeeded(checkpoint.FinalPath);
+        }
+    }
+
+    private sealed class ScreenshotCleaner : IPartialCheckpointCleaner
+    {
+        public bool TryDelete(string partialPath) => true;
+    }
+
+    private sealed class ScreenshotTimeProvider : TimeProvider
+    {
+        private long ticks = new DateTimeOffset(2026, 9, 2, 3, 0, 0, TimeSpan.Zero).UtcTicks;
+
+        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
+
+        public override DateTimeOffset GetUtcNow() =>
+            new(Interlocked.Add(ref ticks, TimeSpan.TicksPerSecond), TimeSpan.Zero);
     }
 
     private static void Capture(
@@ -311,6 +491,9 @@ public sealed class DocumentationScreenshotTests
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         Dispatcher.UIThread.RunJobs();
     }
+
+    private static void ResetScroll(ScrollViewer scrollViewer) =>
+        scrollViewer.Offset = default;
 
     private static T Required<T>(Control root, string name)
         where T : Control =>

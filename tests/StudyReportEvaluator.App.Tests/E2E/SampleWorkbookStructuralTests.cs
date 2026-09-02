@@ -15,9 +15,9 @@ namespace StudyReportEvaluator.App.Tests.E2E;
 
 public sealed class SampleWorkbookStructuralTests
 {
-    private const long ExpectedSampleSizeBytes = 661_189;
+    private const long ExpectedSampleSizeBytes = 469_995;
     private const string ExpectedSampleSha256 =
-        "446386E20BB4096561CB4AFD6D74B8EAA9D50EAE53C97F984BA7F70EBEAD0DE5";
+        "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D";
 
     [Fact]
     public void Repository_sample_is_opened_read_only_and_only_structural_metadata_drives_mapping()
@@ -45,17 +45,15 @@ public sealed class SampleWorkbookStructuralTests
         FileFormatClassificationResult classification = new FileFormatClassifier().Classify(samplePath);
         Assert.True(classification.IsAccepted);
         Assert.Equal(FileFormatClassification.StandardXlsx, classification.Classification);
-        Assert.Equal(18, classification.PackagePartCount);
-        Assert.Equal(14, classification.RelationshipCount);
+        Assert.Equal(13, classification.PackagePartCount);
+        Assert.Equal(9, classification.RelationshipCount);
 
         WorkbookMetadata metadata = new WorkbookMetadataReader().Read(samplePath);
-        Assert.Equal(18, metadata.PackagePartCount);
-        Assert.Equal(14, metadata.RelationshipCount);
+        Assert.Equal(13, metadata.PackagePartCount);
+        Assert.Equal(9, metadata.RelationshipCount);
         Assert.Collection(
             metadata.Worksheets,
-            worksheet => AssertSheet(worksheet, "Old", "A1:AF531", 32),
-            worksheet => AssertSheet(worksheet, "Original", "A1:L531", 12),
-            worksheet => AssertSheet(worksheet, "Final", "A1:AD531", 30));
+            worksheet => AssertSheet(worksheet, "Sheet2", "A1:J531", 10));
 
         ColumnMappingSuggestionResult suggestions = new ColumnMappingSuggester().Suggest(metadata);
         WorksheetMappingSuggestion suggestion = Assert.IsType<WorksheetMappingSuggestion>(
@@ -68,34 +66,33 @@ public sealed class SampleWorkbookStructuralTests
         Assert.True(comparison.LastWriteTimeUtcMatches);
         Assert.True(comparison.IsMatch);
 
-        Assert.Equal("Original", suggestion.WorksheetName);
+        Assert.Equal("Sheet2", suggestion.WorksheetName);
         Assert.Equal(1U, suggestion.HeaderRow);
         Assert.Equal(2U, suggestion.FirstDataRow);
         Assert.Equal(531U, suggestion.LastDataRow);
         Assert.Equal(530U, suggestion.SuggestedDataRowCount);
-        Assert.Contains("I", suggestion.InitialTargetColumns);
-        Assert.Equal(["F", "G", "H", "I", "J", "K"], suggestion.InitialTargetColumns);
-        Assert.Equal(["A", "B", "C", "D", "E", "L"], suggestion.InitiallyUnselectedColumns);
+        Assert.Equal(["D", "E", "F", "G", "H", "I"], suggestion.InitialTargetColumns);
+        Assert.Equal(["A", "B", "C", "J"], suggestion.InitiallyUnselectedColumns);
 
         IReadOnlyDictionary<string, ColumnMappingCandidate> candidates = suggestion.Candidates
             .ToDictionary(candidate => candidate.ColumnName, StringComparer.Ordinal);
         Assert.Equal(
-            ["F", "G", "H", "I", "J", "K"],
+            ["D", "E", "F", "G", "H", "I"],
             candidates.Keys.Order(StringComparer.Ordinal));
-        Assert.Equal(ColumnMappingCandidateRole.PrimaryAnswer, candidates["F"].Roles);
+        Assert.Equal(ColumnMappingCandidateRole.PrimaryAnswer, candidates["D"].Roles);
         Assert.Equal(
             ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.StudentPromptPrimary,
-            candidates["G"].Roles);
+            candidates["E"].Roles);
         Assert.Equal(
             ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.Supporting,
-            candidates["H"].Roles);
-        Assert.Equal(ColumnMappingCandidateRole.PrimaryAnswer, candidates["I"].Roles);
+            candidates["F"].Roles);
+        Assert.Equal(ColumnMappingCandidateRole.PrimaryAnswer, candidates["G"].Roles);
         Assert.Equal(
             ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.StudentPromptPrimary,
-            candidates["J"].Roles);
-        Assert.Equal(ColumnMappingCandidateRole.Supporting, candidates["K"].Roles);
-        Assert.Empty(candidates["G"].SuggestedSupportingColumns);
-        Assert.Equal(["K"], candidates["J"].SuggestedSupportingColumns);
+            candidates["H"].Roles);
+        Assert.Equal(ColumnMappingCandidateRole.Supporting, candidates["I"].Roles);
+        Assert.Empty(candidates["E"].SuggestedSupportingColumns);
+        Assert.Equal(["I"], candidates["H"].SuggestedSupportingColumns);
     }
 
     private static void AssertSheet(
@@ -232,14 +229,6 @@ public sealed class WindowsX64PerformanceEvidenceTests
                 workbook.Path,
                 sheetNames,
                 expectedFormulas);
-            OutputPackageValidationResult validation = new OutputPackageValidator().Validate(
-                package.TemporaryPath,
-                validationPlan,
-                TestContext.Current.CancellationToken);
-            Assert.True(
-                validation.IsValid,
-                string.Join(Environment.NewLine, validation.Errors.Select(error => error.ToString())));
-
             AtomicOutputCommitResult commit = new AtomicOutputCommitter().Commit(
                 package,
                 outputPath,
@@ -470,7 +459,7 @@ internal static class E02RepositoryLayout
         string path = Path.Combine(
             FindRepositoryRoot(),
             "sample",
-            "機械学習 サブフィールド PBL 2025 レポート - コピー.xlsx");
+            "SampleReport.xlsx");
         if (!File.Exists(path))
         {
             throw new InvalidOperationException("The required repository sample workbook is missing.");

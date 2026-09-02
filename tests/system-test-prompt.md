@@ -1,16 +1,16 @@
-# StudyReport Evaluator v4.0 システムテスト用Prompt集
+# StudyReport Evaluator v4.1 システムテスト用Prompt集
 
 | 項目 | 内容 |
 |---|---|
 | 文書用途 | システムテスト実行者またはテスト支援AIへ渡す、単独copy可能な実行Prompt集 |
-| 対象 | StudyReport Evaluator v4.0 |
+| 対象 | StudyReport Evaluator v4.1 |
 | 基準日 | 2026-09-02 |
-| 要求正本 | `docs/requirements-definition.md` v4.0 |
-| 設計正本 | `docs-dev/detailed-design.md` / ADR-0012 |
-| 対象環境 | Windows 11 x64、macOS arm64 / x64、.NET 10、Avalonia |
+| 要求正本 | `docs/requirements-definition.md` v4.1 |
+| 設計正本 | `dev/docs/detailed-design.md` / ADR-0012 / ADR-0013 |
+| 対象環境 | Windows 11 x64、.NET 10、Avalonia |
 | 注意 | 本書はテスト結果ではない。未実施をPASSとして扱わない |
 
-> **捏造禁止:** 期待結果は要求・実装・決定的oracleから導出し、実測結果は今回の実行証跡だけから記録する。過去のtest件数、性能値、package hash、Live AI結果、macOS署名結果を今回値として流用しない。
+> **捏造禁止:** 期待結果は要求・実装・決定的oracleから導出し、実測結果は今回の実行証跡だけから記録する。過去のtest件数、性能値、package hash、Live AI結果、未対応platformの結果を今回値として流用しない。
 
 ## 1. 旧v3ユースケースのレビュー結果
 
@@ -29,7 +29,7 @@
 | UC-09 output | 有効 | 手動3-sheet exportから、`result/eval-*` auto final、4 app-owned sheets、partial checkpointへ更新 |
 | UC-10 privacy / validation | 有効 | normalだけでなくreference／special／similarityの4 operationへ拡張 |
 | UC-11 Windows delivery | 有効 | bundled CLI、manifest/hash、user-local installerを必須化 |
-| UC-12 optional smoke | 有効 | macOS deterministic／credentialed external gateを分離し、未実行を明示 |
+| UC-12 delivery／optional smoke | 有効 | Windows package、ZIP再現性、非対応platform claim、optional external smokeを分離 |
 
 再作成版は要求定義§19のTest Requirement 1〜24へ1対1で対応する。Prompt数を過去の42へ合わせず、**24件**を正本とする。
 
@@ -52,7 +52,6 @@
 | `<OUTPUT_DIR>` | 一時出力directory | inputと同一または配下でもよいが、既存fileを上書きしない |
 | `<MODEL_ID>` | 認証確認後にUIへ実表示された通常評価model | 文書から推測しない |
 | `<EVIDENCE_DIR>` | 機密本文を含まない証跡directory | repositoryへcommitしない |
-| `<MAC_RID>` | `osx-arm64`または`osx-x64` | 実runner architectureと一致させる |
 
 ## 4. 判定語彙
 
@@ -63,7 +62,6 @@
 | `BLOCKED` | 必須fixture、tool、permission等がなく開始不能 |
 | `NOT_RUN` | 任意テストを意図的に実行していない |
 | `SKIPPED_NOT_AUTHENTICATED` | optional Live Copilotだけ、login不足で未送信 |
-| `NOT_RUN_EXTERNAL_PREREQUISITE` | macOS runner、Developer ID、notary credential等の外部前提がない |
 
 ---
 
@@ -72,12 +70,12 @@
 ### STP-TR-01: Forms型synthetic workbookとquestion row 1/2
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-01
 Requirement: TR-01 / AC-001 / AC-002
 
 厳守: 実測だけを報告し、未実施をPASSにしない。実在学生データ、回答、Prompt、reason、evidence、credential、token、private pathを証跡へ記録しない。repository sampleをLive AIへ送らない。入力原本と無関係な変更を変更・stash・commitしない。WindowsのPowerShell処理はpwsh 7+ Coreだけを使う。
-報告順: Test ID / 対象commit・OS・architecture・.NET / 前提 / 実施 / 期待 / 実測 / 非機密証跡 / Status / 差異と再現手順。StatusはPASS、FAIL、BLOCKED、NOT_RUN、SKIPPED_NOT_AUTHENTICATED、NOT_RUN_EXTERNAL_PREREQUISITEのいずれか。
+報告順: Test ID / 対象commit・OS・architecture・.NET / 前提 / 実施 / 期待 / 実測 / 非機密証跡 / Status / 差異と再現手順。StatusはPASS、FAIL、BLOCKED、NOT_RUN、SKIPPED_NOT_AUTHENTICATEDのいずれか。
 
 既存test factoryで、Microsoft Forms型とGoogle Forms型の匿名化synthetic workbookを作り、question text rowが1のcaseと2のcaseを個別に検証してください。
 
@@ -93,38 +91,37 @@ Requirement: TR-01 / AC-001 / AC-002
 UIで未観測の内部候補は対応するmetadata/mapping testを証跡にし、画面で確認したと偽らないでください。
 ```
 
-### STP-TR-02: Repository sample identityとF〜K role
+### STP-TR-02: Repository sample identityとD〜I role
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-02
 Requirement: TR-02 / AC-003
 
 厳守: 実測だけを報告し、未実施をPASSにしない。sampleの回答cell、氏名、メール、Prompt本文を読み出し・表示・AI送信しない。構造metadataとfile identityだけを扱う。入力原本と無関係な変更を変更・stash・commitしない。WindowsのPowerShell処理はpwsh 7+ Coreだけを使う。
 報告順: Test ID / 対象commit・OS・architecture・.NET / 前提 / 実施 / 期待 / 実測 / 非機密証跡 / Status / 差異と再現手順。
 
-`<REPO_ROOT>/sample/機械学習 サブフィールド PBL 2025 レポート - コピー.xlsx`をread-onlyで検査してください。
+`<REPO_ROOT>/sample/SampleReport.xlsx`をread-onlyで検査してください。
 
 期待するrepository sample identityと構造:
-- bytes: 661,189
-- SHA-256: `446386E20BB4096561CB4AFD6D74B8EAA9D50EAE53C97F984BA7F70EBEAD0DE5`
-- package entries: 18
-- `Old!A1:AF531`、`Original!A1:L531`、`Final!A1:AD531`
-- initial source: `Original`、question row 1、data rows 2〜531
-- A〜E: managementで初期対象外
-- F/I: normal report answer候補
-- G/J: student Prompt候補
-- H:別回答またはsupporting候補
-- K: JのPrompt considerations/supporting候補
-- L: PBL feedbackで初期対象外
+- bytes: 469,995
+- SHA-256: `F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D`
+- package entries: 13、relationships: 9
+- `Sheet2!A1:J531`
+- initial source: `Sheet2`、question row 1、data rows 2〜531
+- A〜C/J: 初期対象外
+- D/G: primary候補
+- E/H: primary + student Prompt候補
+- F: primary + supporting候補
+- I: supporting候補。Hのinitial supporting候補
 
-F〜Kは候補であり固定mappingではありません。検査前後のSHA-256、size、mtimeを比較し、1つでも不一致ならFAILとしてください。sampleを期待値へ合わせて変更してはいけません。
+D〜Iは候補であり固定mappingではありません。検査前後のSHA-256、size、mtimeを比較し、1つでも不一致ならFAILとしてください。sampleを期待値へ合わせて変更してはいけません。
 ```
 
 ### STP-TR-03: Native picker、direct path、unsupported format
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-03
 Requirement: TR-03 / AC-001 / AC-002
 
@@ -149,7 +146,7 @@ Requirement: TR-03 / AC-001 / AC-002
 ### STP-TR-04: 初期配分、端数、手動保持、均等配分
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-04
 Requirement: TR-04 / AC-004 / AC-005
 
@@ -171,7 +168,7 @@ Design UIとScoringAllocationCalculatorで次を検証してください。
 ### STP-TR-05: 配点、range、similarity、special minimum validation
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-05
 Requirement: TR-05 / AC-006 / AC-008
 
@@ -200,7 +197,7 @@ Requirement: TR-05 / AC-006 / AC-008
 ### STP-TR-06: Prompt placeholderとclosed tool schema
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-06
 Requirement: TR-06 / AC-007 / AC-008
 
@@ -228,7 +225,7 @@ invalid Promptでinput row read、Copilot session、runner callが0件である�
 ### STP-TR-07: Reference exactly once、auto、resume reuse
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-07
 Requirement: TR-07 / AC-009
 
@@ -251,7 +248,7 @@ attempt/session countとcheckpoint更新順をfake transport/storeの記録か�
 ### STP-TR-08: Normal/special/similarity境界、empty-zero、failure-blank
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-08
 Requirement: TR-08 / AC-010 / AC-012
 
@@ -280,7 +277,7 @@ empty-zeroとtechnical-blankを同じtest dataへ混在させず、各cellのtyp
 ### STP-TR-09: Question/Special/Penalty/Final hand oracle
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-09
 Requirement: TR-09 / AC-011 / AC-012
 
@@ -307,7 +304,7 @@ Requirement: TR-09 / AC-011 / AC-012
 ### STP-TR-10: Config参照formula、blank、allowlist、DAG、limits
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-10
 Requirement: TR-10 / AC-006 / AC-011 / AC-012
 
@@ -335,7 +332,7 @@ Open XML reopen validationと独立FormulaPreflightValidatorの両方を実測�
 ### STP-TR-11: 4 app-owned sheets、元sheet保持、name collision
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-11
 Requirement: TR-11 / AC-013
 
@@ -360,7 +357,7 @@ input/outputのSHA-256を混同せず、input identityが不変であること�
 ### STP-TR-12: result naming、suffix、directory、race、atomic final
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-12
 Requirement: TR-12 / AC-013
 
@@ -388,7 +385,7 @@ inputと既存targetのbytesが全caseで不変であることを確認してく
 ### STP-TR-13: Partial create、chunk/hash、atomic update fault
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-13
 Requirement: TR-13 / AC-014
 
@@ -413,7 +410,7 @@ normal/special/similarity/token usageを1つのCheckpointCompletedRowとしてro
 ### STP-TR-14: Resume mismatch matrix、deep validation、completed-row skip
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-14
 Requirement: TR-14 / AC-015
 
@@ -450,7 +447,7 @@ Requirement: TR-14 / AC-015
 ### STP-TR-15: Auth/timeout/network/schema/cleanup/cancel/no-send
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-15
 Requirement: TR-15 / AC-012 / AC-016
 
@@ -478,7 +475,7 @@ attempt/session/abort/dispose/delete countをtest doubleから取得し、期待
 ### STP-TR-16: Selected same-row isolationとformula injection防止
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-16
 Requirement: TR-16 / AC-019
 
@@ -503,7 +500,7 @@ Results/References/Config/Checkpointへ`=`, `+`, `-`, `@`で始まる合成text�
 ### STP-TR-17: Warning、stage、resume、completion、keyboard、200%
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-17
 Requirement: TR-17 / AC-016 / AC-017
 
@@ -535,7 +532,7 @@ Requirement: TR-17 / AC-016 / AC-017
 ### STP-TR-18: Parser、UTF-8 Prompt、explicit apply、no auto-run
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.1のシステムテスト担当者です。
 Test ID: STP-TR-18
 Requirement: TR-18 / AC-018
 
@@ -565,7 +562,7 @@ safe error windowへoption value、Prompt本文、private pathを表示しない
 ### STP-TR-19: Windows publish/package/install/bundled CLI/clean launch
 
 ```text
-あなたはStudyReport Evaluator v4.0のWindows deliveryテスト担当者です。
+あなたはStudyReport Evaluator v4.1のWindows deliveryテスト担当者です。
 Test ID: STP-TR-19
 Requirement: TR-19 / AC-020
 
@@ -576,72 +573,68 @@ Requirement: TR-19 / AC-020
 - global.jsonのSDK feature bandとversion 2 lockを使うlocked restore。
 - Release build warning/error 0と今回のsolution test実測件数。
 - RID`win-x64`、self-contained、non-trimmed、non-single-file publish。
-- packageにapp、README/docs/images、install-windows.cmd/ps1、`copilot-runtime.json`、RID別bundled CLIを含む。
+- packageにapp、README/docs/images、`copilot-runtime.json`、RID別bundled CLIを含む。
 - manifestのschema/RID/CLI version/CLI SHA-256/SDK version/relative pathと実file hashが一致。
 - Appはmanifestからpackage-relative absolute CLI pathを解決し、PATH fallbackしない。
 - ZIP entriesはsingle root、safe relative path、0-byte/reparse/source/test/sample/secretなし、SHA-256 sidecar一致。
-- installerはhash検証後、default `%LOCALAPPDATA%\Programs\StudyReportEvaluator`またはtest overrideへuser-local installし、Start Menu shortcutを作る。
-- adminと.NET Runtime/SDK追加installを要求しない。
-- ps1はpwsh 7+だけを受理し、5.1をfail closed。
-- installed appを外部.NET無効化環境で起動し、startup中に異常終了しない。
+- ZIPとsidecarのSHA-256を照合し、cleanな一時directoryへ展開する。
+- installer、admin権限、.NET Runtime/SDK追加installを要求しない。
+- publish/package ps1はpwsh 7+だけを受理し、5.1へfallbackしない。
+- 展開済みappを外部.NET無効化環境で起動し、startup中に異常終了しない。
 
-bundle/install scriptsまたはCLI fileが欠落していれば、その事実をFAILとして報告し、旧v3 packageをPASSにしないでください。
+CLI、manifest、sidecarまたは必須文書が欠落していれば、その事実をFAILとして報告し、旧packageをPASSにしないでください。
 ```
 
 ---
 
-## UC-13: macOS deterministic delivery
+## UC-13: ZIP integrityと再現性
 
-### STP-TR-20: arm64/x64 bundle、absolute CLI、sign/notary fail-closed
+### STP-TR-20: unsigned ZIP、sidecar、safe layout、再package
 
 ```text
-あなたはStudyReport Evaluator v4.0のmacOS deterministic deliveryテスト担当者です。
+あなたはStudyReport Evaluator v4.1のWindows package integrityテスト担当者です。
 Test ID: STP-TR-20
-Requirement: TR-20 / AC-021
+Requirement: TR-20 / AC-020
 
-厳守: source/layout contractをWindowsで検査してもmacOS launch PASSと称しない。credentialなしでad-hoc署名をrelease署名と称しない。secret名や値をreportへ出さない。
-報告順: Test ID / 実行platform / RID / source contract / bundle layout / architecture / gate behavior / Status / 差異。
+厳守: Windows 11 x64とpwsh 7+ Coreだけを使う。既存の利用者fileをpackageへ混入させない。今回生成した実物だけを証跡にし、過去のhashを流用しない。
+報告順: Test ID / environment / ZIP basename・size・SHA-256 / sidecar / layout / first run / second run / tamper rejection / Status / 差異。
 
-repository sourceと、利用可能ならmacOS runnerで次をRID別に確認してください。
-- `osx-arm64`と`osx-x64`は別package。universal binaryではない。
-- `.app/Contents/Info.plist`、`Contents/MacOS/StudyReportEvaluator.App`、self-contained runtime、bundled CLI、manifestが存在。
-- Info.plistのbundle identifier/executable/versionがclosed contractと一致。
-- apphostとCLI Mach-O architectureがRIDと一致。
-- GUIがshell PATHを継承しなくてもmanifest relative pathをAppContext baseからabsolute化する。
-- package/sign/notary/install scriptsはmacOS/RID mismatchをfail closedする。
-- Developer IDまたはnotary profileがなければpackage releaseを作らず`NOT_RUN_EXTERNAL_PREREQUISITE`を示す。
-- codesign/notary/staple/spctlのどれかが失敗したらrelease可能statusにしない。
-- install scriptはhash、signature、staple、architectureを検証後、default `~/Applications`へno-sudo copyする。
+同一publish inputを2回packageし、次を確認してください。
+- ZIPは単一rootを持ち、entry名はordinal順、重複・大小文字衝突・absolute/parent path・symlink/reparse pointがない。
+- source、test、sample、symbol、credential候補、0-byte fileを含まない。
+- entry timestampはpackage契約の固定値である。
+- `RELEASE-NOTES.txt`はunsigned、self-contained、bundled CLIを明記する。
+- sidecarは大文字64桁SHA-256、2 spaces、ZIP basename、LF終端のexact形式で、実ZIP hashと一致する。
+- 同一inputの2回目はZIP sizeとSHA-256が1回目と一致する。
+- ZIPへ1 byte追加したtampered copyはsidecar検証に失敗する。
+- package入力が0-byteまたはreparse pointを含む場合、既存ZIP/sidecarを置換せず失敗する。
 
-Windows上のsource-only検証はPASS_REQUIRED相当と分け、実macOS launch/sign/notaryを同じPASSへまとめないでください。
+署名済み、installer形式、SmartScreen reputationがあるとは報告しないでください。
 ```
 
 ---
 
-## UC-14: macOS external release gate
+## UC-14: 非対応platform claim
 
-### STP-TR-21: Actual launch、codesign、notary、staple
+### STP-TR-21: Windows-only公開scope
 
 ```text
-あなたはStudyReport Evaluator v4.0のcredentialed macOS releaseテスト担当者です。
+あなたはStudyReport Evaluator v4.1の公開scope整合テスト担当者です。
 Test ID: STP-TR-21
 Requirement: TR-21 / AC-021
 
-厳守: このPromptはmacOS runner、architecture一致、Developer ID Application certificate、Apple notary accessが全てある場合だけ実行する。credential値、keychain profile内容、Apple IDをreportへ出さない。どれか不足なら実行せずStatus=`NOT_RUN_EXTERNAL_PREREQUISITE`。未実行をPASSにしない。
-報告順: Test ID / macOS version・architecture / RID / credential presenceはyes/noのみ / publish / codesign verify / notary status / staple / spctl / launch / install smoke / Status / 差異。
+厳守: Avalonia/.NETの一般的なcross-platform対応を本製品の動作証跡にしない。存在しないpackage、installer、署名、notarizationを作成済みと報告しない。
+報告順: Test ID / requirement / README・docs / scripts / package entries / tests / Status / 差異。
 
-外部前提が揃う場合だけ、対象RIDの実packageで次を実行してください。
-1. locked restore/build/test。
-2. self-contained `.app` publish。
-3. Developer ID Applicationでhardened runtime/timestamp付きcodesign。
-4. `codesign --verify --deep --strict --verbose`成功。
-5. packageを`xcrun notarytool submit --wait`しAcceptedを確認。
-6. appへticketをstapleし、`xcrun stapler validate`成功。
-7. `spctl --assess --type execute`成功。
-8. package hashとarchitectureを検証し、test用`~/Applications`へinstall。
-9. PATHを前提にせずapp launchし、startup livenessとbundled CLI identityを確認。
+次を確認してください。
+- 要求v4.1、ADR-0013、architecture、README、利用者文書が初版対応をWindows 11 x64だけとしている。
+- scriptsとpackage testは`win-x64`だけを正式配布対象とする。
+- READMEとrelease noteはunsigned ZIPであることを明記する。
+- macOS、Linux、Windows Arm64、installer、code signing、notarizationを対応済みと記載しない。
+- packageにmacOS/Linux runtime、installer、署名済みと称するmarkerを必須成果物として要求しない。
+- 将来対応の一般論を現在のPASSへ算入しない。
 
-1件でも失敗したらFAIL。`codesign -`のad-hoc署名、未staple、notary未提出をPASSにしないでください。
+1箇所でも現在対応と誤読できる記述があればFAILとし、文書を期待に合わせたことだけで実装済みと判定しないでください。
 ```
 
 ---
@@ -651,7 +644,7 @@ Requirement: TR-21 / AC-021
 ### STP-TR-22: Docs links、Prompt examples、screenshots、unsupported claims
 
 ```text
-あなたはStudyReport Evaluator v4.0のdocumentation整合テスト担当者です。
+あなたはStudyReport Evaluator v4.1のdocumentation整合テスト担当者です。
 Test ID: STP-TR-22
 Requirement: TR-22 / AC-022
 
@@ -665,8 +658,7 @@ Requirement: TR-22 / AC-022
 - exact warning文がsource/test/docsで一致。
 - screenshotsはproduction XAML/ViewModelをsynthetic dataでrenderし、生成手順とfake境界を記録する。
 - screenshotにprivate path、real answer、credentialがない。
-- unsupportedなLinux/Windows Arm64/universal macOS、未検証sign/notary、AI教育品質を対応済みと書かない。
-- macOS credentialed evidenceがなければ`NOT_RUN_EXTERNAL_PREREQUISITE`と明示する。
+- macOS、Linux、Windows Arm64、installer、code signing、notarization、AI教育品質を対応済みと書かない。
 - Markdown link targetが存在し、packageにuser docs/imagesが含まれる。
 
 文書と実装が違う場合は文書を期待側へ書換えてPASSにせず、差異をFAILとして記録してください。
@@ -675,7 +667,7 @@ Requirement: TR-22 / AC-022
 ### STP-TR-23: Fixed-seed 531-row new/resume E2E
 
 ```text
-あなたはStudyReport Evaluator v4.0のfull synthetic E2Eテスト担当者です。
+あなたはStudyReport Evaluator v4.1のfull synthetic E2Eテスト担当者です。
 Test ID: STP-TR-23
 Requirement: TR-23 / AC-009〜AC-016 / AC-019
 
@@ -703,7 +695,7 @@ Requirement: TR-23 / AC-009〜AC-016 / AC-019
 ### STP-TR-24: Live Copilotとexternal recalculation
 
 ```text
-あなたはStudyReport Evaluator v4.0のoptional advisoryテスト担当者です。
+あなたはStudyReport Evaluator v4.1のoptional advisoryテスト担当者です。
 Test ID: STP-TR-24
 Requirement: TR-24
 
@@ -734,26 +726,26 @@ A/Bを別statusで記録し、片方のPASSをもう片方またはrequired gate
 4. STP-TR-11〜14でfinal path、checkpoint、resumeを確認。
 5. STP-TR-15〜18でfailure、privacy、UI、launchを確認。
 6. STP-TR-19でWindows deliveryを確認。
-7. STP-TR-20でmacOS deterministic contractを確認。
-8. 外部前提が揃う場合だけSTP-TR-21を実行。それ以外は`NOT_RUN_EXTERNAL_PREREQUISITE`。
+7. STP-TR-20でunsigned ZIPのintegrityと再現性を確認。
+8. STP-TR-21でWindows-only公開scopeを確認。
 9. STP-TR-22〜23でdocsとfull E2Eを確認。
 10. 明示許可がある場合だけSTP-TR-24を実行。
 
 ## 6. 最終レポート集約Prompt
 
 ```text
-あなたはStudyReport Evaluator v4.0のシステムテスト結果集約担当者です。
-Prompt ID: FINAL-REPORT-AGGREGATION-V4
+あなたはStudyReport Evaluator v4.1のシステムテスト結果集約担当者です。
+Prompt ID: FINAL-REPORT-AGGREGATION-V4.1
 
 実行記録に存在する事実だけを集約してください。未実施をPASSにせず、初回FAILと再実行結果を時系列で残してください。回答、Prompt、reference、reason、evidence、credential、token、private pathを掲載しないでください。
 
 集約規則:
-1. STP-TR-01〜24を欠番なく列挙し、各statusをPASS / FAIL / BLOCKED / NOT_RUN / SKIPPED_NOT_AUTHENTICATED / NOT_RUN_EXTERNAL_PREREQUISITEから選ぶ。
-2. required deterministic、manual UI、Windows delivery、macOS deterministic、macOS external、optional advisoryを別集計する。
+1. STP-TR-01〜24を欠番なく列挙し、各statusをPASS / FAIL / BLOCKED / NOT_RUN / SKIPPED_NOT_AUTHENTICATEDから選ぶ。
+2. required deterministic、manual UI、Windows delivery、ZIP integrity、platform claim、optional advisoryを別集計する。
 3. test総数、成功、失敗、skip、performance、hashは今回実測した値だけを記載する。
 4. fixed oracleとLive AI結果を混同しない。
 5. optional Live Copilot/external recalculationをrequired PASSへ算入しない。
-6. macOS credential/runner不足はNOT_RUN_EXTERNAL_PREREQUISITEとし、signed/notarized PASSと書かない。
+6. macOS、Linux、Windows Arm64、installer、code signing、notarizationを現在のPASSとして書かない。
 7. sampleはidentity/dimension/roleだけを記載し、回答本文を記載しない。
 8. defectは期待、実測、再現手順、影響、source/testを記載する。
 9. 未確認事項を「問題なし」と要約しない。
@@ -782,9 +774,9 @@ Prompt ID: FINAL-REPORT-AGGREGATION-V4
 | STP-TR-16 | payload isolation・literal strings・SafeLogger |
 | STP-TR-17 | 4-step UI・accessibility・warning/progress |
 | STP-TR-18 | LaunchOptions・PromptFileLoader・startup composition |
-| STP-TR-19 | Windows publish/package/install |
-| STP-TR-20 | macOS bundle/source gate |
-| STP-TR-21 | credentialed macOS external release |
+| STP-TR-19 | Windows publish/package/bundled CLI/clean launch |
+| STP-TR-20 | unsigned ZIP/hash/safe layout/reproducibility |
+| STP-TR-21 | unsupported platform/installer/signing claim exclusion |
 | STP-TR-22 | user/dev docs・screenshots・Prompt examples |
 | STP-TR-23 | fixed-seed new/resume E2E |
 | STP-TR-24 | optional Live/recalculation advisory |
@@ -797,6 +789,6 @@ Prompt ID: FINAL-REPORT-AGGREGATION-V4
 - repository sampleに含まれる個別回答の評価結果。
 - high similarityによる不正行為の証明、low similarityによる回答品質保証。
 - optional Live Copilotまたはexternal spreadsheet recalculationのPASS。
-- credentialed macOS signing/notarizationのPASS。
-- universal macOS binary、Linux、Windows Arm64 support。
+- macOS、Linux、Windows Arm64 support。
+- installer、code signing、notarization、SmartScreen reputation。
 - 未実施のUI操作、screenshot、package、performance、test件数。

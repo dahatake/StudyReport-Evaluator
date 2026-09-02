@@ -263,6 +263,204 @@ function Assert-Amd64PortableExecutable {
     }
 }
 
+function Get-CopilotCliVersion {
+    param(
+        [Parameter(Mandatory)]
+        [string] $DotNetPath,
+
+        [Parameter(Mandatory)]
+        [string] $ProjectPath
+    )
+
+    $output = & $DotNetPath msbuild $ProjectPath `
+        -nologo `
+        -getProperty:CopilotCliVersion `
+        -property:RuntimeIdentifier=$RuntimeIdentifier
+    $exitCode = $LASTEXITCODE
+    $version = ([string](@($output) -join "`n")).Trim()
+    if ($exitCode -ne 0 -or
+        $version -notmatch '^[0-9][A-Za-z0-9._+-]{0,127}$') {
+        throw 'Unable to resolve a safe Copilot CLI version from the pinned SDK package.'
+    }
+
+    return $version
+}
+
+function Get-NpmCopilotCliBinary {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Version,
+
+        [Parameter(Mandatory)]
+        [string] $DestinationDirectory
+    )
+
+    $npmCommand = Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyContinue
+    if ($null -eq $npmCommand) {
+        return $null
+    }
+
+    [void][System.IO.Directory]::CreateDirectory($DestinationDirectory)
+    $packageName = '@github/copilot-win32-x64'
+    $packageSpec = "$packageName@$Version"
+    $expectedPackageShasum = '75265752e8f23150a17cd8f09c5e757bd9ff9374'
+    $packOutput = & $npmCommand.Source pack $packageSpec `
+        --ignore-scripts `
+        --fetch-timeout=120000 `
+        --fetch-retries=2 `
+        --pack-destination $DestinationDirectory `
+        --json
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        throw "npm failed to acquire the pinned Copilot CLI package with exit code $exitCode."
+    }
+
+    try {
+        $packRecords = @(($packOutput | Out-String | ConvertFrom-Json))
+    }
+    catch {
+        throw 'npm returned an invalid package manifest for the Copilot CLI.'
+    }
+
+    if ($packRecords.Count -ne 1) {
+        throw 'npm did not return exactly one Copilot CLI package record.'
+    }
+
+    $packRecord = $packRecords[0]
+    if ([string]$packRecord.name -cne $packageName -or
+        [string]$packRecord.version -cne $Version -or
+        [string]$packRecord.integrity -notmatch '^sha512-[A-Za-z0-9+/]+={0,2}$' -or
+        [string]$packRecord.shasum -cne $expectedPackageShasum) {
+        throw 'npm returned Copilot CLI package metadata that does not match the pinned package.'
+    }
+
+    $archiveName = [string]$packRecord.filename
+    if ([string]::IsNullOrWhiteSpace($archiveName) -or
+        [System.IO.Path]::GetFileName($archiveName) -cne $archiveName -or
+        [System.IO.Path]::GetExtension($archiveName) -cne '.tgz') {
+        throw 'npm returned an unsafe Copilot CLI archive name.'
+    }
+
+    $archivePath = Join-Path $DestinationDirectory $archiveName
+    if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+        throw 'The pinned Copilot CLI archive was not created.'
+    }
+
+    $tarPath = Join-Path $env:SystemRoot 'System32\tar.exe'
+    if (-not (Test-Path -LiteralPath $tarPath -PathType Leaf)) {
+        throw 'Windows system tar is required to inspect the Copilot CLI package.'
+    }
+
+    $archiveEntries = @(& $tarPath -tzf $archivePath)
+    if ($LASTEXITCODE -ne 0 -or $archiveEntries.Count -eq 0) {
+        throw 'The Copilot CLI archive could not be listed.'
+    }
+
+    foreach ($archiveEntry in $archiveEntries) {
+        $normalized = ([string]$archiveEntry).Replace('\', '/').TrimEnd('/')
+        if ([string]::IsNullOrWhiteSpace($normalized) -or
+            -not $normalized.StartsWith('package/', [System.StringComparison]::Ordinal)) {
+            throw "Unsafe Copilot CLI archive entry: $archiveEntry"
+        }
+
+        foreach ($segment in $normalized.Split('/', [System.StringSplitOptions]::RemoveEmptyEntries)) {
+            if ($segment -eq '.' -or $segment -eq '..' -or
+                $segment.Contains(':', [System.StringComparison]::Ordinal)) {
+                throw "Unsafe Copilot CLI archive entry: $archiveEntry"
+            }
+        }
+    }
+
+    $extractionDirectory = Join-Path $DestinationDirectory 'extracted'
+    [void][System.IO.Directory]::CreateDirectory($extractionDirectory)
+    & $tarPath -xzf $archivePath -C $extractionDirectory
+    if ($LASTEXITCODE -ne 0) {
+        throw 'The Copilot CLI archive could not be extracted.'
+    }
+
+    foreach ($item in @(Get-ChildItem -LiteralPath $extractionDirectory -Force -Recurse)) {
+        Assert-NotReparsePoint -Item $item
+    }
+
+    $cliPath = Join-Path $extractionDirectory 'package\copilot.exe'
+    if (-not (Test-Path -LiteralPath $cliPath -PathType Leaf) -or
+        (Get-Item -LiteralPath $cliPath).Length -le 0) {
+        throw 'The pinned Copilot CLI binary is missing or empty.'
+    }
+
+    Assert-Amd64PortableExecutable -ExecutablePath $cliPath
+    $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cliPath)
+    if ([string]$versionInfo.ProductVersion -cne $Version -and
+        [string]$versionInfo.FileVersion -cne $Version) {
+        throw 'The Copilot CLI binary version does not match the pinned SDK runtime version.'
+    }
+
+    return [System.IO.Path]::GetFullPath($cliPath)
+}
+
+function Assert-BundledCopilotRuntime {
+    param(
+        [Parameter(Mandatory)]
+        [string] $PublishDirectory
+    )
+
+    $manifestPath = Join-Path $PublishDirectory 'copilot-runtime.json'
+    $expectedRelativePath = 'runtimes/win-x64/native/copilot.exe'
+    $cliPath = Join-Path $PublishDirectory $expectedRelativePath.Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $cliPath -PathType Leaf)) {
+        throw 'The bundled Copilot CLI manifest or binary is missing.'
+    }
+
+    try {
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    }
+    catch {
+        throw 'The bundled Copilot CLI manifest is invalid JSON.'
+    }
+
+    $propertyNames = @($manifest.PSObject.Properties.Name)
+    $expectedPropertyNames = @(
+        'schemaVersion',
+        'runtimeIdentifier',
+        'cliVersion',
+        'cliSha256',
+        'sdkVersion',
+        'cliRelativePath'
+    )
+    if ($propertyNames.Count -ne $expectedPropertyNames.Count -or
+        @($propertyNames | Where-Object { $_ -cnotin $expectedPropertyNames }).Count -ne 0 -or
+        [int]$manifest.schemaVersion -ne 1 -or
+        [string]$manifest.runtimeIdentifier -cne $RuntimeIdentifier -or
+        [string]$manifest.cliRelativePath -cne $expectedRelativePath -or
+        [string]$manifest.cliVersion -notmatch '^[0-9][A-Za-z0-9._+-]{0,127}$' -or
+        [string]$manifest.sdkVersion -notmatch '^[0-9][A-Za-z0-9._+-]{0,127}$' -or
+        [string]$manifest.cliSha256 -notmatch '^[0-9A-Fa-f]{64}$') {
+        throw 'The bundled Copilot CLI manifest violates the release contract.'
+    }
+
+    $cliItem = Get-Item -LiteralPath $cliPath -Force
+    Assert-NotReparsePoint -Item $cliItem
+    if ($cliItem.Length -le 0 -or
+        (Get-Sha256Hex -Path $cliPath) -cne ([string]$manifest.cliSha256).ToUpperInvariant()) {
+        throw 'The bundled Copilot CLI does not match its manifest hash.'
+    }
+
+    Assert-Amd64PortableExecutable -ExecutablePath $cliPath
+    $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cliPath)
+    if ([string]$versionInfo.ProductVersion -cne [string]$manifest.cliVersion -and
+        [string]$versionInfo.FileVersion -cne [string]$manifest.cliVersion) {
+        throw 'The bundled Copilot CLI does not match its manifest version.'
+    }
+
+    $sdkPath = Join-Path $PublishDirectory 'GitHub.Copilot.SDK.dll'
+    $sdkVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($sdkPath)
+    $sdkPackageVersion = ([string]$sdkVersionInfo.ProductVersion).Split('+', 2)[0]
+    if ($sdkPackageVersion -cne [string]$manifest.sdkVersion) {
+        throw 'The bundled Copilot manifest does not match the published SDK package version.'
+    }
+}
+
 function Assert-SafePublishLayout {
     param(
         [Parameter(Mandatory)]
@@ -351,6 +549,8 @@ function Assert-SafePublishLayout {
         'DocumentFormat.OpenXml.dll',
         'DocumentFormat.OpenXml.Framework.dll',
         'GitHub.Copilot.SDK.dll',
+        'copilot-runtime.json',
+        'runtimes\win-x64\native\copilot.exe',
         'Avalonia.dll',
         'Avalonia.Win32.dll',
         'coreclr.dll',
@@ -366,8 +566,10 @@ function Assert-SafePublishLayout {
         }
     }
 
+    Assert-BundledCopilotRuntime -PublishDirectory $PublishDirectory
+
     if (Test-Path -LiteralPath (Join-Path $PublishDirectory 'copilot.exe')) {
-        throw 'Copilot CLI must not be downloaded into the publish output.'
+        throw 'The Copilot CLI must be stored only under the pinned RID runtime directory.'
     }
 
     $runtimeConfigPath = Join-Path $PublishDirectory "$ApplicationName.runtimeconfig.json"
@@ -514,11 +716,13 @@ $globalJsonPath = Join-Path $repositoryRoot 'global.json'
 $appProjectPath = Join-Path $repositoryRoot 'src\StudyReportEvaluator.App\StudyReportEvaluator.App.csproj'
 $coreProjectDirectory = Join-Path $repositoryRoot 'src\StudyReportEvaluator.Core'
 $appProjectDirectory = Join-Path $repositoryRoot 'src\StudyReportEvaluator.App'
+$packageDirectory = Join-Path $repositoryRoot 'artifacts\package'
 $publishParent = Join-Path $repositoryRoot 'artifacts\package\publish'
 $finalPublishDirectory = Join-Path $publishParent $RuntimeIdentifier
 $runId = [System.Guid]::NewGuid().ToString('N')
 $temporaryPublishDirectory = Join-Path $publishParent ('.' + $RuntimeIdentifier + '-' + $runId)
 $temporaryLockRelativePath = "obj\P01\$runId\packages.$RuntimeIdentifier.lock.json"
+$temporaryCopilotDirectory = Join-Path $packageDirectory ('.copilot-cli-' + $runId)
 
 foreach ($requiredPath in @($solutionPath, $globalJsonPath, $appProjectPath)) {
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
@@ -529,6 +733,7 @@ foreach ($requiredPath in @($solutionPath, $globalJsonPath, $appProjectPath)) {
 Assert-PathWithinRoot -Root $repositoryRoot -Path $publishParent
 Assert-PathWithinRoot -Root $repositoryRoot -Path $finalPublishDirectory
 Assert-PathWithinRoot -Root $repositoryRoot -Path $temporaryPublishDirectory
+Assert-PathWithinRoot -Root $repositoryRoot -Path $temporaryCopilotDirectory
 [void][System.IO.Directory]::CreateDirectory($publishParent)
 
 foreach ($existingPath in @($publishParent, $finalPublishDirectory)) {
@@ -612,7 +817,13 @@ try {
             }
         }
 
-        Invoke-DotNet -DotNetPath $dotNetPath -Arguments @(
+        $copilotCliVersion = Get-CopilotCliVersion `
+            -DotNetPath $dotNetPath `
+            -ProjectPath $appProjectPath
+        $copilotCliPath = Get-NpmCopilotCliBinary `
+            -Version $copilotCliVersion `
+            -DestinationDirectory $temporaryCopilotDirectory
+        $publishArguments = @(
             'publish',
             $appProjectPath,
             '--configuration',
@@ -626,7 +837,7 @@ try {
             '--no-restore',
             '--output',
             $temporaryPublishDirectory,
-            '--property:CopilotSkipCliDownload=true',
+            '--property:CopilotSkipCliDownload=false',
             '--property:PublishSingleFile=false',
             '--property:PublishTrimmed=false',
             '--property:PublishReadyToRun=false',
@@ -636,6 +847,11 @@ try {
             '--verbosity',
             'minimal'
         )
+        if ($null -ne $copilotCliPath) {
+            $publishArguments += "--property:CopilotCliBinaryPath=$copilotCliPath"
+        }
+
+        Invoke-DotNet -DotNetPath $dotNetPath -Arguments $publishArguments
     }
     finally {
         Pop-Location
@@ -662,6 +878,10 @@ finally {
 
     if (-not $published -and (Test-Path -LiteralPath $temporaryPublishDirectory)) {
         Remove-Item -LiteralPath $temporaryPublishDirectory -Recurse -Force
+    }
+
+    if (Test-Path -LiteralPath $temporaryCopilotDirectory) {
+        Remove-Item -LiteralPath $temporaryCopilotDirectory -Recurse -Force
     }
 
     foreach ($lockPath in $canonicalLockPaths) {

@@ -1,201 +1,156 @@
-# はじめに — 最初の定量化workbookを作る
+# はじめに
 
-対象読者は、Windows 11 x64で標準 `.xlsx` の回答を定量化する教員・採点者です。本書は現在のUIとproduction sourceだけを手順化し、未取得の画面やlive AI結果を作りません。
+このガイドでは、Windows 11 x64でStudyReport Evaluatorを起動し、標準`.xlsx`から最初の結果workbookを作る手順を説明します。
 
-GitHub Copilotへ起動依頼Promptを貼り、入力workbookと複数の評価Promptを事前入力して起動する場合は、[GitHub CopilotからPromptで起動する](prompt-launch.md)を先に参照してください。
+> [!WARNING]
+> 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません
 
-## 全体像
+## 準備
+
+必要なもの:
+
+- 配布された`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`
+- Windows 11 x64
+- 評価対象の標準`.xlsx`
+- AI処理を行う場合は、利用可能なGitHub Copilot accountと対話login
+
+.NET Runtime、.NET SDK、Microsoft Excel、Office、LibreOffice、別途導入したCopilot CLIは必要ありません。CLIはZIP内に同梱されています。
+
+配布ZIPはunsignedです。発行者を示すcode signingやSmartScreen reputationがあると誤認しないでください。入手元とSHA-256を確認してから使用します。
+
+## ZIPを確認して起動する
+
+1. ZIPと`.sha256`を同じdirectoryへ置きます。
+2. PowerShell 7でZIPのSHA-256を取得します。
+3. `.sha256`の先頭64文字と一致することを確認します。
+4. ZIPを新しいdirectoryへ展開します。
+5. `StudyReportEvaluator-win-x64\StudyReportEvaluator.App.exe`を起動します。
+
+SHA-256確認例:
+
+```powershell
+(Get-FileHash -Algorithm SHA256 .\StudyReportEvaluator-win-x64.zip).Hash
+```
+
+正式なdownload URLは、実在するrelease assetが公開されている場合だけ案内できます。URLを推測したり、repository内の`artifacts`を一般配布先として扱ったりしないでください。
+
+## 4stepの流れ
 
 ```mermaid
 flowchart LR
-    A[1. 入力pathを記入] --> B[read-only読込とmapping]
-    B --> C[2. Knowledge / Customを設計]
-    C --> D[3. Copilot状態を確認して実行]
-    D --> E[4. raw / override / previewを確認]
-    E --> F[新規output pathへ検証して出力]
+    A[1. 入力] --> B[2. 定量化設計]
+    B --> C[3. 実行]
+    C --> D[4. 結果・出力]
 ```
-
-実装根拠: [`WorkflowNavigator.cs`](../src/StudyReportEvaluator.App/Navigation/WorkflowNavigator.cs#L14-L32)、[`MainWindow.axaml`](../src/StudyReportEvaluator.App/Views/MainWindow.axaml#L234-L296)。
-
-## 0. 準備
-
-### 必須
-
-- Windows 11 x64。
-- 標準Office Open XML `.xlsx`。`.xls`、`.xlsb`、CSV、PDF、`.xlsm`、暗号化／権利保護workbookは利用できません。
-- 入力とは別の完成fileを作成できる既存directory。
-
-### AI評価を使う場合だけ必要
-
-- GitHub Copilot CLIを別途導入する。配布ZIPに`copilot.exe`は含まれません。
-- Windowsの`PATH`から`copilot.exe`を解決できるようにする。
-- Copilot CLIで対話loginを完了する。アプリへPAT、client secret、passwordを入力する欄はありません。
-
-実装根拠: [`FileFormatClassifier.cs`](../src/StudyReportEvaluator.App/Workbooks/Intake/FileFormatClassifier.cs#L86-L104)、[`CopilotClientFactory.cs`](../src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs#L15-L57)、[`WindowsPublishPackageTests.cs`](../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs#L399-L414)。
 
 ## 1. 入力
 
-![入力workbook、sheet、行範囲を指定する画面。合成pathと100名分の行範囲を表示](../images/01-input-workbook.png)
+![標準xlsxの選択、sheet、行範囲を設定する入力画面。synthetic dataを使用](../images/01-input-workbook.png)
 
-| 画面項目 | 入力例 | 意味 |
-|---|---|---|
-| ファイルpath（標準 `.xlsx`） | `C:\Synthetic\StudyReport-100x2.xlsx` | 実際には利用するworkbookのfull pathを入力 |
-| 回答sheet | `Original` | 回答を含むsheetを選択 |
-| 見出し行 | `1` | column headerがあるrow |
-| 回答開始行 | `2` | 最初の回答row |
-| 回答終了行 | `101` | 100名ならheaderを除く最終row |
+1. **ファイルを選択**でnative pickerを開くか、**ファイル path（標準 .xlsx）**へfull pathを入力します。
+2. **read-only で読込**を選びます。
+3. **回答 sheet**を選びます。
+4. **質問文の行**を1または2から選びます。
+5. **回答開始行**と**回答終了行**を確認します。
+6. 質問ごとの表示名、設問text、主回答列、補助列を確認します。
+7. 技術検証の問題をすべて解消します。
 
-1. **ファイルを選択**でnative pickerを使うか、**ファイルpath（標準 `.xlsx`）**へfull pathを入力します。
-2. **read-onlyで読込**を選びます。
-3. 回答sheet、見出し行、回答開始行、回答終了行を確認します。
-4. 自動候補を出発点として、質問ごとの主回答列と補助列を確認・変更します。
-5. 画面下部が「技術検証を通過しました」になることを確認します。
-
-主回答列と同じ列を同じ質問の補助列にはできません。同じ列を別の質問で使うことはできます。入力変更時は、それまでのmetadataとmapping候補が破棄されます。
-
-![質問ごとの表示名、設問text、主回答列、補助列を設定するmapping画面](../images/02-input-mapping.png)
-
-| 画面項目 | 入力例 | 意味 |
-|---|---|---|
-| 表示名 | `設問1：機械学習の基礎` | Results画面やConfigで識別する名称 |
-| 設問text | `機械学習とルールベースの違いを説明してください。` | AIへ送る設問本文 |
-| 主回答列 | `B` | このQuestionの評価対象。必ず1列 |
-| 補助列 | `D · 補助情報` | 必要な場合だけ0件以上を選択 |
-
-UI根拠: [`InputView.axaml`](../src/StudyReportEvaluator.App/Views/InputView.axaml#L117-L145)、[`InputView.axaml`](../src/StudyReportEvaluator.App/Views/InputView.axaml#L149-L362)。検証根拠: [`InputViewTests.cs`](../tests/StudyReportEvaluator.App.Tests/UI/InputViewTests.cs#L104-L123)、[`InputViewTests.cs`](../tests/StudyReportEvaluator.App.Tests/UI/InputViewTests.cs#L208-L228)。
+候補mappingは出発点です。列位置だけで役割を確定せず、workbookの見出しと授業設計に合わせて変更してください。同じ質問内で主回答列と補助列を重複させることはできません。
 
 ## 2. 定量化設計
 
-![Knowledge evaluatorのweight、range、app-owned semantic Promptを確認する画面](../images/03-design-knowledge.png)
+設計画面で次を設定します。
 
-| 画面項目 | 入力例 | 意味 |
-|---|---|---|
-| 定義名 | `100名・2設問 レポート定量化` | run snapshotを識別する名称 |
-| revision | `2026-09` | 利用者が管理する版識別子 |
-| 丸め桁数 | `1` | normalized / aggregateを0〜6桁で丸める |
-| 質問weight | `1` | question間の相対weight |
-| evaluator weight | `1` | 同じquestion内の相対weight |
-| range minimum / maximum | `0` / `10` | evaluatorのdefault raw range |
-| criterion weight | `1` | 同じevaluator内の相対weight |
+- **Base points:** 既定60
+- **Special points:** 既定0
+- **Similarity penalty weight:** 既定0.1、範囲0〜1
+- **Question points:** 設問ごとの絶対配点
+- **Knowledge / Custom evaluator:** 通常回答の評価方法
+- **criterion:** evaluator内の評価項目、range、weight
+- **固有評価:** 学生Prompt等、別source列を0〜1で定量化する任意項目
+- **丸め桁数:** 0〜6
 
-KnowledgeのPrompt previewはread-onlyです。知識ポイントはcriterionの項目名と説明へ入力します。
+配点は次を正確に満たす必要があります。
 
-1. definition名、revision、丸め桁数（0〜6）を確認します。
-2. 質問を追加・複製・並べ替え・無効化・削除できます。
-3. 各質問へKnowledgeまたはCustom evaluatorを追加します。
-4. evaluator range、criterion、criterion / evaluator / question weightを設定します。
-5. Customでは`{回答}`と`{評価項目}`を含むtemplateを入力します。
-6. **snapshot preflightが「設計は有効です」になることを必ず確認します。**
+$$
+Base + Special + \sum QuestionPoints = 100
+$$
 
-Custom evaluatorでは次の編集欄を使用します。
+**設問配点を均等化**は利用者が選んだときだけ実行されます。設問追加やBase/Special変更だけで、手動入力したQuestion pointsを黙って変更しません。
 
-![Custom Prompt templateへ回答、補助情報、評価項目placeholderを入力する画面](../images/04-design-custom-prompt.png)
-
-| 画面項目 | 入力例 | 意味 |
-|---|---|---|
-| type | `CUSTOM_PROMPT` | Knowledge以外の独自評価 |
-| 評価方法名 | `説明品質` | evaluatorの表示名 |
-| Custom Prompt template | `次の回答を… {回答} … {補助情報} … {評価項目}` | `{回答}`と`{評価項目}`は必須 |
-| 項目名 | `具体性と論理性` | AIがraw scoreを返すcriterion |
-| 説明 | `活用例が具体的で、説明の流れが論理的か。` | criterionの判断観点 |
-
-> [!IMPORTANT]
-> Custom Promptのplaceholder構文はDesignだけでなく、Execution開始条件とimmutable snapshot作成時にも同じCore validatorで再検査されます。invalidのままstepを移動できてもrunは開始されず、入力本文の読取やCopilot session作成は行われません。
-
-UI根拠: [`QuantificationDesignView.axaml`](../src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml#L52-L216)、[`QuantificationDesignViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/QuantificationDesignViewModel.cs#L1187-L1261)。
+Custom Promptの作り方は[Custom evaluator](custom-evaluator-guide.md)を参照してください。Promptファイルを起動時に読み込む場合は[Promptファイルから起動](prompt-launch.md)を参照してください。
 
 ## 3. 実行
 
-![fake login state、Auto model、concurrency 2、200 evaluation unitsを示す実行画面](../images/05-execution-auto.png)
+![Copilot状態、model、並列度、新規runまたは再開を設定する実行画面。fake authenticationを使用](../images/05-execution-auto.png)
 
-| 画面項目 | 選択例 | 意味 |
-|---|---|---|
-| Copilot状態を確認 | buttonを実行 | CLI loginと利用可能modelを確認 |
-| Model | `Auto` | UIに列挙された場合だけ選択。具体的modelはserviceが決定 |
-| Concurrency | `2` | 同時実行数。1〜3 |
-| Evaluation plan | `200 evaluation units` | 100名 × 2設問 × 1 evaluator |
+### 新規run
 
-1. **Copilot状態を確認**を選びます。
-2. 「既存のCopilot CLI loginを利用できます」と表示された場合だけ、列挙されたmodelから1件を選びます。
-3. concurrencyを1〜3から選びます。既定は1です。
-4. evaluation unit数を確認します。単位は1行 × 1質問 × 1 enabled evaluatorです。
-5. **定量化を開始**を選びます。
-6. 必要なら**cancel**を選びます。新規送信を停止し、完了済みunitだけを保持した部分結果へ進めます。
+1. **Copilot 状態を確認**を選びます。
+2. loginが利用可能と表示されたら、列挙された**Model**を選びます。
+3. **Concurrency**を1〜3から選びます。既定は1です。
+4. **既存checkpointから再開**をoffにします。
+5. **出力directory**を確認します。初期値は入力fileに隣接する`result`です。
+6. evaluation planと技術検証を確認します。
+7. **定量化を開始**を選びます。
 
-run開始後のdraft編集は現在runへ反映されません。Prompt、schema、range、weight、mappingは開始時snapshotへ固定されます。
+run開始時にfinalとpartialの未使用名を予約します。
 
-UI根拠: [`ExecutionView.axaml`](../src/StudyReportEvaluator.App/Views/ExecutionView.axaml#L97-L203)。実装根拠: [`QuantificationOrchestrator.cs`](../src/StudyReportEvaluator.App/Workflow/QuantificationOrchestrator.cs#L119-L177)、[`EvaluationScheduler.cs`](../src/StudyReportEvaluator.App/Workflow/EvaluationScheduler.cs#L273-L404)。
+- final: `eval-yyyyMMdd-HHmm[-NN].xlsx`
+- partial: `eval-yyyyMMdd-HHmm[-NN].partial.xlsx`
 
-## 4. 結果を確認する
+処理順は参照回答生成、学生行評価、checkpoint保存、finalizationです。全処理と検証が成功するとfinalを自動作成し、Resultsへ移動します。
 
-![合成raw score 8、override 9、effective 9、normalized 90を示す結果review画面](../images/06-results-review.png)
+### checkpointから再開
 
-画面には次を表示します。
+1. **既存checkpointから再開**をonにします。
+2. **再開するpartial checkpoint**へ`.partial.xlsx`のfull pathを入力します。
+3. Copilot状態とmodelを確認します。
+4. 技術検証を通過したら**定量化を開始**を選びます。
 
-- source row
-- question / evaluator / criterion名
-- status
-- AI raw
-- 任意override
-- effective raw
-- normalized score
-- evaluator score
-- overall score
+再開にはinput、definition、model、app/SDK/CLI runtime identityの一致が必要です。保存済み参照回答とcomplete student rowを再利用し、最初の未完了rowから続けます。partialを書換えて一致を回避しないでください。
 
-Reason、Evidence、Evidence source、Question scoreは現在のResults画面には表示せず、出力workbookの`Quantification_Results`へ保存します。
+### cancel
 
-overrideは主回答が非空の場合だけ入力できます。空欄なら妥当なAI rawを使い、range内の数値ならAI rawより優先します。非空の不正overrideはAI rawへfallbackせず、scoreを空欄にしてexportを停止します。
+**cancel**後は新しいAI送信を開始せず、最後にatomic保存されたcomplete rowまでのpartialを保持します。処理中だったrowはcomplete扱いにしません。
 
-スクリーンショットのraw `8`とoverride `9`はfake runnerの合成値です。期待されるlive AI scoreではありません。
+## 4. 結果・出力
 
-UI根拠: [`ResultsOutputView.axaml`](../src/StudyReportEvaluator.App/Views/ResultsOutputView.axaml#L151-L219)。workbook根拠: [`ResultsSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/ResultsSheetWriter.cs#L157-L171)。
+![finalまたはpartialと行別scoreを確認する結果画面。fake scoreを使用](../images/06-results-review.png)
 
-## 5. 別workbookへ出力する
+結果画面では次を確認します。
 
-![合成output pathを入力するatomic output画面](../images/07-output-export.png)
+- run statusとfinal/partial path
+- 対象row、成功、空回答、技術失敗の件数
+- Question earned、Special earned、Similarity penalty
+- Final rawと0〜100へ収めたFinal score
+- criterionのAI raw、effective raw、normalized value
+- cleanup warning
 
-| 画面項目 | 入力例 | 意味 |
-|---|---|---|
-| Output path | `C:\Synthetic\StudyReport-100x2_quantified_20260901-170325.xlsx` | 実際には既存directory内の未使用 `.xlsx` full path |
-| 検証して出力 | buttonを実行 | working copyの検証後にno-overwrite commit |
-| cancel output | 必要時に実行 | final rename前の出力を取り消す |
+空回答はAIを呼ばず0相当です。非空回答のAI技術失敗はblankであり、0点と同じではありません。blankが必要な計算へ伝播するとFinal raw/Final scoreもblankになります。
 
-1. **Output path**へ、入力とは異なる新規 `.xlsx` のfull pathを入力します。directoryは事前に存在している必要があります。
-2. 既存fileを指定すると上書きせず停止します。
-3. **検証して出力**を選びます。
-4. working copyのwrite、flush、close、reopen、formula/cache検証、入力identity再確認が成功した場合だけ完成名へ移動します。
+criterion overrideが必要な場合はrange内の値を入力し、任意の新しい`.xlsx`へ反映版を出力できます。この操作は既存finalを変更せず、別名workbookを作ります。
 
-```mermaid
-sequenceDiagram
-    participant U as 利用者
-    participant A as App
-    participant T as target-local temp
-    participant F as final .xlsx
-    U->>A: 新規output pathでexport
-    A->>T: 入力をbyte-copyして3 sheetとformulaを追加
-    A->>T: flush / close / read-only reopen / validate
-    A->>A: 入力SHA-256・size・mtimeを再確認
-    alt 全検証成功・final未使用
-        A->>F: no-overwrite rename
-    else cancel / drift / validation failure
-        A-->>U: 完成名を作らずstatusを表示
-    end
-```
+## final workbook
 
-実装根拠: [`ResultsOutputViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs#L134-L177)、[`ResultsOutputViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs#L201-L274)、[`AtomicOutputCommitter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/AtomicOutputCommitter.cs#L105-L243)。
+finalは入力workbookの全sheetとdataを保持し、次の4sheetを追加します。
 
-> [!CAUTION]
-> output workbookは入力の全sheet・全データを保持し、さらにquestion、Prompt、criterion、weight、AI resultを追加します。入力と同等以上に機密なfileとして扱ってください。詳細は[データとprivacy](privacy-and-data-handling.md)を参照してください。
+- `Quantification_Config`
+- `Quantification_References`
+- `Quantification_Results`
+- `Quantification_Run`
 
-## 現行UIで提供しない操作
+入力に同名sheetがある場合は、既存sheetを変更せず` (2)`等の一意名を使います。partialは入力全体と`Quantification_Checkpoint`を含みます。
 
-- native open/save file picker
-- reusable definition profileの独立save/load
-- 保存済みoutput workbookをアプリへ再importしてreviewする機能
-- signed installer、macOS／Linux／Windows Arm64 package
+final/partialには入力全体、Prompt、参照回答、AI結果が含まれ得ます。入力と同等以上に機密なfileとして扱ってください。詳細は[データとprivacy](privacy-and-data-handling.md)を参照してください。
 
-Results画面は同一プロセス内で完了またはcancelされたrunの`ExecutionRunContext`からだけ読み込まれます。根拠: [`MainWindowViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/MainWindowViewModel.cs#L242-L245)、[`ResultsOutputViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs#L683-L706)。
+## 対応しない操作
 
-## スクリーンショットの境界
+- `.xlsx`以外や暗号化／macro-enabled workbookの読込
+- 保存済みfinalのアプリへの再import
+- definition profileだけの独立save/load
+- macOS、Linux、Windows Arm64
+- installer、code signing、notarization
+- AIによる最終評点・合否・不正行為の確定
 
-本書の画像は[`DocumentationScreenshotTests.cs`](../tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs)がproduction viewをheadless Skiaでrenderしたものです。合成workbook metadata、fake authentication、fake AI resultだけを使い、live network、実在学生data、private pathを含みません。詳細は[`images/README.md`](../images/README.md)を参照してください。
+問題がある場合は[トラブルシューティング](troubleshooting.md)を参照してください。

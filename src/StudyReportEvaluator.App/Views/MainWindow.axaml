@@ -352,7 +352,7 @@
                     Background="#20AAB6FF"
                     HorizontalAlignment="Left">
                   <TextBlock
-                      Text="U-04 で実行・結果画面を接続"
+                      Text="4 ステップで入力から出力まで進みます"
                       Foreground="White"
                       FontSize="12"
                       FontWeight="SemiBold" />
@@ -414,7 +414,7 @@
                       Foreground="{DynamicResource TechnicalTextBrush}"
                       TextWrapping="Wrap" />
                   <TextBlock
-                      Text="実行・結果画面は U-04 で接続します。"
+                      Text="問題を解消すると次の操作へ進めます。"
                       Foreground="{DynamicResource TechnicalTextBrush}"
                       FontSize="12" />
                 </StackPanel>

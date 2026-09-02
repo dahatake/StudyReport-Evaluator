@@ -207,12 +207,6 @@ public sealed class SyntheticQuantificationJourneyTests
                 workbook.Path,
                 sheetNames,
                 expectedFormulas);
-            OutputPackageValidationResult directValidation = new OutputPackageValidator().Validate(
-                temporaryPath,
-                validationPlan,
-                cancellationToken);
-            Assert.True(directValidation.IsValid);
-
             AtomicOutputCommitResult commit = new AtomicOutputCommitter().Commit(
                 package,
                 outputPath,

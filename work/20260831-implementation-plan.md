@@ -428,7 +428,7 @@ Optional external recalculation smoke runs only when a supported executable is d
 | App composition root | U-02 |
 | package versions/locks | F-01/F-03 |
 
-Exact paths are fixed in `docs-dev/preflight/implementation-task-file-map.md` before revised GATE-0。
+Exact paths are fixed in `dev/docs/preflight/implementation-task-file-map.md` before revised GATE-0。
 
 ## 16. Execution rules
 

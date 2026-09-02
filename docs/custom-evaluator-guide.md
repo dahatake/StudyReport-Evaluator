@@ -1,78 +1,49 @@
-# Custom evaluator ガイド
+# Custom evaluator
 
-対象読者は、Knowledge以外の観点を独自Promptで定量化する教員・評価設計者です。開発者向けの実装根拠は本書末尾にまとめます。
+このガイドでは、利用者が編集できる通常Custom evaluatorと固有評価のPromptを説明します。
 
-機械学習PBLを題材にしたready-to-save `.txt`例、GitHub Copilotへ貼る起動依頼、Imported Promptの明示適用手順は[GitHub CopilotからPromptで起動する](prompt-launch.md)を参照してください。
+## Knowledge、Custom、固有評価
 
-## KnowledgeとCustomの使い分け
-
-| 種別 | 適した用途 | Prompt ownership |
+| 種別 | 用途 | AI出力 |
 |---|---|---|
-| Knowledge (`KNOWLEDGE_COVERAGE`) | 知識ポイントが説明され、他概念と関係付けられ、具体的に適用されている程度 | semantic instructionはapp-owned。利用者は知識ポイント、description、range、weightを編集 |
-| Custom (`CUSTOM_PROMPT`) | 論理性、具体性、調査の深さ、文章品質、Prompt設計等 | 利用者が分析templateを編集。structured-output contractはapp-owned |
+| Knowledge (`KNOWLEDGE_COVERAGE`) | 知識の説明、関係、具体的適用 | criterion別raw、reason、evidence、source |
+| Custom (`CUSTOM_PROMPT`) | 論理性、具体性、調査、文章等の独自観点 | criterion別raw、reason、evidence、source |
+| 固有評価 | 学生Prompt等、通常回答とは別sourceの評価 | 0〜1、reason、evidence、source |
 
-どちらもAIへaggregate、weight、合否を要求しません。criterion別raw score、reason、evidence、sourceだけを受け取り、aggregateはExcel formulaが計算します。実装根拠: [`BuiltInPromptTemplates.cs`](../src/StudyReportEvaluator.Core/Prompting/BuiltInPromptTemplates.cs)、[`SafeEvaluationPayloadBuilder.cs`](../src/StudyReportEvaluator.Core/Prompting/SafeEvaluationPayloadBuilder.cs)。
+Knowledgeのsemantic instructionとstructured result schemaはapp-ownedです。利用者はKnowledgeのcriterion、description、range、weightを編集できますが、app-owned instruction自体は編集しません。
 
-## primary / supporting columns
+Customと固有評価では利用者がPrompt templateを編集します。AIへ配点、Question earned、Final score、合否を要求しないでください。
 
-1つのQuestionは、利用者が選んだ任意の1列をprimary column、0件以上の列をsupporting columnsとして持ちます。学生Prompt列もprimaryにできます。
+## source列
 
-- primaryが空白なら`EMPTY`となり、AIへdispatchせず、overrideとscore chainをblankにします。
-- supportingが空白でもprimaryがあれば評価を続けます。
-- 同じQuestion内ではprimary/supportingおよびsupporting同士の重複を拒否します。
-- workbook由来でPromptへ入る値は、対象と同じ行の選択済みprimary/supportingだけです。他行、非選択列、workbook pathは含めません。
+通常Custom evaluatorはQuestionの主回答列と補助列を使います。固有評価は項目ごとに別の主source列と補助列を持てます。
 
-この他に、question text、criterion metadata、Custom template、app-owned output contractもPromptへ含まれます。詳細は[データとprivacy](privacy-and-data-handling.md)を参照してください。
+- workbook由来で送るのはcurrent rowの選択済みsourceだけです。
+- 他row、非選択列、workbook pathは送信しません。
+- 同じ項目内で主列と補助列を重複させることはできません。
+- 空の主値はAIへ送らず0相当です。
+- 非空の値に対する技術的AI失敗はblankです。
 
-## placeholder契約
+## placeholder
 
-![Custom Prompt template、range、weightを編集する画面。合成データのみ](../images/04-design-custom-prompt.png)
-
-許可するplaceholderは次の6個だけです。
+許可されるplaceholderは6個だけです。
 
 | Placeholder | 展開値 |
 |---|---|
 | `{設問}` | Question text |
-| `{回答}` | 同じ行のprimary value |
-| `{補助情報}` | 同じ行のsupporting valuesとstable source column IDs |
-| `{評価項目}` | enabled criteriaのID、表示名、description、effective range |
-| `{最小点}` | evaluator default rangeのminimum |
-| `{最大点}` | evaluator default rangeのmaximum |
+| `{回答}` | current rowの主値 |
+| `{補助情報}` | current rowの選択済み補助値とsource ID |
+| `{評価項目}` | criterion ID、表示名、description、effective range |
+| `{最小点}` | evaluator default minimum |
+| `{最大点}` | evaluator default maximum |
 
-Custom templateは空白にできず、`{回答}` と `{評価項目}` をそれぞれ1回以上含める必要があります。他の4個は任意です。
+### 通常Custom evaluator
 
-literalの`{`と`}`は`{{` と `}}` でescapeします。例えば`{{"形式":"例"}}`は`{"形式":"例"}`というliteral textになります。placeholder展開はsingle-passです。回答・補助情報・評価項目への挿入値は **opaque** として扱い、再走査しません。
-
-実装根拠: [`PromptTemplateRenderer.cs`](../src/StudyReportEvaluator.Core/Prompting/PromptTemplateRenderer.cs#L7-L93)。
-
-## rangeとweight
-
-- evaluatorはdefault rangeを持ちます。
-- criterionは個別rangeを省略でき、その場合は親evaluatorのrangeを使います。
-- `{最小点}` / `{最大点}`は常にevaluator default rangeです。
-- `{評価項目}`にはcriterion effective rangeが入ります。
-- minimumはmaximumより小さく、weightは0より大きい値にします。
-- weightを100へ揃える必要はありません。各階層で`個別weight / weight合計`へ正規化し、UIには実効percentageを表示します。
-
-## 安全なtemplate例
-
-### 最小template
+`{回答}`と`{評価項目}`が必須です。他の4個は任意です。
 
 ```text
 次の回答を、指定された評価項目ごとに分析してください。
-
-### 回答
-{回答}
-
-### 評価項目
-{評価項目}
-```
-
-### supporting informationとliteral braceを使うtemplate
-
-```text
-設問と同じ行の回答・補助情報だけを使い、根拠のない推測を避けてください。
-説明用のliteral object例: {{"source":"selected-row-only"}}
+回答にない内容を推測しないでください。
 
 ### 設問
 {設問}
@@ -85,38 +56,75 @@ literalの`{`と`}`は`{{` と `}}` でescapeします。例えば`{{"形式":"�
 
 ### 評価項目
 {評価項目}
-
-親evaluatorの既定範囲: {最小点} から {最大点}
 ```
 
-JSON schemaやtool call手順をtemplateへ追加する必要はありません。appがrender後にclosed structured-output contract、expected evaluator / criterion IDs、許可source IDsを付加します。
+### 固有評価
 
-## validation errors
+`{回答}`が必須です。固有評価は単一の0〜1値を返すため、`{評価項目}`は任意です。
 
-| Code | 原因 | 修正 |
-|---|---|---|
-| `TEMPLATE_REQUIRED` | templateが空 | `{回答}`と`{評価項目}`を含む本文を入力 |
-| `ANSWER_PLACEHOLDER_REQUIRED` | `{回答}`がない | 評価対象を挿入する位置へ追加 |
-| `CRITERIA_PLACEHOLDER_REQUIRED` | `{評価項目}`がない | criterion一覧を挿入する位置へ追加 |
-| `UNKNOWN_PLACEHOLDER` | 許可リスト外または空のplaceholder | 6個のいずれかへ修正 |
-| `UNCLOSED_PLACEHOLDER` | opening braceが閉じていない | `}`を補うかliteralとしてescape |
-| `MALFORMED_PLACEHOLDER` | nested opening brace | nested braceを除去 |
-| `UNMATCHED_CLOSING_BRACE` | 単独の`}` | literalなら`}}`へ修正 |
+```text
+学生が作成した次のPromptを、第三者が再現できる指示かという観点で評価してください。
+目的、入力、制約、期待出力、検証方法を確認し、書かれていない内容を補わないでください。
 
-Design画面の**snapshot preflightが有効になるまでrunを開始できません**。同じPrompt ownership / placeholder検証をExecutionとsnapshot作成でも再実行し、不正Promptではinput capture、row read、Copilot session、runner callを開始しません。実装状態は[`implementation-status.md`](../docs-dev/implementation-status.md)を参照してください。
+### 関連する設問
+{設問}
 
-## AI出力と人手確認
+### 学生Prompt
+{回答}
 
-AIへaggregateを要求しないでください。required resultは、expected criterionごとのraw score、短いreason、同じ行の連続substring evidence、evidence source、stable source column IDです。partial、duplicate、unknown criterion、range外、出所不一致はpayload全体を不正として扱い、部分採用・clamp・0点化をしません。
+### 同じ行の補助情報
+{補助情報}
+```
 
-> AIによる定量値には誤りや偏りが含まれる可能性があります。利用目的に応じて結果を確認してください。
+## braceとsingle-pass展開
 
-warningはnonblockingです。結果確認とrange内overrideは利用できますが、mandatory human review、承認checkbox、倫理gate、合否gateはありません。
+literalの`{`と`}`は`{{`と`}}`でescapeします。
 
-## 実装・テスト出典
+```text
+literal object: {{"source":"selected-row-only"}}
+```
 
-- Prompt template: [`BuiltInPromptTemplates.cs`](../src/StudyReportEvaluator.Core/Prompting/BuiltInPromptTemplates.cs)
-- placeholder renderer: [`PromptTemplateRenderer.cs`](../src/StudyReportEvaluator.Core/Prompting/PromptTemplateRenderer.cs)
-- selected-row payload: [`SafeEvaluationPayloadBuilder.cs`](../src/StudyReportEvaluator.Core/Prompting/SafeEvaluationPayloadBuilder.cs)
-- result validation: [`QuantificationResultValidator.cs`](../src/StudyReportEvaluator.Core/Validation/QuantificationResultValidator.cs)
-- deterministic tests: [`PromptTemplateRendererTests.cs`](../tests/StudyReportEvaluator.Core.Tests/Prompting/PromptTemplateRendererTests.cs)、[`SafeEvaluationPayloadBuilderTests.cs`](../tests/StudyReportEvaluator.Core.Tests/Prompting/SafeEvaluationPayloadBuilderTests.cs)
+展開後は`{"source":"selected-row-only"}`になります。挿入した回答や補助情報の中にplaceholderに似た文字列があっても再展開しません。
+
+## range、criterion、weight
+
+- evaluator minimumはmaximumより小さくします。
+- criterionは個別rangeを省略でき、その場合は親evaluator rangeを使います。
+- criterion/evaluator weightはenabledなら0より大きくします。
+- weightを100へ揃える必要はありません。親内の比率として正規化します。
+- Question間はweightではなくQuestion pointsの絶対配点です。
+- `Base + Special + enabled Question points`を正確に100へ合わせます。
+
+## Prompt fileを適用する
+
+`--prompt`で読み込んだ`.txt`はDesign画面のImported Promptsへ表示されます。
+
+1. Imported Promptを選択します。
+2. 適用先として通常Custom evaluatorまたは固有評価を選びます。
+3. **Promptを適用**を選びます。
+4. template欄へcopyされた内容と技術検証を確認します。
+
+選択しただけでは適用されません。同じPromptを複数の対象へ再利用できます。詳しくは[Promptファイルから起動](prompt-launch.md)を参照してください。
+
+## 主なvalidation
+
+| 状況 | 修正 |
+|---|---|
+| templateが空 | 必須placeholderを含むPromptを入力 |
+| `{回答}`がない | 主値を入れる位置へ追加 |
+| 通常Customに`{評価項目}`がない | criterion一覧を入れる位置へ追加 |
+| 未知placeholder | 許可された6個だけを使う |
+| braceが閉じていない／余分 | 対応するbraceを追加するか`{{` / `}}`でescape |
+| nested brace | nested構造を除去 |
+| source列が不正 | 読込済みsheetの列から選び直す |
+| 配点合計が100でない | Base、Special、Question pointsを修正 |
+| Special pointsが正で固有評価がない | enabled固有評価を追加するかSpecial pointsを0へ戻す |
+
+同じPrompt validationはDesign、Execution開始条件、snapshot作成で再実行されます。invalid Promptでは新しいAI処理を開始しません。
+
+## AI出力の扱い
+
+expected ID、closed schema、range、evidence sourceを満たす結果だけを採用します。duplicate、unknown、partial、range外の結果を部分採用・clamp・0点化しません。
+
+> [!WARNING]
+> 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません

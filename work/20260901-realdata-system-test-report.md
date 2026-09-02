@@ -76,7 +76,7 @@
 
 ## 既知状態との整合
 
-`docs-dev/implementation-status.md` では旧 `IMPL-GAP-001/002` はclosed、new GATE-ACCEPTANCEは `PENDING_REQUIRED_RERUN`。今回のrunはgap closure後の非文書検証を補完するが、独立reviewや正式gate recordの代替とはしない。
+`dev/docs/implementation-status.md` では旧 `IMPL-GAP-001/002` はclosed、new GATE-ACCEPTANCEは `PENDING_REQUIRED_RERUN`。今回のrunはgap closure後の非文書検証を補完するが、独立reviewや正式gate recordの代替とはしない。
 
 ## Privacy
 
@@ -91,7 +91,7 @@
 - `work/20260901-realdata-recalculation-evidence.json`
 - `work/20260901-realdata-system-test-evidence.json`
 - `artifacts/test/system-20260901-1713/system-test-report.md`
-- `docs-dev/implementation-status.md`
+- `dev/docs/implementation-status.md`
 - `tests/StudyReportEvaluator.App.Tests/E2E/ExternalSpreadsheetRecalculationSmokeTests.cs`
 - `tests/StudyReportEvaluator.App.Tests/Workbooks/Intake/FileFormatClassifierTests.cs`
 - `src/StudyReportEvaluator.App/Workbooks/Writing/ConfigSheetWriter.cs`

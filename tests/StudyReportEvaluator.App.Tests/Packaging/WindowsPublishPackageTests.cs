@@ -1,10 +1,13 @@
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Reflection;
 using System.Reflection.PortableExecutable;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using GitHub.Copilot;
+using StudyReportEvaluator.App.Copilot;
 using Xunit;
 
 namespace StudyReportEvaluator.App.Tests.Packaging;
@@ -14,6 +17,7 @@ public sealed class WindowsPublishPackageTests
     private const string PackageRootName = "StudyReportEvaluator-win-x64";
     private const string ZipFileName = "StudyReportEvaluator-win-x64.zip";
     private const string HashFileName = "StudyReportEvaluator-win-x64.zip.sha256";
+    private const string CopilotCliRelativePath = "runtimes/win-x64/native/copilot.exe";
     private static readonly DateTime FixedZipTimestamp = new(2000, 1, 1, 0, 0, 0);
 
     private static readonly string[] RequiredApplicationFiles =
@@ -26,6 +30,8 @@ public sealed class WindowsPublishPackageTests
         "DocumentFormat.OpenXml.dll",
         "DocumentFormat.OpenXml.Framework.dll",
         "GitHub.Copilot.SDK.dll",
+        "copilot-runtime.json",
+        CopilotCliRelativePath,
         "Avalonia.dll",
         "Avalonia.Win32.dll",
         "coreclr.dll",
@@ -36,6 +42,7 @@ public sealed class WindowsPublishPackageTests
 
     private static readonly string[] RequiredDocumentationFiles =
     [
+        "LICENSE",
         "README.md",
         "docs/README.md",
         "docs/getting-started.md",
@@ -46,6 +53,11 @@ public sealed class WindowsPublishPackageTests
         "docs/troubleshooting.md",
         "images/README.md",
         "images/01-input-workbook.png",
+        "images/02-input-mapping.png",
+        "images/03-design-knowledge.png",
+        "images/04-design-custom-prompt.png",
+        "images/05-execution-auto.png",
+        "images/06-results-review.png",
         "images/07-output-export.png",
     ];
 
@@ -188,6 +200,12 @@ public sealed class WindowsPublishPackageTests
             Assert.Equal(PackageRootName, Path.GetFileName(extractedPackageRoot));
             Assert.True(Directory.Exists(extractedPackageRoot));
             AssertPublishLayout(extractedPackageRoot, allowReleaseNotes: true);
+            AssertExtractedDocumentationLinks(extractedPackageRoot);
+            string? resolvedCliPath = await new BundledCopilotCliPathResolver(extractedPackageRoot)
+                .ResolveAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(
+                Path.Combine(extractedPackageRoot, CopilotCliRelativePath.Replace('/', Path.DirectorySeparatorChar)),
+                resolvedCliPath);
             await AssertApplicationStartsAndStopsAsync(
                 extractedPackageRoot,
                 TestContext.Current.CancellationToken);
@@ -374,8 +392,8 @@ public sealed class WindowsPublishPackageTests
         Assert.True(publishSource.Contains("PublishReadyToRun=false", StringComparison.Ordinal));
         Assert.True(publishSource.Contains("SelfContained=true", StringComparison.Ordinal));
         Assert.True(publishSource.Contains("UseAppHost=true", StringComparison.Ordinal));
-        Assert.True(publishSource.Contains("CopilotSkipCliDownload=true", StringComparison.Ordinal));
         Assert.True(packageSource.Contains("Signing: UNSIGNED", StringComparison.Ordinal));
+        Assert.True(packageSource.Contains("GitHub Copilot CLI runtime: BUNDLED", StringComparison.Ordinal));
         Assert.True(packageSource.Contains("StringComparer]::Ordinal", StringComparison.Ordinal));
         Assert.True(packageSource.Contains("SHA256]::HashData", StringComparison.Ordinal));
         Assert.True(packageSource.Contains("Assert-SafeRelativePath", StringComparison.Ordinal));
@@ -425,6 +443,7 @@ public sealed class WindowsPublishPackageTests
             Assert.True(new FileInfo(requiredPath).Length > 0);
         }
 
+        AssertBundledCopilotRuntime(publishDirectory);
         Assert.False(File.Exists(Path.Combine(publishDirectory, "copilot.exe")));
         Assert.DoesNotContain(
             files,
@@ -549,6 +568,7 @@ public sealed class WindowsPublishPackageTests
         Assert.Contains("Signing: UNSIGNED\n", releaseNotes, StringComparison.Ordinal);
         Assert.Contains("Deployment: .NET 10 self-contained folder\n", releaseNotes, StringComparison.Ordinal);
         Assert.Contains("Symbols: EXCLUDED\n", releaseNotes, StringComparison.Ordinal);
+        Assert.Contains("GitHub Copilot CLI runtime: BUNDLED\n", releaseNotes, StringComparison.Ordinal);
         Assert.Contains("User guide: README.md and docs/getting-started.md\n", releaseNotes, StringComparison.Ordinal);
         Assert.DoesNotContain("Signing: SIGNED", releaseNotes, StringComparison.Ordinal);
     }
@@ -565,6 +585,93 @@ public sealed class WindowsPublishPackageTests
         Assert.Equal($"{hash}  {ZipFileName}\n", actual);
         Assert.Matches("^[0-9A-F]{64}  StudyReportEvaluator-win-x64[.]zip\\n$", actual);
         return hash;
+    }
+
+    private static void AssertExtractedDocumentationLinks(string packageRoot)
+    {
+        string canonicalRoot = Path.GetFullPath(packageRoot)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        string[] markdownPaths = RequiredDocumentationFiles
+            .Where(path => path.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            .Select(path => Path.Combine(packageRoot, path.Replace('/', Path.DirectorySeparatorChar)))
+            .ToArray();
+        Assert.NotEmpty(markdownPaths);
+        int linkCount = 0;
+        foreach (string markdownPath in markdownPaths)
+        {
+            string content = File.ReadAllText(markdownPath);
+            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(
+                         content,
+                         @"!?\[[^\]]*\]\((?<target>[^)]+)\)",
+                         System.Text.RegularExpressions.RegexOptions.CultureInvariant))
+            {
+                string target = match.Groups["target"].Value.Trim().Trim('<', '>');
+                if (target.StartsWith('#')
+                    || target.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                    || target.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                    || target.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                linkCount++;
+                target = Uri.UnescapeDataString(target.Split('#', 2)[0].Split('?', 2)[0]);
+                string resolved = Path.GetFullPath(
+                    target.Replace('/', Path.DirectorySeparatorChar),
+                    Path.GetDirectoryName(markdownPath)!);
+                Assert.StartsWith(canonicalRoot, resolved, StringComparison.OrdinalIgnoreCase);
+                Assert.True(
+                    File.Exists(resolved) || Directory.Exists(resolved),
+                    $"Broken extracted documentation link: {Path.GetRelativePath(packageRoot, markdownPath)} -> {target}");
+            }
+        }
+
+        Assert.True(linkCount >= 25, $"Expected at least 25 extracted documentation links, found {linkCount}.");
+    }
+
+    private static void AssertBundledCopilotRuntime(string applicationDirectory)
+    {
+        string manifestPath = Path.Combine(applicationDirectory, BundledCopilotCliPathResolver.ManifestFileName);
+        string cliPath = Path.Combine(
+            applicationDirectory,
+            CopilotCliRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        Assert.True(File.Exists(manifestPath));
+        Assert.True(File.Exists(cliPath));
+        Assert.True(new FileInfo(manifestPath).Length > 0);
+        Assert.True(new FileInfo(cliPath).Length > 0);
+
+        string manifestJson = File.ReadAllText(
+            manifestPath,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true));
+        using JsonDocument document = JsonDocument.Parse(manifestJson);
+        JsonElement root = document.RootElement;
+        string[] propertyNames = root.EnumerateObject().Select(property => property.Name).ToArray();
+        Assert.Equal(
+            ["schemaVersion", "runtimeIdentifier", "cliVersion", "cliSha256", "sdkVersion", "cliRelativePath"],
+            propertyNames);
+        Assert.Equal(1, root.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal("win-x64", root.GetProperty("runtimeIdentifier").GetString());
+        Assert.Equal(CopilotCliRelativePath, root.GetProperty("cliRelativePath").GetString());
+
+        string cliVersion = Assert.IsType<string>(root.GetProperty("cliVersion").GetString());
+        string cliSha256 = Assert.IsType<string>(root.GetProperty("cliSha256").GetString());
+        string sdkVersion = Assert.IsType<string>(root.GetProperty("sdkVersion").GetString());
+        Assert.Matches("^[0-9][A-Za-z0-9._+-]{0,127}$", cliVersion);
+        Assert.Matches("^[0-9A-F]{64}$", cliSha256);
+        Assert.Equal(ComputeSha256(cliPath), cliSha256);
+        Assert.Equal(
+            typeof(CopilotClient).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion
+                .Split('+', 2)[0],
+            sdkVersion);
+
+        FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(cliPath);
+        Assert.True(
+            string.Equals(versionInfo.ProductVersion, cliVersion, StringComparison.Ordinal)
+            || string.Equals(versionInfo.FileVersion, cliVersion, StringComparison.Ordinal));
+        AssertAmd64AppHost(cliPath);
     }
 
     private static bool VerifyHashSidecar(string candidateZipPath, string hashPath)
@@ -947,7 +1054,9 @@ public sealed class WindowsPublishPackageTests
     {
         foreach (string requiredFile in RequiredApplicationFiles)
         {
-            File.WriteAllBytes(Path.Combine(directory, requiredFile), [0x01]);
+            string path = Path.Combine(directory, requiredFile.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, [0x01]);
         }
     }
 

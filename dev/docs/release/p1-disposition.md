@@ -1,7 +1,7 @@
 # P1 disposition — initial release
 
 > [!WARNING]
-> **HISTORICAL / SUPERSEDED:** requirements v1.2のP1候補です。ここで`IMPLEMENT`とされたrepeated evaluation、named ranges、review copy等は現行requirements v3.0の実装済みfeatureではありません。現行scopeは[要求定義書](../../docs/requirements-definition.md)と[ADR-0011](../adr/0011-dynamic-quantification-excel-formulas.md)を参照してください。
+> **HISTORICAL / SUPERSEDED:** requirements v1.2のP1候補です。ここで`IMPLEMENT`とされたrepeated evaluation、named ranges、review copy等は現行requirements v3.0の実装済みfeatureではありません。現行scopeは[要求定義書](../../../docs/requirements-definition.md)と[ADR-0011](../adr/0011-dynamic-quantification-excel-formulas.md)を参照してください。
 
 | 項目 | 内容 |
 |---|---|
@@ -173,8 +173,8 @@ calendar dateは根拠がないため捏造せず、依存task開始前を拘束
 | 理由 | WCAG 2.2 AA/WCAG2ICTの各criteriaをdesktopへ適用/非適用/証拠に分解し、曖昧な「準拠」claimを避けるため |
 | 影響 | manual assistive-technology evidence、例外理由、更新reviewが必要。checklist完了だけで第三者認証を意味しない |
 | 暫定統制 | P0のkeyboard/focus/screen-reader/200% testsを維持し、文書完成前はWCAG AA適合を表示しない |
-| 実装/試験 | `P1-10`: `docs-dev/accessibility-conformance.md`; `E2E.Tests/Accessibility/ConformanceChecklistTests.cs`。全criterionにApplicable/Not applicable/Not tested、根拠、OS/AT、artifact hash、ownerを要求し、空欄や自己申告だけをPASSにしない |
-| 期限/gate | `E-08`後、`D-07`前。`docs-dev/accessibility-conformance.md`; `E2E.Tests/Accessibility/ConformanceChecklistTests.cs`がPASSするまで、GATE-ACCEPTANCEのP0結果にかかわらずReleaseをblockする。README/release claimは実結果行だけを参照 |
+| 実装/試験 | `P1-10`: `dev/docs/accessibility-conformance.md`; `E2E.Tests/Accessibility/ConformanceChecklistTests.cs`。全criterionにApplicable/Not applicable/Not tested、根拠、OS/AT、artifact hash、ownerを要求し、空欄や自己申告だけをPASSにしない |
+| 期限/gate | `E-08`後、`D-07`前。`dev/docs/accessibility-conformance.md`; `E2E.Tests/Accessibility/ConformanceChecklistTests.cs`がPASSするまで、GATE-ACCEPTANCEのP0結果にかかわらずReleaseをblockする。README/release claimは実結果行だけを参照 |
 | 承認 | DEC-22既定案のセッション承認。独立適合認証は主張しない |
 
 ## Integration rules

@@ -149,8 +149,7 @@ public sealed class SyntheticSpecificationContractTests
         Assert.All(policy.EnumerateObject(), property => Assert.False(property.Value.GetBoolean()));
 
         string allFixtures = string.Join('\n', Directory.EnumerateFiles(_fixtureRoot, "*.json").Select(File.ReadAllText));
-        Assert.DoesNotContain("446386E20BB4096561CB4AFD6D74B8EAA9D50EAE53C97F984BA7F70EBEAD0DE5", allFixtures, StringComparison.Ordinal);
-        Assert.DoesNotContain("機械学習 サブフィールド", allFixtures, StringComparison.Ordinal);
+        Assert.DoesNotContain("F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D", allFixtures, StringComparison.Ordinal);
     }
 
     [Fact]

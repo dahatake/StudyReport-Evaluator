@@ -1,23 +1,18 @@
+using System.Reflection;
 using System.Text.RegularExpressions;
+using StudyReportEvaluator.App.Copilot;
+using StudyReportEvaluator.App.Launch;
+using StudyReportEvaluator.App.Resources;
+using StudyReportEvaluator.App.Workbooks.Checkpoint;
+using StudyReportEvaluator.App.Workbooks.Intake;
+using StudyReportEvaluator.App.Workbooks.Writing;
 using Xunit;
 
 namespace StudyReportEvaluator.App.Tests.Content;
 
 public sealed class DocumentationContractTests
 {
-    private static readonly string[] V4BaselineDocumentPaths =
-    [
-        "docs/requirements-definition.md",
-        "docs-dev/README.md",
-        "docs-dev/architecture.md",
-        "docs-dev/detailed-design.md",
-        "docs-dev/excel-contract.md",
-        "docs-dev/traceability.md",
-        "docs-dev/adr/0012-point-allocation-similarity-resume-portability.md",
-        "work/20260901-v4-implementation-plan.md",
-    ];
-
-    private static readonly string[] ExistingUserDocumentPaths =
+    private static readonly string[] PublicDocumentPaths =
     [
         "README.md",
         "docs/README.md",
@@ -31,346 +26,476 @@ public sealed class DocumentationContractTests
     ];
 
     [Fact]
-    public void V4_baseline_and_existing_user_documents_exist_and_are_nonempty()
+    public void Public_documents_exist_are_nonempty_and_have_no_broken_local_links()
     {
-        foreach (string relativePath in V4BaselineDocumentPaths.Concat(ExistingUserDocumentPaths))
+        string root = FindRepositoryRoot();
+        int linkCount = 0;
+        foreach (string relativePath in PublicDocumentPaths)
         {
-            string path = Resolve(FindRepositoryRoot(), relativePath);
-            Assert.True(File.Exists(path), $"Missing documentation source: {relativePath}");
+            string path = Resolve(root, relativePath);
+            Assert.True(File.Exists(path), $"Missing public document: {relativePath}");
+            string content = File.ReadAllText(path);
+            Assert.False(string.IsNullOrWhiteSpace(content));
+
+            foreach (Match match in Regex.Matches(
+                         content,
+                         @"!?\[[^\]]*\]\((?<target>[^)]+)\)",
+                         RegexOptions.CultureInvariant))
+            {
+                string target = match.Groups["target"].Value.Trim().Trim('<', '>');
+                if (target.StartsWith('#')
+                    || target.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                    || target.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                    || target.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                linkCount++;
+                target = target.Split('#', 2)[0].Split('?', 2)[0];
+                target = Uri.UnescapeDataString(target);
+                string resolved = Path.GetFullPath(
+                    target.Replace('/', Path.DirectorySeparatorChar),
+                    Path.GetDirectoryName(path)!);
+                Assert.True(
+                    IsWithinRoot(root, resolved),
+                    $"Public link escapes the repository: {relativePath} -> {target}");
+                Assert.True(
+                    File.Exists(resolved) || Directory.Exists(resolved),
+                    $"Broken public link: {relativePath} -> {target}");
+            }
+        }
+
+        Assert.True(linkCount >= 25, $"Expected at least 25 local links, found {linkCount}.");
+    }
+
+    [Fact]
+    public void Developer_documents_and_product_version_management_are_current()
+    {
+        string root = FindRepositoryRoot();
+        string developerRoot = Resolve(root, "dev/docs");
+        Assert.True(Directory.Exists(developerRoot));
+        Assert.False(Directory.Exists(Resolve(root, "docs" + "-dev")));
+
+        string[] requiredPaths =
+        [
+            "CHANGELOG.md",
+            "dev/README.md",
+            "dev/version.ps1",
+            "dev/version.tests.ps1",
+            "dev/docs/README.md",
+            "dev/docs/version-management.md",
+            "dev/docs/adr/0014-product-versioning.md",
+        ];
+        foreach (string relativePath in requiredPaths)
+        {
+            string path = Resolve(root, relativePath);
+            Assert.True(File.Exists(path), $"Missing developer version-management artifact: {relativePath}");
             Assert.False(string.IsNullOrWhiteSpace(File.ReadAllText(path)));
+        }
+
+        string[] developerDocuments = Directory.GetFiles(
+            developerRoot,
+            "*.md",
+            SearchOption.AllDirectories);
+        Assert.True(
+            developerDocuments.Length >= 32,
+            $"Expected at least 32 developer documents after migration, found {developerDocuments.Length}.");
+        int linkCount = 0;
+        foreach (string path in developerDocuments)
+        {
+            string content = File.ReadAllText(path);
+            Assert.DoesNotContain("docs" + "-dev", content, StringComparison.Ordinal);
+            foreach (Match match in Regex.Matches(
+                         content,
+                         @"!?\[[^\]]*\]\((?<target>[^)]+)\)",
+                         RegexOptions.CultureInvariant))
+            {
+                string target = match.Groups["target"].Value.Trim().Trim('<', '>');
+                if (target.StartsWith('#')
+                    || target.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                    || target.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                    || target.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                linkCount++;
+                target = Uri.UnescapeDataString(target.Split('#', 2)[0].Split('?', 2)[0]);
+                string resolved = Path.GetFullPath(
+                    target.Replace('/', Path.DirectorySeparatorChar),
+                    Path.GetDirectoryName(path)!);
+                Assert.True(
+                    IsWithinRoot(root, resolved),
+                    $"Developer document link escapes the repository: {Path.GetRelativePath(root, path)} -> {target}");
+                Assert.True(
+                    File.Exists(resolved) || Directory.Exists(resolved),
+                    $"Broken developer document link: {Path.GetRelativePath(root, path)} -> {target}");
+            }
+        }
+
+        Assert.True(linkCount >= 100, $"Expected at least 100 developer-document local links, found {linkCount}.");
+        AssertContainsAll(
+            Read("dev/docs/README.md"),
+            "[アプリケーション版管理手順](version-management.md)",
+            "[ADR-0014](adr/0014-product-versioning.md)");
+        AssertContainsAll(
+            Read("dev/version.ps1"),
+            "#Requires -Version 7.0",
+            "#Requires -PSEdition Core",
+            "'show', 'set', 'bump', 'verify'",
+            "Directory.Build.props must contain exactly one VersionPrefix and one VersionSuffix element");
+        Assert.Contains("## [Unreleased]", Read("CHANGELOG.md"), StringComparison.Ordinal);
+
+        string buildProperties = Read("Directory.Build.props");
+        Match prefix = Regex.Match(
+            buildProperties,
+            @"<VersionPrefix>(?<value>[^<]+)</VersionPrefix>",
+            RegexOptions.CultureInvariant);
+        Match suffix = Regex.Match(
+            buildProperties,
+            @"<VersionSuffix>(?<value>[^<]*)</VersionSuffix>",
+            RegexOptions.CultureInvariant);
+        Assert.True(prefix.Success);
+        Assert.True(suffix.Success);
+        string productVersion = prefix.Groups["value"].Value;
+        if (suffix.Groups["value"].Value.Length > 0)
+        {
+            productVersion += "-" + suffix.Groups["value"].Value;
+        }
+
+        Assert.Matches(
+            new Regex(
+                @"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$",
+                RegexOptions.CultureInvariant),
+            productVersion);
+    }
+
+    [Fact]
+    public void Root_readme_contains_no_development_progress_or_placeholder_text()
+    {
+        string readme = Read("README.md");
+        string[] forbidden =
+        [
+            "GATE-ACCEPTANCE",
+            "IMPL-GAP-",
+            "IMPLEMENTATION_IN_PROGRESS",
+            "U-03",
+            "U-04",
+            "HEAD ",
+            "dev/docs/",
+            "traceability",
+            "sourceからbuild",
+            "dotnet test",
+            "TODO",
+            "TBD",
+            "example.com",
+            "<URL>",
+            "公開後にこの節へ追加",
+        ];
+        AssertDoesNotContainAny(readme, forbidden);
+        Assert.DoesNotMatch(
+            new Regex(@"\b[0-9a-f]{7,40}\b", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase),
+            readme);
+        Assert.DoesNotMatch(
+            new Regex(@"\b\d+\s*/\s*\d+\s*(?:PASS|成功|passed)\b", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase),
+            readme);
+    }
+
+    [Fact]
+    public void Ethics_warning_is_exact_in_readme_and_user_guides()
+    {
+        foreach (string path in new[]
+                 {
+                     "README.md",
+                     "docs/README.md",
+                     "docs/getting-started.md",
+                     "docs/custom-evaluator-guide.md",
+                     "docs/privacy-and-data-handling.md",
+                 })
+        {
+            Assert.Contains(EthicsWarningText.Message, Read(path), StringComparison.Ordinal);
+        }
+
+        Assert.Single(
+            typeof(EthicsWarningText).GetFields(BindingFlags.Public | BindingFlags.Static));
+    }
+
+    [Fact]
+    public void Platform_and_unsigned_package_claims_match_the_windows_delivery_contract()
+    {
+        string readme = Read("README.md");
+        string userIndex = Read("docs/README.md");
+        string publishScript = Read("scripts/publish-windows.ps1");
+        string packageScript = Read("scripts/package-windows.ps1");
+
+        AssertContainsAll(
+            readme,
+            "Windows 11 x64",
+            ".NET 10 self-contained",
+            "unsigned ZIP",
+            "StudyReportEvaluator-win-x64.zip",
+            "StudyReportEvaluator-win-x64.zip.sha256",
+            "macOS、Linux、Windows Arm64は初版対応対象外",
+            "installer、code signing、notarizationを提供しません");
+        AssertContainsAll(
+            userIndex,
+            "Windows 11 x64",
+            "unsigned ZIP",
+            "macOS、Linux、Windows Arm64");
+        AssertContainsAll(
+            publishScript,
+            "$RuntimeIdentifier = 'win-x64'",
+            "--self-contained",
+            "Assert-BundledCopilotRuntime");
+        AssertContainsAll(
+            packageScript,
+            "Signing: UNSIGNED",
+            "GitHub Copilot CLI runtime: BUNDLED");
+    }
+
+    [Fact]
+    public void Bundled_cli_documentation_matches_the_default_resolver_and_never_advises_path_fallback()
+    {
+        string publicContent = string.Join(Environment.NewLine, PublicDocumentPaths.Select(Read));
+        AssertContainsAll(
+            publicContent,
+            "ZIPへ同梱したGitHub Copilot CLI",
+            "PATH上の別CLIへfallbackしません",
+            "runtimes\\win-x64\\native\\copilot.exe");
+        AssertDoesNotContainAny(
+            publicContent,
+            "Copilot CLIを別途導入",
+            "PATHから`copilot.exe`を解決",
+            "PATH上のCLIを使います");
+
+        CopilotClientFactory factory = new();
+        FieldInfo resolverField = typeof(CopilotClientFactory).GetField(
+            "_pathResolver",
+            BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("Copilot path resolver field not found.");
+        Assert.IsType<BundledCopilotCliPathResolver>(resolverField.GetValue(factory));
+    }
+
+    [Fact]
+    public void Input_format_claims_match_the_closed_classifier_vocabulary()
+    {
+        string content = Read("README.md") + Environment.NewLine + Read("docs/troubleshooting.md");
+        AssertContainsAll(
+            content,
+            "標準Office Open XML `.xlsx`",
+            ".xls",
+            ".xlsb",
+            "CSV",
+            "PDF",
+            "MacroEnabledWorkbook",
+            "EncryptedOrRightsProtected",
+            "UnsafePackage",
+            "InvalidRelationship");
+        Assert.Equal(FileFormatClassification.StandardXlsx, Enum.GetValues<FileFormatClassification>()[0]);
+        Assert.Equal(14, Enum.GetValues<FileFormatClassification>().Length);
+    }
+
+    [Fact]
+    public void Scoring_output_and_checkpoint_names_match_production_constants()
+    {
+        string readme = Read("README.md");
+        string features = Read("docs/features.md");
+        foreach (string name in new[]
+                 {
+                     AppOwnedSheetNameResolver.ConfigBaseName,
+                     AppOwnedSheetNameResolver.ReferencesBaseName,
+                     AppOwnedSheetNameResolver.ResultsBaseName,
+                     AppOwnedSheetNameResolver.RunBaseName,
+                     CheckpointStore.CheckpointSheetName,
+                 })
+        {
+            Assert.Contains(name, readme, StringComparison.Ordinal);
+        }
+
+        AssertContainsAll(
+            readme,
+            "BasePoints + SpecialPoints + \\sum_{q=1}^{N}QuestionPoints_q = 100",
+            "QuestionEarned_q=QuestionPoints_q\\times QuestionRate_q",
+            "SimilarityPenalty_q=QuestionPoints_q\\times Similarity_q\\times SimilarityPenaltyWeight",
+            "eval-yyyyMMdd-HHmm[-NN].xlsx",
+            "eval-yyyyMMdd-HHmm[-NN].partial.xlsx",
+            "空の主回答: AI callなし",
+            "技術的AI失敗: 対象値はblank");
+        AssertContainsAll(
+            features,
+            "各Reference完了後",
+            "1 student row",
+            "Final rawは監査用",
+            "Final scoreを0〜100");
+    }
+
+    [Fact]
+    public void Launch_documentation_matches_parser_utf8_and_no_auto_run_contract()
+    {
+        string readme = Read("README.md");
+        string guide = Read("docs/prompt-launch.md");
+        AssertContainsAll(
+            readme,
+            "StudyReportEvaluator.App.exe --input <xlsx-path> --prompt <txt-path> [--prompt <txt-path> ...]",
+            "`--input`は0または1回",
+            "`--prompt`は0回以上",
+            "strict UTF-8",
+            "AI処理はExecution画面の明示操作まで開始しない");
+        AssertContainsAll(
+            guide,
+            "BOMあり／なしを受理",
+            "1〜32,767 UTF-16 code units",
+            "`--run`や`--resume`はありません",
+            "filenameによる自動割当は行いません");
+        Assert.Equal(32_767, PromptFileLoader.MaximumCharacters);
+        Assert.NotNull(LaunchOptions.Parse([]));
+    }
+
+    [Fact]
+    public void Privacy_documentation_distinguishes_payload_log_and_output_boundaries()
+    {
+        string readme = Read("README.md");
+        string privacy = Read("docs/privacy-and-data-handling.md");
+        AssertContainsAll(
+            readme,
+            "current rowの選択済みprimary／supporting／special sourceだけ",
+            "他row、非選択列、workbook pathは通常payloadへ含めません",
+            "application logは回答、Prompt、Reference、reason、evidence、credentialを受け取るfree-text surfaceを持ちません",
+            "入力と同等以上に機密");
+        AssertContainsAll(
+            privacy,
+            "| Reference | なし |",
+            "| Normal | current rowの選択済み主回答・補助列 |",
+            "| Special | current rowの選択済み固有評価主値・補助列 |",
+            "| Similarity | current rowの主回答 |",
+            "shell、filesystem、Web、GitHub write、MCP toolを公開しません",
+            "partialは暗号化containerではありません");
+    }
+
+    [Fact]
+    public void Screenshot_captions_and_manifest_disclose_synthetic_and_fake_state()
+    {
+        string readme = Read("README.md");
+        string manifest = Read("images/README.md");
+        AssertContainsAll(
+            readme,
+            "synthetic dataを使用",
+            "fake scoreを使用");
+        AssertContainsAll(
+            manifest,
+            "fake authentication boundary",
+            "fake row/AI/checkpoint/output boundaries",
+            "実fileを作成した証跡ではない",
+            "personal/student data: なし");
+
+        foreach (string fileName in new[]
+                 {
+                     "01-input-workbook.png",
+                     "02-input-mapping.png",
+                     "03-design-knowledge.png",
+                     "04-design-custom-prompt.png",
+                     "05-execution-auto.png",
+                     "06-results-review.png",
+                     "07-output-export.png",
+                 })
+        {
+            Assert.True(File.Exists(Resolve(FindRepositoryRoot(), "images/" + fileName)));
+            Assert.Contains(fileName, manifest, StringComparison.Ordinal);
         }
     }
 
     [Fact]
-    public void Requirement_v4_records_approved_defaults_formulas_workflow_and_scope()
+    public void Readme_excludes_unsupported_guarantees_and_links_the_mit_license()
+    {
+        string readme = Read("README.md");
+        AssertContainsAll(
+            readme,
+            "AI品質、教育的妥当性、公平性、法的適合性、組織policy適合性、不正行為を保証・判定しません",
+            "未実測の処理時間、token数、費用を保証しません",
+            "[MIT License](LICENSE)");
+        AssertDoesNotContainAny(
+            readme,
+            "自動採点します",
+            "不正検知",
+            "公平性を保証",
+            "signed installer",
+            "macOS対応");
+        Assert.StartsWith("MIT License", Read("LICENSE"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Requirements_claim_ledger_and_system_prompts_are_complete_and_current()
     {
         string requirements = Read("docs/requirements-definition.md");
+        string ledger = Read("dev/docs/readme-claim-ledger.md");
+        string prompts = Read("tests/system-test-prompt.md");
 
         AssertContainsAll(
             requirements,
-            "| 文書版 | 4.0 |",
-            "| 状態 | 要求所有者承認済み baseline |",
-            "ベース点 `BasePoints`。既定60",
-            "固有設定配点 `SpecialPoints`。既定0",
-            "類似度減点係数 `SimilarityPenaltyWeight`。既定0.1",
-            "B+S+\\sum_{q=1}^{N}P_q=100",
-            "QuestionEarned_q=P_qR_q",
-            "SimilarityPenalty_q=P_qL_qW",
-            "FinalRaw=B+\\sum_q QuestionEarned_q+SpecialEarned-\\sum_q SimilarityPenalty_q",
-            "FinalScore=",
-            "0 & FinalRaw<0",
-            "100 & FinalRaw>100",
-            "FinalRaw & \\text{otherwise}",
-            "`eval-{yyyyMMdd-HHmm}-02.xlsx`",
-            "`eval-{yyyyMMdd-HHmm}.partial.xlsx`",
-            "`Quantification_References`",
-            "`Quantification_Checkpoint`",
-            "StudyReportEvaluator.App --input <xlsx-path> --prompt <txt-path>",
-            "Windows 11 x64",
-            "macOS arm64 / x64",
-            "NOT_RUN_EXTERNAL_PREREQUISITE",
-            "## 22. Approval record");
-
+            "| 文書版 | 4.1 |",
+            "ADR-0013",
+            "| 対応環境 | Windows 11 x64 |");
         AssertSequentialTableIds(requirements, "AC-", 22);
-        Assert.Contains("1. Microsoft Forms型、Google Forms型", requirements, StringComparison.Ordinal);
-        Assert.Contains("24. optional authenticated synthetic Copilot smoke", requirements, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Current_developer_index_uses_v4_and_adr0012_as_sources_of_truth()
-    {
-        string index = Read("docs-dev/README.md");
-        string architecture = Read("docs-dev/architecture.md");
-
-        AssertContainsAll(
-            index,
-            "[詳細設計書](detailed-design.md)",
-            "[ADR-0012](adr/0012-point-allocation-similarity-resume-portability.md)",
-            "current requirements v4.0 / ADR-0012 / detailed design");
-        AssertContainsAll(
-            architecture,
-            "| Current requirement | requirements v4.0 |",
-            "| Current decision | ADR-0012 |",
-            "ReferenceCheckpoint",
-            "complete-row checkpoint",
-            "submit_reference_answer",
-            "submit_special_quantification",
-            "submit_similarity",
-            "technical failureはblank",
-            "partial | `Quantification_Checkpoint`",
-            "final | `Quantification_Config`, `Quantification_References`, `Quantification_Results`, `Quantification_Run`");
-    }
-
-    [Fact]
-    public void Adr_and_detailed_design_preserve_minimal_architecture_and_explicit_boundaries()
-    {
-        string adr = Read("docs-dev/adr/0012-point-allocation-similarity-resume-portability.md");
-        string design = Read("docs-dev/detailed-design.md");
-
-        AssertContainsAll(
-            adr,
-            "| 状態 | **承認済み** |",
-            "StudyReportEvaluator.Core",
-            "StudyReportEvaluator.App",
-            "production projectは次の2件だけ",
-            "questionの旧`Weight`は`Points`へ置き換え",
-            "SpecialEvaluationDefinition",
-            "1 question/runで1回",
-            "Copilot session persistenceをjob resumeに使用しない",
-            "汎用plugin typeは導入しない",
-            "SQLite／cloud database");
-        AssertContainsAll(
-            design,
-            "public decimal BasePoints { get; init; } = 60m;",
-            "public decimal SpecialPoints { get; init; }",
-            "public decimal SimilarityPenaltyWeight { get; init; } = 0.1m;",
-            "public decimal Points { get; init; }",
-            "SpecialEvaluationDefinition",
-            "ScoringAllocationCalculator",
-            "Core result型へApp型を参照させない",
-            "row間は並列化しない",
-            "1行内のnormal evaluator、special item、similarity");
-    }
-
-    [Fact]
-    public void Excel_contract_defines_partial_final_sheets_and_blank_safe_formulas()
-    {
-        string contract = Read("docs-dev/excel-contract.md");
-
-        AssertContainsAll(
-            contract,
-            "`eval-20260901-1530.partial.xlsx`",
-            "input byte-copy + `Quantification_Checkpoint`",
-            "input byte-copy + Config / References / Results / Run",
-            "`PayloadSha256`",
-            "replace前の失敗では旧partialを保持",
-            "`Quantification_References`",
-            ".Question_Earned",
-            ".Special_Question_Rate",
-            ".Similarity_Penalty",
-            "`Final_Raw`",
-            "`Final_Score`",
-            "EnabledSpecialCount >= 1",
-            "COUNT(...)=expected",
-            "0は数値として数え、blankは数えない",
-            "MidpointRounding.AwayFromZero",
-            "same-volume no-overwrite move");
-        AssertDoesNotContainAny(contract, "MIN(`", "MAX(`", "AVERAGE(`", "COUNTIF(`");
-    }
-
-    [Fact]
-    public void Plan_and_traceability_map_every_task_acceptance_and_test_requirement()
-    {
-        string plan = Read("work/20260901-v4-implementation-plan.md");
-        string traceability = Read("docs-dev/traceability.md");
-
-        foreach (string task in new[]
-        {
-            "B-01", "B-06", "C-01", "C-06", "X-01", "X-04", "A-01", "A-04",
-            "W-01", "W-02", "U-01", "U-04", "L-01", "P-01", "P-03", "D-01",
-            "D-05", "E-01", "E-03",
-        })
-        {
-            Assert.Matches(
-                $@"(?m)^\| {Regex.Escape(task)}(?:\s|\|)",
-                plan);
-        }
-
-        AssertSequentialTableIds(traceability, "AC-", 22);
-        AssertSequentialTableIds(traceability, "TR-", 24);
-        AssertContainsAll(
-            traceability,
-            "IMPLEMENTATION_IN_PROGRESS",
-            "`PLANNED`は未実装をPASSと称しない",
-            "BLOCKED_REVIEW",
-            "NOT_RUN_EXTERNAL_PREREQUISITE",
-            "unresolved reproducible blocker/high finding 0");
-    }
-
-    [Fact]
-    public void Historical_v3_decision_is_retained_but_not_current()
-    {
-        string adr11 = Read("docs-dev/adr/0011-dynamic-quantification-excel-formulas.md");
-        string adr12 = Read("docs-dev/adr/0012-point-allocation-similarity-resume-portability.md");
-        string developerIndex = Read("docs-dev/README.md");
-
-        Assert.Contains("| 状態 | **承認済み** |", adr11, StringComparison.Ordinal);
-        Assert.Contains("Supersedes | ADR-0011", adr12, StringComparison.Ordinal);
-        Assert.Contains("ADR-0001〜0011", developerIndex, StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            "current requirements v3.0",
-            developerIndex,
-            StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void V4_baseline_never_promotes_unexecuted_external_evidence_to_pass()
-    {
-        string content = string.Join(Environment.NewLine, V4BaselineDocumentPaths.Select(Read));
-
-        AssertContainsAll(
-            content,
-            "NOT_RUN_EXTERNAL_PREREQUISITE",
-            "未実行をPASSとしない",
-            "署名済み／notarized／対応済みと称しない");
-        AssertDoesNotContainAny(
-            content,
-            "macOS signing PASS",
-            "macOS notarization PASS",
-            "signed and notarized artifact is verified");
-    }
-
-    [Fact]
-    public void Prompt_launch_guide_has_copyable_teacher_scenarios_and_never_claims_unattended_grading()
-    {
-        string guide = Read("docs/prompt-launch.md");
-        string root = Read("README.md");
-        string userIndex = Read("docs/README.md");
-        string gettingStarted = Read("docs/getting-started.md");
-        string customGuide = Read("docs/custom-evaluator-guide.md");
-
-        AssertContainsAll(
-            root,
-            "[GitHub CopilotからPromptで起動する](docs/prompt-launch.md)");
-        AssertContainsAll(
-            userIndex,
-            "[GitHub CopilotからPromptで起動する](prompt-launch.md)");
-        AssertContainsAll(gettingStarted, "[GitHub CopilotからPromptで起動する](prompt-launch.md)");
-        AssertContainsAll(customGuide, "[GitHub CopilotからPromptで起動する](prompt-launch.md)");
-        AssertContainsAll(
-            guide,
-            "## できることと安全上の境界",
-            "**Copilot起動依頼Prompt**",
-            "**評価Promptファイル**",
-            "--input",
-            "--prompt",
-            "AI評価を自動開始しません",
-            "定量化を開始",
-            "result/eval-{yyyyMMdd-HHmm}[-NN].xlsx",
-            "sample/機械学習 サブフィールド PBL 2025 レポート - コピー.xlsx",
-            "| F | 設問1のレポート回答primary候補 |",
-            "| G | 設問1に関する学生Prompt候補 |",
-            "| I | 設問2のレポート回答primary候補 |",
-            "| J | 設問2に関する学生Prompt候補 |",
-            "| K | Prompt作成時の考慮事項／観点。Jのsupporting候補 |",
-            "## ユースケース1 — 機械学習概念の理解を確認する",
-            "## ユースケース2 — PBL提案の具体性と実行可能性を確認する",
-            "## ユースケース3 — 学生が作成したPromptの品質を固有評価する",
-            "## ユースケース4 — Prompt作成時の考慮事項を含めて評価する",
-            "## ユースケース5 — まず10行だけpilot実行する",
-            "## ユースケース6 — 中断したrunを再開する",
-            "ml-concept-understanding.txt",
-            "student-prompt-quality.txt",
-            "{回答}",
-            "{評価項目}",
-            "## GitHub Copilotへ結果fileの存在だけ確認してもらう",
-            "workbookを開いてcell、sheet本文、氏名、回答、score、reason、evidenceを読むこと",
-            "存在しないfileを作成済みと報告すること",
-            "類似度は不正行為の証明ではありません",
-            "最終的な評点と利用判断は教員が行います");
-    }
-
-    [Fact]
-    public void System_test_prompt_maps_all_v4_test_requirements_without_stale_v3_expectations()
-    {
-        string prompt = Read("tests/system-test-prompt.md");
+        AssertSequentialTableIds(ledger, "C-", 32);
+        AssertContainsAll(ledger, "VERIFIED", "BLOCKED", "EXCLUDED");
 
         int[] promptIds = Regex.Matches(
-                prompt,
+                prompts,
                 @"^### STP-TR-(\d{2}):",
                 RegexOptions.Multiline | RegexOptions.CultureInvariant)
             .Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))
             .ToArray();
-
         Assert.Equal(Enumerable.Range(1, 24), promptIds);
-        foreach (int requirementId in Enumerable.Range(1, 24))
-        {
-            string promptBody = ExtractSystemTestPrompt(prompt, requirementId);
-            AssertContainsAll(
-                promptBody,
-                $"Test ID: STP-TR-{requirementId:00}",
-                $"Requirement: TR-{requirementId:00}",
-                "厳守:",
-                "報告順:");
-        }
-
-        AssertContainsAll(
-            prompt,
-            "| 対象 | StudyReport Evaluator v4.0 |",
-            "**24件**を正本とする");
-        Assert.Matches(@"BasePoints\s*=\s*60", ExtractSystemTestPrompt(prompt, 4));
-        Assert.Matches(@"SpecialPoints\s*=\s*0", ExtractSystemTestPrompt(prompt, 4));
-        Assert.Matches(@"SimilarityPenaltyWeight\s*=\s*0\.1", ExtractSystemTestPrompt(prompt, 4));
-        AssertContainsAll(
-            ExtractSystemTestPrompt(prompt, 6),
-            "6 placeholder制約は利用者編集可能なCustom／Specialだけに適用する",
-            "`{参照回答}`を利用者placeholderとして許可しない",
-            "reference=`submit_reference_answer`",
-            "similarity=`submit_similarity`");
-        AssertContainsAll(
-            ExtractSystemTestPrompt(prompt, 8),
-            "空normal primaryはAI callなし、QuestionRate=0、QuestionEarned=0",
-            "nonempty入力のschema/timeout/network/auth/cleanup failureはraw blankで、0へ変換しない");
-        AssertContainsAll(
-            ExtractSystemTestPrompt(prompt, 11),
-            "Config、References、Results、Runのexact 4件",
-            "finalにはCheckpoint sheetがない");
-        AssertContainsAll(
-            ExtractSystemTestPrompt(prompt, 13),
-            "`Quantification_Checkpoint`",
-            "reference完了およびcomplete student rowごと");
-        AssertContainsAll(
-            ExtractSystemTestPrompt(prompt, 14),
-            "complete rowだけskipし、最初の未完了rowから続行する",
-            "row途中の結果はskipせず、そのrow全体を再実行する");
-        AssertContainsAll(
-            ExtractSystemTestPrompt(prompt, 17),
-            "生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません");
-        AssertContainsAll(
-            ExtractSystemTestPrompt(prompt, 18),
-            "`--input` 0/1回と`--prompt` 0回以上",
-            "startup後のCopilot runner/session call countは0");
-        AssertContainsAll(
-            ExtractSystemTestPrompt(prompt, 19),
-            "bundled CLI",
-            "PATH fallbackしない");
-        AssertContainsAll(
-            ExtractSystemTestPrompt(prompt, 21),
-            "NOT_RUN_EXTERNAL_PREREQUISITE",
-            "未実行をPASSにしない");
-        AssertContainsAll(
-            ExtractSystemTestPrompt(prompt, 24),
-            "required deterministic acceptanceの代替にしない",
-            "A/Bを別statusで記録し、片方のPASSをもう片方またはrequired gateへ代用しない");
-        AssertDoesNotContainAny(
-            prompt,
-            "| 対象 | StudyReport Evaluator v3.0 実装 |",
-            "空回答、失敗、取消、欠損scoreは0ではなく空欄",
-            "Config、Results、Runの3 sheet",
-            "`tests/fixtures/v3/definition-matrix.json`",
-            "`tests/fixtures/v3/result-oracles.json`",
-            "signed installer、signed ZIP、notarization");
+        Assert.Contains("| 対象 | StudyReport Evaluator v4.1 |", prompts, StringComparison.Ordinal);
     }
 
-    private static string ExtractSystemTestPrompt(string content, int requirementId)
+    [Fact]
+    public void Package_script_includes_every_public_document_image_and_license()
     {
-        Match match = Regex.Match(
-            content,
-            $@"(?ms)^### STP-TR-{requirementId:00}:.*?^```text\r?\n(?<body>.*?)^```",
-            RegexOptions.CultureInvariant);
-        Assert.True(match.Success, $"Missing copyable Prompt body for STP-TR-{requirementId:00}.");
-        return match.Groups["body"].Value;
+        string packageScript = Read("scripts/package-windows.ps1");
+        AssertContainsAll(
+            packageScript,
+            "$documentationRelativePaths = @(",
+            "'README.md'",
+            "'LICENSE'",
+            "'docs\\getting-started.md'",
+            "'images\\07-output-export.png'",
+            "Documentation package input must be LICENSE, Markdown, or PNG and nonempty");
+
+        string packageTest = Read("tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs");
+        foreach (string required in new[]
+                 {
+                     "LICENSE",
+                     "README.md",
+                     "docs/getting-started.md",
+                     "docs/features.md",
+                     "docs/custom-evaluator-guide.md",
+                     "docs/prompt-launch.md",
+                     "docs/privacy-and-data-handling.md",
+                     "docs/troubleshooting.md",
+                     "images/README.md",
+                     "images/01-input-workbook.png",
+                     "images/02-input-mapping.png",
+                     "images/03-design-knowledge.png",
+                     "images/04-design-custom-prompt.png",
+                     "images/05-execution-auto.png",
+                     "images/06-results-review.png",
+                     "images/07-output-export.png",
+                 })
+        {
+            Assert.Contains($"\"{required}\"", packageTest, StringComparison.Ordinal);
+        }
     }
 
     private static void AssertSequentialTableIds(string content, string prefix, int expectedCount)
     {
         int[] actual = Regex.Matches(
                 content,
-                $@"^\| {Regex.Escape(prefix)}(\d{{2,3}}) \|",
+                $@"^\| {Regex.Escape(prefix)}(\d{{3}}) \|",
                 RegexOptions.Multiline | RegexOptions.CultureInvariant)
             .Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))
             .ToArray();
-
         Assert.Equal(Enumerable.Range(1, expectedCount), actual);
     }
 
@@ -395,6 +520,17 @@ public sealed class DocumentationContractTests
 
     private static string Resolve(string root, string relativePath) =>
         Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+
+    private static bool IsWithinRoot(string root, string path)
+    {
+        string canonicalRoot = Path.GetFullPath(root)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        string canonicalPath = Path.GetFullPath(path);
+        return canonicalPath.StartsWith(
+            canonicalRoot,
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    }
 
     private static string FindRepositoryRoot()
     {

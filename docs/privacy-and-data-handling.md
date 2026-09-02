@@ -1,91 +1,103 @@
 # データとprivacy
 
-対象読者は教員、情報管理担当、運用担当です。本書はアプリが実際に扱うデータ経路を説明します。法的助言、機関承認、教育的妥当性の証明ではありません。
+このガイドは、StudyReport Evaluatorが扱う情報と保存先を説明します。法的助言、組織承認、教育的妥当性の証明ではありません。
 
-## データフロー
+## 全体像
 
 ```mermaid
 flowchart LR
-    IN[入力 .xlsx\n全sheet・全データ] -->|local read-only| APP[StudyReport Evaluator]
-    DEF[question / Prompt / criteria\nrange / IDs] --> APP
-    APP -->|同一行の選択済みcell値\n+ definition / schema metadata| COPILOT[Copilot CLI / GitHub Copilot]
-    COPILOT -->|criterion raw / reason / evidence / source| APP
-    APP -->|入力全体のbyte-copy\n+ Config / Results / Run\n+ 観測済みusage数値| OUT[出力 .xlsx]
-    APP -.->|本文を記録しない| LOG[code + safe dimensions only]
+    IN[入力 .xlsx\n全sheet・全data] -->|local read-only| APP[StudyReport Evaluator]
+    APP -->|必要なcurrent-row source\n+ definition/schema| CLI[同梱Copilot CLI]
+    CLI --> GH[GitHub Copilot]
+    GH -->|raw/reason/evidence/status| APP
+    APP --> PARTIAL[partial .xlsx]
+    APP --> FINAL[final .xlsx]
+    APP -. closed fields only .-> LOG[application log]
 ```
 
-実装根拠: [`SafeEvaluationPayloadBuilder.cs`](../src/StudyReportEvaluator.Core/Prompting/SafeEvaluationPayloadBuilder.cs)、[`WorkingPackage.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/WorkingPackage.cs)、[`SafeLogger.cs`](../src/StudyReportEvaluator.App/Logging/SafeLogger.cs)。
+## AIへ送る情報
 
-## Copilotへ送る情報
+処理ごとに送る内容が異なります。
 
-### workbook由来
+| 処理 | workbook由来の値 | その他 |
+|---|---|---|
+| Reference | なし | Question text、closed output schema |
+| Normal | current rowの選択済み主回答・補助列 | Question、Prompt、criterion metadata、許可source IDs、closed schema |
+| Special | current rowの選択済み固有評価主値・補助列 | Question、利用者Prompt、closed schema |
+| Similarity | current rowの主回答 | 同じQuestionの保存済みReference、closed schema |
 
-- 現在のevaluation unitと同じ行のprimary value
-- 同じ行の、利用者が選択したsupporting values
+workbook由来で送る値は、現在処理しているrowの選択済みsourceだけです。他row、非選択列、workbook pathは通常payloadへ含めません。
 
-他行、非選択列、workbook pathはpayloadへ含めません。source cellにはExcel列名をstable source IDとして割り当てます。
+「選択済みcellだけを送る」はworkbook由来の値についての説明です。Question text、利用者Prompt、criterion、Reference、schema metadataも処理に必要な範囲で送ります。
 
-### definition由来
+## AIへ公開しないapp capability
 
-- question text
-- evaluator ID
-- criterion ID、表示名、description、effective range
-- Custom Prompt template、またはapp-owned Knowledge template
-- expected criterion IDs、許可source IDs、app-owned structured-output instruction
+各attemptは必要なresult toolだけを持つrestricted sessionです。StudyReport Evaluatorは評価sessionへshell、filesystem、Web、GitHub write、MCP toolを公開しません。
 
-したがって「選択cellだけを送る」という表現は、**workbook由来の値**に限定した説明です。Prompt全体にはdefinition metadataも含まれます。
+これはGitHub Copilot serviceや同梱CLI全体のデータ取扱いを置き換える説明ではありません。利用するaccount・組織のGitHub Copilot policyも確認してください。
 
-根拠: [`SafeEvaluationPayloadBuilder.cs`](../src/StudyReportEvaluator.Core/Prompting/SafeEvaluationPayloadBuilder.cs#L52-L87)、[`SafeEvaluationPayloadBuilder.cs`](../src/StudyReportEvaluator.Core/Prompting/SafeEvaluationPayloadBuilder.cs#L107-L160)。
+## application log
 
-## Copilotへ送らない情報
+application loggerはclosedな項目だけを扱います。
 
-- 他のrow
-- 非選択列
-- workbook path
-- app logや過去sessionから取得した本文
-- evaluator / question / overall aggregate、weight、合否
+- event code
+- severity
+- attempt/count/limit/concurrency
+- failure category
+- appが生成したsession ID
 
-結果tool以外のshell、filesystem、GitHub write、MCP、memory、session store等はsession configで無効化します。根拠: [`EvaluationSchemaFactory.cs`](../src/StudyReportEvaluator.App/Copilot/EvaluationSchemaFactory.cs#L179-L243)。
+回答、Prompt、Reference、reason、evidence、file path、credentialを受け取るfree-text parameterはありません。SDKが返したtoken usage数値はapplication logへ出さず、観測できたunitだけをRun sheetへ集計します。
 
-## log
+## input
 
-production loggerの項目はevent code、severity、attempt、limit、concurrency、failure category、生成session IDに限定されます。回答、Prompt、reason、evidence、path、token、credentialを受け取るfree-text parameterはありません。
+入力workbookはread-onlyで開きます。run開始時にSHA-256、size、last-write timeを記録し、checkpoint更新・再開・final commit時に再確認します。不一致時は新しい送信やfinal commitを停止します。
 
-SDKから取得できたinput / output / reasoning / cache tokenの**件数値**はlogへ出さず、完成workbookの`Quantification_Run`へ観測unit数とともに保存します。取得不能なunitを0 tokenと断定しません。token文字列、credential、本文は保存しません。
+ただし、同時に別applicationで入力を編集しないことを推奨します。入力を変更する場合はrunを止め、変更完了後に最初から読み込み直してください。
 
-根拠: [`SafeLogger.cs`](../src/StudyReportEvaluator.App/Logging/SafeLogger.cs)、検証: [`SafeLoggerCanaryTests.cs`](../tests/StudyReportEvaluator.App.Tests/Logging/SafeLoggerCanaryTests.cs)。
+## partial
 
-## output workbookは入力と同等以上に機密
+`.partial.xlsx`は入力全体のbyte-copyへ`Quantification_Checkpoint`を追加した標準workbookです。次を含み得ます。
 
-出力は入力を縮小・匿名化したfileではありません。入力workbookをbyte-copyするため、選択しなかったsheet、管理列、氏名、email、元回答等も入力に存在すればそのまま残ります。
+- 入力の全sheet・全data
+- definition snapshotとPrompt
+- input/definition/model/runtime identity
+- Reference
+- complete rowのraw、reason、evidence、status、usage
 
-さらに`Quantification_Config`には次が追加されます。
+partialは暗号化containerではありません。保存先のOS access controlに従います。final完成までは再開に必要な正本なので、編集、rename、copy、削除しないでください。
 
-- question text
-- Custom Prompt
-- evaluator / criterionの表示名とdescription
-- source mapping、range、weight、rounding
-- canonical definition snapshotとSHA-256
+## final
 
-`Quantification_Results`にはAI raw、override、reason、evidence、status、formulaが追加されます。`Quantification_Run`にはSDKが観測できたunitのtoken usage集計値が追加されます。
+finalも入力を匿名化・縮小したfileではありません。入力の全sheet・全dataを保持し、次を追加します。
 
-根拠: [`WorkingPackage.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/WorkingPackage.cs#L105-L155)、[`ConfigSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/ConfigSheetWriter.cs#L129-L249)、[`ResultsSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/ResultsSheetWriter.cs#L157-L171)。
+- `Quantification_Config`: definition、Prompt、mapping、range、配点
+- `Quantification_References`: Question、Reference、model、status、時刻
+- `Quantification_Results`: raw、override、reason、evidence、status、formula、score
+- `Quantification_Run`: input/definition/runtime identity、時刻、件数、観測usage
 
-### 運用上の扱い
+選択しなかったsheet、管理列、氏名、email等も入力にあればそのまま残ります。
 
-- inputとoutputへ同等のaccess controlを適用する。
-- outputを共有する前に、元sheetとConfig / Resultsの含有情報を確認する。
-- appはretention期限、自動削除、共有先の安全性を判定しない。
-- repositoryや通常のtest artifactへ実在学生の本文を追加しない。
+## 運用上の注意
+
+- input、partial、finalへ同等以上のaccess controlを適用する
+- 共有前に元sheetとapp-owned sheetsの含有情報を確認する
+- repository、issue、chat、通常test artifactへ実在学生本文を貼らない
+- retention期限と削除手順は所属組織の規則に従う
+- appは送信権限、保持期間、共有先の安全性、法的根拠を判定しない
 
 ## credential
 
-アプリ固有OAuth app、client ID、client secret、PATを入力・保存しません。別途導入済みCopilot CLIのlogged-in userを使用します。根拠: [`CopilotClientFactory.cs`](../src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs#L258-L270)。
+アプリはPAT、password、client secret、独自OAuth credentialを入力・保存しません。同梱Copilot CLIで利用者本人が完了した対話loginを使います。
 
-## optional検証と非保証境界
+loginできない場合、新しいAI処理は開始できません。workbook読込や設計編集は引き続き利用できます。
 
-- authenticated live Copilot smoke: `PASS`。固定合成payload 1件だけを使用し、実在学生データは送信していません。
-- external Microsoft Excel recalculation: `PASS`。固定合成workbookだけを使用しました。
-- 上記はrequired fake/oracle testの代替ではなく、AI scoreの教育的品質、公平性、法的適合性、組織policy適合性は引き続き非保証です。
+## 非保証
 
-証跡: [`traceability.md`](../docs-dev/traceability.md#optional-advisory-evidence--never-a-required-substitute)。
+- AI score、reason、evidenceの正確性
+- 教育的妥当性、公平性
+- 法的適合性、組織policy適合性
+- Similarityによる不正行為判定
+- GitHub Copilot service側の契約・保持・料金
+
+> [!WARNING]
+> 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません

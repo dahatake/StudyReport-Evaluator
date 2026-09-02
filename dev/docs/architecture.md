@@ -2,11 +2,11 @@
 
 | 項目 | 内容 |
 |---|---|
-| Current requirement | requirements v4.0 |
-| Current decision | ADR-0012 |
+| Current requirement | requirements v4.1 |
+| Current decision | ADR-0012（機能）/ ADR-0013（platform） |
 | Detailed design | [`detailed-design.md`](detailed-design.md) |
 | Production projects | 2（Core / App） |
-| Target platforms | Windows 11 x64、macOS arm64/x64 |
+| Target platform | Windows 11 x64 |
 
 本書はcomponent境界と実行data flowの正本である。型、sheet、formula、checkpoint encodingの詳細は[詳細設計書](detailed-design.md)と[Excel契約](excel-contract.md)を参照する。
 
@@ -135,10 +135,9 @@ checkpointとoutputはinput全体、Prompt、reference、AI resultを含むた�
 
 - End-user appはRID別.NET 10 self-containedで、.NET Runtime／SDKを別installしない。
 - SDK互換Copilot CLIをpackageに含め、manifestでpath/hashを固定する。
-- Windowsはwin-x64、user-local install、admin不要。
-- macOSはosx-arm64／osx-x64を別packageとし、bundle-relative CLI pathを使う。
-- macOS releaseはDeveloper ID署名、notary、staple、verificationが揃ったrunだけを公開する。
-- external credential／runnerなしではrelease evidenceを`NOT_RUN_EXTERNAL_PREREQUISITE`とし、PASSを捏造しない。
+- Windowsは`win-x64`のunsigned ZIPとSHA-256 sidecarを作り、展開先から起動する。
+- package内CLIは`runtimes/win-x64/native/copilot.exe`へ配置し、PATHへfallbackしない。
+- macOS、Linux、Windows Arm64、installer、code signing、notarizationは初版正式公開の対応対象外である。
 
 ## 9. Validation timing
 
@@ -155,4 +154,4 @@ checkpointとoutputはinput全体、Prompt、reference、AI resultを含むた�
 
 ## 10. Evidence boundary
 
-Required deterministic testsはfake Copilot transportとOpen XML／Core oracleだけで成立させる。authenticated Copilot、external spreadsheet recalculation、macOS signing/notaryは別のadvisoryまたはexternal-prerequisite evidenceとして記録し、required fake/oracle evidenceの代替にしない。
+Required deterministic testsはfake Copilot transportとOpen XML／Core oracleだけで成立させる。authenticated Copilotとexternal spreadsheet recalculationは別のadvisory evidenceとして記録し、required fake/oracle evidenceの代替にしない。Windows以外のplatform対応は別の要求改版と実runner evidenceなしに追加しない。

@@ -1,7 +1,7 @@
 # Requirements baseline integration record
 
 > [!NOTE]
-> **BASELINE SNAPSHOT:** B-03時点のidentityとdependency boundaryです。末尾の`pending`は当時の進捗であり、現在の実装状態ではありません。現在状態は[`docs-dev/implementation-status.md`](../implementation-status.md)を参照してください。
+> **BASELINE SNAPSHOT:** B-03時点のidentityとdependency boundaryです。末尾の`pending`は当時の進捗であり、現在の実装状態ではありません。現在状態は[`dev/docs/implementation-status.md`](../implementation-status.md)を参照してください。
 
 | 項目 | 値 |
 |---|---|
@@ -9,8 +9,8 @@
 | 状態 | **CURRENT BASELINE** |
 | Requirement | `docs/requirements-definition.md` v3.0 |
 | Plan | `work/20260831-implementation-plan.md` v4.0 |
-| Scope decision | `docs-dev/adr/0011-dynamic-quantification-excel-formulas.md` |
-| Sample profile | `docs-dev/preflight/sample-workbook-profile.md` |
+| Scope decision | `dev/docs/adr/0011-dynamic-quantification-excel-formulas.md` |
+| Sample profile | `dev/docs/preflight/sample-workbook-profile.md` |
 | Requirement/plan commit | `adc6ad12a3c80b4a92c9453d8b7a58e2daeb346f` |
 | ADR/profile commit | `502b48898411ca247543143773be8a3ee28ea7e5` |
 | Previous baseline | requirement v2.0 / plan v3.0 / ADR-0010 — **SUPERSEDED** |
@@ -35,8 +35,8 @@ ADR-0011はこの要求を現行scopeとして承認し、ADR-0010の固定候�
 |---|---:|---|---|
 | `docs/requirements-definition.md` | 30,480 | `ACB7E1C524E1628C48AC2669B5B2FC730B3EF7EED96723D02F1B5AA6B6264C03` | `adc6ad12a3c80b4a92c9453d8b7a58e2daeb346f` |
 | `work/20260831-implementation-plan.md` | 30,790 | `F63D0E1A9AAABFA4C0F2C0A0F032AFE5F5674A64B76723F82D68000A7A506BCD` | `adc6ad12a3c80b4a92c9453d8b7a58e2daeb346f` |
-| `docs-dev/adr/0011-dynamic-quantification-excel-formulas.md` | 10,919 | `33A678396FFC9BFB7B5726B34B1874ADC9868C97E9C6EAA3E94FFB0F9C14CC65` | `502b48898411ca247543143773be8a3ee28ea7e5` |
-| `docs-dev/preflight/sample-workbook-profile.md` | 4,898 | `A0BA407B55A59363649FE3CEB001B7219838B2F216D8B74FF7E74B9A3B17A2C1` | `502b48898411ca247543143773be8a3ee28ea7e5` |
+| `dev/docs/adr/0011-dynamic-quantification-excel-formulas.md` | 10,919 | `33A678396FFC9BFB7B5726B34B1874ADC9868C97E9C6EAA3E94FFB0F9C14CC65` | `502b48898411ca247543143773be8a3ee28ea7e5` |
+| `dev/docs/preflight/sample-workbook-profile.md` | 4,898 | `A0BA407B55A59363649FE3CEB001B7219838B2F216D8B74FF7E74B9A3B17A2C1` | `502b48898411ca247543143773be8a3ee28ea7e5` |
 
 SHA-256はexact repository bytesのintegrity anchorであり、組織電子署名、本人確認、法務・教育・security承認、実装完了を意味しない。
 
@@ -155,7 +155,7 @@ No Application、Infrastructure、Platform、Workbooks、Desktop、separate E2E 
 | Sample structural profile committed | PASS — `502b488` |
 | Hidden external implementation input | 0 |
 | Production `src/` files at this record | 0 |
-| Current exact path map | `docs-dev/preflight/implementation-task-file-map.md` |
+| Current exact path map | `dev/docs/preflight/implementation-task-file-map.md` |
 | Current 15-AC traceability | B-04 pending |
 | Revised v3.0 GATE-0 result | pending |
 

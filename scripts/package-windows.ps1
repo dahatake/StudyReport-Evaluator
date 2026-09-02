@@ -13,6 +13,8 @@ $ProgressPreference = 'SilentlyContinue'
 $PackageRootName = 'StudyReportEvaluator-win-x64'
 $ZipFileName = "$PackageRootName.zip"
 $HashFileName = "$ZipFileName.sha256"
+$RuntimeIdentifier = 'win-x64'
+$CopilotCliRelativePath = 'runtimes/win-x64/native/copilot.exe'
 $FixedTimestamp = [System.DateTimeOffset]::new(2000, 1, 1, 0, 0, 0, [System.TimeSpan]::Zero)
 $Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 $ReleaseNotes = @(
@@ -23,6 +25,7 @@ $ReleaseNotes = @(
     'Signing: UNSIGNED',
     'Symbols: EXCLUDED',
     'Office dependency: NONE',
+    'GitHub Copilot CLI runtime: BUNDLED',
     'GitHub Copilot CLI login is required only for AI evaluation.',
     'User guide: README.md and docs/getting-started.md'
 ) -join "`n"
@@ -93,6 +96,69 @@ function Get-Sha256Hex {
     }
     finally {
         $stream.Dispose()
+    }
+}
+
+function Assert-BundledCopilotRuntime {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Directory
+    )
+
+    $manifestPath = Join-Path $Directory 'copilot-runtime.json'
+    $cliPath = Join-Path $Directory $CopilotCliRelativePath.Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $cliPath -PathType Leaf)) {
+        throw 'The bundled Copilot CLI manifest or binary is missing from the package input.'
+    }
+
+    try {
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    }
+    catch {
+        throw 'The bundled Copilot CLI manifest in the package input is invalid JSON.'
+    }
+
+    $propertyNames = @($manifest.PSObject.Properties.Name)
+    $expectedPropertyNames = @(
+        'schemaVersion',
+        'runtimeIdentifier',
+        'cliVersion',
+        'cliSha256',
+        'sdkVersion',
+        'cliRelativePath'
+    )
+    if ($propertyNames.Count -ne $expectedPropertyNames.Count -or
+        @($propertyNames | Where-Object { $_ -cnotin $expectedPropertyNames }).Count -ne 0 -or
+        [int]$manifest.schemaVersion -ne 1 -or
+        [string]$manifest.runtimeIdentifier -cne $RuntimeIdentifier -or
+        [string]$manifest.cliRelativePath -cne $CopilotCliRelativePath -or
+        [string]$manifest.cliVersion -notmatch '^[0-9][A-Za-z0-9._+-]{0,127}$' -or
+        [string]$manifest.sdkVersion -notmatch '^[0-9][A-Za-z0-9._+-]{0,127}$' -or
+        [string]$manifest.cliSha256 -notmatch '^[0-9A-Fa-f]{64}$') {
+        throw 'The bundled Copilot CLI manifest violates the package contract.'
+    }
+
+    $manifestItem = Get-Item -LiteralPath $manifestPath -Force
+    $cliItem = Get-Item -LiteralPath $cliPath -Force
+    Assert-NotReparsePoint -Item $manifestItem
+    Assert-NotReparsePoint -Item $cliItem
+    if ($manifestItem.Length -le 0 -or $cliItem.Length -le 0 -or
+        (Get-Sha256Hex -Path $cliPath) -cne ([string]$manifest.cliSha256).ToUpperInvariant()) {
+        throw 'The bundled Copilot CLI does not match its package manifest hash.'
+    }
+
+    $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($cliPath)
+    if ([string]$versionInfo.ProductVersion -cne [string]$manifest.cliVersion -and
+        [string]$versionInfo.FileVersion -cne [string]$manifest.cliVersion) {
+        throw 'The bundled Copilot CLI does not match its package manifest version.'
+    }
+
+    $sdkPath = Join-Path $Directory 'GitHub.Copilot.SDK.dll'
+    $sdkVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($sdkPath)
+    $sdkPackageVersion = ([string]$sdkVersionInfo.ProductVersion).Split('+', 2)[0]
+    if ($sdkPackageVersion -cne [string]$manifest.sdkVersion) {
+        throw 'The bundled Copilot manifest does not match the packaged SDK version.'
     }
 }
 
@@ -208,6 +274,8 @@ function Assert-PublishInput {
         'DocumentFormat.OpenXml.dll',
         'DocumentFormat.OpenXml.Framework.dll',
         'GitHub.Copilot.SDK.dll',
+        'copilot-runtime.json',
+        'runtimes\win-x64\native\copilot.exe',
         'Avalonia.dll',
         'Avalonia.Win32.dll',
         'coreclr.dll',
@@ -221,8 +289,10 @@ function Assert-PublishInput {
         }
     }
 
+    Assert-BundledCopilotRuntime -Directory $Directory
+
     if (Test-Path -LiteralPath (Join-Path $Directory 'copilot.exe')) {
-        throw 'Copilot CLI must not be included in the package input.'
+        throw 'The Copilot CLI must be stored only under the pinned RID runtime directory.'
     }
 
     $dependencyContextPath = Join-Path $Directory 'StudyReportEvaluator.App.deps.json'
@@ -360,20 +430,32 @@ foreach ($file in @(Get-ChildItem -LiteralPath $PublishedDirectory -File -Force 
 }
 
 $documentationItems = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
-$rootReadme = Get-Item -LiteralPath (Join-Path $repositoryRoot 'README.md') -Force
-$documentationItems.Add($rootReadme)
-foreach ($documentationRootName in @('docs', 'images')) {
-    $documentationRoot = Join-Path $repositoryRoot $documentationRootName
-    if (-not (Test-Path -LiteralPath $documentationRoot -PathType Container)) {
-        throw "Required documentation directory is missing: $documentationRootName"
+$documentationRelativePaths = @(
+    'README.md',
+    'LICENSE',
+    'docs\README.md',
+    'docs\getting-started.md',
+    'docs\features.md',
+    'docs\custom-evaluator-guide.md',
+    'docs\prompt-launch.md',
+    'docs\privacy-and-data-handling.md',
+    'docs\troubleshooting.md',
+    'images\README.md',
+    'images\01-input-workbook.png',
+    'images\02-input-mapping.png',
+    'images\03-design-knowledge.png',
+    'images\04-design-custom-prompt.png',
+    'images\05-execution-auto.png',
+    'images\06-results-review.png',
+    'images\07-output-export.png'
+)
+foreach ($documentationRelativePath in $documentationRelativePaths) {
+    $documentationPath = Join-Path $repositoryRoot $documentationRelativePath
+    if (-not (Test-Path -LiteralPath $documentationPath -PathType Leaf)) {
+        throw "Required public documentation file is missing: $documentationRelativePath"
     }
 
-    foreach ($documentationItem in @(Get-ChildItem -LiteralPath $documentationRoot -Force -Recurse)) {
-        Assert-NotReparsePoint -Item $documentationItem
-        if (-not $documentationItem.PSIsContainer) {
-            $documentationItems.Add($documentationItem)
-        }
-    }
+    $documentationItems.Add((Get-Item -LiteralPath $documentationPath -Force))
 }
 
 foreach ($documentationFile in $documentationItems) {
@@ -382,8 +464,10 @@ foreach ($documentationFile in $documentationItems) {
     Assert-SafeRelativePath -RelativePath $relative
     $normalized = $relative.Replace('\', '/')
     $extension = [System.IO.Path]::GetExtension($documentationFile.Name)
-    if (($extension -cne '.md' -and $extension -cne '.png') -or $documentationFile.Length -le 0) {
-        throw "Documentation package input must be a nonempty Markdown or PNG file: $normalized"
+    $isLicense = $normalized -ceq 'LICENSE'
+    if ((-not $isLicense -and $extension -cne '.md' -and $extension -cne '.png') -or
+        $documentationFile.Length -le 0) {
+        throw "Documentation package input must be LICENSE, Markdown, or PNG and nonempty: $normalized"
     }
 
     if ($fileMap.ContainsKey($normalized)) {

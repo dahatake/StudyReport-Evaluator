@@ -2,9 +2,9 @@
 
 | 項目 | 内容 |
 |---|---|
-| 対象要求 | `docs/requirements-definition.md` v4.0 |
-| 設計決定 | ADR-0012 |
-| 作成日 | 2026-09-01 |
+| 対象要求 | `docs/requirements-definition.md` v4.1 |
+| 設計決定 | ADR-0012（機能）/ ADR-0013（platform） |
+| 作成日 | 2026-09-02 |
 | 状態 | 実装baseline |
 | Production topology | Core + App の2 projectを維持 |
 
@@ -18,7 +18,7 @@
 - `.partial.xlsx` checkpointとprocess restart後のresume
 - native file picker
 - Prompt text fileによるGUI prefill
-- Windows/macOS self-contained配布
+- Windows 11 x64 self-contained unsigned ZIP配布
 
 追加のdatabase、server、plugin framework、汎用AI operation framework、production projectは作らない。
 
@@ -46,7 +46,7 @@ flowchart LR
 | `App/Workbooks` | read-only input、Config/References/Results/Run/Checkpoint sheet |
 | `App/Workflow` | reference先行、student row単位処理、checkpoint、resume |
 | `App/ViewModels` / `Views` | 4-step UI、picker、Prompt import、progress、completion |
-| `scripts` | RID別publish/package/install/sign/notary |
+| `scripts` | Windows x64 publish/package |
 
 ## 3. Domain model
 
@@ -669,30 +669,30 @@ checkpointとRun sheetへ次を保存する。
 
 - RID `win-x64`
 - self-contained、non-trimmed、non-single-file
-- app、bundled CLI、README/docs/images、install scripts、manifest、SHA-256
-- `install-windows.cmd`: OS標準native bootstrap。user-local copyとshortcut作成
-- `install-windows.ps1`: PowerShell 7以上で同じ処理。5.1はfail closed
-- admin不要、既定install root `%LOCALAPPDATA%\Programs\StudyReportEvaluator`
+- app、bundled CLI、README/docs/images、manifestを含むunsigned ZIPとSHA-256 sidecar
+- ZIP展開先から直接起動し、admin権限を要求しない
+- publish/package scriptはPowerShell 7以上だけを受理し、5.1へfallbackしない
 
-.NET Runtime／SDK、PowerShell 7を一般利用者向けにinstallしない。appがself-containedであり、native `.cmd` installerがあるため不要である。
+.NET Runtime／SDK、PowerShell 7を一般利用者端末へinstallしない。PowerShell 7はrepositoryのpublish/package担当者だけの前提である。
 
-### 13.2 macOS
+### 13.2 非対応platform
 
-- RID `osx-arm64` / `osx-x64`
-- `.app` bundle内にself-contained filesとbundled CLI
-- launcherはbundle-relative absolute pathを使用
-- `install-macos.sh`: architecture確認、hash/signature/notary検証、`~/Applications`へcopy
-- package/sign scriptはmacOS上だけで実行
-- Developer ID、notary profile、staple、`spctl`／`codesign` verificationをfail closedで実行
+- macOS、Linux、Windows Arm64は初版正式公開scopeに含めない。
+- installer、code signing、notarizationの成果物またはscriptが存在すると主張しない。
+- 将来追加時は要求改版とplatform別のpackage／launch／trust evidenceを必須にする。
 
-credential未提供時にad-hoc署名をrelease署名として扱わない。
+### 13.3 自動化境界
 
-### 13.3 CI
+- repositoryにCI workflowは存在しないため、正式公開前にrestore/build/test/publish/package/展開先launchをWindows 11 x64上で明示実行する。
+- CIを将来追加する場合も、同じPowerShell 7 scriptとpackage testを正本にし、未実行platformを成功扱いにしない。
 
-- Windows job: restore/build/test/publish/package/install smoke
-- macOS arm64/x64 build matrix: restore/build/test/publish/bundle/layout/launch
-- release job: protected secretsがあるtag runだけcodesign/notary/staple
-- credentialなしPRではrelease jobを`NOT_RUN_EXTERNAL_PREREQUISITE`として明示
+### 13.4 製品版
+
+- 製品SemVerの単一正本はroot `Directory.Build.props`の`VersionPrefix` / `VersionSuffix`とする。
+- 版の表示、設定、bump、App/Core/published assembly/tag検証は`dev/version.ps1`を使う。
+- 要求文書版、definition/checkpoint/Copilot manifest schema、Prompt template、dependency versionを製品版へ読み替えない。
+- MAJOR/MINOR/PATCH判定、CHANGELOG、tag、GitHub Release、failure handlingは[`version-management.md`](version-management.md)を正本とする。
+- 製品版変更だけでtest済みまたは公開済みとは扱わない。
 
 ## 14. Privacyとlogging
 
@@ -766,10 +766,9 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 
 ### 16.5 Delivery
 
-- Windows package layout、bundled CLI manifest、user-local install smoke
-- macOS bundle layout／architecture／absolute CLI path
-- sign/notary scripts fail closed without credential
-- macOS credentialed release evidenceはexternal gateとして分離
+- Windows package layout、bundled CLI manifest/hash/version、展開先clean launch
+- unsigned ZIPとSHA-256 sidecarの再現可能生成
+- unsupported platform／installer／signingの非対応claim contract
 
 ## 17. File-level implementation map
 
@@ -797,17 +796,14 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 | U-04 | warning resource/shell | warning tests |
 | L-01 | Program/App/composition + launch files | startup tests |
 | P-01 | Windows scripts/package | packaging tests |
-| P-02 | macOS scripts/bundle/sign | packaging tests |
-| P-03 | CI workflow | documentation/package contract tests |
-| D-01..05 | README/docs/docs-dev/images | documentation/screenshot tests |
+| D-01..05 | README/docs/dev/docs/images | documentation/screenshot tests |
 
 ## 18. Definition of done
 
-- 要求v4.0のAC-001〜022がdirect deterministic evidenceへ接続される。
+- 要求v4.1のAC-001〜022がdirect deterministic evidenceへ接続される。
 - 各implementation taskでtarget tests、Release build、diff checkが成功する。
 - 各taskの敵対的reviewで再現したfindingを修正し、同じ観点のfollow-upで0件を確認する。
 - full required testsが成功する。
-- Windows packageとinstall smokeが成功する。
-- macOS package/layout/launch evidenceはmacOS runnerで成功する。
-- signed/notarized artifactはcredentialed release gateが実行された場合だけPASSと記録する。
+- Windows package、展開先launch、bundled CLI resolverが成功する。
+- macOS、Linux、Windows Arm64、installer、code signing、notarizationを対応済みと記録しない。
 - 実在学生本文、Prompt、reference、AI reason/evidenceをlog、test artifact、review recordへ追加しない。

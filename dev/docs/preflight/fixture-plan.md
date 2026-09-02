@@ -1,7 +1,7 @@
 # G-11 synthetic fixture specification plan
 
 > [!WARNING]
-> **HISTORICAL PREFLIGHT:** requirements v1.2用のfixture計画です。現行v3 fixtureとproduction testの正本ではありません。現行状態は[`docs-dev/implementation-status.md`](../implementation-status.md)を参照してください。
+> **HISTORICAL PREFLIGHT:** requirements v1.2用のfixture計画です。現行v3 fixtureとproduction testの正本ではありません。現行状態は[`dev/docs/implementation-status.md`](../implementation-status.md)を参照してください。
 
 | 項目 | 内容 |
 |---|---|

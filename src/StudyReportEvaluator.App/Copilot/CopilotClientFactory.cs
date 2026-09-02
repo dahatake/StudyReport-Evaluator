@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using GitHub.Copilot;
@@ -53,6 +54,13 @@ public sealed class BundledCopilotCliPathResolver : ICopilotCliPathResolver
             return null;
         }
 
+        FileInfo manifestInfo = new(manifestPath);
+        manifestInfo.Refresh();
+        if (!manifestInfo.Exists || manifestInfo.Length is <= 0 or > 16_384)
+        {
+            throw new InvalidDataException("The bundled Copilot manifest size is invalid.");
+        }
+
         BundledCopilotManifest manifest;
         await using (FileStream manifestStream = new(
             manifestPath,
@@ -64,10 +72,21 @@ public sealed class BundledCopilotCliPathResolver : ICopilotCliPathResolver
                 Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
             }))
         {
-            manifest = await JsonSerializer.DeserializeAsync<BundledCopilotManifest>(
+            using StreamReader reader = new(
                 manifestStream,
-                ManifestJsonOptions,
-                cancellationToken).ConfigureAwait(false)
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true),
+                detectEncodingFromByteOrderMarks: true,
+                bufferSize: 1024,
+                leaveOpen: true);
+            string manifestJson = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+            if (reader.CurrentEncoding.CodePage != Encoding.UTF8.CodePage)
+            {
+                throw new InvalidDataException("The bundled Copilot manifest must use UTF-8.");
+            }
+
+            manifest = JsonSerializer.Deserialize<BundledCopilotManifest>(
+                manifestJson,
+                ManifestJsonOptions)
                 ?? throw new InvalidDataException("The bundled Copilot manifest is empty.");
         }
 
@@ -75,14 +94,11 @@ public sealed class BundledCopilotCliPathResolver : ICopilotCliPathResolver
             ?? throw new PlatformNotSupportedException("The current platform has no bundled Copilot runtime.");
         string expectedRelativePath = $"runtimes/{expectedRuntimeIdentifier}/native/"
             + (OperatingSystem.IsWindows() ? "copilot.exe" : "copilot");
-        string sdkVersion = typeof(CopilotClient).Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-            ?.InformationalVersion
-            ?? throw new InvalidDataException("The Copilot SDK informational version cannot be verified.");
+        string sdkPackageVersion = GetSdkPackageVersion();
         if (manifest.SchemaVersion != 1
             || !string.Equals(manifest.RuntimeIdentifier, expectedRuntimeIdentifier, StringComparison.Ordinal)
             || !string.Equals(manifest.CliRelativePath, expectedRelativePath, StringComparison.Ordinal)
-            || !string.Equals(manifest.SdkVersion, sdkVersion, StringComparison.Ordinal)
+            || !string.Equals(manifest.SdkVersion, sdkPackageVersion, StringComparison.Ordinal)
             || !CopilotRuntimeIdentity.IsSafeVersion(manifest.CliVersion)
             || manifest.CliSha256.Length != 64
             || manifest.CliSha256.Any(character => !Uri.IsHexDigit(character)))
@@ -169,6 +185,18 @@ public sealed class BundledCopilotCliPathResolver : ICopilotCliPathResolver
         }
 
         return null;
+    }
+
+    private static string GetSdkPackageVersion()
+    {
+        string informationalVersion = typeof(CopilotClient).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion
+            ?? throw new InvalidDataException("The Copilot SDK informational version cannot be verified.");
+        string packageVersion = informationalVersion.Split('+', 2)[0];
+        return CopilotRuntimeIdentity.IsSafeVersion(packageVersion)
+            ? packageVersion
+            : throw new InvalidDataException("The Copilot SDK package version cannot be verified.");
     }
 
     private sealed record BundledCopilotManifest

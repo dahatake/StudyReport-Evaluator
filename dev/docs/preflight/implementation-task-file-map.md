@@ -1,7 +1,7 @@
 # Implementation task file map — plan v4.0
 
 > [!NOTE]
-> **OWNERSHIP SNAPSHOT:** exact path ownershipの記録として有効です。本文の`future`、`pending`、phase開始条件はtask実行前の時間的snapshotであり、現在の実装進捗ではありません。現在状態は[`docs-dev/implementation-status.md`](../implementation-status.md)を参照してください。
+> **OWNERSHIP SNAPSHOT:** exact path ownershipの記録として有効です。本文の`future`、`pending`、phase開始条件はtask実行前の時間的snapshotであり、現在の実装進捗ではありません。現在状態は[`dev/docs/implementation-status.md`](../implementation-status.md)を参照してください。
 
 | 項目 | 内容 |
 |---|---|
@@ -34,10 +34,10 @@ No `Application/`、`Infrastructure/`、`Platform/`、`Workbooks/`、`Desktop/`�
 | Task | Exact files |
 |---|---|
 | B-01 | `docs/requirements-definition.md`; `work/20260831-implementation-plan.md` |
-| B-02 | `docs-dev/adr/0011-dynamic-quantification-excel-formulas.md`; `docs-dev/preflight/sample-workbook-profile.md` |
-| B-03 | `docs-dev/preflight/requirements-baseline.md`; `docs-dev/preflight/implementation-task-file-map.md` |
-| B-04 | `docs-dev/traceability.md` |
-| GATE-0 | `docs-dev/preflight/gate-result.md` |
+| B-02 | `dev/docs/adr/0011-dynamic-quantification-excel-formulas.md`; `dev/docs/preflight/sample-workbook-profile.md` |
+| B-03 | `dev/docs/preflight/requirements-baseline.md`; `dev/docs/preflight/implementation-task-file-map.md` |
+| B-04 | `dev/docs/traceability.md` |
+| GATE-0 | `dev/docs/preflight/gate-result.md` |
 
 ## Phase 1 — Foundation
 
@@ -97,8 +97,8 @@ No `Application/`、`Infrastructure/`、`Platform/`、`Workbooks/`、`Desktop/`�
 | E-01 | `App.Tests/E2E/SyntheticWorkbookFactory.cs`; `App.Tests/E2E/FakeCopilotTransport.cs`; `App.Tests/E2E/SyntheticQuantificationJourneyTests.cs`; generated ignored workbooks under `artifacts/test/fixtures/` |
 | E-02 | `App.Tests/E2E/SampleWorkbookStructuralTests.cs`; `App.Tests/E2E/WindowsLocalApplicationTests.cs`; `App.Tests/E2E/HostileInputAndFailureTests.cs`; `artifacts/test/performance-windows-x64.json` |
 | P-01 | `scripts/publish-windows.ps1`; `scripts/package-windows.ps1`; `App.Tests/Packaging/WindowsPublishPackageTests.cs`; generated ignored `artifacts/package/StudyReportEvaluator-win-x64.zip`; generated ignored `artifacts/package/StudyReportEvaluator-win-x64.zip.sha256` |
-| D-01 | `README.md`; `docs-dev/architecture.md`; `docs-dev/excel-contract.md`; `docs-dev/custom-evaluator-guide.md`; `App.Tests/Content/DocumentationContractTests.cs` |
-| E-TR | `docs-dev/traceability.md` |
+| D-01 | `README.md`; `dev/docs/architecture.md`; `dev/docs/excel-contract.md`; `dev/docs/custom-evaluator-guide.md`; `App.Tests/Content/DocumentationContractTests.cs` |
+| E-TR | `dev/docs/traceability.md` |
 | GATE-ACCEPTANCE | generated `artifacts/test/gate-acceptance.json` |
 
 ## Shared and sequential ownership
@@ -106,7 +106,7 @@ No `Application/`、`Infrastructure/`、`Platform/`、`Workbooks/`、`Desktop/`�
 | Path | Ordered owners | Rule |
 |---|---|---|
 | `App/App.axaml`; `App/App.axaml.cs` | F-02 → U-02 | F-02 creates minimal bootstrap; U-02 integrates shell/resources without changing project topology |
-| `docs-dev/traceability.md` | B-04 → E-TR | B-04 creates planned mapping; E-TR replaces planned status with final evidence only after task/gate completion |
+| `dev/docs/traceability.md` | B-04 → E-TR | B-04 creates planned mapping; E-TR replaces planned status with final evidence only after task/gate completion |
 | `.gitignore` | F-01 | Read and merge existing uncommitted content; never reset or overwrite unrelated lines |
 | `README.md` | D-01 | Read and merge existing uncommitted content; never reset or overwrite unrelated sections |
 

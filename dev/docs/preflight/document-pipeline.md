@@ -1,7 +1,7 @@
 # G-16 DocumentPipeline preflight evidence
 
 > [!WARNING]
-> **HISTORICAL PREFLIGHT:** requirements v1.xの隔離spike記録です。現在のproduction implementation statusやGATE-ACCEPTANCEを表しません。現行状態は[`docs-dev/implementation-status.md`](../implementation-status.md)を参照してください。
+> **HISTORICAL PREFLIGHT:** requirements v1.xの隔離spike記録です。現在のproduction implementation statusやGATE-ACCEPTANCEを表しません。現行状態は[`dev/docs/implementation-status.md`](../implementation-status.md)を参照してください。
 
 | 項目 | 内容 |
 |---|---|

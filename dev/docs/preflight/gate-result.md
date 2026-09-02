@@ -1,7 +1,7 @@
 # Revised GATE-0 result — dynamic Excel quantification
 
 > [!NOTE]
-> **GATE-TIME SNAPSHOT:** production sourceが0件だったGATE-0評価時点の記録です。現在の実装・最終gate状態は[`docs-dev/implementation-status.md`](../implementation-status.md)とgenerated `artifacts/test/gate-acceptance.json`を参照してください。
+> **GATE-TIME SNAPSHOT:** production sourceが0件だったGATE-0評価時点の記録です。現在の実装・最終gate状態は[`dev/docs/implementation-status.md`](../implementation-status.md)とgenerated `artifacts/test/gate-acceptance.json`を参照してください。
 
 | 項目 | 値 |
 |---|---|
@@ -39,11 +39,11 @@ This decision applies only to requirement v3.0 / plan v4.0 / ADR-0011。It does 
 |---|---|---:|---|---|
 | `docs/requirements-definition.md` v3.0 | `adc6ad12a3c80b4a92c9453d8b7a58e2daeb346f` | 30,480 | `ACB7E1C524E1628C48AC2669B5B2FC730B3EF7EED96723D02F1B5AA6B6264C03` | PASS |
 | `work/20260831-implementation-plan.md` v4.0 | `adc6ad12a3c80b4a92c9453d8b7a58e2daeb346f` | 30,790 | `F63D0E1A9AAABFA4C0F2C0A0F032AFE5F5674A64B76723F82D68000A7A506BCD` | PASS |
-| `docs-dev/adr/0011-dynamic-quantification-excel-formulas.md` | `502b48898411ca247543143773be8a3ee28ea7e5` | 10,919 | `33A678396FFC9BFB7B5726B34B1874ADC9868C97E9C6EAA3E94FFB0F9C14CC65` | PASS |
-| `docs-dev/preflight/sample-workbook-profile.md` | `502b48898411ca247543143773be8a3ee28ea7e5` | 4,898 | `A0BA407B55A59363649FE3CEB001B7219838B2F216D8B74FF7E74B9A3B17A2C1` | PASS |
-| `docs-dev/preflight/requirements-baseline.md` | `da8ced2f3ff78f7d3c1d7ed0c95c8de359bcbaab` | 9,708 | `0EC8C1591195ECE3A5DF880CC553C0831383B2309D1D867A9BF4911700515CBE` | PASS |
-| `docs-dev/preflight/implementation-task-file-map.md` | `da8ced2f3ff78f7d3c1d7ed0c95c8de359bcbaab` | 13,552 | `A2A9BD9A9E8E6026AAF89E3889D6A48192AF83056C294579706FD9BBB3AFD68C` | PASS |
-| `docs-dev/traceability.md` | `dfeb25408756c8626f1d2cab0995bed107167415` | 13,848 | `054D46AC8FD16605A6429DB7255D678F7992802C6AF4876D69F473A258047983` | PASS |
+| `dev/docs/adr/0011-dynamic-quantification-excel-formulas.md` | `502b48898411ca247543143773be8a3ee28ea7e5` | 10,919 | `33A678396FFC9BFB7B5726B34B1874ADC9868C97E9C6EAA3E94FFB0F9C14CC65` | PASS |
+| `dev/docs/preflight/sample-workbook-profile.md` | `502b48898411ca247543143773be8a3ee28ea7e5` | 4,898 | `A0BA407B55A59363649FE3CEB001B7219838B2F216D8B74FF7E74B9A3B17A2C1` | PASS |
+| `dev/docs/preflight/requirements-baseline.md` | `da8ced2f3ff78f7d3c1d7ed0c95c8de359bcbaab` | 9,708 | `0EC8C1591195ECE3A5DF880CC553C0831383B2309D1D867A9BF4911700515CBE` | PASS |
+| `dev/docs/preflight/implementation-task-file-map.md` | `da8ced2f3ff78f7d3c1d7ed0c95c8de359bcbaab` | 13,552 | `A2A9BD9A9E8E6026AAF89E3889D6A48192AF83056C294579706FD9BBB3AFD68C` | PASS |
+| `dev/docs/traceability.md` | `dfeb25408756c8626f1d2cab0995bed107167415` | 13,848 | `054D46AC8FD16605A6429DB7255D678F7992802C6AF4876D69F473A258047983` | PASS |
 
 Hashes identify exact repository bytes。They are not organizational signatures、identity proof、legal approval、educational validation、or proof of production behavior。
 
