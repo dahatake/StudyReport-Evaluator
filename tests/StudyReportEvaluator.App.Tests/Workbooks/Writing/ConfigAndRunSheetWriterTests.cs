@@ -217,6 +217,16 @@ public sealed class ConfigAndRunSheetWriterTests
         Assert.Equal("0.1", Text(definition, "AB"));
         Assert.Equal("100", CachedValue(definition, "AD"));
         Assert.Equal("1", CachedValue(definition, "AE"));
+        Assert.All(rows, row =>
+        {
+            string[] columns = row.Elements<Cell>()
+                .Select(cell => Column(cell.CellReference?.Value))
+                .ToArray();
+            Assert.Equal(
+                columns.OrderBy(column => column.Length)
+                    .ThenBy(column => column, StringComparer.Ordinal),
+                columns);
+        });
 
         string reconstructedSnapshot = string.Concat(
             rows.Where(row => Text(row, "A") == "CANONICAL_JSON")

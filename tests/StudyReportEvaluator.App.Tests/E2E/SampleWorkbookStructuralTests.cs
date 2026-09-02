@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using DocumentFormat.OpenXml.Packaging;
 using StudyReportEvaluator.App.Workbooks.Intake;
@@ -15,9 +17,11 @@ namespace StudyReportEvaluator.App.Tests.E2E;
 
 public sealed class SampleWorkbookStructuralTests
 {
-    private const long ExpectedSampleSizeBytes = 469_995;
+    private const long ExpectedSampleSizeBytes = 470_806;
     private const string ExpectedSampleSha256 =
-        "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D";
+        "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA";
+    private const string ExpectedWorksheetNameSha256 =
+        "88D759EA02CEF4B82885C6C620473162757C75522805707C20E2BE76A40A2825";
 
     [Fact]
     public void Repository_sample_is_opened_read_only_and_only_structural_metadata_drives_mapping()
@@ -45,15 +49,14 @@ public sealed class SampleWorkbookStructuralTests
         FileFormatClassificationResult classification = new FileFormatClassifier().Classify(samplePath);
         Assert.True(classification.IsAccepted);
         Assert.Equal(FileFormatClassification.StandardXlsx, classification.Classification);
-        Assert.Equal(13, classification.PackagePartCount);
-        Assert.Equal(9, classification.RelationshipCount);
+        Assert.Equal(11, classification.PackagePartCount);
+        Assert.Equal(8, classification.RelationshipCount);
 
         WorkbookMetadata metadata = new WorkbookMetadataReader().Read(samplePath);
-        Assert.Equal(13, metadata.PackagePartCount);
-        Assert.Equal(9, metadata.RelationshipCount);
-        Assert.Collection(
-            metadata.Worksheets,
-            worksheet => AssertSheet(worksheet, "Sheet2", "A1:J531", 10));
+        Assert.Equal(11, metadata.PackagePartCount);
+        Assert.Equal(8, metadata.RelationshipCount);
+        WorksheetMetadata worksheet = Assert.Single(metadata.Worksheets);
+        AssertSheet(worksheet, "A1:L531", 12);
 
         ColumnMappingSuggestionResult suggestions = new ColumnMappingSuggester().Suggest(metadata);
         WorksheetMappingSuggestion suggestion = Assert.IsType<WorksheetMappingSuggestion>(
@@ -66,42 +69,43 @@ public sealed class SampleWorkbookStructuralTests
         Assert.True(comparison.LastWriteTimeUtcMatches);
         Assert.True(comparison.IsMatch);
 
-        Assert.Equal("Sheet2", suggestion.WorksheetName);
+        Assert.Equal(worksheet.Name, suggestion.WorksheetName);
         Assert.Equal(1U, suggestion.HeaderRow);
         Assert.Equal(2U, suggestion.FirstDataRow);
         Assert.Equal(531U, suggestion.LastDataRow);
         Assert.Equal(530U, suggestion.SuggestedDataRowCount);
-        Assert.Equal(["D", "E", "F", "G", "H", "I"], suggestion.InitialTargetColumns);
-        Assert.Equal(["A", "B", "C", "J"], suggestion.InitiallyUnselectedColumns);
+        Assert.Equal(["F", "G", "H", "I", "J", "K"], suggestion.InitialTargetColumns);
+        Assert.Equal(["A", "B", "C", "D", "E", "L"], suggestion.InitiallyUnselectedColumns);
 
         IReadOnlyDictionary<string, ColumnMappingCandidate> candidates = suggestion.Candidates
             .ToDictionary(candidate => candidate.ColumnName, StringComparer.Ordinal);
         Assert.Equal(
-            ["D", "E", "F", "G", "H", "I"],
+            ["F", "G", "H", "I", "J", "K"],
             candidates.Keys.Order(StringComparer.Ordinal));
-        Assert.Equal(ColumnMappingCandidateRole.PrimaryAnswer, candidates["D"].Roles);
+        Assert.Equal(ColumnMappingCandidateRole.PrimaryAnswer, candidates["F"].Roles);
         Assert.Equal(
             ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.StudentPromptPrimary,
-            candidates["E"].Roles);
+            candidates["G"].Roles);
         Assert.Equal(
             ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.Supporting,
-            candidates["F"].Roles);
-        Assert.Equal(ColumnMappingCandidateRole.PrimaryAnswer, candidates["G"].Roles);
+            candidates["H"].Roles);
+        Assert.Equal(ColumnMappingCandidateRole.PrimaryAnswer, candidates["I"].Roles);
         Assert.Equal(
             ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.StudentPromptPrimary,
-            candidates["H"].Roles);
-        Assert.Equal(ColumnMappingCandidateRole.Supporting, candidates["I"].Roles);
-        Assert.Empty(candidates["E"].SuggestedSupportingColumns);
-        Assert.Equal(["I"], candidates["H"].SuggestedSupportingColumns);
+            candidates["J"].Roles);
+        Assert.Equal(ColumnMappingCandidateRole.Supporting, candidates["K"].Roles);
+        Assert.Empty(candidates["G"].SuggestedSupportingColumns);
+        Assert.Equal(["K"], candidates["J"].SuggestedSupportingColumns);
     }
 
     private static void AssertSheet(
         WorksheetMetadata worksheet,
-        string expectedName,
         string expectedDimension,
         uint expectedColumns)
     {
-        Assert.Equal(expectedName, worksheet.Name);
+        Assert.Equal(
+            ExpectedWorksheetNameSha256,
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(worksheet.Name))));
         Assert.Equal(expectedDimension, worksheet.DimensionReference);
         Assert.Equal(1U, worksheet.FirstRowIndex);
         Assert.Equal(531U, worksheet.LastRowIndex);

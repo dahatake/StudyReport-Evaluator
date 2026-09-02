@@ -6,7 +6,7 @@
 | Decision | ADR-0012（機能）/ ADR-0013（platform） |
 | Detailed design | `dev/docs/detailed-design.md` |
 | Plan | `work/20260901-v4-implementation-plan.md` |
-| Current validation | Release build warning/error 0。full 664/665 PASS、正規sample欠落1件FAIL。sample test除外664/664 PASSは代替にしない |
+| Current validation | Release build warning/error 0。full 670/670 PASS（Core 190 / App 480）。canonical sample technical E2E 1/1、documentation contract 14/14 PASS |
 | Current status | IMPLEMENTATION_IN_PROGRESS |
 
 この表の`PLANNED`は未実装をPASSと称しない。task完了後にproduction symbol、direct test、gate identityへ更新する。旧v3 traceabilityはGit履歴とADR-0011に保持する。
@@ -31,7 +31,7 @@
 |---|---|---|---|---|
 | AC-001 | picker/path、immutable input、separate output | X-01/U-01/X-04 | input/path/atomic tests | PASS_REQUIRED |
 | AC-002 | question row 1/2、sheet/rows/normal/special mapping | X-01/U-01/U-02 | metadata/mapping/UI tests | PASS_REQUIRED |
-| AC-003 | repository sample D〜I candidate、input identity | X-01 | sample structural test | PASS_REQUIRED |
+| AC-003 | canonical repository sample F〜K candidate、input identity | X-01 | sample structural test | PASS_REQUIRED |
 | AC-004 | base 60、special 0、similarity weight 0.1 | C-01/U-02 | domain/design tests | PASS_REQUIRED |
 | AC-005 | equal initial question points、explicit equalize、manual preservation | C-02/U-02 | allocation/UI tests | PASS_REQUIRED |
 | AC-006 | exact allocation total 100 | C-02/C-04/X-02 | validator/formula tests | PASS_REQUIRED |
@@ -76,7 +76,7 @@
 | TR-18 | launch options/Prompt/no auto-run | L-01/U-02 | PASS_REQUIRED |
 | TR-19 | Windows publish/package/bundled CLI/clean launch | P-01 | PASS_REQUIRED |
 | TR-20 | unsigned ZIP/hash/safe layout/reproducibility | P-01 | PASS_REQUIRED |
-| TR-21 | unsupported platform/installer/signing claim exclusion | P-01/D-01..05 | PLANNED |
+| TR-21 | unsupported platform/installer/signing claim exclusion | P-01/D-01..05 | PASS_REQUIRED |
 | TR-22 | docs/screenshots | D-01..04 | PASS_REQUIRED |
 | TR-23 | fixed-seed new/resume E2E | E-01/E-02 | PASS_REQUIRED |
 | TR-24 | optional live/recalculation | E-03 advisory | MIXED_ADVISORY |

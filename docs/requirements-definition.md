@@ -3,7 +3,7 @@
 | 項目 | 内容 |
 |---|---|
 | 文書版 | 4.1 |
-| 基準日 | 2026-09-02 |
+| 基準日 | 2026-09-03 |
 | 状態 | 正式公開scope同期済み baseline |
 | 入力 | Microsoft Forms または Google Forms から export した標準 `.xlsx` 1ファイル |
 | 出力 | 入力を変更せず作成する別の標準 `.xlsx` 1ファイル |
@@ -12,7 +12,7 @@
 | AI | GitHub Copilot SDK for .NET。通常評価は利用者選択model、参照回答と類似度は `auto` |
 | 旧版 | v4.0のplatform scopeを本版でsupersede。v3.0はv4.0により全面的にsupersede済み |
 
-> 本版は、2026-09-01の要求所有者指示と、その後のdefault plan採用指示に加え、2026-09-02の正式公開README実装指示を反映する。platform scopeは[ADR-0013](../dev/docs/adr/0013-windows-only-public-release.md)に基づき、実packageと実行証跡があるWindows 11 x64へ限定する。
+> 本版は、2026-09-01の要求所有者指示と、その後のdefault plan採用指示、2026-09-02の正式公開README実装指示、および2026-09-03のrepository sample単一化指示を反映する。platform scopeは[ADR-0013](../dev/docs/adr/0013-windows-only-public-release.md)に基づき、実packageと実行証跡があるWindows 11 x64へ限定する。
 >
 > 本書の「AI評価」は成績を確定する自動判定ではない。AIは定量化候補を作り、最終的な評点と利用判断の責任は利用者が負う。
 
@@ -111,20 +111,22 @@ repository内の現行サンプル正本は次とする。
 
 `sample/SampleReport.xlsx`
 
-2026-09-02に回答本文を出力せず、production readerで構造とheader由来mapping候補だけを再確認したprofileを使用する。
+2026-09-03に回答本文を出力せず、production readerで構造とheader由来mapping候補だけを再確認したprofileを使用する。このexact pathだけをrepository sample契約として使い、同directoryの他fileを列挙、fallback、代用しない。local deterministic technical E2Eも同じfileを使う。
 
 | 項目 | 実測値 |
 |---|---|
-| Bytes | 469,995 |
-| SHA-256 | `F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D` |
-| `Sheet2` | `A1:J531` |
-| 初期primary候補 | D、E、F、G、H |
-| 学生Prompt primary候補 | E、H |
-| supporting候補 | F、I |
-| Hの初期supporting候補 | I |
-| 初期対象外 | A〜C、J |
+| Bytes | 470,806 |
+| SHA-256 | `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA` |
+| package entries / relationships | 11 / 8 |
+| worksheet / dimension | 1件 / `A1:L531` |
+| worksheet name SHA-256 | `88D759EA02CEF4B82885C6C620473162757C75522805707C20E2BE76A40A2825` |
+| 初期primary候補 | F、G、H、I、J |
+| 学生Prompt primary候補 | G、J |
+| supporting候補 | H、K |
+| Jの初期supporting候補 | K |
+| 初期target / 対象外 | F〜K / A〜E、L |
 
-D〜Iの役割はheader semanticsから得た候補であり、列位置だけで固定しない。利用者は実際のheaderと授業設計を確認し、通常Questionまたは固有評価のprimary/supportingを画面で変更する。
+F〜Kの役割はheader semanticsから得た候補であり、列位置だけで固定しない。利用者は実際のheaderと授業設計を確認し、通常Questionまたは固有評価のprimary/supportingを画面で変更する。
 
 ### 4.5 元本不変
 
@@ -673,7 +675,7 @@ run開始時、完成名に対応する次のfileを作る。
 |---|---|
 | AC-001 | native pickerまたはpathから標準 `.xlsx`を選び、元本を変更せず別 `.xlsx`を作る。 |
 | AC-002 | question text rowを1または2から選び、sheet、回答行、質問／通常回答／固有項目列を変更可能な候補として表示する。 |
-| AC-003 | 指定sampleでF/Iを通常回答、G/J/KをPrompt関連の固有項目候補として提示し、元本identityを維持する。 |
+| AC-003 | 指定sampleでF〜Jをprimary候補、G/Jを学生Prompt primary候補、H/Kをsupporting候補、KをJの初期supporting候補として提示し、元本identityを維持する。 |
 | AC-004 | base既定60、special既定0、similarity weight既定0.1を表示・変更できる。 |
 | AC-005 | 設問Pointsの初期値が`(100-base-special)/有効設問数`となり、明示的な均等配分以外で手動値を変更しない。 |
 | AC-006 | `base + special + Σ question points = 100`をrun前とformulaで検証する。 |
@@ -756,5 +758,6 @@ run開始時、完成名に対応する次のfileを作る。
 | Initial requirement source | 2026-09-01の本セッションで提示されたアプリケーション要件 |
 | Default-decision approval source | 同日の後続指示「不明点はデフォルトのプランを採用してください。全てのタスクを実行してください」 |
 | Release-scope update source | 2026-09-02の正式公開README実装指示とADR-0013 |
+| Sample consolidation source | 2026-09-03の`sample/SampleReport.xlsx`を唯一のsampleとして扱う要求所有者指示 |
 | Approved scope | 本書§1〜§21。base／special／similarity、checkpoint再開、Prompt起動、Windows 11 x64配布を含む |
 | Meaning | repository要求baselineの承認記録。組織の法務・教育・security承認または電子署名を意味しない |

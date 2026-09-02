@@ -206,7 +206,7 @@ pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify -Tag v1.1.0 -RequireC
 
 ### 6.4 buildとtest
 
-現行repositoryにはCI workflowがないため、正式公開前はWindows 11 x64上で手動実行します。[詳細設計 §13.3](detailed-design.md#133-自動化境界)
+現行repositoryは[CI workflow](../../.github/workflows/ci.yml)でsample非依存のlocked restore、Release build、決定的testを実行します。`sample/SampleReport.xlsx`はGit追跡しないprivate local inputなので、正式公開前はWindows 11 x64上でcanonical sampleを含むmanual final gateも実行し、CIで代用しません。[詳細設計 §13.3](detailed-design.md#133-自動化境界)
 
 1. locked restore。
 2. Release build。
@@ -237,7 +237,7 @@ pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify -Tag v1.1.0 -RequireC
 
 ### 6.7 GitHub Release
 
-現時点ではrelease workflowがないため、GitHub Releaseは手動作成です。
+GitHub Releaseは既存annotated tagを対象に[release workflow](../../.github/workflows/release.yml)のmanual dispatchで作成できます。workflowを利用できない場合も、以下と同じfail-closed手順で手動作成します。
 
 1. verified tagを選び、draft Releaseを作ります。
 2. ZIPと対応する`.sha256`をdraftへ添付します。

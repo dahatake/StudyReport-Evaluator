@@ -31,7 +31,7 @@ AIが作る値は確認対象です。最終的な評点と利用判断は、授
 
 ## 入手・SHA-256確認・起動
 
-1. 公開元から`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`を同じdirectoryへdownloadします。
+1. [v1.0.0のZIP](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v1.0.0/StudyReportEvaluator-win-x64.zip)と[SHA-256 sidecar](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v1.0.0/StudyReportEvaluator-win-x64.zip.sha256)を同じdirectoryへdownloadします。
 2. ZIPのSHA-256を確認します。
 3. sidecarの先頭64文字と完全一致することを確認します。
 4. ZIPを新しいdirectoryへ展開します。

@@ -154,6 +154,38 @@ public sealed class WeightedScoreCalculatorTests
     }
 
     [Fact]
+    public void V4_system_prompt_hand_oracle_produces_86_point_8()
+    {
+        decimal? firstRate = _calculator.QuestionRate(answerPresent: true, 80m);
+        decimal? secondRate = _calculator.QuestionRate(answerPresent: true, 50m);
+        decimal? firstEarned = _calculator.QuestionEarned(firstRate, 20m, 1);
+        decimal? secondEarned = _calculator.QuestionEarned(secondRate, 10m, 1);
+        decimal? firstSpecial = _calculator.SpecialQuestionRate([0.8m], 1);
+        decimal? secondSpecial = _calculator.SpecialQuestionRate([0.6m], 1);
+        decimal? specialEarned = _calculator.SpecialEarned(10m, [firstSpecial, secondSpecial], 1);
+        decimal? firstPenalty = _calculator.SimilarityPenalty(20m, 0.5m, 0.1m, 1);
+        decimal? secondPenalty = _calculator.SimilarityPenalty(10m, 0.2m, 0.1m, 1);
+        decimal? finalRaw = _calculator.FinalRaw(
+            60m,
+            [firstEarned, secondEarned],
+            specialEarned,
+            [firstPenalty, secondPenalty],
+            1);
+
+        Assert.Equal(0.8m, firstRate);
+        Assert.Equal(0.5m, secondRate);
+        Assert.Equal(16m, firstEarned);
+        Assert.Equal(5m, secondEarned);
+        Assert.Equal(0.8m, firstSpecial);
+        Assert.Equal(0.6m, secondSpecial);
+        Assert.Equal(7m, specialEarned);
+        Assert.Equal(1m, firstPenalty);
+        Assert.Equal(0.2m, secondPenalty);
+        Assert.Equal(86.8m, finalRaw);
+        Assert.Equal(86.8m, WeightedScoreCalculator.FinalScore(finalRaw));
+    }
+
+    [Fact]
     public void Empty_input_becomes_zero_while_technical_missing_remains_blank()
     {
         decimal? emptyRate = _calculator.QuestionRate(answerPresent: false, questionNormalized: null);

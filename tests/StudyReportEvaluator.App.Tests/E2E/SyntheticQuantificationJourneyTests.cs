@@ -1,8 +1,11 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text.Json;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using DocumentFormat.OpenXml.Validation;
+using StudyReportEvaluator.App.Workbooks.Checkpoint;
 using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.App.Workbooks.Mapping;
 using StudyReportEvaluator.App.Workbooks.Reading;
@@ -234,6 +237,290 @@ public sealed class SyntheticQuantificationJourneyTests
             expectedPlanCount,
             expectedEmptyCount,
             cancellationToken);
+    }
+
+    [Fact]
+    public async Task Fixed_seed_531_row_durable_new_and_resume_matches_uninterrupted_run()
+    {
+        using SyntheticWorkbook workbook = SyntheticWorkbookFactory.Create();
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        InputSnapshotService snapshots = new();
+        InputSnapshot inputBefore = snapshots.Capture(workbook.Path);
+        string originalWorksheetXml = ReadWorksheetXml(
+            workbook.Path,
+            SyntheticWorkbookFactory.SourceSheetName);
+        WorkbookMetadata metadata = new WorkbookMetadataReader().Read(workbook.Path);
+        QuantificationDefinition definition = CreateDurableDefinition();
+        Assert.True(new ColumnMappingValidator().Validate(metadata, definition).IsValid);
+
+        string baselineDirectory = Path.Combine(workbook.RootDirectory, "durable-baseline");
+        string resumeDirectory = Path.Combine(workbook.RootDirectory, "durable-resume");
+        Directory.CreateDirectory(baselineDirectory);
+        Directory.CreateDirectory(resumeDirectory);
+
+        FakeCopilotTransport baselineNormal = new(workbook);
+        DurableReferenceRunner baselineReferences = new();
+        DurableSpecialRunner baselineSpecials = new(workbook);
+        DurableSimilarityRunner baselineSimilarities = new();
+        DurableCountingCheckpointStore baselineStore = new(new CheckpointStore());
+        RunSummary baseline = await DurableOrchestrator(
+            workbook,
+            baselineNormal,
+            baselineReferences,
+            baselineSpecials,
+            baselineSimilarities,
+            baselineStore).RunAsync(
+                DurableRequest(definition, metadata, workbook.Path, baselineDirectory),
+                cancellationToken: cancellationToken);
+
+        int expectedEmptyCount = workbook.CountBlankRows("F") + workbook.CountBlankRows("J");
+        int expectedNormalCalls = (SyntheticWorkbookFactory.DataRowCount * 2) - expectedEmptyCount;
+        int expectedSpecialCalls = SyntheticWorkbookFactory.DataRowCount - workbook.CountBlankRows("J");
+        AssertDurableSuccess(baseline, expectedEmptyCount, expectedResumed: false);
+        Assert.Equal(expectedNormalCalls, baselineNormal.Calls.Length);
+        Assert.Equal(2, baselineReferences.CallCount);
+        Assert.Equal(expectedSpecialCalls, baselineSpecials.CallCount);
+        Assert.Equal(expectedNormalCalls, baselineSimilarities.CallCount);
+        Assert.Equal(1, baselineStore.CreateCount);
+        Assert.Equal(532, baselineStore.UpdateCount);
+        Assert.Equal(0, baselineStore.LoadCount);
+
+        using CancellationTokenSource interruption = new();
+        FakeCopilotTransport interruptedNormal = new(workbook);
+        DurableReferenceRunner interruptedReferences = new();
+        DurableSpecialRunner interruptedSpecials = new(workbook);
+        DurableSimilarityRunner interruptedSimilarities = new();
+        DurableCountingCheckpointStore interruptedStore = new(
+            new CheckpointStore(),
+            envelope =>
+            {
+                if (envelope.CompletedRows.Length == 265)
+                {
+                    interruption.Cancel();
+                }
+            });
+        RunSummary interrupted = await DurableOrchestrator(
+            workbook,
+            interruptedNormal,
+            interruptedReferences,
+            interruptedSpecials,
+            interruptedSimilarities,
+            interruptedStore).RunAsync(
+                DurableRequest(definition, metadata, workbook.Path, resumeDirectory),
+                cancellationToken: interruption.Token);
+
+        Assert.Equal(QuantificationRunStatusCodes.Cancelled, interrupted.StatusCode);
+        Assert.True(interrupted.IsPartial);
+        Assert.False(interrupted.WasResumed);
+        Assert.Equal(2, interrupted.References.Length);
+        Assert.Equal(265, interrupted.CompletedRows.Length);
+        Assert.Null(interrupted.FinalPath);
+        string partialPath = Assert.IsType<string>(interrupted.PartialPath);
+        Assert.True(File.Exists(partialPath));
+        Assert.Equal(2, interruptedReferences.CallCount);
+        Assert.Equal(interruptedNormal.Calls.Length, interruptedSimilarities.CallCount);
+        Assert.Equal(1, interruptedStore.CreateCount);
+        Assert.Equal(267, interruptedStore.UpdateCount);
+        Assert.Equal(0, interruptedStore.LoadCount);
+
+        FakeCopilotTransport resumedNormal = new(workbook);
+        DurableReferenceRunner resumedReferences = new(throwOnCall: true);
+        DurableSpecialRunner resumedSpecials = new(workbook);
+        DurableSimilarityRunner resumedSimilarities = new();
+        DurableCountingCheckpointStore resumedStore = new(new CheckpointStore());
+        RunSummary resumed = await DurableOrchestrator(
+            workbook,
+            resumedNormal,
+            resumedReferences,
+            resumedSpecials,
+            resumedSimilarities,
+            resumedStore).RunAsync(
+                DurableRequest(definition, metadata, workbook.Path, resumeDirectory) with
+                {
+                    ResumePartialPath = partialPath,
+                },
+                cancellationToken: cancellationToken);
+
+        AssertDurableSuccess(resumed, expectedEmptyCount, expectedResumed: true);
+        Assert.Equal(expectedNormalCalls - interruptedNormal.Calls.Length, resumedNormal.Calls.Length);
+        Assert.Equal(0, resumedReferences.CallCount);
+        Assert.Equal(expectedSpecialCalls - interruptedSpecials.CallCount, resumedSpecials.CallCount);
+        Assert.Equal(expectedNormalCalls - interruptedSimilarities.CallCount, resumedSimilarities.CallCount);
+        Assert.Equal(0, resumedStore.CreateCount);
+        Assert.Equal(265, resumedStore.UpdateCount);
+        Assert.Equal(1, resumedStore.LoadCount);
+        Assert.False(File.Exists(partialPath));
+
+        Assert.Equal(DurableResultHash(baseline), DurableResultHash(resumed));
+        string baselineFinal = Assert.IsType<string>(baseline.FinalPath);
+        string resumedFinal = Assert.IsType<string>(resumed.FinalPath);
+        Assert.Equal(ResultFormulaHash(baselineFinal), ResultFormulaHash(resumedFinal));
+        AssertDurableOutput(baselineFinal, originalWorksheetXml, cancellationToken);
+        AssertDurableOutput(resumedFinal, originalWorksheetXml, cancellationToken);
+        Assert.True(snapshots.Recheck(workbook.Path, inputBefore).IsMatch);
+    }
+
+    private static QuantificationDefinition CreateDurableDefinition()
+    {
+        QuantificationDefinition source = CreateDefinition();
+        SpecialEvaluationDefinition special = new()
+        {
+            Id = "S-PROMPT",
+            DisplayName = "Synthetic prompt special",
+            PrimarySourceColumn = "J",
+            SupportingSourceColumns = ["K"],
+            PromptTemplate = "{回答}\n{補助情報}",
+        };
+        return source with
+        {
+            Id = "DEF-E01-DURABLE-SEED-20260901",
+            Name = "Synthetic E-01 durable fixed-seed definition",
+            Revision = "durable-" + SyntheticWorkbookFactory.Seed.ToString(CultureInfo.InvariantCulture),
+            BasePoints = 85m,
+            SpecialPoints = 10m,
+            Questions = source.Questions.Select(question =>
+                question.Id == "Q-PROMPT"
+                    ? question with { SpecialEvaluations = [special] }
+                    : question).ToImmutableArray(),
+        };
+    }
+
+    private static DurableQuantificationOrchestrator DurableOrchestrator(
+        SyntheticWorkbook workbook,
+        IEvaluationRunner normal,
+        IReferenceAnswerOperationRunner references,
+        ISpecialEvaluationOperationRunner specials,
+        ISimilarityEvaluationOperationRunner similarities,
+        ICheckpointStore checkpoints) =>
+        new(
+            new SyntheticEvaluationRowSource(workbook),
+            normal,
+            references,
+            specials,
+            similarities,
+            new PhysicalInputSnapshotBoundary(),
+            checkpoints,
+            new OutputPathPlanner(),
+            new WorkbookDurableRunFinalizer(),
+            new PhysicalPartialCheckpointCleaner());
+
+    private static DurableQuantificationRunRequest DurableRequest(
+        QuantificationDefinition definition,
+        WorkbookMetadata metadata,
+        string inputPath,
+        string outputDirectory) =>
+        new()
+        {
+            Run = new QuantificationRunRequest
+            {
+                DraftDefinition = definition,
+                WorkbookMetadata = metadata,
+                InputPath = inputPath,
+                ModelId = ModelId,
+                MaximumPromptTokens = 64_000,
+                MaximumContextWindowTokens = 128_000,
+                MaxConcurrency = 3,
+            },
+            Runtime = new CheckpointRuntimeIdentity
+            {
+                ApplicationIdentity = "StudyReportEvaluator.App/E-01-durable-test",
+                CliVersion = "1.0.82-test-no-cli",
+                CliSha256 = new string('A', 64),
+                SdkInformationalVersion = "1.0.11",
+            },
+            OutputDirectory = outputDirectory,
+        };
+
+    private static void AssertDurableSuccess(
+        RunSummary summary,
+        int expectedEmptyCount,
+        bool expectedResumed)
+    {
+        Assert.Equal(QuantificationRunStatusCodes.Success, summary.StatusCode);
+        Assert.True(summary.IsDurable);
+        Assert.Equal(expectedResumed, summary.WasResumed);
+        Assert.False(summary.IsPartial);
+        Assert.False(summary.PartialCleanupFailed);
+        Assert.Equal(AtomicOutputStatusCodes.Success, summary.FinalizationCode);
+        Assert.Equal(1_060, summary.PlannedEvaluationCount);
+        Assert.Equal(1_060, summary.CompletedEvaluationCount);
+        Assert.Equal(1_060 - expectedEmptyCount, summary.SucceededCount);
+        Assert.Equal(expectedEmptyCount, summary.EmptyCount);
+        Assert.Equal(0, summary.FailureCount);
+        Assert.Equal(0, summary.CancelledCount);
+        Assert.Equal(2, summary.References.Length);
+        Assert.Equal(530, summary.CompletedRows.Length);
+        Assert.Equal(summary.PlannedOperationCount, summary.CompletedOperationCount);
+        Assert.Equal(0, summary.OperationFailureCount);
+        Assert.Equal(0, summary.OperationCancelledCount);
+        Assert.True(File.Exists(summary.FinalPath));
+        Assert.False(File.Exists(summary.PartialPath));
+    }
+
+    private static string DurableResultHash(RunSummary summary)
+    {
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            References = summary.References.Select(reference => new
+            {
+                reference.QuestionId,
+                reference.Answer,
+                reference.StatusCode,
+                reference.AttemptCount,
+                reference.TokenUsage,
+            }),
+            Rows = summary.CompletedRows,
+        });
+        return Convert.ToHexString(SHA256.HashData(bytes));
+    }
+
+    private static string ResultFormulaHash(string path)
+    {
+        using SpreadsheetDocument document = SpreadsheetDocument.Open(path, false);
+        Worksheet results = GetWorksheet(document, AppOwnedSheetNameResolver.ResultsBaseName);
+        string[] signature = results.Descendants<Cell>()
+            .Where(cell => cell.CellFormula is not null)
+            .Select(cell => string.Join(
+                '|',
+                cell.CellReference?.Value,
+                cell.CellFormula?.Text,
+                cell.DataType?.Value.ToString() ?? "<blank>",
+                cell.CellValue?.Text ?? "<blank>"))
+            .ToArray();
+        Assert.NotEmpty(signature);
+        return Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(signature)));
+    }
+
+    private static void AssertDurableOutput(
+        string path,
+        string originalWorksheetXml,
+        CancellationToken cancellationToken)
+    {
+        using SpreadsheetDocument document = SpreadsheetDocument.Open(path, false);
+        Assert.Empty(new OpenXmlValidator().Validate(document, cancellationToken));
+        Workbook workbook = document.WorkbookPart?.Workbook
+            ?? throw new InvalidDataException("The durable output workbook root is missing.");
+        Sheet[] sheets = workbook.Descendants<Sheet>().ToArray();
+        Assert.Equal(5, sheets.Length);
+        Assert.Equal(SyntheticWorkbookFactory.SourceSheetName, sheets[0].Name?.Value);
+        Assert.Equal(originalWorksheetXml, GetWorksheet(document, SyntheticWorkbookFactory.SourceSheetName).OuterXml);
+        Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.ConfigBaseName);
+        Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.ReferencesBaseName);
+        Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.ResultsBaseName);
+        Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.RunBaseName);
+        Assert.DoesNotContain(sheets, sheet => string.Equals(
+            sheet.Name?.Value,
+            CheckpointStore.CheckpointSheetName,
+            StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(2, GetWorksheet(document, AppOwnedSheetNameResolver.ConfigBaseName)
+            .Descendants<CellFormula>().Count());
+        Assert.Empty(GetWorksheet(document, AppOwnedSheetNameResolver.ReferencesBaseName)
+            .Descendants<CellFormula>());
+        Worksheet results = GetWorksheet(document, AppOwnedSheetNameResolver.ResultsBaseName);
+        Assert.Equal(530, results.Descendants<Row>().Count(row => row.RowIndex?.Value >= 2));
+        Assert.NotEmpty(results.Descendants<CellFormula>());
+        Assert.Empty(GetWorksheet(document, AppOwnedSheetNameResolver.RunBaseName)
+            .Descendants<CellFormula>());
     }
 
     private static QuantificationDefinition CreateDefinition() =>
@@ -715,6 +1002,139 @@ public sealed class SyntheticQuantificationJourneyTests
             }
 
             return hash.ToHashCode();
+        }
+    }
+
+    private sealed class DurableReferenceRunner(bool throwOnCall = false)
+        : IReferenceAnswerOperationRunner
+    {
+        private int calls;
+
+        internal int CallCount => Volatile.Read(ref calls);
+
+        public Task<AuxiliaryOperationResult<ReferenceAnswerResult>> EvaluateAsync(
+            SafeReferenceAnswerPayload payload,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref calls);
+            if (throwOnCall)
+            {
+                throw new InvalidOperationException("Saved synthetic references must be reused.");
+            }
+
+            return Task.FromResult(AuxiliaryOperationResult<ReferenceAnswerResult>.Succeeded(
+                new ReferenceAnswerResult
+                {
+                    QuestionId = payload.QuestionId,
+                    Answer = "SYNTHETIC-DURABLE-REFERENCE-" + payload.QuestionId,
+                }));
+        }
+    }
+
+    private sealed class DurableSpecialRunner(SyntheticWorkbook workbook)
+        : ISpecialEvaluationOperationRunner
+    {
+        private int calls;
+
+        internal int CallCount => Volatile.Read(ref calls);
+
+        public Task<AuxiliaryOperationResult<SpecialQuantificationResult>> EvaluateAsync(
+            SafeSpecialEvaluationPayload payload,
+            string modelId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(ModelId, modelId);
+            int sourceRow = workbook.FindUniqueSourceRow(
+                payload.PrimarySource.SourceColumnId,
+                payload.PrimarySource.Value);
+            Assert.All(payload.Sources, source => Assert.Equal(
+                workbook.GetCell(sourceRow, source.SourceColumnId),
+                source.Value));
+            Interlocked.Increment(ref calls);
+            return Task.FromResult(AuxiliaryOperationResult<SpecialQuantificationResult>.Succeeded(
+                new SpecialQuantificationResult
+                {
+                    SpecialEvaluationId = payload.SpecialEvaluationId,
+                    Score = (sourceRow % 10) / 10m,
+                    Reason = "SYNTHETIC-DURABLE-SPECIAL",
+                    Evidence = string.Empty,
+                    EvidenceSource = EvidenceSourceKind.None,
+                    EvidenceSourceColumnId = string.Empty,
+                }));
+        }
+    }
+
+    private sealed class DurableSimilarityRunner : ISimilarityEvaluationOperationRunner
+    {
+        private int calls;
+
+        internal int CallCount => Volatile.Read(ref calls);
+
+        public Task<AuxiliaryOperationResult<SimilarityQuantificationResult>> EvaluateAsync(
+            SafeSimilarityPayload payload,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref calls);
+            return Task.FromResult(AuxiliaryOperationResult<SimilarityQuantificationResult>.Succeeded(
+                new SimilarityQuantificationResult
+                {
+                    QuestionId = payload.QuestionId,
+                    Similarity = 0.25m,
+                    Reason = "SYNTHETIC-DURABLE-SIMILARITY",
+                }));
+        }
+    }
+
+    private sealed class DurableCountingCheckpointStore(
+        ICheckpointStore inner,
+        Action<CheckpointEnvelope>? afterSuccessfulUpdate = null) : ICheckpointStore
+    {
+        private int creates;
+        private int updates;
+        private int loads;
+
+        internal int CreateCount => Volatile.Read(ref creates);
+
+        internal int UpdateCount => Volatile.Read(ref updates);
+
+        internal int LoadCount => Volatile.Read(ref loads);
+
+        public CheckpointSaveResult Create(
+            CheckpointEnvelope envelope,
+            CancellationToken cancellationToken = default)
+        {
+            CheckpointSaveResult result = inner.Create(envelope, cancellationToken);
+            if (result.IsSuccess)
+            {
+                Interlocked.Increment(ref creates);
+            }
+
+            return result;
+        }
+
+        public CheckpointSaveResult Update(
+            CheckpointEnvelope envelope,
+            CancellationToken cancellationToken = default)
+        {
+            CheckpointSaveResult result = inner.Update(envelope, cancellationToken);
+            if (result.IsSuccess)
+            {
+                Interlocked.Increment(ref updates);
+                afterSuccessfulUpdate?.Invoke(envelope);
+            }
+
+            return result;
+        }
+
+        public CheckpointLoadResult Load(
+            string partialPath,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref loads);
+            return inner.Load(partialPath, cancellationToken);
         }
     }
 }

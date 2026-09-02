@@ -1,0 +1,192 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing annotated release tag (for example, v1.0.0)
+        required: true
+        type: string
+      draft:
+        description: Create the GitHub Release as a draft
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+  STUDY_REPORT_EVALUATOR_COPILOT_LIVE_SMOKE: "0"
+  STUDY_REPORT_EVALUATOR_EXTERNAL_RECALC_SMOKE: "0"
+  STUDY_REPORT_EVALUATOR_REALDATA_SYSTEM_SMOKE: "0"
+
+jobs:
+  package-and-release:
+    name: Validate, package, and create release
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag }}
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.400
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+
+      - name: Verify release identity and privacy boundary
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          if ($PSVersionTable.PSEdition -cne 'Core' -or $PSVersionTable.PSVersion.Major -lt 7) {
+              throw 'PowerShell Core 7 or later is required.'
+          }
+          if ($env:RELEASE_TAG -cnotmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
+              throw "Invalid release tag: $env:RELEASE_TAG"
+          }
+
+          $tagCommit = (git rev-list -n 1 $env:RELEASE_TAG).Trim()
+          $headCommit = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $tagCommit -cne $headCommit) {
+              throw 'The requested tag must exist and point to the checked-out commit.'
+          }
+          if ((git cat-file -t $env:RELEASE_TAG).Trim() -cne 'tag') {
+              throw 'The release tag must be annotated.'
+          }
+          if (@(git status --porcelain=v1 --untracked-files=all).Count -ne 0) {
+              throw 'The release checkout must be clean.'
+          }
+          if (@(git ls-files -- sample).Count -ne 0) {
+              throw 'The private local sample directory must remain untracked.'
+          }
+
+          pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify -Tag $env:RELEASE_TAG -RequireClean
+          if ($LASTEXITCODE -ne 0) {
+              throw 'Release version verification failed.'
+          }
+
+      - name: Restore locked dependencies
+        shell: pwsh
+        run: dotnet restore .\StudyReportEvaluator.slnx --locked-mode
+
+      - name: Build Release
+        shell: pwsh
+        run: dotnet build .\StudyReportEvaluator.slnx --configuration Release --no-restore
+
+      - name: Run deterministic release tests
+        shell: pwsh
+        run: >-
+          dotnet test .\StudyReportEvaluator.slnx
+          --configuration Release
+          --no-build
+          --no-restore
+          --filter "FullyQualifiedName!~StudyReportEvaluator.App.Tests.E2E.SampleWorkbookStructuralTests"
+          --results-directory .\TestResults\release
+          --logger "trx"
+          --logger "console;verbosity=minimal"
+
+      - name: Build final Windows package
+        shell: pwsh
+        run: |
+          pwsh.exe -NoLogo -NoProfile -File .\scripts\package-windows.ps1
+          if ($LASTEXITCODE -ne 0) {
+              throw 'Windows packaging failed.'
+          }
+          pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify -PublishedDirectory .\artifacts\package\publish\win-x64
+          if ($LASTEXITCODE -ne 0) {
+              throw 'Published binary version verification failed.'
+          }
+
+      - name: Verify package hash
+        shell: pwsh
+        run: |
+          $zip = '.\artifacts\package\StudyReportEvaluator-win-x64.zip'
+          $sidecar = "$zip.sha256"
+          if (-not (Test-Path -LiteralPath $zip -PathType Leaf) -or
+              -not (Test-Path -LiteralPath $sidecar -PathType Leaf)) {
+              throw 'The package or SHA-256 sidecar is missing.'
+          }
+          $expected = ((Get-Content -LiteralPath $sidecar -Raw -Encoding utf8).Trim() -split '\s+')[0]
+          $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash
+          if ($expected -cne $actual) {
+              throw 'The package SHA-256 does not match its sidecar.'
+          }
+
+      - name: Upload workflow package
+        uses: actions/upload-artifact@v7
+        with:
+          name: StudyReportEvaluator-${{ inputs.tag }}-win-x64
+          path: |
+            artifacts/package/StudyReportEvaluator-win-x64.zip
+            artifacts/package/StudyReportEvaluator-win-x64.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload release test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-test-results-${{ github.run_id }}
+          path: TestResults/release/**/*.trx
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          CREATE_DRAFT: ${{ inputs.draft }}
+        run: |
+          gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+              throw "Release $env:RELEASE_TAG already exists; published releases are immutable."
+          }
+
+          $version = $env:RELEASE_TAG.Substring(1)
+          $changelog = Get-Content -LiteralPath '.\CHANGELOG.md' -Raw -Encoding utf8
+          $escapedVersion = [regex]::Escape($version)
+          $match = [regex]::Match(
+              $changelog,
+              "(?ms)^## \[$escapedVersion\] - (?<date>\d{4}-\d{2}-\d{2})\r?\n(?<body>.*?)(?=^## \[|\z)")
+          if (-not $match.Success) {
+              throw "CHANGELOG.md does not contain a dated $version section."
+          }
+
+          $notesPath = Join-Path $env:RUNNER_TEMP "release-notes-$version.md"
+          $notes = "StudyReport Evaluator $version`n`n" + $match.Groups['body'].Value.Trim() + "`n"
+          [System.IO.File]::WriteAllText($notesPath, $notes, [System.Text.UTF8Encoding]::new($false))
+
+          $arguments = @(
+              'release', 'create', $env:RELEASE_TAG,
+              '.\artifacts\package\StudyReportEvaluator-win-x64.zip',
+              '.\artifacts\package\StudyReportEvaluator-win-x64.zip.sha256',
+              '--repo', $env:GITHUB_REPOSITORY,
+              '--verify-tag',
+              '--title', "StudyReport Evaluator $version",
+              '--notes-file', $notesPath
+          )
+          if ($env:CREATE_DRAFT -ceq 'true') {
+              $arguments += '--draft'
+          }
+
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) {
+              throw 'GitHub Release creation failed.'
+          }

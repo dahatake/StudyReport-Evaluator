@@ -39,11 +39,12 @@ public sealed partial class RealDataSystemSmokeTests
     private const string SourceStatusHashEnvironmentVariable =
         "STUDY_REPORT_EVALUATOR_SOURCE_STATUS_SHA256";
     private const string RunId = "SYSTEM-TEST-REALDATA-V4-20260901-2205";
+    private const string ExpectedSampleSha256 =
+        "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA";
     private const string LocalModelId =
         "local-deterministic-midpoint-no-network-not-for-grading";
-    // The first 128 bytes supplied in the chat attachment preview. This binds the
-    // local materialization to the attachment without exposing workbook content.
-    private const string ExpectedAttachmentPrefixHex =
+    // The canonical sample prefix is checked without exposing workbook content.
+    private const string ExpectedSamplePrefixHex =
         "504B030414000600080000002100A90F"
         + "68387F01000002050000130008025B43"
         + "6F6E74656E745F54797065735D2E786D"
@@ -64,14 +65,18 @@ public sealed partial class RealDataSystemSmokeTests
             return;
         }
 
+        string repositoryRoot = FindRepositoryRoot();
         string inputPath = RequiredAbsoluteFile(InputEnvironmentVariable);
+        string canonicalSamplePath = Path.Combine(repositoryRoot, "sample", "SampleReport.xlsx");
+        Assert.True(
+            PathsEqual(inputPath, canonicalSamplePath),
+            "The technical E2E input must be the canonical SampleReport.xlsx path.");
         string evidencePath = RequiredAbsolutePath(EvidenceEnvironmentVariable);
         string evidenceDirectory = Path.GetDirectoryName(evidencePath)
             ?? throw new InvalidOperationException("The evidence path has no parent directory.");
         Directory.CreateDirectory(evidenceDirectory);
 
         DateTimeOffset measuredAtUtc = DateTimeOffset.UtcNow;
-        string repositoryRoot = FindRepositoryRoot();
         string outputDirectory = Path.Combine(
             Path.GetTempPath(),
             "StudyReportEvaluator-SystemTest-" + Guid.NewGuid().ToString("N"));
@@ -85,7 +90,8 @@ public sealed partial class RealDataSystemSmokeTests
             InputSnapshot inputBefore = snapshots.Capture(inputPath);
             FileInfo inputFile = new(inputPath);
             Assert.Equal(470_806, inputFile.Length);
-            AssertAttachmentPrefix(inputPath);
+            Assert.Equal(ExpectedSampleSha256, inputBefore.Sha256);
+            AssertSamplePrefix(inputPath);
 
             FileFormatClassificationResult classification = new FileFormatClassifier().Classify(inputPath);
             Assert.True(classification.IsAccepted);
@@ -145,7 +151,8 @@ public sealed partial class RealDataSystemSmokeTests
             NoCallSpecialRunner specials = new();
             LocalSimilarityRunner similarities = new(concurrency);
             CountingRowSource rowSource = new(new OpenXmlEvaluationRowSource(inputPath));
-            CountingCheckpointStore checkpoints = new(new CheckpointStore());
+            TracingCheckpointFileOperations checkpointFiles = new();
+            CountingCheckpointStore checkpoints = new(new CheckpointStore(checkpointFiles));
             ConcurrentQueue<DurableEvaluationProgress> progress = new();
             Stopwatch runWatch = Stopwatch.StartNew();
             CheckpointRuntimeIdentity runtime = RuntimeIdentity();
@@ -181,7 +188,24 @@ public sealed partial class RealDataSystemSmokeTests
                 TestContext.Current.CancellationToken);
             runWatch.Stop();
 
-            Assert.Equal(QuantificationRunStatusCodes.Success, summary.StatusCode);
+            Assert.True(
+                string.Equals(
+                    QuantificationRunStatusCodes.Success,
+                    summary.StatusCode,
+                    StringComparison.Ordinal),
+                string.Join(
+                    "; ",
+                    $"status={summary.StatusCode}",
+                    $"finalization={summary.FinalizationCode ?? "<none>"}",
+                    $"references={summary.References.Length}",
+                    $"rows={summary.CompletedRows.Length}",
+                    $"checkpointCreates={checkpoints.CreateCount}",
+                    $"checkpointUpdateAttempts={checkpoints.UpdateAttemptCount}",
+                    $"checkpointUpdates={checkpoints.UpdateCount}",
+                    $"lastCheckpointCode={checkpoints.LastSaveCode}",
+                    $"checkpointFileFailures={checkpointFiles.FailureCount}",
+                    $"lastFailedFileOperation={checkpointFiles.LastFailedOperation}",
+                    $"lastFileExceptionType={checkpointFiles.LastExceptionType}"));
             Assert.True(summary.IsDurable);
             Assert.False(summary.WasResumed);
             Assert.False(summary.IsPartial);
@@ -267,8 +291,8 @@ public sealed partial class RealDataSystemSmokeTests
                     commit = Environment.GetEnvironmentVariable(SourceCommitEnvironmentVariable) ?? "UNRECORDED",
                     worktree_status_sha256 = Environment.GetEnvironmentVariable(SourceStatusHashEnvironmentVariable) ?? "UNRECORDED",
                     test_driver = "tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs",
-                    requirements = "docs/requirements-definition.md v4.0",
-                    system_test_prompt = "tests/system-test-prompt.md v4.0",
+                    requirements = "docs/requirements-definition.md v4.1",
+                    system_test_prompt = "SystemTest-prompt.md v4.1",
                 },
                 environment = new
                 {
@@ -282,9 +306,10 @@ public sealed partial class RealDataSystemSmokeTests
                 },
                 input = new
                 {
-                    logical_name = "attached-realdata.xlsx",
-                    attachment_size_match = inputFile.Length == 470_806,
-                    attachment_prefix_128_match = true,
+                    logical_name = "SampleReport.xlsx",
+                    sample_size_match = inputFile.Length == 470_806,
+                    sample_sha256_match = inputBefore.Sha256 == ExpectedSampleSha256,
+                    sample_prefix_128_match = true,
                     size_bytes = inputBefore.SizeBytes,
                     sha256 = inputBefore.Sha256,
                     last_write_time_utc = inputBefore.LastWriteTimeUtc,
@@ -810,9 +835,9 @@ public sealed partial class RealDataSystemSmokeTests
     private static string Column(string? reference) =>
         new((reference ?? string.Empty).TakeWhile(char.IsAsciiLetter).ToArray());
 
-    private static void AssertAttachmentPrefix(string path)
+    private static void AssertSamplePrefix(string path)
     {
-        byte[] expected = Convert.FromHexString(ExpectedAttachmentPrefixHex);
+        byte[] expected = Convert.FromHexString(ExpectedSamplePrefixHex);
         byte[] actual = new byte[expected.Length];
         using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         stream.ReadExactly(actual);
@@ -1264,20 +1289,27 @@ public sealed partial class RealDataSystemSmokeTests
     private sealed class CountingCheckpointStore(ICheckpointStore inner) : ICheckpointStore
     {
         private int creates;
+        private int updateAttempts;
         private int updates;
         private int loads;
+        private string lastSaveCode = "NOT_CALLED";
 
         internal int CreateCount => Volatile.Read(ref creates);
+
+        internal int UpdateAttemptCount => Volatile.Read(ref updateAttempts);
 
         internal int UpdateCount => Volatile.Read(ref updates);
 
         internal int LoadCount => Volatile.Read(ref loads);
+
+        internal string LastSaveCode => Volatile.Read(ref lastSaveCode);
 
         public CheckpointSaveResult Create(
             CheckpointEnvelope envelope,
             CancellationToken cancellationToken = default)
         {
             CheckpointSaveResult result = inner.Create(envelope, cancellationToken);
+            Volatile.Write(ref lastSaveCode, result.Code);
             if (result.IsSuccess)
             {
                 Interlocked.Increment(ref creates);
@@ -1290,7 +1322,9 @@ public sealed partial class RealDataSystemSmokeTests
             CheckpointEnvelope envelope,
             CancellationToken cancellationToken = default)
         {
+            Interlocked.Increment(ref updateAttempts);
             CheckpointSaveResult result = inner.Update(envelope, cancellationToken);
+            Volatile.Write(ref lastSaveCode, result.Code);
             if (result.IsSuccess)
             {
                 Interlocked.Increment(ref updates);
@@ -1305,6 +1339,66 @@ public sealed partial class RealDataSystemSmokeTests
         {
             Interlocked.Increment(ref loads);
             return inner.Load(partialPath, cancellationToken);
+        }
+    }
+
+    private sealed class TracingCheckpointFileOperations : ICheckpointFileOperations
+    {
+        private readonly PhysicalCheckpointFileOperations inner = new();
+        private int failureCount;
+        private string lastFailedOperation = "NONE";
+        private string lastExceptionType = "NONE";
+
+        internal int FailureCount => Volatile.Read(ref failureCount);
+
+        internal string LastFailedOperation => Volatile.Read(ref lastFailedOperation);
+
+        internal string LastExceptionType => Volatile.Read(ref lastExceptionType);
+
+        public bool Exists(string path) => Invoke("Exists", () => inner.Exists(path));
+
+        public void FlushToDisk(string path) =>
+            Invoke("FlushToDisk", () => inner.FlushToDisk(path));
+
+        public void MoveNoOverwrite(string sourcePath, string destinationPath) =>
+            Invoke("MoveNoOverwrite", () => inner.MoveNoOverwrite(sourcePath, destinationPath));
+
+        public void Replace(string sourcePath, string destinationPath) =>
+            Invoke("Replace", () => inner.Replace(sourcePath, destinationPath));
+
+        public void Delete(string path) => Invoke("Delete", () => inner.Delete(path));
+
+        private T Invoke<T>(string operation, Func<T> action)
+        {
+            try
+            {
+                return action();
+            }
+            catch (Exception exception)
+            {
+                RecordFailure(operation, exception);
+                throw;
+            }
+        }
+
+        private void Invoke(string operation, Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception exception)
+            {
+                RecordFailure(operation, exception);
+                throw;
+            }
+        }
+
+        private void RecordFailure(string operation, Exception exception)
+        {
+            Volatile.Write(ref lastFailedOperation, operation);
+            Volatile.Write(ref lastExceptionType, exception.GetType().Name);
+            Interlocked.Increment(ref failureCount);
         }
     }
 

@@ -5,7 +5,7 @@
 | 対象 | 正式公開用`README.md`とリンク先利用者文書 |
 | 要求 | `docs/requirements-definition.md` v4.1 |
 | Decision | ADR-0012（機能）/ ADR-0013（platform） |
-| 更新日 | 2026-09-02 |
+| 更新日 | 2026-09-03 |
 | 状態語彙 | `VERIFIED` / `BLOCKED` / `EXCLUDED` |
 
 この台帳は公開文書の事実確認用であり、READMEまたは配布ZIPから利用者へ案内しない。`VERIFIED`だけを現在機能として断定できる。`BLOCKED`は解消までREADME本文へ断定形で書かない。`EXCLUDED`は非対応・非保証としてのみ記載できる。
@@ -40,7 +40,7 @@
 | C-024 | AI定量値、教育的妥当性、公平性、法的・組織policy適合性、不正行為を保証・判定しない。 | [`EthicsWarningText.cs`](../../src/StudyReportEvaluator.App/Resources/EthicsWarningText.cs)、[`requirements-definition.md`](../../docs/requirements-definition.md) | [`EthicsWarningTests.cs`](../../tests/StudyReportEvaluator.App.Tests/UI/EthicsWarningTests.cs)、documentation contract | VERIFIED | 類似度は不正行為の証明ではない。 |
 | C-025 | licenseはMITである。 | [`LICENSE`](../../LICENSE) | [`DocumentationContractTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Content/DocumentationContractTests.cs)、[`WindowsPublishPackageTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs) | VERIFIED | LICENSEをZIPへ含め、license本文を独自に変更しない。 |
 | C-026 | 正式release assetを実在URLからdownloadできる。 | repository public release API（2026-09-02確認時0件）、[`package-windows.ps1`](../../scripts/package-windows.ps1) | local ZIP生成は成功したがpublic assetは未作成 | BLOCKED | GitHub Release作成・asset upload・URL実在確認後にだけREADMEへ記載する。 |
-| C-027 | repository正規sampleの構造・identityを現在のrelease候補で再検証済みである。 | [`SampleWorkbookStructuralTests.cs`](../../tests/StudyReportEvaluator.App.Tests/E2E/SampleWorkbookStructuralTests.cs)、[`sample-workbook-profile.md`](preflight/sample-workbook-profile.md) | `SampleReport.xlsx` direct test 1/1 PASS、synthetic isolation 1/1 PASS、入力identity不変、B-07敵対review finding 0（2026-09-02） | VERIFIED | 回答/header本文を証跡へ出力せず、構造とheader由来roleだけを検証。 |
+| C-027 | repository正規sampleの構造・identityを現在のrelease候補で再検証済みである。 | [`SampleWorkbookStructuralTests.cs`](../../tests/StudyReportEvaluator.App.Tests/E2E/SampleWorkbookStructuralTests.cs)、[`RealDataSystemSmokeTests.cs`](../../tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs)、[`sample-workbook-profile.md`](preflight/sample-workbook-profile.md) | canonical exact-path structural test 1/1 PASS、synthetic isolation 1/1 PASS、530-row no-network technical E2E 1/1 PASS、入力identity不変（2026-09-03） | VERIFIED | `sample/SampleReport.xlsx`だけを対象とし、回答/header本文やprivate pathを証跡へ出力しない。 |
 | C-028 | READMEの画面画像はcurrent production UIを示す。 | [`DocumentationScreenshotTests.cs`](../../tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs) | 7画像再生成1/1 PASS、全て1440×1050、主要画面目視確認、RD-03敵対review finding 0（2026-09-02） | VERIFIED | synthetic/fake境界をcaptionと[`images/README.md`](../../images/README.md)へ記載済み。 |
 | C-029 | READMEからリンクする全利用者文書がv4.1 current contractと一致する。 | `docs/*.md` | relative link 20件・欠落0、warning完全一致、RD-02敵対review finding 0（2026-09-02） | VERIFIED | package同梱後も同じ文書を使う。 |
 | C-030 | 公開READMEに処理時間、token数、費用の保証値を載せる。 | なし | Windows performance testは特定synthetic scenarioだけを測定 | EXCLUDED | 未実測の実利用時間・AI待機・費用へ一般化しない。 |
@@ -56,17 +56,20 @@
 
 GitHub Copilotのplan、料金、model availabilityは利用者accountとservice変更に依存するため、この台帳では固定claimにしない。公開READMEではGitHub公式のcurrent documentationへ案内し、アプリ内の「Copilot状態を確認」で実際のlogin/model availabilityを検証する。
 
-## 2026-09-02 validation snapshot
+## 2026-09-03 validation snapshot
 
 この節は監査記録でありREADMEへtest件数として転載しない。
 
 - Release build: warning 0 / error 0。
 - `MainWindowTests`: 8/8 PASS。
 - `CopilotClientFactoryTests`: 14/14 PASS。
-- `DocumentationContractTests`: 13/13 PASS。
+- `DocumentationContractTests`: 14/14 PASS。root `SystemTest-prompt.md`、21 scenario、TR-01〜TR-24、canonical sample identityを検証。
 - Windows publish/package/extract/bundled-resolver/clean-launch/repackage: 3/3 PASS。
 - 最終敵対reviewで全7画像のpackage test assertion不足を検出・修正し、文書＋package契約16/16 PASS。
-- Windows 531-row synthetic read/write/final validation: measurements 4.244251 / 3.069137 / 4.074791秒、median 4.074791秒、threshold 30秒、PASS。
-- B-07更新前のfull required testは665件中664件PASS、sample欠落1件FAIL。更新後はdirect sample test 1/1 PASS。本依頼範囲ではfull aggregateを再実行していない。
-- optional authenticated fixed-synthetic Copilot smoke: 3/3 test PASS、advisory status `PASS`。required acceptanceや教育品質の代替にしない。
-- optional external spreadsheet recalculation: 1/1 test実行、advisory status `FAILED_ADVISORY`。synthetic workbookの分類/schemaはPASSし、Excel COM openはHRESULT `0x800A03EC`で失敗。
+- Windows 531-row synthetic read/write/final validation: measurements 7.090321 / 7.180183 / 5.476567秒、median 7.090321秒、threshold 30秒、PASS。
+- Canonical `sample/SampleReport.xlsx`: 470,806 bytes、SHA-256 `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA`。exact-path structural test 1/1 PASS、synthetic isolation 1/1 PASS。
+- Canonical no-network technical E2E: 1/1 PASS。530 rows、2,650 normal evaluations、5,305 total operations、535 checkpoint updates、530 numeric final scores、formula/Open XML error 0、input identity不変、fresh privacy-scanned evidence生成。
+- Fixed 10-person system smoke: fixture identity/formula canaryとuninterrupted/interruption-resume同値性 2/2 PASS。Fixed-seed 531-row local atomic/durable new-resume journeysも2/2 PASS。
+- Full required Release test: Core 190/190、App 480/480、aggregate 670/670 PASS。failed/error/not-executed 0。
+- optional authenticated fixed-synthetic Copilot smokeの最新実行は2026-09-02: 3/3 test PASS、advisory status `PASS`。required acceptanceや教育品質の代替にしない。
+- optional external spreadsheet recalculationは`MIXED_ADVISORY`。Config rowのcell列順修正後、syntheticはMicrosoft Excel 16.0でopen/recalculate/saveとprocess cleanupまで`PASS`。canonical output copyは20,672 formula error 0だが、Excelが保存時に生成したoptional `/xl/calcChain.xml`だけに`Sem_MissingIndexedElement`が発生して`FAILED_ADVISORY`。required acceptanceの代替にせず、primary application outputのOpen XML error 0とは区別する。

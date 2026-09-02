@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+  STUDY_REPORT_EVALUATOR_COPILOT_LIVE_SMOKE: "0"
+  STUDY_REPORT_EVALUATOR_EXTERNAL_RECALC_SMOKE: "0"
+  STUDY_REPORT_EVALUATOR_REALDATA_SYSTEM_SMOKE: "0"
+
+jobs:
+  validate:
+    name: Windows release validation
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.400
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+
+      - name: Verify PowerShell and privacy boundary
+        shell: pwsh
+        run: |
+          if ($PSVersionTable.PSEdition -cne 'Core' -or $PSVersionTable.PSVersion.Major -lt 7) {
+              throw 'PowerShell Core 7 or later is required.'
+          }
+
+          $trackedSamples = @(git ls-files -- sample)
+          if ($LASTEXITCODE -ne 0 -or $trackedSamples.Count -ne 0) {
+              throw 'The private local sample directory must remain untracked.'
+          }
+
+      - name: Restore locked dependencies
+        shell: pwsh
+        run: dotnet restore .\StudyReportEvaluator.slnx --locked-mode
+
+      - name: Verify product version
+        shell: pwsh
+        run: pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify
+
+      - name: Build Release
+        shell: pwsh
+        run: dotnet build .\StudyReportEvaluator.slnx --configuration Release --no-restore
+
+      - name: Run deterministic tests
+        shell: pwsh
+        run: >-
+          dotnet test .\StudyReportEvaluator.slnx
+          --configuration Release
+          --no-build
+          --no-restore
+          --filter "FullyQualifiedName!~StudyReportEvaluator.App.Tests.E2E.SampleWorkbookStructuralTests"
+          --results-directory .\TestResults\ci
+          --logger "trx"
+          --logger "console;verbosity=minimal"
+
+      - name: Check repository integrity
+        shell: pwsh
+        run: |
+          git diff --check
+          if ($LASTEXITCODE -ne 0) {
+              throw 'git diff --check failed.'
+          }
+
+          $zeroByteFiles = @(Get-ChildItem -Path src,tests -Recurse -File -Include *.cs,*.csproj,*.props,*.targets,*.md |
+              Where-Object {
+                  $_.FullName -notmatch '[\\/](bin|obj)[\\/]' -and $_.Length -eq 0
+              })
+          if ($zeroByteFiles.Count -ne 0) {
+              $zeroByteFiles | ForEach-Object { Write-Error $_.FullName }
+              throw 'Zero-byte source files are not allowed.'
+          }
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ github.run_id }}
+          path: TestResults/ci/**/*.trx
+          if-no-files-found: error
+          retention-days: 14

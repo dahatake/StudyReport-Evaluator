@@ -6,25 +6,28 @@
 | Scope ADR | ADR-0012（機能）/ ADR-0013（platform） |
 | Product version | `1.0.0` — `Directory.Build.props`の明示`VersionPrefix` |
 | Version management | [`version-management.md`](version-management.md) / [`dev/version.ps1`](../version.ps1) / ADR-0014 |
-| Source baseline | working tree based on `c9db2fc038cc09874a142d6575b47bdb49ac4b55` |
+| Source baseline | working tree based on `3dbda8c17d4d980f06473cceba0ba3efc0df10dd` |
 | Public release status | `IMPLEMENTATION_IN_PROGRESS` |
-| Release build | PASS、warning 0 / error 0（2026-09-02実行） |
+| Release build | PASS、warning 0 / error 0（2026-09-03実行） |
 | Focused UI validation | `MainWindowTests` 8/8 PASS（2026-09-02実行） |
 | Bundled CLI validation | `CopilotClientFactoryTests` 14/14 PASS（2026-09-02実行） |
-| Documentation contract | 14/14 PASS（2026-09-02実行。developer docs移動・版管理契約を含む） |
+| Documentation contract | 14/14 PASS（2026-09-03実行。root `SystemTest-prompt.md`、21 scenario、TR-01〜TR-24、canonical sample契約を含む） |
 | Screenshot generation | 7画像再生成、1440×1050、test 1/1 PASS、敵対review finding 0（2026-09-02実行） |
 | Windows package integration | publish/package/展開/resolver/clean launch/repackage、全class 3/3 PASS（2026-09-02実行） |
 | Independent adversarial review | task別reviewと最終3観点reviewを実施。再現可能な指摘を反映後、文書＋package契約16/16 PASS |
-| B-07 focused validation | `SampleReport.xlsx` identity/structure/input不変 1/1 PASS、synthetic fixture isolation 1/1 PASS、敵対review finding 0 |
-| Full required validation | B-07更新後のfull aggregateは本依頼範囲外のため未再実行。直前runはsample欠落で664/665 PASS |
+| B-07 focused validation | canonical `sample/SampleReport.xlsx` exact path・identity・structure・input不変 1/1 PASS、synthetic fixture isolation 1/1 PASS（2026-09-03実行） |
+| Canonical technical E2E | 530行、2,650 normal evaluations、5 references、535 checkpoint updates、no-network primary application path 1/1 PASS（2026-09-03実行） |
+| 10-person system smoke | fixed 10-person fixtureのidentity/formula canaryとuninterrupted/interruption-resume同値性 2/2 PASS（2026-09-03 full run） |
+| Synthetic 531-row journey | fixed-seed local atomic journeyとdurable new/resume同値性 2/2 PASS（2026-09-03 full run） |
+| Full required validation | Release 670/670 PASS、Core 190/190・App 480/480、failed/error/not-executed 0（2026-09-03実行） |
 | Optional live Copilot | `PASS` — fixed synthetic payload、required substitute false（2026-09-02実行） |
-| Optional external recalculation | `FAILED_ADVISORY` — synthetic workbookは分類/schema PASS、Excel COM openが`0x800A03EC`で失敗（2026-09-02実行） |
+| Optional external recalculation | `MIXED_ADVISORY` — syntheticはMicrosoft Excel 16.0でopen/recalculate/save・process cleanupまで`PASS`。canonical output copyは20,672 formula error 0だが、Excel保存時に生成されたoptional `/xl/calcChain.xml`だけに`Sem_MissingIndexedElement`が発生して`FAILED_ADVISORY`（2026-09-03実行） |
 | Version tool validation | show/verify/set/bump/dry-run/invalid rejection、11 assertions PASS（2026-09-02実行） |
-| Audit date | 2026-09-02 |
+| Audit date | 2026-09-03 |
 
-現在の正式公開作業は[`20260902-readme-end-user-release-plan.md`](../../work/20260902-readme-end-user-release-plan.md)に従う。B-01〜B-04、B-06〜B-08は実装・focused test・敵対的reviewまで完了した。B-05（実在release asset）は未完了であり、正式公開済みとは扱わない。
+現在の正式公開作業は[`20260902-readme-end-user-release-plan.md`](../../work/20260902-readme-end-user-release-plan.md)に従う。B-01〜B-04、B-06〜B-08は実装・focused test・敵対的reviewまで完了した。B-05（実在release asset）は未完了であり、正式公開済みとは扱わない。external spreadsheet recalculationはadvisoryであり、syntheticの`PASS`とcanonical Excel保存copyの既知`calcChain` semantic `FAILED_ADVISORY`をrequired primary pathへ合算しない。
 
-直前のfull solution testは665件中664件成功し、当時未配置だったsample test 1件だけが失敗した。その後、ユーザーが配置した`sample/SampleReport.xlsx`を新正本としてread-only再profileし、direct sample testは1/1成功、検査前後のSHA-256、size、last-write timeも一致した。本依頼はB-07だけのためfull aggregateは再実行していない。Windows 531行synthetic read/write/final validationの最新3回中央値は4.074791秒で30秒基準内である。
+2026-09-03の最新working treeを再buildしたfull solution testは670件中670件成功した。ユーザーが配置した`sample/SampleReport.xlsx`だけをcanonical sampleとし、exact path、470,806 bytes、SHA-256 `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA`、read-only検査前後のidentity不変を確認した。opt-in technical E2Eはnetwork/live AIを使わず530行を完走し、5,305 operations、530 numeric final scores、formula/Open XML error 0、input不変、primary application path `PASS`のfresh evidenceを生成した。10-person fixtureの中断・再開と531行synthetic durable new/resumeもuninterrupted runとの同値性を確認した。Windows 531行synthetic read/write/final validationの最新3回中央値は7.090321秒で30秒基準内である。
 
 ## 実装済みsurface
 

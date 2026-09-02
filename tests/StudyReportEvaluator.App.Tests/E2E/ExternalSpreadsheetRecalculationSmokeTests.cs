@@ -233,7 +233,9 @@ public sealed partial class ExternalSpreadsheetRecalculationSmokeTests
                     UpdateLinks: 0,
                     ReadOnly: false,
                     IgnoreReadOnlyRecommended: true,
-                    AddToMru: false);
+                    AddToMru: false,
+                    Local: true,
+                    CorruptLoad: 0);
                 dynamic workbook = workbookObject;
                 result = new RecalculationResult(false, "full_recalculation_failed");
                 application.CalculateFullRebuild();

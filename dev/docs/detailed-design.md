@@ -683,8 +683,10 @@ checkpointとRun sheetへ次を保存する。
 
 ### 13.3 自動化境界
 
-- repositoryにCI workflowは存在しないため、正式公開前にrestore/build/test/publish/package/展開先launchをWindows 11 x64上で明示実行する。
-- CIを将来追加する場合も、同じPowerShell 7 scriptとpackage testを正本にし、未実行platformを成功扱いにしない。
+- [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)はpush、pull request、manual dispatchでlocked restore、Release build、決定的test、zero-byte／diff検査をWindows runner上で実行する。
+- `sample/SampleReport.xlsx`はprivate local inputとしてGit追跡・package同梱を禁止するため、CIは`SampleWorkbookStructuralTests`だけを除外する。正式公開前のlocal Windows 11 x64 gateではcanonical sample identity／input不変testを別途必須とし、CI結果で代用しない。
+- [`.github/workflows/release.yml`](../../.github/workflows/release.yml)は既存annotated tagをmanual dispatchで検証し、同じPowerShell 7 publish/package scriptからZIPとSHA-256 sidecarを生成してGitHub Releaseを作成する。既存Releaseを上書きしない。
+- Live Copilot、canonical sample technical E2E、Microsoft Excel recalculationは外部／local前提を持つためdefault CIでopt-inせず、未実行を成功扱いにしない。
 
 ### 13.4 製品版
 

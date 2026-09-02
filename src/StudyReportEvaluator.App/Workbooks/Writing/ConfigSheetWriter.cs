@@ -327,12 +327,12 @@ public sealed class ConfigSheetWriter
                         supportingRowNumber,
                         $"{specialPath}.supportingSourceColumns[{supportingIndex.ToString(CultureInfo.InvariantCulture)}]");
                     AppendInline(supportingRow, ParentNodeIdColumn, supportingRowNumber, special.Id);
+                    AppendNumber(supportingRow, ChunkIndexColumn, supportingRowNumber, supportingIndex + 1);
                     AppendInline(
                         supportingRow,
                         SpecialSupportingSourceColumn,
                         supportingRowNumber,
                         special.SupportingSourceColumns[supportingIndex]);
-                    AppendNumber(supportingRow, ChunkIndexColumn, supportingRowNumber, supportingIndex + 1);
                     sheetData.Append(supportingRow);
                 }
             }
@@ -619,11 +619,11 @@ public sealed class ConfigSheetWriter
         AppendNumber(row, FirstDataRowColumn, rowNumber, definition.FirstDataRow);
         AppendNumber(row, LastDataRowColumn, rowNumber, definition.LastDataRow);
         AppendNumber(row, RoundingDigitsColumn, rowNumber, definition.RoundingDigits);
+        AppendInline(row, SchemaVersionColumn, rowNumber, CanonicalDefinitionSerializer.SchemaVersion);
+        AppendInline(row, DefinitionSha256Column, rowNumber, snapshot.Sha256);
         AppendNumber(row, BasePointsColumn, rowNumber, definition.BasePoints);
         AppendNumber(row, SpecialPointsColumn, rowNumber, definition.SpecialPoints);
         AppendNumber(row, SimilarityPenaltyWeightColumn, rowNumber, definition.SimilarityPenaltyWeight);
-        AppendInline(row, SchemaVersionColumn, rowNumber, CanonicalDefinitionSerializer.SchemaVersion);
-        AppendInline(row, DefinitionSha256Column, rowNumber, snapshot.Sha256);
         return row;
     }
 
