@@ -9,18 +9,19 @@
 | [実装状態](implementation-status.md) | 開発、QA、リリース | 現在の実装済みsurface、生成gate、post-gate gap closure |
 | [アプリケーション版管理手順](version-management.md) | 開発、QA、リリース | SemVer、版変更tool、検証、tag、GitHub Release、failure handling |
 | [アーキテクチャ](architecture.md) | 開発、アーキテクト | dependency、run、Copilot、UI、output data flow |
-| [詳細設計書](detailed-design.md) | 開発、アーキテクト、QA | v4 domain、AI operation、formula、checkpoint、UI、Windows配布設計 |
+| [詳細設計書](detailed-design.md) | 開発、アーキテクト、QA | v4 domain、AI operation、formula、checkpoint、UI、Windows/macOS delivery設計 |
 | [Excel / formula契約](excel-contract.md) | 開発、Excel監査、QA | sheet、formula、blank、preflight、atomic commit |
 | [Traceability](traceability.md) | QA、リリース | AC / TR / implementation / test / gate対応 |
-| [要求定義書](../../docs/requirements-definition.md) | 要求所有者、QA | v4.1規範baseline |
+| [要求定義書](../../docs/requirements-definition.md) | 要求所有者、QA | v4.2規範baseline |
 | [ADR-0012](adr/0012-point-allocation-similarity-resume-portability.md) | アーキテクト | 配点、AI operation、formula、checkpoint、Prompt起動 |
 | [ADR-0013](adr/0013-windows-only-public-release.md) | アーキテクト、リリース | 現行platform/release scope decision |
 | [ADR-0014](adr/0014-product-versioning.md) | アーキテクト、リリース | 製品SemVer、単一正本、tag/release identity |
+| [ADR-0015](adr/0015-windows-macos-installer-delivery.md) | アーキテクト、リリース、QA | Windows MSIX、macOS RID別DMG、sign/notary、3操作setup |
 | [Screenshot manifest](../../images/README.md) | UI開発、QA、利用者支援 | 7枚のproduction view renderと合成fixture provenance |
 
 ## 履歴文書
 
-ADR-0012はADR-0011のv3評価契約をsupersedeし、入力不変、closed AI result、Excel formula ownership、2-project構成等をcarry forwardします。ADR-0013はADR-0012のplatform配布だけをWindows 11 x64初版へ限定します。ADR-0014は製品SemVerとrelease identityを定義します。ADR-0001〜0012のsuperseded箇所と旧baseline／preflightは履歴として保持します。
+ADR-0012はADR-0011のv3評価契約をsupersedeし、入力不変、closed AI result、Excel formula ownership、2-project構成等をcarry forwardします。ADR-0013はcurrent public evidenceをWindows 11 x64初版へ限定した記録です。ADR-0014は製品SemVerとrelease identityを定義します。ADR-0015はWindows MSIXとmacOS RID別DMGをtarget deliveryにしますが、platform別production証跡が揃うまでADR-0013のpublic claim境界を維持します。
 
 ```mermaid
 flowchart LR
@@ -28,7 +29,8 @@ flowchart LR
     V2 -->|superseded evaluation model| V3[requirements v3.0\nADR-0011]
     V3 -->|superseded score / workflow| V4[requirements v4.0\nADR-0012]
     V4 -->|verified release scope| V41[requirements v4.1\nADR-0013]
-    V41 --> IMPL[current source + deterministic tests]
+    V41 --> V42[requirements v4.2\nADR-0015 delivery expansion]
+    V42 --> IMPL[current source + deterministic tests]
     IMPL --> GATE[generated gate evidence]
     GATE --> AUDIT[post-gate conformance audit\n2 gaps found]
     AUDIT --> CLOSE[commit 69e4b99\n2 gaps closed]
@@ -57,7 +59,7 @@ flowchart LR
 
 1. current production source
 2. current deterministic tests
-3. current requirements v4.1 / ADR-0012 / ADR-0013 / ADR-0014 / detailed design / version-management
+3. current requirements v4.2 / ADR-0012 / ADR-0013 / ADR-0014 / ADR-0015 / detailed design / version-management
 4. generated ignored gate・performance・package evidence
 5. historical ADR・preflight
 
@@ -69,7 +71,7 @@ historical fileへ追加した先頭bannerはpost-gate navigation metadataです
 
 | Item | Pinned value | Source |
 |---|---:|---|
-| Product version | `1.0.0` | [`Directory.Build.props`](../../Directory.Build.props)、[版管理手順](version-management.md) |
+| Product version | `1.1.0` candidate | [`Directory.Build.props`](../../Directory.Build.props)、[版管理手順](version-management.md) |
 | .NET SDK | 10.0.400、latestPatch | [`global.json`](../../global.json) |
 | Target framework | `net10.0` | [`Directory.Build.props`](../../Directory.Build.props) |
 | Avalonia | 12.1.1 | [`Directory.Packages.props`](../../Directory.Packages.props) |
@@ -82,3 +84,5 @@ historical fileへ追加した先頭bannerはpost-gate navigation metadataです
 - Excel limits: Microsoft [Excel specifications and limits](https://support.microsoft.com/office/excel-specifications-and-limits-1672b34d-7043-467e-8e27-269d656771c3)（2026-09-01確認）
 - Open XML formula / cached value: Microsoft [Working with formulas](https://learn.microsoft.com/office/open-xml/spreadsheet/working-with-formulas)（2026-09-01確認）
 - .NET self-contained deployment: Microsoft [.NET application publishing overview](https://learn.microsoft.com/dotnet/core/deploying/#publish-as-self-contained)（2026-09-01確認）
+- Windows MSIX: Microsoft [Choose a distribution path](https://learn.microsoft.com/windows/apps/package-and-deploy/choose-distribution-path)、[Sign an MSIX package](https://learn.microsoft.com/windows/msix/package/signing-package-overview)（2026-09-03確認）
+- macOS delivery: Avalonia [macOS deployment](https://docs.avaloniaui.net/docs/deployment/macos)、Apple [Notarizing macOS software](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)（2026-09-03確認）

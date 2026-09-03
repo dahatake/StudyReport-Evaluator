@@ -50,6 +50,21 @@ function Assert-SupportedHost {
     }
 }
 
+function Resolve-ApplicationPath {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name
+    )
+
+    $command = Get-Command $Name -CommandType Application -ErrorAction Stop |
+        Select-Object -First 1
+    if ($null -eq $command -or [string]::IsNullOrWhiteSpace([string]$command.Source)) {
+        throw "Unable to resolve application command: $Name"
+    }
+
+    return [string]$command.Source
+}
+
 function Resolve-RepositoryRoot {
     if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
         return [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -328,7 +343,7 @@ function Assert-GitTag {
         throw "Tag must exactly match the product version: expected $expectedTag."
     }
 
-    $gitPath = (Get-Command git -CommandType Application -ErrorAction Stop).Source
+    $gitPath = Resolve-ApplicationPath -Name 'git'
     $tagType = ([string](@(& $gitPath -C $Root cat-file -t "refs/tags/$TagName") -join '')).Trim()
     if ($LASTEXITCODE -ne 0 -or $tagType -cne 'tag') {
         throw "Release tag must exist and be annotated: $TagName"
@@ -358,7 +373,7 @@ function Assert-CleanWorkingTree {
         [string] $Root
     )
 
-    $gitPath = (Get-Command git -CommandType Application -ErrorAction Stop).Source
+    $gitPath = Resolve-ApplicationPath -Name 'git'
     $status = @(& $gitPath -C $Root status --porcelain=v1 --untracked-files=all)
     if ($LASTEXITCODE -ne 0) {
         throw 'Unable to inspect the Git working tree.'
@@ -516,7 +531,7 @@ switch ($Command) {
             throw 'The verify command does not accept -Version, -Part, -Prerelease, or -DryRun.'
         }
 
-        $dotNetPath = (Get-Command dotnet -CommandType Application -ErrorAction Stop).Source
+        $dotNetPath = Resolve-ApplicationPath -Name 'dotnet'
         $projectPaths = @(
             (Join-Path $root 'src\StudyReportEvaluator.Core\StudyReportEvaluator.Core.csproj'),
             (Join-Path $root 'src\StudyReportEvaluator.App\StudyReportEvaluator.App.csproj')

@@ -377,7 +377,7 @@
           "Avalonia.Themes.Fluent": "[12.1.1, )",
           "DocumentFormat.OpenXml": "[3.5.1, )",
           "GitHub.Copilot.SDK": "[1.0.11, )",
-          "StudyReportEvaluator.Core": "[1.0.0, )"
+          "StudyReportEvaluator.Core": "[1.0.1, )"
         }
       },
       "studyreportevaluator.core": {

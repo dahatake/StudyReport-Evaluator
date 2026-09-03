@@ -2,12 +2,12 @@
 
 | 項目 | 値 |
 |---|---|
-| Current requirement | `docs/requirements-definition.md` v4.1 |
-| Scope ADR | ADR-0012（機能）/ ADR-0013（platform） |
-| Product version | `1.0.0` — `Directory.Build.props`の明示`VersionPrefix` |
+| Current requirement | `docs/requirements-definition.md` v4.2 |
+| Scope ADR | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence） |
+| Product version | `1.1.0` candidate — `Directory.Build.props`の明示`VersionPrefix` |
 | Version management | [`version-management.md`](version-management.md) / [`dev/version.ps1`](../version.ps1) / ADR-0014 |
-| Source baseline | working tree based on `3dbda8c17d4d980f06473cceba0ba3efc0df10dd` |
-| Public release status | `IMPLEMENTATION_IN_PROGRESS` |
+| Source baseline | `feature/setup-simplification-20260903`、base `5a1d1ebe5e6dcc5d934f959e58ac2582f9d9c326`。exact release commitはtag作成時に確定する |
+| Public release status | `IMPLEMENTATION_IN_PROGRESS — Windows/macOS delivery expansion` |
 | Release build | PASS、warning 0 / error 0（2026-09-03実行） |
 | Focused UI validation | `MainWindowTests` 8/8 PASS（2026-09-02実行） |
 | Bundled CLI validation | `CopilotClientFactoryTests` 14/14 PASS（2026-09-02実行） |
@@ -19,15 +19,28 @@
 | Canonical technical E2E | 530行、2,650 normal evaluations、5 references、535 checkpoint updates、no-network primary application path 1/1 PASS（2026-09-03実行） |
 | 10-person system smoke | fixed 10-person fixtureのidentity/formula canaryとuninterrupted/interruption-resume同値性 2/2 PASS（2026-09-03 full run） |
 | Synthetic 531-row journey | fixed-seed local atomic journeyとdurable new/resume同値性 2/2 PASS（2026-09-03 full run） |
-| Full required validation | Release 670/670 PASS、Core 190/190・App 480/480、failed/error/not-executed 0（2026-09-03実行） |
+| Previous functional baseline | Release 670/670 PASS、Core 190/190・App 480/480、failed/error/not-executed 0（2026-09-03、v1.0.1 recovery tree。1.1.0 delivery証跡へ流用しない） |
 | Optional live Copilot | `PASS` — fixed synthetic payload、required substitute false（2026-09-02実行） |
 | Optional external recalculation | `MIXED_ADVISORY` — syntheticはMicrosoft Excel 16.0でopen/recalculate/save・process cleanupまで`PASS`。canonical output copyは20,672 formula error 0だが、Excel保存時に生成されたoptional `/xl/calcChain.xml`だけに`Sem_MissingIndexedElement`が発生して`FAILED_ADVISORY`（2026-09-03実行） |
-| Version tool validation | show/verify/set/bump/dry-run/invalid rejection、11 assertions PASS（2026-09-02実行） |
+| Version tool validation | show/verify/set/bump/dry-run/invalid rejection、複数Git pathでのtag/clean検証、14 assertions PASS（2026-09-03実行） |
 | Audit date | 2026-09-03 |
 
-現在の正式公開作業は[`20260902-readme-end-user-release-plan.md`](../../work/20260902-readme-end-user-release-plan.md)に従う。B-01〜B-04、B-06〜B-08は実装・focused test・敵対的reviewまで完了した。B-05（実在release asset）は未完了であり、正式公開済みとは扱わない。external spreadsheet recalculationはadvisoryであり、syntheticの`PASS`とcanonical Excel保存copyの既知`calcChain` semantic `FAILED_ADVISORY`をrequired primary pathへ合算しない。
+現在のdelivery実装は[`20260903-0923-windows-macos-setup-simplification-plan.md`](../../work/20260903-0923-windows-macos-setup-simplification-plan.md)と[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に従う。未公開`v1.0.1` recoveryは`1.1.0`へcarry forwardし、`v1.0.1` tag／Releaseを作成しない。Windows MSIX、macOS package、production signing/notarization、clean-machine証跡は本節の過去test結果から導出せず、完了までは`NOT_RUN`または`BLOCKED_EXTERNAL`である。
 
-2026-09-03の最新working treeを再buildしたfull solution testは670件中670件成功した。ユーザーが配置した`sample/SampleReport.xlsx`だけをcanonical sampleとし、exact path、470,806 bytes、SHA-256 `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA`、read-only検査前後のidentity不変を確認した。opt-in technical E2Eはnetwork/live AIを使わず530行を完走し、5,305 operations、530 numeric final scores、formula/Open XML error 0、input不変、primary application path `PASS`のfresh evidenceを生成した。10-person fixtureの中断・再開と531行synthetic durable new/resumeもuninterrupted runとの同値性を確認した。Windows 531行synthetic read/write/final validationの最新3回中央値は7.090321秒で30秒基準内である。
+2026-09-03のdelivery変更前working treeを再buildしたfull solution testは670件中670件成功した。ユーザーが配置した`sample/SampleReport.xlsx`だけをcanonical sampleとし、exact path、470,806 bytes、SHA-256 `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA`、read-only検査前後のidentity不変を確認した。opt-in technical E2Eはnetwork/live AIを使わず530行を完走した。これらは機能regressionの比較baselineであり、1.1.0のMSIX／macOS／signing／notarization／quarantine結果ではない。delivery変更後は全required regressionを再実行する。
+
+## v4.2 delivery transition
+
+| Surface | Current status | Completion evidence |
+|---|---|---|
+| Windows unsigned ZIP regression | `PASS_REQUIRED`（delivery変更前baseline。再実行予定） | publish/package/hash/extract/clean launch |
+| Windows MSIX mechanism | `NOT_RUN` | manifest/layout/test-sign/install/launch/repair/uninstall |
+| Windows production trust | `BLOCKED_EXTERNAL` | trusted signature/timestamp + clean target verification |
+| macOS `osx-arm64` publish/bundle | `NOT_RUN` | native bundle/Info.plist/mode/CLI manifest |
+| macOS `osx-x64` publish/bundle | `NOT_RUN` | native bundle/Info.plist/mode/CLI manifest |
+| macOS Developer ID/notarization | `BLOCKED_EXTERNAL` | nested/outer sign, notary log, app/DMG staple |
+| macOS clean-machine matrix | `BLOCKED_EXTERNAL` | exact OS build × native architecture quarantine launch |
+| 3-operation public setup docs | `NOT_RUN` | public artifact re-download後のdocumentation contract |
 
 ## 実装済みsurface
 
@@ -41,7 +54,9 @@
 | score / formula AST | [`Scoring`](../../src/StudyReportEvaluator.Core/Scoring/)、[`Formulas`](../../src/StudyReportEvaluator.Core/Formulas/) | [`Scoring tests`](../../tests/StudyReportEvaluator.Core.Tests/Scoring/)、[`Formula tests`](../../tests/StudyReportEvaluator.Core.Tests/Formulas/) |
 | Config / References / Results / Run / partial checkpoint / atomic output | [`Workbooks`](../../src/StudyReportEvaluator.App/Workbooks/)、[`Workflow`](../../src/StudyReportEvaluator.App/Workflow/) | [`Workbook tests`](../../tests/StudyReportEvaluator.App.Tests/Workbooks/)、[`Workflow tests`](../../tests/StudyReportEvaluator.App.Tests/Workflow/) |
 | 4-step UI / keyboard / 200% | [`Views`](../../src/StudyReportEvaluator.App/Views/)、[`ViewModels`](../../src/StudyReportEvaluator.App/ViewModels/) | [`UI headless tests`](../../tests/StudyReportEvaluator.App.Tests/UI/) |
-| Windows x64 unsigned ZIP / bundled CLI | [`publish-windows.ps1`](../../scripts/publish-windows.ps1)、[`package-windows.ps1`](../../scripts/package-windows.ps1)、[`CopilotClientFactory.cs`](../../src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs) | [`WindowsPublishPackageTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs)、[`CopilotClientFactoryTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Copilot/CopilotClientFactoryTests.cs) |
+| Windows x64 unsigned ZIP / bundled CLI regression | [`publish-windows.ps1`](../../scripts/publish-windows.ps1)、[`package-windows.ps1`](../../scripts/package-windows.ps1)、[`CopilotClientFactory.cs`](../../src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs) | [`WindowsPublishPackageTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs)、[`CopilotClientFactoryTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Copilot/CopilotClientFactoryTests.cs) |
+| Windows MSIX | planned `eng/packaging/windows` + `scripts/package-windows-msix.ps1` | planned installer mechanism/production tests |
+| macOS RID別DMG | planned `eng/packaging/macos` + macOS publish/package scripts | planned bundle/sign/notary/quarantine tests |
 
 詳細なAC/TR対応は[`traceability.md`](traceability.md)を参照してください。
 

@@ -4,6 +4,25 @@ StudyReport Evaluatorの利用者に影響する変更をこのファイルへ�
 
 ## [Unreleased]
 
+### Added
+
+- Windows 11 x64向けMSIXとmacOS ARM64/x64向けDMGを、署名・公証・clean-machine証跡が揃ったplatformだけ公開するdelivery pipelineを追加中。
+
+### Changed
+
+- end-user setupのprimary pathを、WindowsはMSIXのInstall、macOSはDMGからApplicationsへの配置という各3操作以内へ簡素化する。
+- 対応platform追加をSemVer MINORとして、次のcandidate版を`1.1.0`へ更新。
+
+## [1.0.1] - 2026-09-03
+
+### Changed
+
+- `v1.0.0`ではGitHub Releaseと配布assetが作成されなかったため、`v1.0.1`を初回公開packageとし、`1.0.0` sectionの利用者向け変更をすべて含める。
+
+### Fixed
+
+- Windows runnerの`PATH`に複数のGit実行pathがある場合も、版・tag・clean tree検証とpublish toolが単一のapplication commandを選択できるよう修正。
+
 ## [1.0.0] - 2026-09-03
 
 ### Added

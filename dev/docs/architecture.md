@@ -2,11 +2,11 @@
 
 | 項目 | 内容 |
 |---|---|
-| Current requirement | requirements v4.1 |
-| Current decision | ADR-0012（機能）/ ADR-0013（platform） |
+| Current requirement | requirements v4.2 |
+| Current decision | ADR-0012（機能）/ ADR-0015（target delivery）。current public evidence境界はADR-0013 |
 | Detailed design | [`detailed-design.md`](detailed-design.md) |
 | Production projects | 2（Core / App） |
-| Target platform | Windows 11 x64 |
+| Target platform | Windows 11 x64 + evidence-gated macOS x64/Arm64 |
 
 本書はcomponent境界と実行data flowの正本である。型、sheet、formula、checkpoint encodingの詳細は[詳細設計書](detailed-design.md)と[Excel契約](excel-contract.md)を参照する。
 
@@ -134,10 +134,28 @@ checkpointとoutputはinput全体、Prompt、reference、AI resultを含むた�
 ## 8. Platform delivery
 
 - End-user appはRID別.NET 10 self-containedで、.NET Runtime／SDKを別installしない。
-- SDK互換Copilot CLIをpackageに含め、manifestでpath/hashを固定する。
-- Windowsは`win-x64`のunsigned ZIPとSHA-256 sidecarを作り、展開先から起動する。
-- package内CLIは`runtimes/win-x64/native/copilot.exe`へ配置し、PATHへfallbackしない。
-- macOS、Linux、Windows Arm64、installer、code signing、notarizationは初版正式公開の対応対象外である。
+- SDK互換Copilot CLIをpackageに含め、manifestでRID、path、version、shipped file hashを固定する。PATHへfallbackしない。
+- Windows targetは`win-x64` self-contained payloadをproduction-trusted MSIXへ格納する。現行unsigned ZIPは移行中のregression/fallbackとして別contractで維持する。
+- macOS targetは`osx-arm64`と`osx-x64`を別々に`.app`へ組み立て、Developer ID署名、hardened runtime、notarization、stapling後にRID別DMGへ格納する。
+- macOSではnested CLIを署名してshipped hashをmanifestへ反映した後、outer `.app`を最後に署名する。outer署名後のbundle変更を禁止する。
+- Windows/MSIXとmacOS/DMGはいずれもOS標準UIの3操作以内をprimary setupとし、terminalや別runtime installを要求しない。
+- current public claimはplatform別`PASS_PRODUCTION`が揃うまでWindows 11 x64 unsigned ZIPだけとする。cross-publishやframework supportを製品証跡にしない。
+- Linux、Windows Arm64、macOS 13以前、universal macOS artifact、Store配布はv4.2 scope外である。
+
+```mermaid
+flowchart LR
+    Source[Tagged source] --> WinPublish[win-x64 self-contained]
+    Source --> MacArm[osx-arm64 self-contained]
+    Source --> MacX64[osx-x64 self-contained]
+    WinPublish --> MSIX[MSIX package + production signature]
+    MacArm --> MacSign[Bundle + nested sign + manifest + outer sign]
+    MacX64 --> MacSign
+    MacSign --> Notary[Notarize + staple]
+    Notary --> DMG[RID-specific DMG]
+    MSIX --> Matrix[Clean-machine evidence]
+    DMG --> Matrix
+    Matrix -->|PASS_PRODUCTION only| Release[Public release + docs]
+```
 
 ## 9. Validation timing
 
@@ -154,4 +172,4 @@ checkpointとoutputはinput全体、Prompt、reference、AI resultを含むた�
 
 ## 10. Evidence boundary
 
-Required deterministic testsはfake Copilot transportとOpen XML／Core oracleだけで成立させる。authenticated Copilotとexternal spreadsheet recalculationは別のadvisory evidenceとして記録し、required fake/oracle evidenceの代替にしない。Windows以外のplatform対応は別の要求改版と実runner evidenceなしに追加しない。
+Required deterministic testsはfake Copilot transportとOpen XML／Core oracleだけで成立させる。authenticated Copilotとexternal spreadsheet recalculationは別のadvisory evidenceとして記録し、required fake/oracle evidenceの代替にしない。Windows installerとmacOS packageはtest-only mechanism、production trust、clean-machine evidenceを分離し、未実測行を対応表示しない。

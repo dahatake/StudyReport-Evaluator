@@ -41,6 +41,20 @@ public sealed class CopilotClientFactoryTests
     }
 
     [Fact]
+    public async Task Bundled_resolver_rejects_a_manifest_for_a_different_runtime_identifier()
+    {
+        string wrongRuntimeIdentifier = OperatingSystem.IsWindows()
+            ? "osx-x64"
+            : "win-x64";
+        using TemporaryBundledCli bundle = TemporaryBundledCli.Create(
+            runtimeIdentifier: wrongRuntimeIdentifier);
+        BundledCopilotCliPathResolver resolver = new(bundle.Directory);
+
+        await Assert.ThrowsAsync<InvalidDataException>(async () =>
+            await resolver.ResolveAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Missing_bundled_manifest_does_not_fall_back_to_path()
     {
         string directory = Path.Combine(Path.GetTempPath(), "StudyReportEvaluator-A01-" + Guid.NewGuid().ToString("N"));
@@ -241,9 +255,10 @@ public sealed class CopilotClientFactoryTests
 
         public static TemporaryBundledCli Create(
             string? cliSha256 = null,
-            bool writeUtf8Bom = false)
+            bool writeUtf8Bom = false,
+            string? runtimeIdentifier = null)
         {
-            string runtimeIdentifier = CurrentRuntimeIdentifier();
+            runtimeIdentifier ??= CurrentRuntimeIdentifier();
             string binaryName = OperatingSystem.IsWindows() ? "copilot.exe" : "copilot";
             string directory = Path.Combine(
                 Path.GetTempPath(),

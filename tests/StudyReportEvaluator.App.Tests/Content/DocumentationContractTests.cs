@@ -236,8 +236,8 @@ public sealed class DocumentationContractTests
             "unsigned ZIP",
             "StudyReportEvaluator-win-x64.zip",
             "StudyReportEvaluator-win-x64.zip.sha256",
-            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v1.0.0/StudyReportEvaluator-win-x64.zip",
-            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v1.0.0/StudyReportEvaluator-win-x64.zip.sha256",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v1.0.1/StudyReportEvaluator-win-x64.zip",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v1.0.1/StudyReportEvaluator-win-x64.zip.sha256",
             "macOS、Linux、Windows Arm64は初版対応対象外",
             "installer、code signing、notarizationを提供しません");
         AssertContainsAll(
@@ -444,10 +444,10 @@ public sealed class DocumentationContractTests
 
         AssertContainsAll(
             requirements,
-            "| 文書版 | 4.1 |",
+            "| 文書版 | 4.2 |",
             "| 基準日 | 2026-09-03 |",
             "ADR-0013",
-            "| 対応環境 | Windows 11 x64 |",
+            "| 対応環境 | target: Windows 11 x64、macOS 14 / 15 / 26 x64・Arm64。正式表示はplatform別実測後だけ |",
             "`sample/SampleReport.xlsx`",
             "| Bytes | 470,806 |",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
@@ -474,8 +474,8 @@ public sealed class DocumentationContractTests
             "469,995",
             "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D",
             "A1:J531");
-        AssertSequentialTableIds(requirements, "AC-", 22);
-        AssertSequentialTableIds(ledger, "C-", 32);
+        AssertSequentialTableIds(requirements, "AC-", 28);
+        AssertSequentialTableIds(ledger, "C-", 38);
         AssertContainsAll(ledger, "VERIFIED", "BLOCKED", "EXCLUDED");
 
         int[] scenarioHeadingIds = Regex.Matches(
@@ -484,7 +484,7 @@ public sealed class DocumentationContractTests
                 RegexOptions.Multiline | RegexOptions.CultureInvariant)
             .Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))
             .ToArray();
-        Assert.Equal(Enumerable.Range(1, 21), scenarioHeadingIds);
+        Assert.Equal(Enumerable.Range(1, 25), scenarioHeadingIds);
 
         Match[] standalonePrompts = Regex.Matches(
                 prompts,
@@ -493,7 +493,7 @@ public sealed class DocumentationContractTests
             .Cast<Match>()
             .ToArray();
         Assert.Equal(
-            Enumerable.Range(1, 21),
+            Enumerable.Range(1, 25),
             standalonePrompts.Select(match => int.Parse(
                 match.Groups[1].Value,
                 System.Globalization.CultureInfo.InvariantCulture)));
@@ -521,6 +521,10 @@ public sealed class DocumentationContractTests
             "real-data technical E2E / AC-009〜AC-016 / AC-019",
             "TR-24A advisory",
             "TR-24B advisory",
+            "TR-25 / AC-023 / AC-026 / AC-027",
+            "TR-26 / AC-024 / AC-026",
+            "TR-27 / AC-025",
+            "TR-28 / TR-29 / AC-027 / AC-028",
         ];
         Assert.Equal(
             expectedRequirementMappings,
@@ -536,12 +540,12 @@ public sealed class DocumentationContractTests
             .Distinct()
             .Order()
             .ToArray();
-        Assert.Equal(Enumerable.Range(1, 24), coveredRequirementIds);
+        Assert.Equal(Enumerable.Range(1, 29), coveredRequirementIds);
         AssertContainsAll(
             prompts,
-            "| 対象 | StudyReport Evaluator v4.1 |",
+            "| 対象 | StudyReport Evaluator v4.2 |",
             "| 基準日 | 2026-09-03 |",
-            "| 要求正本 | `docs/requirements-definition.md` v4.1 |",
+            "| 要求正本 | `docs/requirements-definition.md` v4.2 |",
             "`sample/SampleReport.xlsx`",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
             "他fileを列挙、fallback、代用しない");

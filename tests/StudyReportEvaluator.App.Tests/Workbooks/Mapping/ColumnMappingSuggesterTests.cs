@@ -83,21 +83,45 @@ public sealed class ColumnMappingSuggesterTests
     [Theory]
     [InlineData(1U)]
     [InlineData(2U)]
-    public void Forms_like_question_rows_suggest_normal_answers_and_prompt_related_special_sources(
+    public void Microsoft_Forms_like_profile_suggests_roles_at_question_rows(
         uint questionTextRow)
     {
-        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
-            "Form Responses 1",
-            questionTextRow,
-            lastRow: questionTextRow + 10,
-            lastColumn: 7,
-            new X02Header(1, "Timestamp"),
-            new X02Header(2, "Email Address"),
-            new X02Header(3, "Report answer 1"),
-            new X02Header(4, "Prompt used for report 1"),
-            new X02Header(5, "Report answer 2"),
-            new X02Header(6, "Prompt used for report 2"),
-            new X02Header(7, "Prompt considerations and viewpoint"));
+        using X02TemporaryWorkbook workbook =
+            X02SyntheticWorkbookFactory.CreateMicrosoftFormsLikeProfile(questionTextRow);
+
+        WorksheetMappingSuggestion suggestion = Assert.IsType<WorksheetMappingSuggestion>(
+            suggester.Suggest(reader.Read(workbook.Path, questionTextRow)).SuggestedWorksheet);
+
+        Assert.Equal(questionTextRow, suggestion.HeaderRow);
+        Assert.Equal(questionTextRow + 1, suggestion.FirstDataRow);
+        Assert.Equal(["F", "G", "H", "I", "J", "K"], suggestion.InitialTargetColumns);
+        Assert.Equal(["A", "B", "C", "D", "E", "L"], suggestion.InitiallyUnselectedColumns);
+        AssertRoles(suggestion, "F", ColumnMappingCandidateRole.PrimaryAnswer);
+        AssertRoles(
+            suggestion,
+            "G",
+            ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.StudentPromptPrimary);
+        AssertRoles(
+            suggestion,
+            "H",
+            ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.Supporting);
+        AssertRoles(suggestion, "I", ColumnMappingCandidateRole.PrimaryAnswer);
+        ColumnMappingCandidate prompt = AssertRoles(
+            suggestion,
+            "J",
+            ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.StudentPromptPrimary);
+        Assert.Equal(["K"], prompt.SuggestedSupportingColumns);
+        AssertRoles(suggestion, "K", ColumnMappingCandidateRole.Supporting);
+    }
+
+    [Theory]
+    [InlineData(1U)]
+    [InlineData(2U)]
+    public void Google_Forms_like_profile_suggests_roles_at_question_rows(
+        uint questionTextRow)
+    {
+        using X02TemporaryWorkbook workbook =
+            X02SyntheticWorkbookFactory.CreateGoogleFormsLikeProfile(questionTextRow);
 
         WorksheetMappingSuggestion suggestion = Assert.IsType<WorksheetMappingSuggestion>(
             suggester.Suggest(reader.Read(workbook.Path, questionTextRow)).SuggestedWorksheet);
@@ -333,6 +357,43 @@ internal sealed class X02TemporaryWorkbook(string directory, string path) : IDis
 
 internal static class X02SyntheticWorkbookFactory
 {
+    // Synthetic structural profile, not an actual export fixture.
+    // https://support.microsoft.com/en-us/office/check-and-share-your-form-results-02859424-341d-406f-b32a-9a0fbaf357af
+    internal static X02TemporaryWorkbook CreateMicrosoftFormsLikeProfile(uint headerRow) =>
+        CreateSingleSheet(
+            "Responses",
+            headerRow,
+            lastRow: headerRow + 10,
+            lastColumn: 12,
+            new X02Header(1, "Response ID"),
+            new X02Header(2, "Start time"),
+            new X02Header(3, "Completion time"),
+            new X02Header(4, "Email"),
+            new X02Header(5, "Name"),
+            new X02Header(6, "Report answer 1"),
+            new X02Header(7, "Student Prompt 1"),
+            new X02Header(8, "Question"),
+            new X02Header(9, "Report answer 2"),
+            new X02Header(10, "Student Prompt 2"),
+            new X02Header(11, "Prompt considerations and viewpoint"),
+            new X02Header(12, "Feedback"));
+
+    // Synthetic structural profile, not an actual export fixture.
+    // https://developers.google.com/apps-script/guides/triggers/events#google_sheets_events
+    internal static X02TemporaryWorkbook CreateGoogleFormsLikeProfile(uint headerRow) =>
+        CreateSingleSheet(
+            "Responses",
+            headerRow,
+            lastRow: headerRow + 10,
+            lastColumn: 7,
+            new X02Header(1, "Timestamp"),
+            new X02Header(2, "Email Address"),
+            new X02Header(3, "Report answer 1"),
+            new X02Header(4, "Prompt used for report 1"),
+            new X02Header(5, "Report answer 2"),
+            new X02Header(6, "Prompt used for report 2"),
+            new X02Header(7, "Prompt considerations and viewpoint"));
+
     internal static X02TemporaryWorkbook CreateSampleLike() => Create(
         new X02SheetSpec(
             "Old",

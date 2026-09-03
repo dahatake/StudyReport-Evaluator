@@ -2,10 +2,10 @@
 
 | 項目 | 内容 |
 |---|---|
-| 対象要求 | `docs/requirements-definition.md` v4.1 |
-| 設計決定 | ADR-0012（機能）/ ADR-0013（platform） |
+| 対象要求 | `docs/requirements-definition.md` v4.2 |
+| 設計決定 | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence boundary） |
 | 作成日 | 2026-09-02 |
-| 状態 | 実装baseline |
+| 状態 | delivery expansion実装baseline |
 | Production topology | Core + App の2 projectを維持 |
 
 ## 1. 設計目標
@@ -18,7 +18,7 @@
 - `.partial.xlsx` checkpointとprocess restart後のresume
 - native file picker
 - Prompt text fileによるGUI prefill
-- Windows 11 x64 self-contained unsigned ZIP配布
+- Windows 11 x64 self-contained MSIXとmacOS RID別DMGによる3操作setup
 
 追加のdatabase、server、plugin framework、汎用AI operation framework、production projectは作らない。
 
@@ -46,7 +46,7 @@ flowchart LR
 | `App/Workbooks` | read-only input、Config/References/Results/Run/Checkpoint sheet |
 | `App/Workflow` | reference先行、student row単位処理、checkpoint、resume |
 | `App/ViewModels` / `Views` | 4-step UI、picker、Prompt import、progress、completion |
-| `scripts` | Windows x64 publish/package |
+| `scripts` | Windows x64 publish/ZIP/MSIX、macOS RID publish/bundle/sign/notary/DMG |
 
 ## 3. Domain model
 
@@ -665,30 +665,50 @@ checkpointとRun sheetへ次を保存する。
 
 ## 13. Packaging
 
-### 13.1 Windows
+### 13.1 共通payload
 
-- RID `win-x64`
-- self-contained、non-trimmed、non-single-file
-- app、bundled CLI、README/docs/images、manifestを含むunsigned ZIPとSHA-256 sidecar
-- ZIP展開先から直接起動し、admin権限を要求しない
-- publish/package scriptはPowerShell 7以上だけを受理し、5.1へfallbackしない
+- `win-x64`、`osx-arm64`、`osx-x64`を別々にRelease/self-contained/non-trimmed/non-single-fileでpublishする。
+- apphost、.NET runtime、Avalonia native assets、Open XML、GitHub Copilot SDK、RID別bundled CLI、runtime manifest、README/docs/images/licenseを含める。
+- source、test、sample、symbol、secret、0-byte、root外linkをpackageへ含めない。
+- package-installed appが外部.NET、Office、別Copilot CLIへfallbackしないことを検証する。
 
-.NET Runtime／SDK、PowerShell 7を一般利用者端末へinstallしない。PowerShell 7はrepositoryのpublish/package担当者だけの前提である。
+### 13.2 Windows
 
-### 13.2 非対応platform
+- primary artifactは`StudyReportEvaluator-win-x64.msix`とSHA-256 sidecar。
+- package Identity Versionはstable SemVer `Major.Minor.Patch`から`Major.Minor.Patch.0`へ写像し、Publisherはproduction certificate subjectと一致させる。
+- test certificateはmanifest/layout/install mechanismだけを検証し、statusを`PASS_MECHANISM`に限定する。
+- 証明書なしのWindows 11開発試験は`StudyReportEvaluator-win-x64.unsigned.test.msix`へ分離する。Publisherは`CN=<test name>, OID.2.25.311729368913984317654407730594956997722=1`とし、fixed unsigned markerを最終fieldに置く。署名entryなし、signed packageと別identityを必須とし、使い捨てVMまたは復元可能なsnapshot上で管理者PowerShellの`Add-AppxPackage -AllowUnsigned`による全ユーザーinstallだけを行う。標準App Installer UI、非管理者setup、production trustの証拠にしない。
+- production packageはtrusted signatureとtimestampを持ち、clean Windows 11 x64でinstall、Start menu launch、upgrade、repair、uninstallを検証する。
+- bundled `runtimes/win-x64/native/copilot.exe`のspawn、login state、model list、cleanup、user-selected workbook I/OをMSIX container下で実測する。
+- 現行unsigned ZIPとsidecarはregression/fallbackとして維持し、MSIXと別artifact contractにする。
+- PowerShell 7はengineering scriptだけの前提で、end-user setup要件にしない。
 
-- macOS、Linux、Windows Arm64は初版正式公開scopeに含めない。
-- installer、code signing、notarizationの成果物またはscriptが存在すると主張しない。
-- 将来追加時は要求改版とplatform別のpackage／launch／trust evidenceを必須にする。
+### 13.3 macOS
 
-### 13.3 自動化境界
+- `StudyReportEvaluator.app/Contents`に`Info.plist`、`MacOS`、`Resources`、必要な`Frameworks`を配置する。
+- `CFBundleExecutable`はapphost、`CFBundleIdentifier`は`com.github.dahatake.study-report-evaluator`、short versionはstable SemVer、build versionは単調増加するnumeric valueとする。
+- `osx-arm64`と`osx-x64`を別bundle／DMGにし、Mach-O architectureとexecute modeを各artifactで検証する。
+- entitlementは実測で必要な最小集合とし、`get-task-allow`を含めない。JITが必要な場合だけ`com.apple.security.cs.allow-jit`を採用する。
+- nested Mach-O／CLI／apphostを署名し、signed CLI SHA-256をmanifestへ反映後、outer `.app`を最後に署名する。outer署名後はbundleを変更しない。
+- appをnotarize／stapleした後にDMGへ格納し、DMGもnotarize／staple／validateする。notary statusがAcceptedでもlogを検査する。
+- quarantine付きdownload、DMG open、Applicationsへのdrag、Finder launch、bundled CLI、workbook read/write、app removalをexact OS build × native architectureで実測する。
 
-- [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)はpush、pull request、manual dispatchでlocked restore、Release build、決定的test、zero-byte／diff検査をWindows runner上で実行する。
-- `sample/SampleReport.xlsx`はprivate local inputとしてGit追跡・package同梱を禁止するため、CIは`SampleWorkbookStructuralTests`だけを除外する。正式公開前のlocal Windows 11 x64 gateではcanonical sample identity／input不変testを別途必須とし、CI結果で代用しない。
-- [`.github/workflows/release.yml`](../../.github/workflows/release.yml)は既存annotated tagをmanual dispatchで検証し、同じPowerShell 7 publish/package scriptからZIPとSHA-256 sidecarを生成してGitHub Releaseを作成する。既存Releaseを上書きしない。
-- Live Copilot、canonical sample technical E2E、Microsoft Excel recalculationは外部／local前提を持つためdefault CIでopt-inせず、未実行を成功扱いにしない。
+### 13.4 Setup lifecycle
 
-### 13.4 製品版
+- Windows: MSIXを開く→Install→起動。
+- macOS: DMGを開く→Applicationsへdrag→起動。
+- install／upgrade／repair／uninstallまたはapp removalは利用者のinput、final、partialを変更・削除しない。
+- wrong RID、tamper、invalid signature、partial install、disk full、locked file、process killを単一原因で試験し、成功表示しない。
+
+### 13.5 自動化境界
+
+- [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)はsecretなしでlocked restore、Release build、決定的test、Windows legacy package、MSIX mechanism、macOS RID publish/bundle structureを検査する。
+- `sample/SampleReport.xlsx`はprivate local inputとしてGit追跡・package同梱を禁止する。platform package acceptanceはsynthetic fixtureで行い、canonical sampleのlocal technical E2Eと分離する。
+- [`.github/workflows/release.yml`](../../.github/workflows/release.yml)はprotected environmentでproduction signing/notarizationを実行する。PR/forkへsecretを渡さない。
+- required platform matrixの全claim行が`PASS_PRODUCTION`でなければ該当artifactを公開しない。
+- Live Copilot、canonical sample technical E2E、external spreadsheet recalculationは各scopeを分離し、未実行を成功扱いにしない。
+
+### 13.6 製品版
 
 - 製品SemVerの単一正本はroot `Directory.Build.props`の`VersionPrefix` / `VersionSuffix`とする。
 - 版の表示、設定、bump、App/Core/published assembly/tag検証は`dev/version.ps1`を使う。
@@ -768,9 +788,11 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 
 ### 16.5 Delivery
 
-- Windows package layout、bundled CLI manifest/hash/version、展開先clean launch
-- unsigned ZIPとSHA-256 sidecarの再現可能生成
-- unsupported platform／installer／signingの非対応claim contract
+- Windows legacy ZIP layout/hash/clean launch regression
+- MSIX manifest/version/layout、test-sign mechanism、production trust、install/upgrade/repair/uninstall
+- macOS RID別bundle、Info.plist、Mach-O/mode、nested/outer signing、runtime manifest、notary/staple/DMG/quarantine
+- package-installed appのbundled CLI、input不変、checkpoint/resume、final、privacy regression
+- platform matrix、secret isolation、未実測artifact非公開、public candidate再download
 
 ## 17. File-level implementation map
 
@@ -798,14 +820,18 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 | U-04 | warning resource/shell | warning tests |
 | L-01 | Program/App/composition + launch files | startup tests |
 | P-01 | Windows scripts/package | packaging tests |
+| P-02 | Windows MSIX manifest/package/sign/install | Windows installer tests |
+| P-03 | macOS RID publish/bundle/sign/notary/DMG | macOS package and quarantine tests |
+| P-04 | platform matrix / protected release | workflow contract and release evidence tests |
 | D-01..05 | README/docs/dev/docs/images | documentation/screenshot tests |
 
 ## 18. Definition of done
 
-- 要求v4.1のAC-001〜022がdirect deterministic evidenceへ接続される。
+- 要求v4.2のAC-001〜028がdirect deterministic、mechanism、production external evidenceへ適切に接続される。
 - 各implementation taskでtarget tests、Release build、diff checkが成功する。
 - 各taskの敵対的reviewで再現したfindingを修正し、同じ観点のfollow-upで0件を確認する。
 - full required testsが成功する。
-- Windows package、展開先launch、bundled CLI resolverが成功する。
-- macOS、Linux、Windows Arm64、installer、code signing、notarizationを対応済みと記録しない。
+- Windows legacy package regressionとMSIX production install/launch/bundled CLI/uninstallが成功する。
+- macOS RID別sign/notary/staple/quarantine launchがexact test行で成功する。
+- Linux、Windows Arm64、macOS 13以前、未実測installer／signing／notarizationを対応済みと記録しない。
 - 実在学生本文、Prompt、reference、AI reason/evidenceをlog、test artifact、review recordへ追加しない。

@@ -52,7 +52,7 @@ $assertionCount = 0
 $show = ConvertFrom-ToolJson -Output @(& $toolPath show -RepositoryRoot $repositoryRoot -Json)
 Assert-Equal -Expected 'PASS' -Actual $show.Status -Message 'show status mismatch.'
 $assertionCount++
-Assert-Equal -Expected '1.0.0' -Actual $show.Version -Message 'repository version mismatch.'
+Assert-Equal -Expected '1.0.1' -Actual $show.Version -Message 'repository version mismatch.'
 $assertionCount++
 
 $verify = ConvertFrom-ToolJson -Output @(& $toolPath verify -RepositoryRoot $repositoryRoot -Json)
@@ -60,6 +60,93 @@ Assert-Equal -Expected 'PASS' -Actual $verify.Status -Message 'verify status mis
 $assertionCount++
 Assert-Equal -Expected 2 -Actual @($verify.Projects).Count -Message 'verify project count mismatch.'
 $assertionCount++
+
+$actualGitPath = [string](
+    Get-Command git -CommandType Application -ErrorAction Stop |
+        Select-Object -First 1).Source
+$multipleGitRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('StudyReportEvaluator-MultipleGit-' + [System.Guid]::NewGuid().ToString('N'))
+$temporaryRepository = Join-Path $multipleGitRoot 'repository'
+$originalPath = $env:PATH
+try {
+    [void][System.IO.Directory]::CreateDirectory($multipleGitRoot)
+    & $actualGitPath clone --no-hardlinks --quiet $repositoryRoot $temporaryRepository
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Unable to create the temporary Git repository for the multiple-command test.'
+    }
+
+    foreach ($relativePath in @('Directory.Build.props', 'CHANGELOG.md', 'dev\version.ps1')) {
+        $destinationPath = Join-Path $temporaryRepository $relativePath
+        [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($destinationPath))
+        Copy-Item -LiteralPath (Join-Path $repositoryRoot $relativePath) -Destination $destinationPath -Force
+    }
+
+    $pendingChanges = @(& $actualGitPath -C $temporaryRepository status --porcelain=v1 --untracked-files=all)
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Unable to inspect the temporary Git repository.'
+    }
+
+    if ($pendingChanges.Count -ne 0) {
+        & $actualGitPath -C $temporaryRepository config user.name 'Version Tool Test'
+        & $actualGitPath -C $temporaryRepository config user.email 'version-tool-test@example.invalid'
+        & $actualGitPath -C $temporaryRepository add -- Directory.Build.props CHANGELOG.md dev/version.ps1
+        & $actualGitPath -C $temporaryRepository commit --quiet -m 'Prepare version tool test input'
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Unable to commit the temporary version tool test input.'
+        }
+    }
+
+    $tagName = "v$($show.Version)"
+    & $actualGitPath -C $temporaryRepository tag --delete $tagName 2>$null
+    if ($LASTEXITCODE -notin @(0, 1)) {
+        throw 'Unable to remove an inherited temporary release tag.'
+    }
+
+    & $actualGitPath -C $temporaryRepository `
+        -c user.name='Version Tool Test' `
+        -c user.email='version-tool-test@example.invalid' `
+        tag --annotate $tagName --message "Version tool test $($show.Version)"
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Unable to create the temporary annotated release tag.'
+    }
+
+    $shimDirectories = @(
+        (Join-Path $multipleGitRoot 'git-shim-1'),
+        (Join-Path $multipleGitRoot 'git-shim-2')
+    )
+    $shimText = "@echo off`r`n`"$actualGitPath`" %*`r`n"
+    foreach ($shimDirectory in $shimDirectories) {
+        [void][System.IO.Directory]::CreateDirectory($shimDirectory)
+        [System.IO.File]::WriteAllText(
+            (Join-Path $shimDirectory 'git.cmd'),
+            $shimText,
+            [System.Text.Encoding]::ASCII)
+    }
+
+    $env:PATH = ($shimDirectories + $originalPath) -join [System.IO.Path]::PathSeparator
+    $matchingGitCommands = @(Get-Command git -CommandType Application -ErrorAction Stop)
+    if ($matchingGitCommands.Count -lt 2) {
+        throw 'The multiple-command test did not expose at least two Git applications.'
+    }
+
+    $multipleGitVerify = ConvertFrom-ToolJson -Output @(
+        & (Join-Path $temporaryRepository 'dev\version.ps1') verify `
+            -RepositoryRoot $temporaryRepository `
+            -Tag $tagName `
+            -RequireClean `
+            -Json)
+    Assert-Equal -Expected 'PASS' -Actual $multipleGitVerify.Status -Message 'multiple Git command verify status mismatch.'
+    $assertionCount++
+    Assert-Equal -Expected $tagName -Actual $multipleGitVerify.Tag.Name -Message 'multiple Git command tag mismatch.'
+    $assertionCount++
+    Assert-Equal -Expected $true -Actual $multipleGitVerify.CleanWorkingTreeChecked -Message 'multiple Git command clean check mismatch.'
+    $assertionCount++
+}
+finally {
+    $env:PATH = $originalPath
+    if (Test-Path -LiteralPath $multipleGitRoot) {
+        Remove-Item -LiteralPath $multipleGitRoot -Recurse -Force
+    }
+}
 
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('StudyReportEvaluator-VersionTool-' + [System.Guid]::NewGuid().ToString('N'))
 [void][System.IO.Directory]::CreateDirectory($temporaryRoot)

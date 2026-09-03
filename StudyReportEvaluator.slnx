@@ -1,4 +1,10 @@
 <Solution>
+  <Folder Name="/eng/" />
+  <Folder Name="/eng/packaging/" />
+  <Folder Name="/eng/packaging/windows/" />
+  <Folder Name="/eng/packaging/windows/tools/">
+    <Project Path="eng/packaging/windows/tools/WindowsSdkBuildTools.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/StudyReportEvaluator.Core/StudyReportEvaluator.Core.csproj" />
     <Project Path="src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj" />

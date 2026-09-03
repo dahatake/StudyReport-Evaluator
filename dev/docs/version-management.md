@@ -15,7 +15,7 @@
 
 この手順は、同じ製品版がsource、App/Core project、公開binary、Git tag、変更履歴で一貫するように管理するための正本です。製品版を変更しただけで、test済み、公開済み、署名済み、またはGitHub Release作成済みとは扱いません。
 
-現在のsource版は`1.0.0`です。導入前も.NET SDKが同じ`1.0.0`を暗黙評価していたため、初期導入では実効値を維持し、`Directory.Build.props`へ明示しました。[調査証拠](../../work/20260902-version-management-investigation-evidence.json)
+現在のsource candidate版は`1.1.0`です。初期導入では.NET SDKの暗黙評価と同じ`1.0.0`を`Directory.Build.props`へ明示し、未公開release recoveryで`1.0.1`へ更新後、Windows/macOS delivery追加を§3.1のMINOR規則へ適用して`1.1.0`へ更新しました。[調査証拠](../../work/20260902-version-management-investigation-evidence.json)、[ADR-0015](adr/0015-windows-macos-installer-delivery.md)
 
 2026-09-02の公開API調査では公開GitHub Releaseとremote tagはいずれも0件でした。この観測はprivate draftの不存在を証明しません。[調査レポート §2.2](../../work/20260902-version-management-investigation-report.md#22-実測した主なcommand)
 
@@ -42,7 +42,7 @@
 
 版の上げ幅は、C#の`public` keywordだけでなく、利用者や後続処理が依存する次のsurfaceで判断します。
 
-- 対応OS / architecture、配布形式、package layout、起動file。[ADR-0013](adr/0013-windows-only-public-release.md)
+- 対応OS / architecture、配布形式、package layout、起動file。[ADR-0013](adr/0013-windows-only-public-release.md)、[ADR-0015](adr/0015-windows-macos-installer-delivery.md)
 - `--input` / `--prompt`等のcommand-line contract。
 - 受理するworkbook形式、入力不変、no-overwrite。
 - final/partialのfile名、sheet名、field、formula、status、blank/zero semantics。[Excel契約](excel-contract.md)
@@ -74,8 +74,8 @@
 
 | Version | 現在値 | 更新条件 | Source |
 |---|---:|---|---|
-| 製品版 | `1.0.0` | 本手順の公開契約差分 | [`Directory.Build.props`](../../Directory.Build.props) |
-| 要求文書版 | `4.1` | 要求baseline変更 | [`requirements-definition.md`](../../docs/requirements-definition.md) |
+| 製品版 | `1.1.0` candidate | 本手順の公開契約差分 | [`Directory.Build.props`](../../Directory.Build.props) |
+| 要求文書版 | `4.2` | 要求baseline変更 | [`requirements-definition.md`](../../docs/requirements-definition.md) |
 | QuantificationDefinition schema | `4.0` | canonical definition format変更 | [`CanonicalDefinitionSerializer.cs`](../../src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs) |
 | checkpoint schema | `1` | checkpoint payload format変更 | [`CheckpointEnvelope.cs`](../../src/StudyReportEvaluator.App/Workbooks/Checkpoint/CheckpointEnvelope.cs) |
 | Copilot runtime manifest schema | `1` | `copilot-runtime.json` format変更 | [`StudyReportEvaluator.App.csproj`](../../src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj) |
@@ -220,11 +220,13 @@ pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify -Tag v1.1.0 -RequireC
 
 ### 6.5 publish/packageを検証
 
-1. [`scripts/publish-windows.ps1`](../../scripts/publish-windows.ps1)でpublishします。
-2. `version.ps1 verify -PublishedDirectory ...`でApp/Core DLLを検証します。
-3. [`scripts/package-windows.ps1`](../../scripts/package-windows.ps1)でZIPとSHA-256 sidecarを作ります。
-4. package testでZIP layout、sidecar、bundled CLI、clean launchを検証します。
-5. 現行asset名は`StudyReportEvaluator-win-x64.zip`です。製品版はGitHub Release tag、release notes、DLL metadata、SHA-256の組で識別します。asset名をversion入りへ変更する場合は、package script、test、README、入手手順を同じ変更で更新します。
+1. [`scripts/publish-windows.ps1`](../../scripts/publish-windows.ps1)で`win-x64`をpublishし、legacy ZIP regressionを維持します。
+2. macOSは`osx-arm64`と`osx-x64`を別々にpublishします。
+3. `version.ps1 verify -PublishedDirectory ...`でRID別App/Core DLLを検証します。
+4. Windows MSIXはmanifest/version/layoutを検査し、test certificateを`PASS_MECHANISM`、trusted certificateとclean installを`PASS_PRODUCTION`として分離します。
+5. macOSは`.app` bundle、nested sign、shipped CLI hash manifest、outer sign、notary/staple、RID別DMGの順で検証します。
+6. package testで各artifactのlayout、sidecar、bundled CLI、clean launchを検証します。
+7. asset名は`StudyReportEvaluator-win-x64.msix`、`StudyReportEvaluator-osx-arm64.dmg`、`StudyReportEvaluator-osx-x64.dmg`と各`.sha256`です。製品版はGitHub Release tag、release notes、binary/package metadata、SHA-256の組で識別します。
 
 ### 6.6 release commitとtag
 

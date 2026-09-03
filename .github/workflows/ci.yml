@@ -26,7 +26,7 @@ env:
 
 jobs:
   validate:
-    name: Windows release validation
+    name: Windows deterministic and legacy package validation
     runs-on: windows-latest
     timeout-minutes: 60
 
@@ -79,6 +79,10 @@ jobs:
           --logger "trx"
           --logger "console;verbosity=minimal"
 
+      - name: Build and validate unsigned MSIX mechanism
+        shell: pwsh
+        run: .\scripts\test-windows-msix-unsigned.ps1
+
       - name: Check repository integrity
         shell: pwsh
         run: |
@@ -102,5 +106,80 @@ jobs:
         with:
           name: test-results-${{ github.run_id }}
           path: TestResults/ci/**/*.trx
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload unsigned MSIX mechanism evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-msix-mechanism-${{ github.run_id }}
+          path: |
+            artifacts/package/mechanism/StudyReportEvaluator-win-x64.unsigned.test.msix.sha256
+            artifacts/package/mechanism/StudyReportEvaluator-win-x64.unsigned.test.evidence.json
+          if-no-files-found: error
+          retention-days: 14
+
+  macos-contract:
+    name: macOS repository contract (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - macos-15
+          - macos-15-intel
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.400
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+
+      - name: Record non-production runner facts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p TestResults/macos-contract
+          {
+            printf 'runner=%s\n' '${{ matrix.runner }}'
+            printf 'os=' && sw_vers -productVersion
+            printf 'build=' && sw_vers -buildVersion
+            printf 'architecture=' && uname -m
+            printf 'dotnet=' && dotnet --version
+          } > "TestResults/macos-contract/${{ matrix.runner }}-facts.txt"
+
+      - name: Restore locked dependencies
+        shell: bash
+        run: dotnet restore ./StudyReportEvaluator.slnx --locked-mode
+
+      - name: Build Release
+        shell: bash
+        run: dotnet build ./StudyReportEvaluator.slnx --configuration Release --no-restore
+
+      - name: Run macOS repository contract tests
+        shell: bash
+        run: >-
+          dotnet test ./tests/StudyReportEvaluator.App.Tests/StudyReportEvaluator.App.Tests.csproj
+          --configuration Release
+          --no-build
+          --no-restore
+          --filter "FullyQualifiedName~StudyReportEvaluator.App.Tests.Packaging.MacOsPublishPackageTests|FullyQualifiedName~StudyReportEvaluator.App.Tests.Copilot.CopilotClientFactoryTests"
+          --results-directory ./TestResults/macos-contract
+          --logger "trx;LogFileName=${{ matrix.runner }}.trx"
+          --logger "console;verbosity=minimal"
+
+      - name: Upload macOS contract evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-contract-${{ matrix.runner }}-${{ github.run_id }}
+          path: TestResults/macos-contract/*
           if-no-files-found: error
           retention-days: 14

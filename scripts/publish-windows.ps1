@@ -31,6 +31,21 @@ function Assert-SupportedHost {
     }
 }
 
+function Resolve-ApplicationPath {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name
+    )
+
+    $command = Get-Command $Name -CommandType Application -ErrorAction Stop |
+        Select-Object -First 1
+    if ($null -eq $command -or [string]::IsNullOrWhiteSpace([string]$command.Source)) {
+        throw "Unable to resolve application command: $Name"
+    }
+
+    return [string]$command.Source
+}
+
 function Assert-PathWithinRoot {
     param(
         [Parameter(Mandatory)]
@@ -295,7 +310,8 @@ function Get-NpmCopilotCliBinary {
         [string] $DestinationDirectory
     )
 
-    $npmCommand = Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyContinue
+    $npmCommand = Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
     if ($null -eq $npmCommand) {
         return $null
     }
@@ -768,7 +784,7 @@ $published = $false
 try {
     Push-Location $repositoryRoot
     try {
-        $dotNetPath = (Get-Command dotnet -CommandType Application -ErrorAction Stop).Source
+        $dotNetPath = Resolve-ApplicationPath -Name 'dotnet'
         $actualSdkVersion = ((& $dotNetPath --version) | Out-String).Trim()
         if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($actualSdkVersion)) {
             throw 'Unable to resolve the dotnet SDK selected by global.json.'

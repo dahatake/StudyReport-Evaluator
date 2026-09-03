@@ -3,8 +3,8 @@
 | 項目 | 値 |
 |---|---|
 | 対象 | 正式公開用`README.md`とリンク先利用者文書 |
-| 要求 | `docs/requirements-definition.md` v4.1 |
-| Decision | ADR-0012（機能）/ ADR-0013（platform） |
+| 要求 | `docs/requirements-definition.md` v4.2 |
+| Decision | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence） |
 | 更新日 | 2026-09-03 |
 | 状態語彙 | `VERIFIED` / `BLOCKED` / `EXCLUDED` |
 
@@ -45,7 +45,13 @@
 | C-029 | READMEからリンクする全利用者文書がv4.1 current contractと一致する。 | `docs/*.md` | relative link 20件・欠落0、warning完全一致、RD-02敵対review finding 0（2026-09-02） | VERIFIED | package同梱後も同じ文書を使う。 |
 | C-030 | 公開READMEに処理時間、token数、費用の保証値を載せる。 | なし | Windows performance testは特定synthetic scenarioだけを測定 | EXCLUDED | 未実測の実利用時間・AI待機・費用へ一般化しない。 |
 | C-031 | source build、commit、gate、test件数、ADR、traceabilityを利用者quick startの主導線へ載せる。 | なし | 正式公開READMEの目的外 | EXCLUDED | 必要な保守導線は`dev/docs/README.md`へ分離する。 |
-| C-032 | macOS/Linux/Windows Arm64、installer、code signing/notarizationを提供する。 | 該当production/packageなし | [ADR-0013](adr/0013-windows-only-public-release.md) | EXCLUDED | 非対応としてだけ記載できる。 |
+| C-032 | Linux、Windows Arm64、macOS 13以前、universal macOS artifact、Store配布を提供する。 | 該当production/packageなし | [ADR-0015](adr/0015-windows-macos-installer-delivery.md) | EXCLUDED | v4.2非対応としてだけ記載できる。 |
+| C-033 | trusted Windows x64 MSIXをOS標準UIからinstallできる。 | planned Windows MSIX manifest/package script | required test未実行、production signing identity未提供 | BLOCKED | mechanismとproduction trustの両方が完了するまで現在機能として書かない。 |
+| C-034 | macOS Apple Silicon向けsigned/notarized/stapled DMGを提供する。 | planned macOS package script | Developer ID/notary/clean Arm64 host未提供 | BLOCKED | cross-publishだけでVERIFIEDにしない。 |
+| C-035 | macOS Intel向けsigned/notarized/stapled DMGを提供する。 | planned macOS package script | Developer ID/notary/clean x64 host未提供 | BLOCKED | Rosetta結果をnative x64へ代用しない。 |
+| C-036 | Windows/macOSのprimary setupはOS標準UIの3操作以内である。 | [ADR-0015](adr/0015-windows-macos-installer-delivery.md) | public artifact journey未実行 | BLOCKED | artifact実在とclean journey後にだけREADMEを切り替える。 |
+| C-037 | install/upgrade/repair/uninstallまたはapp removalでuser workbookを保持する。 | planned installer/package lifecycle | package-installed E2E未実行 | BLOCKED | input/final/partialのbefore/after identityが必要。 |
+| C-038 | protected release workflowはrequired platform matrixだけを公開する。 | planned CI/release workflow | workflow未実装 | BLOCKED | secret isolationと未実測artifact非公開を直接検証する。 |
 
 ## 外部仕様の確認記録
 
@@ -53,12 +59,14 @@
 |---|---|---|---|---|
 | EXT-001 | .NET版GitHub Copilot SDKはCLIをbundled dependencyとして扱える。 | [GitHub Copilot SDK — Bundled CLI](https://github.com/github/copilot-sdk/blob/main/docs/setup/bundled-cli.md)、local NuGet `GitHub.Copilot.SDK` 1.0.11 MSBuild targets | 2026-09-02 | SDK 1.0.11はCLI 1.0.79をRID別runtime directoryへ登録する。projectはさらにmanifest/hash/versionを検証する。 |
 | EXT-002 | .NET 10 self-contained publishはtarget machineへ.NET runtimeを事前installしない配布方法である。 | [Microsoft Learn — .NET application publishing overview](https://learn.microsoft.com/dotnet/core/deploying/) | 2026-09-02 | Windows package testで外部.NET無効化環境のstartupを確認する。 |
+| EXT-003 | direct MSIXはvalidかつtarget deviceでtrustedなcode-signing certificateを必要とする。 | [Microsoft Learn — Sign an MSIX package](https://learn.microsoft.com/windows/msix/package/signing-package-overview) | 2026-09-03 | test certificateをproduction claimへ使わない。 |
+| EXT-004 | macOS直接配布はDeveloper ID、hardened runtime、notarization、ticket staplingを必要とする。 | [Apple — Notarizing macOS software](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)、[Avalonia — macOS deployment](https://docs.avaloniaui.net/docs/deployment/macos) | 2026-09-03 | production credentialとclean hostがない間はBLOCKED。 |
 
 GitHub Copilotのplan、料金、model availabilityは利用者accountとservice変更に依存するため、この台帳では固定claimにしない。公開READMEではGitHub公式のcurrent documentationへ案内し、アプリ内の「Copilot状態を確認」で実際のlogin/model availabilityを検証する。
 
-## 2026-09-03 validation snapshot
+## 2026-09-03 pre-v1.1.0 functional validation snapshot
 
-この節は監査記録でありREADMEへtest件数として転載しない。
+この節はdelivery変更前の監査記録でありREADMEへtest件数として転載せず、MSIX/macOS/sign/notary証跡へ流用しない。
 
 - Release build: warning 0 / error 0。
 - `MainWindowTests`: 8/8 PASS。

@@ -25,16 +25,41 @@ public sealed class TenPersonSystemSmokeTests
     private const string ModelId = "local-deterministic-10-person-no-network";
 
     [Fact]
-    public void Fixture_has_fixed_identity_structure_and_literal_formula_canaries()
+    public async Task Fixture_has_fixed_identity_structure_and_literal_formula_canaries()
     {
         string path = FixturePath();
-        InputSnapshot snapshot = new InputSnapshotService().Capture(path);
+        InputSnapshotService snapshots = new();
+        InputSnapshot snapshot = snapshots.Capture(path);
 
         Assert.Equal(7_652, snapshot.SizeBytes);
         Assert.Equal(FixtureSha256, snapshot.Sha256);
         FileFormatClassificationResult classification = new FileFormatClassifier().Classify(path);
         Assert.True(classification.IsAccepted);
         Assert.Equal(FileFormatClassification.StandardXlsx, classification.Classification);
+
+        InputViewModel input = new();
+        await input.SetFilePathAsync(path, TestContext.Current.CancellationToken);
+        Assert.True(input.HasLoadedWorkbook);
+        Assert.True(input.CanContinue);
+        Assert.Equal([1, 2], input.HeaderRowOptions);
+        Assert.Equal(1, input.HeaderRow);
+        Assert.Equal(2, input.FirstDataRow);
+        Assert.Equal(11, input.LastDataRow);
+        QuantificationDefinition definition = input.CreateDesignDefinition();
+        Assert.Equal("SystemTestInput", definition.SourceSheet);
+        Assert.Equal(1, definition.HeaderRow);
+        Assert.Equal(2, definition.FirstDataRow);
+        Assert.Equal(11, definition.LastDataRow);
+        Assert.Equal(60m, definition.BasePoints);
+        Assert.Equal(0m, definition.SpecialPoints);
+        Assert.Equal(0.1m, definition.SimilarityPenaltyWeight);
+        Assert.Equal(1, definition.RoundingDigits);
+        Assert.Equal(5, definition.Questions.Length);
+        Assert.Equal(
+            ["F", "G", "H", "I", "J"],
+            definition.Questions.Select(question => question.PrimarySourceColumn));
+        Assert.Equal(["K"], definition.Questions[4].SupportingSourceColumns);
+        Assert.Empty(definition.Questions.SelectMany(question => question.SpecialEvaluations));
 
         WorkbookMetadata metadata = new WorkbookMetadataReader().Read(path);
         WorksheetMetadata worksheetMetadata = Assert.Single(metadata.Worksheets);
@@ -68,6 +93,9 @@ public sealed class TenPersonSystemSmokeTests
 
         Assert.DoesNotContain(cells, cell => cell.CellFormula is not null);
         Assert.Empty(workbook.DefinedNames?.Elements<DefinedName>() ?? []);
+        ExternalWorkbookPart[] externalWorkbookParts = workbookPart.ExternalWorkbookParts.ToArray();
+        // DdeLink is only valid beneath an ExternalWorkbookPart root.
+        Assert.Empty(externalWorkbookParts);
         Cell[] canaries = cells
             .Where(cell => CellText(cell, sharedStrings).StartsWithAny('=', '+', '-', '@'))
             .ToArray();
@@ -93,6 +121,7 @@ public sealed class TenPersonSystemSmokeTests
                 FindCell(worksheet, "J", row),
                 sharedStrings)));
         Assert.False(string.IsNullOrWhiteSpace(CellText(FindCell(worksheet, "K", jBlankRow), sharedStrings)));
+        Assert.True(snapshots.Recheck(path, snapshot).IsMatch);
     }
 
     [Fact]
