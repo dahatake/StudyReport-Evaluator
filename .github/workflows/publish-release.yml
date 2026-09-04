@@ -123,10 +123,16 @@ jobs:
               throw 'The draft release tag does not match the requested tag.'
           }
 
-          $matrixPath = Join-Path $env:CANDIDATE_EVIDENCE_ROOT 'platform-release-matrix.json'
-          if (-not (Test-Path -LiteralPath $matrixPath -PathType Leaf)) {
-              throw 'The candidate control evidence does not contain the release matrix.'
+          # upload-artifact preserves the common source root, so the matrix may sit in a subdirectory.
+          $matrixFiles = @(Get-ChildItem `
+              -LiteralPath $env:CANDIDATE_EVIDENCE_ROOT `
+              -Recurse `
+              -File `
+              -Filter 'platform-release-matrix.json')
+          if ($matrixFiles.Count -ne 1) {
+              throw 'The candidate control evidence must contain exactly one release matrix.'
           }
+          $matrixPath = $matrixFiles[0].FullName
 
           $matrix = Get-Content -LiteralPath $matrixPath -Raw -Encoding utf8 |
               ConvertFrom-Json -DateKind String

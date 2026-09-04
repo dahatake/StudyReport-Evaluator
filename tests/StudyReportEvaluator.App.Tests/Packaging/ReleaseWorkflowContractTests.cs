@@ -111,6 +111,11 @@ public sealed class ReleaseWorkflowContractTests
         string workflow = ReadWorkflow("publish-release.yml");
 
         Assert.Contains(
+            "The candidate control evidence must contain exactly one release matrix.",
+            workflow,
+            StringComparison.Ordinal);
+        Assert.Contains("-Recurse", workflow, StringComparison.Ordinal);
+        Assert.Contains(
             "Exactly one publishable Windows ZIP row must be PASS_REQUIRED.",
             workflow,
             StringComparison.Ordinal);
