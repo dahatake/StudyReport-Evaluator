@@ -2,7 +2,7 @@
 
 このガイドでは、Windows 11 x64でStudyReport Evaluatorを起動し、標準`.xlsx`から最初の結果workbookを作る手順を説明します。
 
-現在、公開済みの配布物はありません。以下の手順は、公開開始後に[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases)から実在するZIPとsidecarを取得した場合、または開発者から同じ2fileを受領した場合に使用します。development MSIXは検証専用で、一般利用者向けの入手・起動手順には含めません。
+現在の公開版は`0.8.1`です。以下の手順は、[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases)から実在するZIPとsidecarを取得した場合、または開発者から同じ二つのfileを受領した場合に使用します。development MSIXは検証専用で、一般利用者向けの入手・起動手順には含めません。
 
 > [!WARNING]
 > 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません

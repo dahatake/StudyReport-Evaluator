@@ -8,7 +8,7 @@
 | Plan | `work/20260904-publication-remediation-plan.md` |
 | Previous validation | delivery変更前 Release build warning/error 0、full 670/670 PASS（Core 190 / App 480）。現在の0.8.0 delivery evidenceへ流用しない |
 | Current focused validation | 2026-09-04 V2-01: locked restore、Release build 0 warning/error、full required gate 696/696（Core 190 / App 506）、version self-test 15、documentation 14/14、`git diff --check` PASS |
-| Current status | DRAFT_CREATED_UNPUBLISHED — release matrix、candidate workflow、protected publish workflowを実装済み。`v0.8.1` draftは作成済みで、公開はenvironment approval待ち |
+| Current status | PUBLISHED — `v0.8.1`を2026-09-04に公開し、認証なしre-downloadでasset identityを確認済み |
 
 この表の`PLANNED`は未実装をPASSと称しない。task完了後にproduction symbol、direct test、gate identityへ更新する。旧v3 traceabilityはGit履歴とADR-0011に保持する。
 
@@ -28,11 +28,10 @@
 | `PASS_MECHANISM` | test certificateまたはunsigned artifactでpackage mechanismだけが成功。非公開であり、production readinessを意味しない |
 | `PASS_PRODUCTION` | production trust pathとclean target OSで成功 |
 | `MIXED_ADVISORY` | optional evidenceを実行し、PASSとFAILED_ADVISORYが混在。required gateへ算入しない |
-| `PASS_REQUIRED_EXCEPT_PUBLIC_REDOWNLOAD` | matrix、workflow contract、draft asset照合までを実測。公開後にしか実行できないunauthenticated re-downloadだけが未実行 |
 
 AC-024／AC-025とTR-26／TR-27の`PASS_REQUIRED`は、現版でrequiredなmacOS static source contract 2件の成功だけを表す。production artifact、署名、公証、clean-host実行は現版scope外であり、`PASS_PRODUCTION`を表さない。
 
-AC-028／TR-29の判定は、release matrixの生成・semantic検証、candidate／publish workflowのcontract test、draft assetとmatrixのhash照合という実測に基づく。GitHub Releaseは`v0.8.1` draftの状態であり、公開済みassetのunauthenticated再取得は公開後にしか実行できない。
+AC-028／TR-29の判定は、release matrixの生成・semantic検証、candidate／publish workflowのcontract test、draft assetとmatrixのhash照合、および公開後の認証なしre-downloadによるasset identity確認という実測に基づく。
 
 ## Acceptance criteria mapping
 
@@ -99,7 +98,7 @@ AC-028／TR-29の判定は、release matrixの生成・semantic検証、candidat
 | TR-26 | macOS source foundation static contract（source-only） | P-03 | PASS_REQUIRED |
 | TR-27 | macOS future trust order static contract（source-only） | P-03 | PASS_REQUIRED |
 | TR-28 | Windows ZIP launch/input不変 + MSIX package exclusion | P-01/P-02 | PASS_REQUIRED |
-| TR-29 | publish matrix/secret/public re-download | P-04 | PASS_REQUIRED_EXCEPT_PUBLIC_REDOWNLOAD |
+| TR-29 | publish matrix/secret/public re-download | P-04 | PASS_REQUIRED |
 
 ## Mandatory safety surfaces
 

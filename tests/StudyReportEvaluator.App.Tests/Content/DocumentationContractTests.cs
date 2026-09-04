@@ -222,7 +222,7 @@ public sealed class DocumentationContractTests
     }
 
     [Fact]
-    public void Platform_and_unpublished_package_claims_match_the_windows_delivery_contract()
+    public void Platform_and_published_package_claims_match_the_windows_delivery_contract()
     {
         string readme = Read("README.md");
         string userIndex = Read("docs/README.md");
@@ -236,22 +236,23 @@ public sealed class DocumentationContractTests
             "unsigned ZIP",
             "StudyReportEvaluator-win-x64.zip",
             "StudyReportEvaluator-win-x64.zip.sha256",
-            "現在、公開済みの配布物はありません",
-            "`0.8.1`は初回公開前の候補版",
+            "現在の公開版は`0.8.1`です",
             "https://github.com/dahatake/StudyReport-Evaluator/releases",
             "macOS、Linux、Windows Arm64は初版対応対象外",
             "installer、code signing、notarizationを提供しません");
+
+        // A versioned direct link goes stale on the next release and once returned 404 to users.
         Assert.DoesNotContain("/releases/download/", readme, StringComparison.OrdinalIgnoreCase);
         AssertContainsAll(
             userIndex,
             "Windows 11 x64",
             "unsigned ZIP",
-            "現在、公開済みの配布物はありません",
+            "現在の公開版は`0.8.1`です",
             "development MSIXは検証専用で、一般配布しません",
             "macOS、Linux、Windows Arm64");
         AssertContainsAll(
             Read("docs/getting-started.md"),
-            "現在、公開済みの配布物はありません",
+            "現在の公開版は`0.8.1`です",
             "https://github.com/dahatake/StudyReport-Evaluator/releases",
             "development MSIXは検証専用");
         AssertContainsAll(

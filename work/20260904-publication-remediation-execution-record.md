@@ -959,3 +959,51 @@ opt-in `RealDataSystemSmokeTests`とLive AIはB1-02および計画§5.1どおり
 - content data included = false。
 
 **Status: PASS**
+
+## 34. V2-06 — protected publishによる公開とclosure
+
+### 実行結果
+
+- 要求所有者が公開を承認したため、`publish` environment（ID 21223204280）のpending deploymentへ`approved`を送信した。
+- 初回run [`33854574594`](https://github.com/dahatake/StudyReport-Evaluator/actions/runs/33854574594)はasset検証stepで`failure`となり、`Publish the verified draft release`は`skipped`だった。公開は行われず、fail-closedが機能した。
+- 原因は`actions/upload-artifact`が複数pathの共通root（`artifacts/package`）を基準に相対構造を保持するため、control artifact内でmatrixが`matrix/platform-release-matrix.json`に配置されていたことである。publish workflowはartifact直下だけを探していた。
+- publish workflowをartifact構造に依存しない再帰検索へ変更し、matrixがちょうど1件であることを要求するようにした。contract testへ同条件を固定した。
+- 修正後のrun [`33855507321`](https://github.com/dahatake/StudyReport-Evaluator/actions/runs/33855507321)は承認後に全step成功し、`--draft=false`が実行された。
+
+### 公開結果と認証なし再取得
+
+| 項目 | 実測値 |
+|---|---|
+| Release | `v0.8.1`、`isDraft=false`、公開時刻 2026-09-04T08:52:49Z |
+| Asset集合 | `StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`のみ |
+| ZIP bytes | 156,214,373（API値と一致） |
+| ZIP SHA-256 | `75F030CBE8979E0EE814041C985225CE785ECC138BFADA6BF8F2BBB86F545F1C`（draft検証時と一致） |
+| Sidecar exact bytes | 一致 |
+| ZIP entry数 | 249、application実行fileあり |
+| workbook entry | 0件 |
+
+認証なしの`releases/download/v0.8.1/`から取得して上記を実測し、一時領域は削除した。
+
+### closure
+
+- README、`docs/README.md`、`docs/getting-started.md`、`version-management.md`を公開済み表記へ更新した。
+- documentation contract testを公開状態へ更新し、testメソッド名も`Platform_and_published_package_claims_...`へ改名した。
+- claim ledgerのC-026を`VERIFIED`、implementation statusを`PUBLISHED`、traceabilityのTR-29を`PASS_REQUIRED`へ更新し、一時的に追加した`PASS_REQUIRED_EXCEPT_PUBLIC_REDOWNLOAD`語彙を削除した。
+
+### 敵対的レビュー
+
+採用:
+- ローカルのdraft検証で`Get-ChildItem -Recurse -Filter`を使ったため、artifactの相対構造の不一致を検出できなかった。artifact検証では相対path構造そのものを確認する必要がある。
+- 承認はrunごとに必要であり、workflow修正後の再実行では再度承認が要る。
+
+棄却:
+- READMEへversioned direct download URLを記載する案は採用しない。次版公開時にstaleとなり、F-005で実際に404を案内した経緯がある。Releases indexのみを案内し、testで`/releases/download/`の不在を固定した。
+- 公開失敗時にdraftを削除して作り直す案は採用しない。draftは保持され、workflow修正だけで同じassetを公開できた。
+
+### 反映確認
+
+- documentation contract 14/14、workflow contract 7/7、aggregate 21/21 PASS。
+- `git diff --check` exit 0。
+- content data included = false。
+
+**Status: PASS**

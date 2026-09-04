@@ -7,7 +7,7 @@
 | Product version | `0.8.1` candidate — `Directory.Build.props`の明示`VersionPrefix` |
 | Version management | [`version-management.md`](version-management.md) / [`dev/version.ps1`](../version.ps1) / ADR-0014 |
 | Source baseline | `main`、release commit `d0b03b9201d397b6c3333dafbb816b13b4dc003c`、annotated tag `v0.8.1` |
-| Public release status | `DRAFT_CREATED_UNPUBLISHED — v0.8.1 draftはZIPとsidecarの2 asset、公開未実行` |
+| Public release status | `PUBLISHED — v0.8.1、2026-09-04T08:52:49Z公開、ZIPとsidecarの2 asset` |
 | Release build | PASS、warning 0 / error 0（2026-09-04 V2-01実行） |
 | Full required gate | 696/696 PASS（Core 190/190、App 506/506、failed 0、skipped 0、2026-09-04 V2-01実行） |
 | Baseline focused validation | locked restore、version self-test 15 assertions、DocumentationContractTests 14/14、WindowsInstallerPackageTests 6/6、MacOsPublishPackageTests 2/2、`git diff --check`が全てPASS（2026-09-04実行） |

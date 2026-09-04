@@ -2,7 +2,7 @@
 
 StudyReport Evaluatorは、標準`.xlsx`の回答をGitHub Copilotで定量化し、入力を変更せず別の`.xlsx`へ結果を作成するWindowsデスクトップアプリです。
 
-現在、公開済みの配布物はありません。公開開始後は[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases)に実在するWindows ZIPとSHA-256 sidecarだけを利用してください。development MSIXは検証専用で、一般配布しません。
+現在の公開版は`0.8.1`です。[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases)に実在するWindows ZIPとSHA-256 sidecarだけを利用してください。development MSIXは検証専用で、一般配布しません。
 
 > [!WARNING]
 > 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません

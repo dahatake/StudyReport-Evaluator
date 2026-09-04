@@ -15,7 +15,7 @@
 
 この手順は、同じ製品版がsource、App/Core project、公開binary、Git tag、変更履歴で一貫するように管理するための正本です。製品版を変更しただけで、test済み、公開済み、署名済み、またはGitHub Release作成済みとは扱いません。
 
-現在のsource candidate版は`0.8.1`です。初回公開前であるため、2026-09-04に製品候補を0.x系列へ再baselineし、公開task完了時にPATCHを1つ進めました。過去の`1.0.0`、`1.0.1`、`1.1.0`は公開済み版ではなく、経緯は[調査証拠](../../work/20260902-version-management-investigation-evidence.json)、[release recovery記録](../../work/20260903-v1.0.1-release-recovery-plan.md)、[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に保持します。
+現在の公開版は`0.8.1`、2026-09-04に初回公開しました。公開前の候補を`0.8.0`へ再baselineし、公開task完了時にPATCHを1つ進めています。過去の`1.0.0`、`1.0.1`、`1.1.0`は公開済み版ではなく、経緯は[調査証拠](../../work/20260902-version-management-investigation-evidence.json)、[release recovery記録](../../work/20260903-v1.0.1-release-recovery-plan.md)、[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に保持します。
 
 2026-09-02の公開API調査では公開GitHub Releaseとremote tagはいずれも0件でした。この観測はprivate draftの不存在を証明しません。[調査レポート §2.2](../../work/20260902-version-management-investigation-report.md#22-実測した主なcommand)
 
