@@ -540,3 +540,30 @@ opt-in `RealDataSystemSmokeTests`とLive AIはB1-02および計画§5.1どおり
 - content data included = false。
 
 **Status: PASS**
+
+## 20. B1-20 — baseline checkpoint commit/push
+
+### 実行結果
+
+- 27 fileの明示allowlistだけをstageした。allowlist delta 0、unstaged 0、untracked 0、secret／private-path候補0。
+- baseline checkpoint commit `268efde00e66fafefc457766120fbebea608df4a`（`fix: align publication readiness baseline`）を作成した。
+- 専用branch `fix/publication-readiness-20260904`だけをoriginへpushした。main、tag、Releaseは変更していない。
+- push直後のlocal／remote SHAは上記commitで一致し、worktree statusは0件だった。
+
+### 敵対的レビュー
+
+採用:
+- staged `git diff --check`がuntrackedだった計画書の末尾空白3件を検出したため、commit前に除去して再検証した。
+- lock差分への懸念を受け、実変更2 fileを再度`--force-evaluate`した。file SHA-256とdiff SHA-256は前後一致し、続くlocked restoreとdiff-checkはexit 0だった。
+- commit後のtree取得で未引用`HEAD^{tree}`がPowerShellに解釈されvalidation commandだけ失敗した。quoted revisionでcommit `268efde...`、tree `e9c5cd209444f2a398f454e1d969313ab1190c46`、status 0を再取得した。commit自体への影響はない。
+
+棄却:
+- 4 lock fileを変更したというレビュー記述は実statusと不一致。変更は`eng/packaging/windows/tools/packages.lock.json`と`tests/StudyReportEvaluator.App.Tests/packages.lock.json`の2件だけである。
+- App Tests lockのCore rangeは手編集ではない。fresh cloneの過去再現に加え、今回もforce-evaluate前後で同一だった。
+
+### 反映確認
+
+- commit object敵対レビューとpush完了後レビューはともにunresolved Critical/High 0。
+- remote SHA一致、content data included = false。
+
+**Status: PASS**
