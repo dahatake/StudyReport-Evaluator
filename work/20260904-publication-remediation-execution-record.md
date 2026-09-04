@@ -732,3 +732,66 @@ opt-in `RealDataSystemSmokeTests`とLive AIはB1-02および計画§5.1どおり
 - content data included = false。
 
 **Status: PASS_LOCAL_PENDING_HOSTED_CI**
+
+## 27. R2-02 — draft-only Windows ZIP candidate workflow
+
+### 実行結果
+
+- `scripts/build-platform-release-matrix.ps1`を追加した。ZIP 3 fileとdevelopment MSIX 3 fileを単一のmatrix directoryへ集約し、実bytes/SHA-256からmatrixを生成して`scripts/validate-platform-release-matrix.ps1`で自己検証する。
+- writerはclean source、両evidenceのsourceCommit一致、両evidenceが同一Windows hostで測定されたことを検証し、失敗時はmatrixを残さない。
+- `.github/workflows/release.yml`を`Release candidate`へ改版した。`draft` inputを削除し、stable annotated tagだけを受理する。
+- tag/annotated/clean checkout/version tool/CHANGELOG dated sectionを事前検証し、deterministic tests、Windows ZIP regression、published binary version、development MSIX mechanism、matrixの順で検証する。
+- Actions control artifactへmatrixと2 evidenceを保存し、公開asset用artifactはZIPとsidecarだけとする。
+- GitHub Releaseは常に`--draft --verify-tag`で作成し、作成直後にdraft状態とexact 2 assetを再確認する。`actions/setup-dotnet`はv6へ更新した。
+
+### 敵対的レビュー
+
+採用:
+- 旧workflowは`draft=false`入力で即時公開でき、F-010に該当したため入力自体を削除した。
+- 旧workflowはprerelease tagを受理しながら`--prerelease`を付けずstable Releaseを作り得たため、tag regexをstable-onlyへ固定した。
+- 旧workflowは`package-windows.ps1`を直接呼び、R2-01のsafe layout／bundled CLI／sentinel検証を経由していなかったため、検証済みdriverへ統一した。
+- CHANGELOG dated sectionの不足をRelease作成時点ではなく識別step時点で検出するようにした。
+
+棄却:
+- development MSIXをdraft assetへ含める案は、unsigned executable MSIXを一般配布しないという§0.1決定に反するため採用しない。control artifactに限定する。
+- matrixをRelease assetへ添付する案は要求にない。publish workflowはActions artifactから取得できるため追加しない。
+
+### 反映確認
+
+- workflow／script diagnostics 0件。
+- 実tag不存在のためworkflowはdispatchしていない。実行はV2-04で行う。
+- content data included = false。
+
+**Status: PASS_STATIC_PENDING_RELEASE_TAG**
+
+## 28. R2-03 — protected publish workflowとcontract tests
+
+### 実行結果
+
+- `.github/workflows/publish-release.yml`を追加した。入力はexisting draft tagとcandidate run IDだけで、`environment: publish`のapproval後に実行される。
+- candidate runのconclusionとhead SHAがtag commitと一致することを確認してからcontrol artifactをdownloadする。
+- matrixのsourceCommit／productVersion、`publish=true`の1行が`PASS_REQUIRED`、`publish=false`の1行が`PASS_MECHANISM`であることを検証する。
+- draftからassetをfresh downloadし、exact asset set、bytes、SHA-256、sidecarのexact bytesをmatrixへ照合する。
+- 最終write stepは`gh release edit TAG --draft=false`だけで、artifact生成・置換・`--clobber`・tag作成・Release削除を行わない。
+- GitHub Environment `publish`をrequired reviewers付きで作成した。
+- `ReleaseWorkflowContractTests.cs`を追加し、candidate 3件、publish 3件、matrix writer 1件の計7 testでこれらの境界を固定した。
+
+### 敵対的レビュー
+
+採用:
+- 公開前検証と公開の順序が入れ替わる回帰を防ぐため、asset照合の位置が`--draft=false`より前であることと、`--draft=false`がfile内で1箇所だけであることをtestで固定した。
+- candidate workflow側にも`gh release edit`と`--draft=false`が現れないことをtestで固定し、公開能力を1 workflowへ限定した。
+
+棄却:
+- publish workflowで再度package buildを行う案は、draft assetと異なるbytesを生む可能性があり、公開対象の同一性を弱めるため採用しない。buildしないことをtestで固定した。
+- signing environmentの分離は現版scopeにproduction signingが存在しないため作成しない。Q-010の2環境案のうちpublish側だけを実装する。
+
+### 反映確認
+
+- workflow／test diagnostics 0件。
+- `ReleaseWorkflowContractTests`、`ReleaseMatrixContractTests`、`WindowsInstallerPackageTests`のaggregate 22/22 PASS、failed/skipped 0。
+- GitHub Environment `publish`の`protection_rules`に`required_reviewers`が設定されていることを実測した。
+- draft不存在のためworkflowはdispatchしていない。実行はV2-04で行う。
+- content data included = false。
+
+**Status: PASS_STATIC_PENDING_DRAFT**

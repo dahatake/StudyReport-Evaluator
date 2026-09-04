@@ -1,17 +1,12 @@
-name: Release
+name: Release candidate
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing annotated release tag (for example, v1.0.0)
+        description: Existing stable annotated release tag (for example, v0.8.1)
         required: true
         type: string
-      draft:
-        description: Create the GitHub Release as a draft
-        required: true
-        default: true
-        type: boolean
 
 permissions:
   contents: write
@@ -29,10 +24,10 @@ env:
   STUDY_REPORT_EVALUATOR_REALDATA_SYSTEM_SMOKE: "0"
 
 jobs:
-  package-and-release:
-    name: Validate, package, and create release
+  candidate:
+    name: Build and validate the draft Windows release candidate
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
 
     steps:
       - name: Check out tagged source
@@ -42,7 +37,7 @@ jobs:
           ref: ${{ inputs.tag }}
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.400
           cache: true
@@ -56,8 +51,8 @@ jobs:
           if ($PSVersionTable.PSEdition -cne 'Core' -or $PSVersionTable.PSVersion.Major -lt 7) {
               throw 'PowerShell Core 7 or later is required.'
           }
-          if ($env:RELEASE_TAG -cnotmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
-              throw "Invalid release tag: $env:RELEASE_TAG"
+          if ($env:RELEASE_TAG -cnotmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+              throw "Only stable release tags are supported: $env:RELEASE_TAG"
           }
 
           $tagCommit = (git rev-list -n 1 $env:RELEASE_TAG).Trim()
@@ -80,6 +75,14 @@ jobs:
               throw 'Release version verification failed.'
           }
 
+          $version = $env:RELEASE_TAG.Substring(1)
+          $changelog = Get-Content -LiteralPath '.\CHANGELOG.md' -Raw -Encoding utf8
+          if (-not [regex]::IsMatch(
+                  $changelog,
+                  "(?m)^## \[$([regex]::Escape($version))\] - \d{4}-\d{2}-\d{2}\s*$")) {
+              throw "CHANGELOG.md does not contain a dated $version section."
+          }
+
       - name: Restore locked dependencies
         shell: pwsh
         run: dotnet restore .\StudyReportEvaluator.slnx --locked-mode
@@ -89,48 +92,53 @@ jobs:
         run: dotnet build .\StudyReportEvaluator.slnx --configuration Release --no-restore
 
       - name: Run deterministic release tests
+        id: release-tests
         shell: pwsh
         run: >-
           dotnet test .\StudyReportEvaluator.slnx
           --configuration Release
           --no-build
           --no-restore
-          --filter "FullyQualifiedName!~StudyReportEvaluator.App.Tests.E2E.SampleWorkbookStructuralTests"
+          --filter "FullyQualifiedName!~StudyReportEvaluator.App.Tests.E2E.SampleWorkbookStructuralTests&FullyQualifiedName!~StudyReportEvaluator.App.Tests.Packaging.WindowsPublishPackageTests"
           --results-directory .\TestResults\release
           --logger "trx"
           --logger "console;verbosity=minimal"
 
-      - name: Build final Windows package
+      - name: Build and validate Windows ZIP regression
         shell: pwsh
-        run: |
-          pwsh.exe -NoLogo -NoProfile -File .\scripts\package-windows.ps1
-          if ($LASTEXITCODE -ne 0) {
-              throw 'Windows packaging failed.'
-          }
-          pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify -PublishedDirectory .\artifacts\package\publish\win-x64
-          if ($LASTEXITCODE -ne 0) {
-              throw 'Published binary version verification failed.'
-          }
+        run: >-
+          .\scripts\test-windows-zip.ps1
+          -ResultsDirectory .\TestResults\release\windows-zip
 
-      - name: Verify package hash
+      - name: Verify published binary version
         shell: pwsh
-        run: |
-          $zip = '.\artifacts\package\StudyReportEvaluator-win-x64.zip'
-          $sidecar = "$zip.sha256"
-          if (-not (Test-Path -LiteralPath $zip -PathType Leaf) -or
-              -not (Test-Path -LiteralPath $sidecar -PathType Leaf)) {
-              throw 'The package or SHA-256 sidecar is missing.'
-          }
-          $expected = ((Get-Content -LiteralPath $sidecar -Raw -Encoding utf8).Trim() -split '\s+')[0]
-          $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash
-          if ($expected -cne $actual) {
-              throw 'The package SHA-256 does not match its sidecar.'
-          }
+        run: >-
+          pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify
+          -PublishedDirectory .\artifacts\package\publish\win-x64
 
-      - name: Upload workflow package
+      - name: Build and validate unsigned MSIX mechanism
+        shell: pwsh
+        run: .\scripts\test-windows-msix-unsigned.ps1
+
+      - name: Build and validate the platform release matrix
+        shell: pwsh
+        run: .\scripts\build-platform-release-matrix.ps1
+
+      - name: Upload release control evidence
         uses: actions/upload-artifact@v7
         with:
-          name: StudyReportEvaluator-${{ inputs.tag }}-win-x64
+          name: release-candidate-${{ inputs.tag }}-${{ github.run_id }}
+          path: |
+            artifacts/package/matrix/platform-release-matrix.json
+            artifacts/package/StudyReportEvaluator-win-x64.evidence.json
+            artifacts/package/mechanism/StudyReportEvaluator-win-x64.unsigned.test.evidence.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload public candidate assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-assets-${{ inputs.tag }}-${{ github.run_id }}
           path: |
             artifacts/package/StudyReportEvaluator-win-x64.zip
             artifacts/package/StudyReportEvaluator-win-x64.zip.sha256
@@ -139,24 +147,23 @@ jobs:
           retention-days: 30
 
       - name: Upload release test results
-        if: always()
+        if: ${{ always() && steps.release-tests.outcome != 'skipped' }}
         uses: actions/upload-artifact@v7
         with:
           name: release-test-results-${{ github.run_id }}
           path: TestResults/release/**/*.trx
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
 
-      - name: Create GitHub Release
+      - name: Create the draft GitHub Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
-          CREATE_DRAFT: ${{ inputs.draft }}
         run: |
           gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY 2>$null | Out-Null
           if ($LASTEXITCODE -eq 0) {
-              throw "Release $env:RELEASE_TAG already exists; published releases are immutable."
+              throw "Release $env:RELEASE_TAG already exists; this workflow never replaces a release."
           }
 
           $version = $env:RELEASE_TAG.Substring(1)
@@ -173,20 +180,29 @@ jobs:
           $notes = "StudyReport Evaluator $version`n`n" + $match.Groups['body'].Value.Trim() + "`n"
           [System.IO.File]::WriteAllText($notesPath, $notes, [System.Text.UTF8Encoding]::new($false))
 
-          $arguments = @(
+          & gh @(
               'release', 'create', $env:RELEASE_TAG,
               '.\artifacts\package\StudyReportEvaluator-win-x64.zip',
               '.\artifacts\package\StudyReportEvaluator-win-x64.zip.sha256',
               '--repo', $env:GITHUB_REPOSITORY,
+              '--draft',
               '--verify-tag',
               '--title', "StudyReport Evaluator $version",
-              '--notes-file', $notesPath
-          )
-          if ($env:CREATE_DRAFT -ceq 'true') {
-              $arguments += '--draft'
+              '--notes-file', $notesPath)
+          if ($LASTEXITCODE -ne 0) {
+              throw 'Draft GitHub Release creation failed.'
           }
 
-          & gh @arguments
-          if ($LASTEXITCODE -ne 0) {
-              throw 'GitHub Release creation failed.'
+          $draft = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json isDraft,assets |
+              ConvertFrom-Json
+          $assetNames = @($draft.assets | ForEach-Object { [string]$_.name } | Sort-Object)
+          $expectedAssets = @(
+              'StudyReportEvaluator-win-x64.zip',
+              'StudyReportEvaluator-win-x64.zip.sha256')
+          if (-not $draft.isDraft -or
+              $assetNames.Count -ne $expectedAssets.Count -or
+              @($expectedAssets | Where-Object { $_ -cnotin $assetNames }).Count -ne 0) {
+              throw 'The candidate release must remain a draft that carries exactly the Windows ZIP and its sidecar.'
           }
+
+          Write-Output "Draft $env:RELEASE_TAG created. Publishing requires the protected publish workflow."

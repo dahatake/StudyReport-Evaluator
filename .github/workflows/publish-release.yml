@@ -1,0 +1,209 @@
+name: Publish release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing draft release tag to publish (for example, v0.8.1)
+        required: true
+        type: string
+      candidate_run_id:
+        description: Release candidate workflow run ID that produced the draft assets
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+
+jobs:
+  publish:
+    name: Verify the draft and publish after approval
+    runs-on: windows-latest
+    timeout-minutes: 60
+    environment: publish
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag }}
+
+      - name: Verify release identity
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          if ($PSVersionTable.PSEdition -cne 'Core' -or $PSVersionTable.PSVersion.Major -lt 7) {
+              throw 'PowerShell Core 7 or later is required.'
+          }
+          if ($env:RELEASE_TAG -cnotmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+              throw "Only stable release tags are supported: $env:RELEASE_TAG"
+          }
+
+          $tagCommit = (git rev-list -n 1 $env:RELEASE_TAG).Trim()
+          $headCommit = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $tagCommit -cne $headCommit) {
+              throw 'The requested tag must exist and point to the checked-out commit.'
+          }
+          if ((git cat-file -t $env:RELEASE_TAG).Trim() -cne 'tag') {
+              throw 'The release tag must be annotated.'
+          }
+          if (@(git status --porcelain=v1 --untracked-files=all).Count -ne 0) {
+              throw 'The publish checkout must be clean.'
+          }
+
+          $version = $env:RELEASE_TAG.Substring(1)
+          pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify -Tag $env:RELEASE_TAG -RequireClean
+          if ($LASTEXITCODE -ne 0) {
+              throw 'Release version verification failed.'
+          }
+
+          $changelog = Get-Content -LiteralPath '.\CHANGELOG.md' -Raw -Encoding utf8
+          if (-not [regex]::IsMatch(
+                  $changelog,
+                  "(?m)^## \[$([regex]::Escape($version))\] - \d{4}-\d{2}-\d{2}\s*$")) {
+              throw "CHANGELOG.md does not contain a dated $version section."
+          }
+
+      - name: Verify the candidate run and download its evidence
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+        run: |
+          if ($env:CANDIDATE_RUN_ID -cnotmatch '^[1-9][0-9]*$') {
+              throw 'The candidate run ID must be a positive integer.'
+          }
+
+          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:CANDIDATE_RUN_ID" |
+              ConvertFrom-Json
+          $tagCommit = (git rev-list -n 1 $env:RELEASE_TAG).Trim()
+          if ([string]$run.conclusion -cne 'success' -or
+              [string]$run.head_sha -cne $tagCommit) {
+              throw 'The candidate run must have succeeded for the exact tagged commit.'
+          }
+
+          $evidenceRoot = Join-Path $env:RUNNER_TEMP 'candidate-evidence'
+          New-Item -ItemType Directory -Path $evidenceRoot -Force | Out-Null
+          gh run download $env:CANDIDATE_RUN_ID `
+              --repo $env:GITHUB_REPOSITORY `
+              --name "release-candidate-$env:RELEASE_TAG-$env:CANDIDATE_RUN_ID" `
+              --dir $evidenceRoot
+          if ($LASTEXITCODE -ne 0) {
+              throw 'Unable to download the candidate control evidence.'
+          }
+
+          "CANDIDATE_EVIDENCE_ROOT=$evidenceRoot" |
+              Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Verify the draft release assets against the matrix
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          $release = gh release view $env:RELEASE_TAG `
+              --repo $env:GITHUB_REPOSITORY `
+              --json isDraft,tagName,assets | ConvertFrom-Json
+          if (-not $release.isDraft) {
+              throw 'Only an existing draft release can be published by this workflow.'
+          }
+          if ([string]$release.tagName -cne $env:RELEASE_TAG) {
+              throw 'The draft release tag does not match the requested tag.'
+          }
+
+          $matrixPath = Join-Path $env:CANDIDATE_EVIDENCE_ROOT 'platform-release-matrix.json'
+          if (-not (Test-Path -LiteralPath $matrixPath -PathType Leaf)) {
+              throw 'The candidate control evidence does not contain the release matrix.'
+          }
+
+          $matrix = Get-Content -LiteralPath $matrixPath -Raw -Encoding utf8 |
+              ConvertFrom-Json -DateKind String
+          $tagCommit = (git rev-list -n 1 $env:RELEASE_TAG).Trim()
+          if ([string]$matrix.sourceCommit -cne $tagCommit -or
+              [string]$matrix.productVersion -cne $env:RELEASE_TAG.Substring(1)) {
+              throw 'The release matrix is not bound to the tagged commit and version.'
+          }
+
+          $publishRows = @($matrix.rows | Where-Object { $_.publish -eq $true })
+          if ($publishRows.Count -ne 1 -or
+              [string]$publishRows[0].artifactKind -cne 'windows-zip' -or
+              [string]$publishRows[0].status -cne 'PASS_REQUIRED') {
+              throw 'Exactly one publishable Windows ZIP row must be PASS_REQUIRED.'
+          }
+          $mechanismRows = @($matrix.rows | Where-Object { $_.publish -eq $false })
+          if ($mechanismRows.Count -ne 1 -or
+              [string]$mechanismRows[0].status -cne 'PASS_MECHANISM') {
+              throw 'The development MSIX row must remain a non-published mechanism row.'
+          }
+
+          $expectedAssets = @(
+              [string]$publishRows[0].artifact.fileName,
+              [string]$publishRows[0].sidecar.fileName)
+          $assetNames = @($release.assets | ForEach-Object { [string]$_.name })
+          if ($assetNames.Count -ne $expectedAssets.Count -or
+              @($expectedAssets | Where-Object { $_ -cnotin $assetNames }).Count -ne 0) {
+              throw 'The draft must carry exactly the Windows ZIP and its SHA-256 sidecar.'
+          }
+
+          $downloadRoot = Join-Path $env:RUNNER_TEMP 'draft-assets'
+          New-Item -ItemType Directory -Path $downloadRoot -Force | Out-Null
+          gh release download $env:RELEASE_TAG `
+              --repo $env:GITHUB_REPOSITORY `
+              --dir $downloadRoot
+          if ($LASTEXITCODE -ne 0) {
+              throw 'Unable to download the draft release assets.'
+          }
+
+          $zipPath = Join-Path $downloadRoot $publishRows[0].artifact.fileName
+          $sidecarPath = Join-Path $downloadRoot $publishRows[0].sidecar.fileName
+          $zipItem = Get-Item -LiteralPath $zipPath -Force
+          $sidecarItem = Get-Item -LiteralPath $sidecarPath -Force
+          $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash
+          $sidecarHash = (Get-FileHash -LiteralPath $sidecarPath -Algorithm SHA256).Hash
+          if ($zipItem.Length -ne [long]$publishRows[0].artifact.bytes -or
+              $zipHash -cne [string]$publishRows[0].artifact.sha256 -or
+              $sidecarItem.Length -ne [long]$publishRows[0].sidecar.bytes -or
+              $sidecarHash -cne [string]$publishRows[0].sidecar.sha256) {
+              throw 'The draft assets do not match the validated release matrix.'
+          }
+
+          $utf8 = [System.Text.UTF8Encoding]::new($false, $true)
+          $expectedSidecar = $utf8.GetBytes("$zipHash  $($zipItem.Name)`n")
+          $actualSidecar = [System.IO.File]::ReadAllBytes($sidecarPath)
+          if (-not [System.Linq.Enumerable]::SequenceEqual($actualSidecar, $expectedSidecar)) {
+              throw 'The published sidecar bytes must exactly describe the published package.'
+          }
+
+          Write-Output "Verified draft assets for $env:RELEASE_TAG against the release matrix."
+
+      - name: Publish the verified draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          gh release edit $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --draft=false
+          if ($LASTEXITCODE -ne 0) {
+              throw 'Publishing the release failed.'
+          }
+
+          $published = gh release view $env:RELEASE_TAG `
+              --repo $env:GITHUB_REPOSITORY `
+              --json isDraft,assets | ConvertFrom-Json
+          if ($published.isDraft -or @($published.assets).Count -ne 2) {
+              throw 'The release did not reach the expected published state.'
+          }
+
+          Write-Output "Published $env:RELEASE_TAG."
