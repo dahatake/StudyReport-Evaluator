@@ -881,3 +881,53 @@ opt-in `RealDataSystemSmokeTests`とLive AIはB1-02および計画§5.1どおり
 - content data included = false。
 
 **Status: PASS**
+
+## 32. V2-04 — release commit、tag、draft作成とpublish引き継ぎ
+
+### 実行結果
+
+- release commit `d0b03b9201d397b6c3333dafbb816b13b4dc003c`を作成し、専用branchから`main`へfast-forward mergeしてpushした。merge baseは`1fdc9ab...`で、main側の先行commitは0だった。
+- main CI run [`33847521532`](https://github.com/dahatake/StudyReport-Evaluator/actions/runs/33847521532)はexact SHAで`success`。Windows、macOS 15、macOS 15 Intelの3/3 jobと全stepが成功し、artifactは5件だった。
+- annotated tag `v0.8.1`を同commitへ作成し、`dev/version.ps1 verify -Tag v0.8.1 -RequireClean`が`PASS`、`Annotated=True`であることを確認してからpushした。既存`v1.0.0`は変更していない。
+- candidate workflow run [`33848620387`](https://github.com/dahatake/StudyReport-Evaluator/actions/runs/33848620387)は`success`。identity検証、deterministic tests、Windows ZIP regression、published binary version、development MSIX mechanism、matrix生成、control artifact、draft作成の全stepが成功した。
+- draft Release `v0.8.1`が作成され、`isDraft=true`、assetはZIPとsidecarのexact 2件だった。
+
+### draft検証（fresh download）
+
+| 項目 | 実測値 |
+|---|---|
+| Draft asset集合 | `StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`のみ |
+| ZIP bytes | 156,214,373 |
+| ZIP SHA-256 | `75F030CBE8979E0EE814041C985225CE785ECC138BFADA6BF8F2BBB86F545F1C` |
+| Sidecar exact bytes | 一致 |
+| Matrix | schemaVersion 1、productVersion `0.8.1`、sourceCommit `d0b03b9...`、rows 2 |
+| `windows-zip` row | `publish=true`、`PASS_REQUIRED`、artifact hash/bytes一致、sidecar hash一致 |
+| `windows-development-msix` row | `publish=false`、`PASS_MECHANISM`、非公開 |
+| ZIP evidence | `windows-zip-required`／`PASS_REQUIRED`／commit・version一致 |
+| MSIX evidence | `PASS_MECHANISM`／`BLOCKED_EXTERNAL`／install未実行 |
+| `PASS_PRODUCTION`出現 | 0件 |
+
+一時downloadは全て削除した。
+
+### 敵対的レビュー
+
+採用:
+- `version.ps1 verify -Tag`は既存annotated tagを前提とするため、tag作成前の事前検証では必ず失敗する。tag作成直後に同じ検証を実行して`PASS`を確認する順序へ修正した。
+- draft assetはworkflow内の確認だけで信用せず、fresh downloadでbytes/hash/sidecarをmatrixへ再照合した。
+
+棄却:
+- draftのZIP hashがR2-01でローカル生成したZIPと異なる点をdefectとする指摘は誤り。両者は異なるsource commit（`efc2aee...`と`d0b03b9...`）から生成されており、各evidenceとmatrixは自分のcommitに対して整合している。
+
+### 未実行と引き継ぎ
+
+- **公開（publish）は実行していない。** `v0.8.1`はdraftのままである。
+- 理由: このrepositoryはImmutable Releasesが有効で公開後にtag/assetを変更できないこと、publish workflowが`environment: publish`のrequired reviewer承認を要求し、承認者は`dahatake`本人であることによる。
+- 公開手順: GitHub Actionsで`Publish release` workflowを`tag=v0.8.1`、`candidate_run_id=33848620387`でdispatchし、`publish` environmentのapprovalを承認する。workflowはtag/source/version/CHANGELOG/draft状態/asset集合/hash/matrixを再検証してから`--draft=false`だけを実行する。
+- 公開後に残る作業: unauthenticated fresh re-downloadによる最終確認と、実在URLを記載するpublic docs closure。
+
+### 反映確認
+
+- main／tag／draftの実測値を上表へ記録した。
+- content data included = false。
+
+**Status: PASS_DRAFT_READY_PUBLISH_PENDING_APPROVAL**
