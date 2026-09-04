@@ -2,6 +2,8 @@
 
 このガイドでは、Windows 11 x64でStudyReport Evaluatorを起動し、標準`.xlsx`から最初の結果workbookを作る手順を説明します。
 
+現在、公開済みの配布物はありません。以下の手順は、公開開始後に[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases)から実在するZIPとsidecarを取得した場合、または開発者から同じ2fileを受領した場合に使用します。development MSIXは検証専用で、一般利用者向けの入手・起動手順には含めません。
+
 > [!WARNING]
 > 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません
 
@@ -9,7 +11,7 @@
 
 必要なもの:
 
-- 配布された`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`
+- 同じrelease／配布元の`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`
 - Windows 11 x64
 - 評価対象の標準`.xlsx`
 - AI処理を行う場合は、利用可能なGitHub Copilot accountと対話login

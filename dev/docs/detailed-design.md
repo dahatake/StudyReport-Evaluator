@@ -2,10 +2,10 @@
 
 | 項目 | 内容 |
 |---|---|
-| 対象要求 | `docs/requirements-definition.md` v4.2 |
+| 対象要求 | `docs/requirements-definition.md` v4.3 |
 | 設計決定 | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence boundary） |
 | 作成日 | 2026-09-02 |
-| 状態 | delivery expansion実装baseline |
+| 状態 | Windows ZIP初回公開・development MSIX検証baseline |
 | Production topology | Core + App の2 projectを維持 |
 
 ## 1. 設計目標
@@ -18,7 +18,7 @@
 - `.partial.xlsx` checkpointとprocess restart後のresume
 - native file picker
 - Prompt text fileによるGUI prefill
-- Windows 11 x64 self-contained MSIXとmacOS RID別DMGによる3操作setup
+- Windows 11 x64 self-contained ZIP公開とnon-public development MSIX検証
 
 追加のdatabase、server、plugin framework、汎用AI operation framework、production projectは作らない。
 
@@ -667,23 +667,22 @@ checkpointとRun sheetへ次を保存する。
 
 ### 13.1 共通payload
 
-- `win-x64`、`osx-arm64`、`osx-x64`を別々にRelease/self-contained/non-trimmed/non-single-fileでpublishする。
+- public `win-x64`をRelease/self-contained/non-trimmed/non-single-fileでpublishする。`osx-arm64`／`osx-x64`はsource foundationのcontract検証に限定する。
 - apphost、.NET runtime、Avalonia native assets、Open XML、GitHub Copilot SDK、RID別bundled CLI、runtime manifest、README/docs/images/licenseを含める。
 - source、test、sample、symbol、secret、0-byte、root外linkをpackageへ含めない。
 - package-installed appが外部.NET、Office、別Copilot CLIへfallbackしないことを検証する。
 
 ### 13.2 Windows
 
-- primary artifactは`StudyReportEvaluator-win-x64.msix`とSHA-256 sidecar。
-- package Identity Versionはstable SemVer `Major.Minor.Patch`から`Major.Minor.Patch.0`へ写像し、Publisherはproduction certificate subjectと一致させる。
+- public primary artifactは`StudyReportEvaluator-win-x64.zip`とSHA-256 sidecar。
+- development MSIXのIdentity Versionはstable SemVer `Major.Minor.Patch`から`Major.Minor.Patch.0`へ写像し、test-only Publisherを使用する。
 - test certificateはmanifest/layout/install mechanismだけを検証し、statusを`PASS_MECHANISM`に限定する。
 - 証明書なしのWindows 11開発試験は`StudyReportEvaluator-win-x64.unsigned.test.msix`へ分離する。Publisherは`CN=<test name>, OID.2.25.311729368913984317654407730594956997722=1`とし、fixed unsigned markerを最終fieldに置く。署名entryなし、signed packageと別identityを必須とし、使い捨てVMまたは復元可能なsnapshot上で管理者PowerShellの`Add-AppxPackage -AllowUnsigned`による全ユーザーinstallだけを行う。標準App Installer UI、非管理者setup、production trustの証拠にしない。
-- production packageはtrusted signatureとtimestampを持ち、clean Windows 11 x64でinstall、Start menu launch、upgrade、repair、uninstallを検証する。
-- bundled `runtimes/win-x64/native/copilot.exe`のspawn、login state、model list、cleanup、user-selected workbook I/OをMSIX container下で実測する。
-- 現行unsigned ZIPとsidecarはregression/fallbackとして維持し、MSIXと別artifact contractにする。
+- development MSIXはpackage、unpack、block map、manifest、bundled CLI、sidecar、policy negative、cleanupを検証し、public assetへ含めない。install lifecycleは現版のrequired gateにしない。
+- public ZIPはbundled `runtimes/win-x64/native/copilot.exe`のidentity、safe layout、clean extract/launchを検証する。
 - PowerShell 7はengineering scriptだけの前提で、end-user setup要件にしない。
 
-### 13.3 macOS
+### 13.3 macOS source foundation（現版公開対象外）
 
 - `StudyReportEvaluator.app/Contents`に`Info.plist`、`MacOS`、`Resources`、必要な`Frameworks`を配置する。
 - `CFBundleExecutable`はapphost、`CFBundleIdentifier`は`com.github.dahatake.study-report-evaluator`、short versionはstable SemVer、build versionは単調増加するnumeric valueとする。
@@ -693,19 +692,21 @@ checkpointとRun sheetへ次を保存する。
 - appをnotarize／stapleした後にDMGへ格納し、DMGもnotarize／staple／validateする。notary statusがAcceptedでもlogを検査する。
 - quarantine付きdownload、DMG open、Applicationsへのdrag、Finder launch、bundled CLI、workbook read/write、app removalをexact OS build × native architectureで実測する。
 
+本節は将来production scopeへ追加する場合のcontractである。現版ではstatic source testだけをrequiredとし、DMG、署名、公証、quarantine結果を作成済みまたは対応済みと表示しない。
+
 ### 13.4 Setup lifecycle
 
-- Windows: MSIXを開く→Install→起動。
-- macOS: DMGを開く→Applicationsへdrag→起動。
-- install／upgrade／repair／uninstallまたはapp removalは利用者のinput、final、partialを変更・削除しない。
-- wrong RID、tamper、invalid signature、partial install、disk full、locked file、process killを単一原因で試験し、成功表示しない。
+- Windows public: ZIP/sidecar取得→SHA-256確認→展開→apphost起動。
+- Windows development MSIX: package mechanismだけをrequiredとし、一般利用者へ案内しない。
+- package作成、展開、起動は利用者のinput、final、partialを変更・削除しない。
+- wrong RID、tamper、hash mismatchを単一原因で試験し、成功表示しない。
 
 ### 13.5 自動化境界
 
 - [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)はsecretなしでlocked restore、Release build、決定的test、Windows legacy package、MSIX mechanism、macOS RID publish/bundle structureを検査する。
 - `sample/SampleReport.xlsx`はprivate local inputとしてGit追跡・package同梱を禁止する。platform package acceptanceはsynthetic fixtureで行い、canonical sampleのlocal technical E2Eと分離する。
-- [`.github/workflows/release.yml`](../../.github/workflows/release.yml)はprotected environmentでproduction signing/notarizationを実行する。PR/forkへsecretを渡さない。
-- required platform matrixの全claim行が`PASS_PRODUCTION`でなければ該当artifactを公開しない。
+- [`.github/workflows/release.yml`](../../.github/workflows/release.yml)はWindows ZIPとsidecarをdraftへ添付する。development MSIXを添付せず、PR/forkへwrite権限を渡さない。
+- release matrixで`publish=true`のWindows ZIP行が`PASS_REQUIRED`でなければ公開しない。development MSIXは`publish=false`かつ`PASS_MECHANISM`として分離する。
 - Live Copilot、canonical sample technical E2E、external spreadsheet recalculationは各scopeを分離し、未実行を成功扱いにしない。
 
 ### 13.6 製品版
@@ -789,9 +790,9 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 ### 16.5 Delivery
 
 - Windows legacy ZIP layout/hash/clean launch regression
-- MSIX manifest/version/layout、test-sign mechanism、production trust、install/upgrade/repair/uninstall
-- macOS RID別bundle、Info.plist、Mach-O/mode、nested/outer signing、runtime manifest、notary/staple/DMG/quarantine
-- package-installed appのbundled CLI、input不変、checkpoint/resume、final、privacy regression
+- development MSIX manifest/version/layout、unpack、block map、bundled CLI、sidecar、policy negative、cleanup
+- macOS RID別bundle/sign/notary source foundationのstatic contractと未実測artifact非公開
+- public ZIPのbundled CLI、input不変、clean extract/launch regression
 - platform matrix、secret isolation、未実測artifact非公開、public candidate再download
 
 ## 17. File-level implementation map
@@ -820,18 +821,18 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 | U-04 | warning resource/shell | warning tests |
 | L-01 | Program/App/composition + launch files | startup tests |
 | P-01 | Windows scripts/package | packaging tests |
-| P-02 | Windows MSIX manifest/package/sign/install | Windows installer tests |
-| P-03 | macOS RID publish/bundle/sign/notary/DMG | macOS package and quarantine tests |
+| P-02 | Windows development MSIX manifest/package/unpack | Windows installer mechanism tests |
+| P-03 | macOS RID publish/bundle/sign/notary source foundation | macOS static contract tests |
 | P-04 | platform matrix / protected release | workflow contract and release evidence tests |
 | D-01..05 | README/docs/dev/docs/images | documentation/screenshot tests |
 
 ## 18. Definition of done
 
-- 要求v4.2のAC-001〜028がdirect deterministic、mechanism、production external evidenceへ適切に接続される。
+- 要求v4.3のAC-001〜028がdirect deterministicまたはmechanism evidenceへ適切に接続される。
 - 各implementation taskでtarget tests、Release build、diff checkが成功する。
 - 各taskの敵対的reviewで再現したfindingを修正し、同じ観点のfollow-upで0件を確認する。
 - full required testsが成功する。
-- Windows legacy package regressionとMSIX production install/launch/bundled CLI/uninstallが成功する。
-- macOS RID別sign/notary/staple/quarantine launchがexact test行で成功する。
+- Windows ZIP regressionとdevelopment MSIX package/unpack/integrityが成功する。
+- macOS source foundationのstatic contractが成功し、production artifactを公開しない。
 - Linux、Windows Arm64、macOS 13以前、未実測installer／signing／notarizationを対応済みと記録しない。
 - 実在学生本文、Prompt、reference、AI reason/evidenceをlog、test artifact、review recordへ追加しない。

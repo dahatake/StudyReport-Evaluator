@@ -2,17 +2,17 @@
 
 | 項目 | 内容 |
 |---|---|
-| 文書版 | 4.2 |
-| 基準日 | 2026-09-03 |
-| 状態 | Windows / macOS delivery expansion承認済み・実装中 baseline |
+| 文書版 | 4.3 |
+| 基準日 | 2026-09-04 |
+| 状態 | Windows ZIP初回公開・development MSIX検証 baseline |
 | 入力 | Microsoft Forms または Google Forms から export した標準 `.xlsx` 1ファイル |
 | 出力 | 入力を変更せず作成する別の標準 `.xlsx` 1ファイル |
-| 対応環境 | target: Windows 11 x64、macOS 14 / 15 / 26 x64・Arm64。正式表示はplatform別実測後だけ |
+| 対応環境 | Windows 11 x64。macOS、Linux、Windows Arm64は現版の正式公開対象外 |
 | UI / Runtime | Avalonia / .NET 10 self-contained |
 | AI | GitHub Copilot SDK for .NET。通常評価は利用者選択model、参照回答と類似度は `auto` |
-| 旧版 | v4.1の機能契約をcarry forwardし、delivery scopeを本版で拡張。v3.0はv4.0により全面的にsupersede済み |
+| 旧版 | v4.2の機能契約をcarry forwardし、外部production signing入力なしで成立する初回公開境界へdelivery scopeを改版。v3.0はv4.0により全面的にsupersede済み |
 
-> 本版は、2026-09-01の要求所有者指示、その後のdefault plan採用指示、2026-09-02の正式公開README実装指示、2026-09-03のrepository sample単一化指示、および同日のWindows/macOS setup簡素化・全task実行指示を反映する。target deliveryは[ADR-0015](../dev/docs/adr/0015-windows-macos-installer-delivery.md)に基づく。ただし、platform別`PASS_PRODUCTION`証跡が揃うまでは[ADR-0013](../dev/docs/adr/0013-windows-only-public-release.md)のWindows unsigned ZIPだけをcurrent public claimとし、target scopeを対応済み表示へ読み替えない。
+> 本版は、v4.2までの機能契約に加え、2026-09-04の要求所有者指示「開発用のMSIXでOK」「外部ブロッカーの情報はない」を反映する。初回公開は[ADR-0013](../dev/docs/adr/0013-windows-only-public-release.md)のWindows 11 x64 self-contained unsigned ZIPとSHA-256 sidecarを使用する。MSIXは証明書不要のdevelopment mechanism検証に限定し、一般利用者へ配布しない。macOS用source foundationは保持するが、Developer ID、notarization、approved icon、native clean-host evidenceがないため現版の公開対象・required acceptanceに含めない。[ADR-0015](../dev/docs/adr/0015-windows-macos-installer-delivery.md)はこのscope変更へ同期する。
 >
 > 本書の「AI評価」は成績を確定する自動判定ではない。AIは定量化候補を作り、最終的な評点と利用判断の責任は利用者が負う。
 
@@ -27,7 +27,7 @@
 5. ベース点、設問配点、固有設定配点、類似度減点はExcel数式で計算する。
 6. 元本全体を保持した別workbookを作成し、元本は一切変更しない。
 7. 長時間処理の進捗を表示し、プロセス終了後もcheckpointから再開できるようにする。
-8. Windows 11 x64と実測済みmacOS targetで、言語runtimeやSDKを別途導入せず、OS標準UIの3操作以内で導入できる配布物を提供する。
+8. Windows 11 x64で、言語runtimeやSDKを別途導入せず起動できるself-contained ZIPとSHA-256 sidecarを提供する。
 
 ## 2. 対象利用者と基本原則
 
@@ -581,36 +581,34 @@ run開始時、完成名に対応する次のfileを作る。
 - GitHub Copilot SDKと互換なCLI runtimeをpackageへ同梱する。
 - source build用SDKを一般利用者端末へ導入しない。
 - GitHub loginは利用者本人の対話が必要であり、scriptがcredentialを収集しない。
-- end-user primary setupはOS標準UIの3操作以内とし、terminal、PowerShell、shell、`chmod`、`xattr`、Gatekeeper無効化を要求しない。
-- package、setup、repair、uninstallは入力／出力／checkpoint workbookを変更または削除しない。
+- end-user primary pathはWindows ZIPの取得、SHA-256確認、展開、apphost起動とする。.NET Runtime／SDK、別Copilot CLI、Officeの導入を要求しない。
+- package作成、展開、起動は入力／出力／checkpoint workbookを変更または削除しない。
 - test certificate、unsigned package、cross-publishだけの成功は`PASS_MECHANISM`であり、正式公開証跡にしない。
 
 ### 13.2 Windows
 
-- Windows 11 x64のprimary artifactは`StudyReportEvaluator-win-x64.msix`とSHA-256 sidecarとする。
-- GitHub Releasesからdirect配布し、MSIXを開く、Installを選ぶ、起動する、の3操作以内とする。
-- MSIXはproduction-trusted code-signing certificateで署名・timestampし、manifest Publisherとcertificate subjectを一致させる。
+- Windows 11 x64のpublic primary artifactは`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`とする。
+- GitHub Releasesからdirect配布し、ZIPとsidecarの一致を確認して新しいdirectoryへ展開し、`StudyReportEvaluator.App.exe`を起動する。
 - Windows 11で証明書なしのcontainer互換性を先行試験する場合は、Publisherの最終fieldに固定marker`OID.2.25.311729368913984317654407730594956997722=1`を置き、明示的なunsigned test artifact名を使用する。実行codeを含むため、使い捨てVMまたは復元可能なsnapshot上で管理者PowerShellの`Add-AppxPackage -AllowUnsigned`による全ユーザーinstallとして実行し、結果を`PASS_MECHANISM`に限定する。この経路を一般利用者setup、signature trust、production配布の証拠にしない。
-- clean Windows 11 x64でinstall、Start menu launch、upgrade、repair、uninstall、bundled CLI child processを実測する。
-- repairはapp-owned missing／tampered payloadを正規packageへ戻し、利用者workbookを変更しない。uninstallはpackage registrationとinstalled app-owned payloadだけを除去する。
-- 現行unsigned ZIPとsidecarは移行中のregression／明示的fallbackとして保持できるが、installerやtrusted packageと表示しない。
+- development MSIX required gateはpackage作成、unpack、manifest/version/RID、block map、public payload、bundled CLI hash、sidecar、policy negative、cleanupまでとする。install／launch／upgrade／repair／uninstallは実行した場合だけ追加の`PASS_MECHANISM` evidenceとし、初回公開をblockしない。
+- public ZIPはcleanな展開先でself-contained apphostとbundled CLI identityを検証する。installer、trusted package、SmartScreen reputation確立済みとは表示しない。
 - engineering用publish/package scriptはPowerShell 7以上だけを使用し、Windows PowerShell 5.1へfallbackしない。PowerShellをend-user setup要件にしない。
 
-### 13.3 macOS
+### 13.3 macOS source foundation（現版公開対象外）
 
-- `osx-arm64`と`osx-x64`を別々にself-contained publishし、各`.app`を収録した`StudyReportEvaluator-osx-<arch>.dmg`とSHA-256 sidecarを作る。
+- `osx-arm64`と`osx-x64`のpublish、bundle、sign、notary script foundationをrepositoryに保持し、secretなしのstatic contractを検証できる。
 - bundle identifierは`com.github.dahatake.study-report-evaluator`とし、`Info.plist`のexecutable、version、icon、minimum OSをartifactへ一致させる。
-- 利用者手順はDMGを開く、appをApplicationsへdragする、Applicationsから起動する、の3操作以内とする。
+- DMGの一般利用者手順とdownload URLは、将来のproduction evidenceが揃うまで公開しない。
 - apphostとbundled CLIをnative architectureで検証し、x64成功をArm64へ、Rosetta成功をnative x64／Arm64へ代用しない。
 - Developer ID Applicationでnested executableを内側から署名し、shipped CLI hashをruntime manifestへ反映してからouter appを署名する。outer署名後にbundleを変更しない。
 - hardened runtime、必要最小限のentitlement、secure timestamp、appとDMGのnotarization／stapling／validation、quarantine付きFinder launchを必須とする。
-- macOS 14、15、26は試験候補であり、exact OS build × architectureの`PASS_PRODUCTION`行だけを対応表示する。
+- macOS 14、15、26は将来の試験候補であり、現版では対応表示しない。将来scopeへ追加する場合だけ、exact OS build × architectureの`PASS_PRODUCTION`行を要求する。
 
 ### 13.4 非対応platform・外部前提・release境界
 
 - Linux、Windows Arm64、macOS 13以前、universal macOS artifact、Microsoft Store、Mac App Storeは本版scope外とする。
-- Windows signing identity、Apple Team／Developer ID／notarization credential、approved visual assets、macOS clean hostsをrepository内の仮値で代用しない。
-- required外部入力がないplatformは`BLOCKED_EXTERNAL`とし、そのartifactと対応claimを公開しない。
+- Windows production signing identityは現版で要求しない。Apple Team／Developer ID／notarization credential、approved visual assets、macOS clean hostsをrepository内の仮値で代用しない。
+- macOS外部入力がない状態は現版のrequired release blockerにせず、macOS artifactと対応claimを公開しない。
 - Windowsのbuild、macOS cross-publish、Avalonia/.NETの一般的なcross-platform対応を、対象platformでの本製品install／launch／CLI／workbook証跡として代用しない。
 
 ## 14. privacy・security・安全境界
@@ -656,9 +654,9 @@ run開始時、完成名に対応する次のfileを作る。
 
 ## 17. Scope
 
-### 17.1 v4.2 required scope
+### 17.1 v4.3 required scope
 
-- Windows 11 x64と、platform gateを通過したmacOS 14 / 15 / 26 x64・Arm64
+- Windows 11 x64
 - RID別.NET 10 self-contained app
 - bundled compatible Copilot CLI runtime
 - standard `.xlsx` from Microsoft Forms or Google Forms
@@ -668,15 +666,14 @@ run開始時、完成名に対応する次のfileを作る。
 - Excel-owned formulas
 - per-student-row `.partial.xlsx` checkpoint and process-restart resume
 - GUI prefill from input/Prompt text command-line options
-- signed Windows MSIX、signed/notarized/stapled macOS RID別DMG、各SHA-256 sidecar
-- current unsigned Windows ZIPのregression/fallback境界
-- OS標準UIだけで3操作以内のprimary setup
-- install、upgrade、repair、uninstall、quarantine launch、bundled CLIのplatform別evidence
+- Windows self-contained unsigned ZIPとSHA-256 sidecar
+- non-public development MSIXのpackage/unpack/integrity `PASS_MECHANISM` evidence
+- clean extract、apphost起動、bundled CLI identityのWindows evidence
 - teacher, operator, engineer documentation and actual synthetic screenshots
 
 ### 17.2 out of scope
 
-- Linux、Windows Arm64、macOS 13以前、universal macOS artifact support claim
+- macOS、Linux、Windows Arm64、universal macOS artifact support claim
 - `.xls`、CSV、PDF、macro、encrypted workbook
 - Microsoft Forms API、Google Forms API、LMS API
 - cloud database、server backend、multi-user service
@@ -687,7 +684,7 @@ run開始時、完成名に対応する次のfileを作る。
 - institutional policy、legal、fairness approval enforcement
 - automated credential collection
 - automatic AI run from command-line arguments
-- Microsoft Store、Mac App Store
+- production-signed/public MSIX、Developer ID/notarized DMG、Microsoft Store、Mac App Store
 - end-user primary pathとしてのPowerShell／shell setup script
 
 ## 18. Acceptance criteria
@@ -716,12 +713,12 @@ run開始時、完成名に対応する次のfileを作る。
 | AC-020 | 移行中もWindows 11 x64 self-contained unsigned ZIPがcleanな展開先で起動し、SHA-256 sidecarとbundled CLI identityを検証できる。 |
 | AC-021 | `PASS_PRODUCTION`がないplatform、architecture、installer、signing、notarizationを対応済みとして表示しない。 |
 | AC-022 | README、教師tutorial、Prompt例、install、privacy、troubleshooting、開発設計、実画面screenshotsを現行UIとcurrent delivery evidenceへ同期する。 |
-| AC-023 | trusted signature／timestampを持つWindows x64 MSIXをclean Windows 11へinstallし、Start menuからself-contained appとbundled CLIを起動できる。 |
-| AC-024 | `osx-arm64`と`osx-x64`のself-contained `.app`／DMGが正しいbundle、Info.plist、mode、native architecture、bundled CLI manifestを持つ。 |
-| AC-025 | macOS artifactはnested sign、shipped CLI hash、outer sign、notarization log、app／DMG staple、strict verificationの順序を満たす。 |
-| AC-026 | WindowsとmacOSのprimary setupをOS標準UIの3操作以内で完了し、terminalやruntimeの別installを要求しない。 |
-| AC-027 | install／upgrade／repair／uninstallまたはapp removalで、利用者の入力、final、partialを変更・削除しない。 |
-| AC-028 | protected release workflowはrequired platform matrixが全て`PASS_PRODUCTION`の場合だけartifactを公開し、secretと未実測claimを漏らさない。 |
+| AC-023 | Windows x64 development MSIXを作成・unpackし、manifest/version/RID、block map、payload、bundled CLI、SHA-256 sidecar、test-only identityを検証し、一般配布しない。 |
+| AC-024 | macOS publish/sign/notary source foundationのstatic contractを検証し、native production evidenceなしにartifactまたはsupport claimを公開しない。 |
+| AC-025 | macOS scriptがnested sign、shipped CLI hash、outer sign、notary log、app／DMG staple、strict verificationの順序を要求する。実行結果は現版のrequired acceptanceにしない。 |
+| AC-026 | Windows public ZIPの取得、SHA-256確認、展開、起動を文書化し、.NET Runtime／SDK、別Copilot CLI、Officeを要求しない。development MSIXを一般利用者手順へ含めない。 |
+| AC-027 | public ZIP/packageとdevelopment MSIXにsample、利用者入力、final、partialを含めず、package作成・展開・起動で利用者workbookを変更・削除しない。 |
+| AC-028 | release workflowはmachine-readable matrixで`publish=true`かつrequired statusを満たすartifactだけをdraftへ添付・公開し、development MSIX、secret、未実測claimを漏らさない。初回required rowはWindows ZIPとする。 |
 
 ## 19. Test requirements
 
@@ -749,11 +746,11 @@ run開始時、完成名に対応する次のfileを作る。
 22. documentation link、screenshot provenance、unsupported claim、Prompt examples contract test。
 23. fixed-seed 531-row synthetic end-to-end、resume end-to-end、input hash不変test。
 24. optional authenticated synthetic Copilot smokeとexternal spreadsheet recalculation smoke。required deterministic testの代替にしない。
-25. Windows MSIX manifest/version/layout、test-sign mechanism、trusted production signature、install/launch/upgrade/repair/uninstall test。
-26. macOS RID別publish、`.app` layout、Info.plist、Mach-O architecture、execute mode、bundled CLI manifest test。
-27. macOS hardened runtime、minimal entitlement、nested/outer signature、secure timestamp、notary log、staple、DMG integrity、quarantine launch test。
-28. package-installed appでpicker、input不変、checkpoint/resume、final、bundled CLI、privacyを再実行するplatform E2E。
-29. required platform matrix、secret isolation、public candidate re-download、未実測artifact非公開のrelease workflow test。
+25. Windows development MSIXのmanifest/version/layout、unpack、block map、bundled CLI、sidecar、unsigned OID、policy negative、cleanup test。
+26. macOS RID別publish／bundle／sign／notary script、Info.plist、entitlement、secret boundaryのstatic contract test。
+27. macOS scriptがhardened runtime、nested/outer signature、secure timestamp、notary log、staple、DMG integrity、quarantine launchをproduction evidenceとして要求することのcontract test。
+28. Windows ZIPのclean extract/apphost/bundled CLI/input不変と、development MSIX packageに利用者workbookを含めないことのE2E／package test。
+29. Windows ZIPをrequired publish row、development MSIXをnon-public mechanism rowとして扱うmatrix、secret isolation、public candidate re-download、未実測artifact非公開のrelease workflow test。
 
 ## 20. 外部仕様出典
 
@@ -788,8 +785,8 @@ run開始時、完成名に対応する次のfileを作る。
 | Checkpoint/resume | App workflow + workbook adapter |
 | Prompt-file launch | App composition + Design UI |
 | Warning/progress/results | App UI |
-| Windows delivery | publish/package/MSIX scripts + Windows packaging/install tests |
-| macOS delivery | macOS publish/package scripts + bundle/sign/notary/quarantine tests |
+| Windows delivery | public ZIP publish/package tests + development MSIX mechanism tests |
+| macOS source foundation | macOS publish/package/sign/notary static contract tests |
 | Platform release matrix | protected CI/release workflow + machine-readable evidence |
 | User/developer documentation | docs + dev/docs + screenshot tests |
 
@@ -804,5 +801,6 @@ run開始時、完成名に対応する次のfileを作る。
 | Sample consolidation source | 2026-09-03の`sample/SampleReport.xlsx`を唯一のsampleとして扱う要求所有者指示 |
 | Setup simplification source | 2026-09-03の「WindowsとMac OSでのセットアップをシンプルに」「不明点はデフォルトのプラン」「全てのタスクを実行」指示 |
 | Delivery decision | [ADR-0015](../dev/docs/adr/0015-windows-macos-installer-delivery.md) |
-| Approved scope | 本書§1〜§21。既存機能に加えWindows MSIX、macOS RID別DMG、sign/notary、3操作setup、platform release matrixを含む |
+| Approved scope | 本書§1〜§21。既存機能、Windows unsigned ZIP公開、non-public development MSIX mechanism、Windows ZIP release matrixを含む。macOS production deliveryは現版scope外 |
+| Delivery scope revision | 2026-09-04の要求所有者指示「開発用のMSIXでOKです」「外部ブロッカーの情報はないです」 |
 | Meaning | repository要求baselineの承認記録。組織の法務・教育・security承認または電子署名を意味しない |

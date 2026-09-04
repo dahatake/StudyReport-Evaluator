@@ -4,7 +4,7 @@
     "net10.0": {
       "Microsoft.Windows.SDK.BuildTools": {
         "type": "Direct",
-        "requested": "[10.0.26100.4948]",
+        "requested": "[10.0.26100.4948, 10.0.26100.4948]",
         "resolved": "10.0.26100.4948",
         "contentHash": "o0T4CVaumDjPNNijKiM7p25vHKdyKqYvaVVLgQO02KTOoUDlgMYJVUQAXn1IG0G9/ZsdZ+bdgWxgQsrO/b37qw=="
       }

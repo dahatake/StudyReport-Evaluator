@@ -9,6 +9,8 @@
 | 版操作tool | [`dev/version.ps1`](../../version.ps1) |
 | 調査 | [`20260902-version-management-investigation-report.md`](../../../work/20260902-version-management-investigation-report.md) |
 
+> 2026-09-04更新: 公開済み製品版・配布assetがない段階で、製品所有者の指示によりsource candidateを`0.8.0`へ再baselineした。公開済みidentityの変更ではなく、SemVerとrelease identityの管理原則は維持する。
+
 ## Context
 
 導入前のprojectには明示的な`Version`、`VersionPrefix`、`VersionSuffix`がなく、.NET SDKの既定値から実効`1.0.0`が生成されていた。assemblyとRun/checkpoint identityにはその値が流れる一方、製品版の正本、bump規則、tag/release手順はなかった。[調査証拠](../../../work/20260902-version-management-investigation-evidence.json)
@@ -19,7 +21,7 @@
 
 1. 製品版は[Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html)を使用する。
 2. [`Directory.Build.props`](../../../Directory.Build.props)の`VersionPrefix`と`VersionSuffix`を唯一のsource-controlled製品版正本とする。
-3. 初期値は導入前の実効値を変えない`1.0.0`とする。この値だけで公開済みとは判定せず、公開にはpassing gate、annotated tag、GitHub Releaseを別途要求する。
+3. 機構導入時の初期値は、導入前の実効値を変えない`1.0.0`とした。公開前の2026-09-04にsource candidateを`0.8.0`へ再baselineした。いずれの値も、それだけで公開済みとは判定せず、公開にはpassing gate、annotated tag、GitHub Releaseを別途要求する。
 4. `VersionPrefix`は`MAJOR.MINOR.PATCH`、`VersionSuffix`は任意のprereleaseとし、build metadataは手入力しない。.NET SDKがsource revisionをInformationalVersionへ追加する。
 5. 版変更は[`dev/version.ps1`](../../version.ps1)で表示、設定、bump、検証できる。toolはCHANGELOG、commit、tag、Releaseを自動作成しない。
 6. 公開互換性はCLI、workbook入出力、checkpoint、配布platform/layout、privacy boundary、利用者文書を含む。

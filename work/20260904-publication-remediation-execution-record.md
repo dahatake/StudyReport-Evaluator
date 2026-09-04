@@ -1,0 +1,542 @@
+# StudyReport Evaluator 公開プロセス修正 実行記録
+
+## 0. 文書管理
+
+| 項目 | 値 |
+|---|---|
+| 実行計画 | [`20260904-publication-remediation-plan.md`](20260904-publication-remediation-plan.md) |
+| 実行開始日 | 2026-09-04 |
+| 開始HEAD | `1fdc9ab40c9e605fa6a49a131e232563d8b351e7` |
+| 開始branch | `main` |
+| 状態 | `IN_PROGRESS` |
+| 原則 | 未実行は`NOT_RUN`、外部入力不足は`BLOCKED_EXTERNAL`、実測成功だけを`PASS`とする |
+
+本記録へcredential、private key、password、token、学生回答、Prompt、AI reason/evidence、private absolute pathを保存しない。
+
+### Scope update
+
+2026-09-04の要求所有者追加指示により、Windows MSIXは開発用`PASS_MECHANISM`までを採用し、production signed MSIX taskは廃止する。unsigned executable MSIXは一般配布せず、Windows public artifactはunsigned ZIPとsidecarを維持する。外部情報が提供されていないmacOS production taskは`BLOCKED_EXTERNAL`として正確に閉じる。
+
+敵対的レビューで、v4.2 AC-023/AC-028と旧W3/R4 taskを残したままでは矛盾することを確認した。このfindingを採用し、計画§0.2へv4.3改版、Windows ZIP initial release、development MSIX非公開、macOS conditional release、旧production MSIX task supersessionを追加した。
+
+再レビューでWindows ZIP flow、PATCH bump位置、v4.3対象file、active task IDと旧taskの区別が不足していたため、S1/M2/R2/V2のactive routing、Windows ZIP中心のMermaid、`V2-02` CHANGELOG、`V2-03` PATCH bumpを追加し、旧Phase 3W〜6見出しを`SUPERSEDED`とした。`docs/requirements-definition.md`のファイル名不正という指摘は、記載も実在fileも同じ複数形であるため棄却した。
+
+active routing最終レビューの「初回公開なのでPATCH bump不要」は、要求所有者が全task完了後のPATCH incrementを明示しているため棄却した。`V2-03`の`0.8.0`→`0.8.1`を維持する。
+
+## 1. P0-01 — デフォルトdecision承認
+
+### 実行結果
+
+- 要求所有者の2026-09-04指示により、計画§4のQ-001〜Q-010を全てデフォルトで採用した。
+- 計画状態を`APPROVED — IN PROGRESS`へ更新した。
+- 採用値: 要求正本は`docs/requirements-definition.md` v4.2、full v4.2 scope、候補版`0.8.0`、SystemTest正本はroot、production releaseはstable-only、Windows signingはPFX/certificate + SignTool、macOS build numberはrelease commit count、macOS required matrixは6行、legacy ZIPはCI regressionのみ、signing/publish Environmentを分離。
+- external identity、credential、approved asset、native hostは未提供であり、推測しない。
+
+### 敵対的レビュー
+
+- Q-001〜Q-010を要求v4.2へ照合し、要件矛盾、存在しない問題、YAGNI違反は確認されなかった。
+- Windows production identity、Apple identity、approved assets、native hostsはデフォルト値で生成できないため、後続の明示的`BLOCKED_EXTERNAL` gateとして保持する。
+
+### 反映確認
+
+- 計画冒頭は`APPROVED — IN PROGRESS`。
+- §4は「要求所有者指示によりデフォルト採用」へ更新済み。
+
+**Status: PASS**
+
+## 2. P0-02 — worktree所有権確認
+
+### 実行結果
+
+- `main`、HEAD `1fdc9ab40c9e605fa6a49a131e232563d8b351e7`で、`git status --porcelain=v1 --untracked-files=all`と`git diff --numstat`を取得した。
+- 計画作成前の調査では14 entriesだった。P0-02再測定時はADR-0014更新と計画書が加わり16 entriesだった。
+- SystemTestの採用正本は計画Q-004どおりrepository rootであり、`tests/SystemTest-prompt.md`のcorrected本文をrootへ戻す。
+
+| 分類 | File |
+|---|---|
+| 0.8.0再baseline | `Directory.Build.props`、`CHANGELOG.md`、ADR-0014、ADR-0015、`dev/docs/version-management.md`、`dev/version.tests.ps1`、App tests lock |
+| public truth/docs | `README.md`、`dev/docs/README.md`、`dev/docs/implementation-status.md`、`dev/docs/traceability.md`、`DocumentationContractTests.cs` |
+| SystemTest正本収束 | root `SystemTest-prompt.md`削除状態、`tests/SystemTest-prompt.md` untracked |
+| MSIX修復 | `scripts/test-windows-msix-unsigned.ps1` |
+| 計画/記録 | `work/20260904-publication-remediation-plan.md` |
+
+所有不明・無関係fileは0件。既存内容をstash/reset/cleanせず全て保持して収束できる。
+
+### 敵対的レビュー
+
+採用:
+- ADR-0014の0.8.0 noteは他の版正本と同じ変更目的に属するため保持する。
+- 全entryに公開修正上の帰属がある。
+
+棄却:
+- 「remote READMEも公開物0件へ訂正済み」は誤り。訂正はlocal未commitである。remote `main`は`https://github.com/dahatake/StudyReport-Evaluator/releases/download/v1.0.1/StudyReportEvaluator-win-x64.zip`を案内していた。
+- 「rootからtestsへの移動が修復」は誤り。現行contractはrootを正本とするため、corrected本文をtestsからrootへ戻す。
+- 「次に全差分を即commit」は計画順序違反。F-001/F-003/F-004等を修正しfocused validation後にcommitする。
+
+### 反映確認
+
+- 後続B1-01はtests→root、B1-09はlocal訂正をremoteへ反映する前提を維持。
+- 未検証差分をcommitしていない。
+
+**Status: PASS**
+
+## 3. P0-03 — 専用branch作成
+
+### 実行結果
+
+- P0-02後に本実行記録を新規作成したため、branch移行直前のstatusは17 entriesだった。
+- `fix/publication-readiness-20260904`を新規作成して移動した。
+- HEADは`1fdc9ab40c9e605fa6a49a131e232563d8b351e7`のまま不変。
+- branch移行直前と直後のstatusは17 entriesで不変。
+- stash、reset、clean、commitは実行していない。
+
+### 敵対的レビュー
+
+採用:
+- P0-03結果と16→17の増分理由が未記載だったため、本節へ明示した。
+
+棄却:
+- 「branch移行でentryが増えた」は誤り。増分は移行前に作成した本記録であり、移行前後は17→17。
+
+### 反映確認
+
+- current branch、HEAD、status countを再取得し、branch=`fix/publication-readiness-20260904`、HEAD一致、17 entriesを確認した。
+
+**Status: PASS**
+
+## 4. P0-04 — public state再観測
+
+### 実行結果
+
+2026-09-04の公開APIおよび認証済みAPIで次を確認した。
+
+| 項目 | 結果 |
+|---|---|
+| GitHub Releases（draft含む） | 0件 |
+| Public tag | `v1.0.0` 1件、target `b68e7577df616c0e259b55697a52d26412a01208` |
+| `v0.8.0` tag | 不存在（HTTP 404） |
+| Immutable Releases | `enabled=true`、`enforced_by_owner=false` |
+| GitHub Environments | 0件 |
+| Repository Actions secret names | 0件 |
+| remote `main` | local baseline HEAD `1fdc9ab40c9e605fa6a49a131e232563d8b351e7`と一致 |
+| latest CI | run `33731803304`、failure |
+| latest Release workflow | run `33696306818`、failure |
+
+新しいRelease、候補tag、第三者によるremote main変更は検出されず、停止条件に該当しない。過去記録は[`20260903-v1.0.1-release-recovery-plan.md`](20260903-v1.0.1-release-recovery-plan.md)を参照した。
+
+### 敵対的レビュー
+
+採用:
+- 過去記録はv1.0.1不存在中心だったため、今回v1.0.0存在、v0.8.0不存在、draft、Environment、secret名、remote mainを同時に再測定した。
+
+棄却:
+- 「tag存在とRelease不存在は矛盾」は誤り。Git tagとGitHub Releaseは独立objectであり、実際にv1.0.0 workflowはRelease作成前に失敗している。
+- 「過去workflow failureはproduction signing不足の可能性」はログと不一致。Release #1は複数Git path、CI #3はempty status parameter bindingが直接原因として確認済み。
+- v0.8.0不存在確認のHTTP 404は期待結果である。正常終了として再検証した。
+
+### 反映確認
+
+- remote main一致、候補tag不存在、専用branch、17 status entriesを1回の正常終了commandで再確認した。
+
+**Status: PASS**
+
+## 5. B1-01 — SystemTest正本をrootへ収束
+
+### 実行結果
+
+- corrected本文を`tests/SystemTest-prompt.md`からroot `SystemTest-prompt.md`へ移動した。
+- 移動前後SHA-256は`B355466C8C781FA7642C4FE380F05CD1EFC215ECC4B2655162A1E6A6CB7EB08E`で一致した。
+- root file 1件、`tests/` copy 0件、ST-UC-01〜25、TR-01〜29を確認した。
+
+### 敵対的レビュー
+
+- 文字化け、内容欠落、scenario重複、TR欠番、正本重複は確認されなかった。
+- TR-24A/Bはoptional smoke 2種をTR-24内で区別する既存契約で、contract regexも対応済みのため変更しない。
+- ST-UC-02の要求§4.4参照は実在するcanonical sample契約へ追跡できるため変更しない。
+
+### 反映確認
+
+- editor diagnostics 0件。
+- `DocumentationContractTests`はrootを読み、`tests/` copy不存在を要求している。
+
+**Status: PASS**
+
+## 6. B1-02 — v4.2 evidence identityへ同期
+
+### 実行結果
+
+- `RealDataSystemSmokeTests.cs`が生成するrequirementsとSystemTest identityをv4.1からv4.2へ更新した。
+- `CURRENT STRUCTURAL PROFILE`である`sample-workbook-profile.md`のRequirementもv4.2へ同期した。
+- `DocumentationContractTests`へprofile版の回帰assertionを追加した。
+
+### 敵対的レビュー
+
+採用:
+- current profileのv4.1は実在する不整合だったため修正した。
+
+棄却:
+- ADR-0013、developer文書の履歴図、旧work計画のv4.1は決定・計画当時の正本を示すhistorical valueであり、current evidenceではないため変更しない。
+
+### 反映確認
+
+- 対象current evidence/profileのv4.1参照は0件。
+- 対象3fileのdiagnosticsは0件。
+- 再レビューでcurrent-contract不一致0件。
+
+**Status: PASS**
+
+## 7. B1-03 — 製品版正本を確定
+
+### 実行結果
+
+- `dev/version.ps1 show -Json`: `PASS`、version/prefix=`0.8.0`、suffix空。
+- `dev/version.ps1 verify -Json`: `PASS`、App/Core 2 projectともversion/prefix=`0.8.0`、suffix空。
+
+### 敵対的レビュー
+
+- `Directory.Build.props`、CHANGELOG、README、ADR-0014/0015、version management、implementation statusの非historical sourceに0.8.0との矛盾は確認されなかった。
+- `bin/`、`obj/`、`work/`の過去snapshot、dependency versionは製品版判定から除外した。
+
+### 反映確認
+
+- source変更は不要。
+- diagnostics 0件。
+
+**Status: PASS**
+
+## 8. B1-04 — version self-testを候補版へ同期
+
+### 実行結果
+
+- `dev/version.tests.ps1`をPowerShell Core 7で1回実行し、14 assertionsが全て成功した。
+- 実repositoryの`Directory.Build.props`と`CHANGELOG.md`は実行前後SHA-256が一致した。
+
+### 敵対的レビュー
+
+棄却:
+- 実CHANGELOGにdated 0.8.0 sectionがない点は、公開時まで作らない計画どおり。temporary cloneのsynthetic release entryはtag検証を可能にし、production履歴を偽装しない。
+- `git config`個別exit check追加は、後続commitが失敗を検出し、本taskの品質向上に対して過剰なerror分岐となるため追加しない。
+- 実repositoryのfile lock、arbitrary version、prerelease checkpoint、異なるGit binary間整合は本self-testの契約外であり、要求のない拡張をしない。
+- 2つのPATH shimは過去障害である複数`Get-Command` resultを直接再現し、修正版が先頭applicationだけを使うことを検証している。
+
+### 反映確認
+
+- source変更なし。
+- diagnostics 0件、14 assertions再現、正本2file不変。
+
+**Status: PASS**
+
+## 9. B1-05 — unsigned MSIX証跡のclean-tree修正と版一元化
+
+### 実行結果
+
+- `Get-Utf8Sha256Hex.Value`へ`AllowEmptyString`を追加し、clean checkoutの空statusをSHA-256化できるよう修正した。
+- 製品版を`dev/version.ps1 show -Json`から取得し、MSIX 4-part版を導出した。`0.8.0`/`0.8.0.0`の4 hard-codeを除去した。
+- version toolは使用前に存在確認し、同一PowerShell sessionのstale `$LASTEXITCODE`へ依存しないようにした。
+- development MSIX mechanismを1回実行した。
+
+| 項目 | 実測値 |
+|---|---|
+| Status | `PASS_MECHANISM` |
+| Production status | `BLOCKED_EXTERNAL`（owner decision後はproduction MSIX scopeをsupersede） |
+| Install status | `NOT_RUN_REQUIRES_ELEVATED_DISPOSABLE_WINDOWS_11_HOST` |
+| Package | `StudyReportEvaluator-win-x64.unsigned.test.msix` |
+| Version | `0.8.0.0` |
+| Bytes | 155,500,648 |
+| SHA-256 | `4D89DAC5716EFA8FBD43E3795374E3B58DA9A20CF710CEF7200A792F9F589FE1` |
+| Package/evidence/sidecar hash | 一致 |
+| Signature entry | 0 |
+| Negative policy checks | 2件 |
+| Temporary MSIX directories | 0 |
+| Relevant residual processes | 0 |
+
+### 敵対的レビュー
+
+採用:
+- version toolの存在確認が使用後だったため、使用前へ移動した。
+- `.ps1`は同一sessionで実行されるため、staleになり得る`$LASTEXITCODE`判定を除去した。
+
+棄却:
+- prerelease拒否はstable-only release decisionどおり。
+- package identity、fixed OID、tool lock、evidence schemaを追加変更する必要は確認されなかった。
+
+### 反映確認
+
+- diagnostics 0件。
+- package、evidence、sidecarのSHA-256一致。
+- cleanup完了。
+
+**Status: PASS_MECHANISM**
+
+## 10. B1-06 — MSIX回帰契約を追加
+
+### 実行結果
+
+- `WindowsInstallerPackageTests`へempty status許可、version tool参照、4-part版導出、0.8.0 hard-code禁止を追加した。
+- 対象classは5/5 PASS。
+
+### 敵対的レビュー
+
+- assertionは実装のexact contractへ一致し、BuildTools固定版を製品版hard-codeとして誤検出しない。
+- clean-status integrityとproduct version一元化の回帰を固定し、自己充足・過剰検査は確認されなかった。
+
+### 反映確認
+
+- 追加修正なし。
+- diagnostics 0件。
+
+**Status: PASS**
+
+## 11. B1-07 — lockを正規生成
+
+### 実行結果
+
+- solution restoreを`--force-evaluate`、続けて`--locked-mode`で実行し、両方成功した。
+- 4 lock中の変更はApp tests lock内のApp→Core project dependency `1.0.1`→`0.8.0`だけだった。
+- 外部packageの`resolved`/`contentHash`変更は0件。
+
+### 敵対的レビュー
+
+棄却:
+- 「project dependency versionは手編集」という指摘は、NuGet force-evaluateの実測と矛盾する。
+- workspace外のfresh temporary cloneへ現在の`Directory.Build.props`だけを適用してrestoreした結果、同じJSON pathに`[0.8.0, )`が生成された。
+- temporary cloneは削除済みで残存0。
+
+### 反映確認
+
+- `dotnet restore --locked-mode`は成功。
+- lock diagnostics 0件。
+- tool生成差分以外なし。
+
+**Status: PASS**
+
+## 12. S1-01 — 要求正本をv4.3へ改版
+
+### 実行結果
+
+- 機能契約を維持し、delivery scopeだけをv4.3へ改版した。
+- Windows public artifactはself-contained unsigned ZIPとsidecar。
+- development MSIXはnon-public `PASS_MECHANISM`。
+- macOS production deliveryは現版scope外、source/static contractだけを維持。
+- AC-001〜028とTR-01〜29のIDを保持した。
+
+### 敵対的レビュー
+
+- 初回レビューで内部矛盾、番号欠落、production MSIX残存、required macOS残存は確認されなかった。
+- 機械検索で§17.1見出しだけv4.2だったため採用し、v4.3へ修正した。
+
+### 反映確認
+
+- 文書版4.3、§17.1 v4.3、AC 28件、TR 29件を確認。
+- current scopeのv4.2見出し0件。
+- diagnostics 0件、最終レビュー未反映0件。
+
+**Status: PASS**
+
+## 13. S1-02 — ADR／architecture／detailed designをv4.3へ同期
+
+### 実行結果
+
+- ADR-0015をv4.3の初回Windows ZIP公開、development MSIX non-public、macOS source foundationへ改版した。
+- architectureの本文とMermaidを同じdelivery flowへ同期した。
+- detailed designのheader、設計目標、§13、delivery tests、file map、Definition of Doneを同期した。
+
+### 敵対的レビュー
+
+採用:
+- ADR Decision #1、Consequences、Transitionに残ったv4.2／3操作／旧production gateを修正した。
+- detailed design冒頭、delivery test、Definition of Doneの旧production MSIX/macOS required記述を修正した。
+- architecture図へ`publish=true`/`publish=false`とRelease filterを明示した。
+
+棄却:
+- Windows direct MSIXの署名要件説明は、development-only判断の根拠となるContextであり保持する。
+- macOS signing orderは将来production scopeの安全contractで、source foundationの一部として保持する。
+- development MSIXを別matrixへ分離する案は、v4.3 AC-028/TR-29が同一matrixのnon-public rowを要求するため採用しない。
+
+### 反映確認
+
+- ADR、architecture、detailed designの再レビューで未反映0件。
+- 3fileのdiagnostics 0件。
+
+**Status: PASS**
+
+## 14. S1-03 — Traceability／SystemTest／public docsをv4.3へ同期
+
+### 実行結果
+
+- traceabilityとclaim ledgerをWindows ZIP public、development MSIX non-public、macOS current scope外へ同期した。
+- SystemTestをv4.3／2026-09-04へ更新し、ST-UC-22〜25をdevelopment MSIX mechanism、macOS static contract、Windows ZIP release matrixへ置換した。
+- RealData evidenceとsample profileをv4.3へ同期した。
+- README、user guide index、getting-startedへ公開asset 0件、Releases index、development MSIX非公開を同期した。
+- architecture header、developer index、version-management、implementation-statusをv4.3へ同期した。
+- DocumentationContractTestsは最終14/14 PASS。
+
+### 敵対的レビュー
+
+採用:
+- sample profileのverification date/conclusionに残ったv4.1をv4.3／2026-09-04へ修正した。
+- traceabilityのAC-023へ`unsigned`とinstall非required／未実行を明記した。
+- current validation前のAC-021/TR-21をPLANNEDへ戻した。
+- claim ledgerの更新日を2026-09-04へ修正した。
+- architecture header、developer index、version-management、implementation-statusの旧current scopeを修正した。
+
+棄却:
+- 同じACを複数scenarioで検証することは重複欠陥ではない。
+- ST-UC-25が後続workflow/matrixを検証すること、candidate前はfresh downloadを`NOT_RUN_NO_CANDIDATE`とすることは実行段階を正確に分ける契約である。
+- READMEから要求定義書へ直接リンクする要件はない。
+- 旧ADR、work計画、履歴図のv4.1/v4.2はhistorical valueとして保持する。
+- 横断レビューの`READY_FOR_RELEASE`表現はmatrix/workflow未完了のため採用しない。
+
+### 反映確認
+
+- current evidence/SystemTestのv4.1/v4.2残存0件。
+- AC-001〜028、TR-01〜29、C-001〜038の連番を維持。
+- public docsにversioned download URL 0件、development MSIX一般利用案内0件。
+- 対象文書diagnostics 0件、DocumentationContractTests 14/14 PASS。
+
+**Status: PASS**
+
+## 15. B1-15 — CIの最小修正
+
+### 実行結果
+
+- CIの`actions/setup-dotnet`をv6へ更新した。
+- version tool self-testをrequired stepへ追加した。
+- deterministic testがskipされた場合のTRX upload二次errorを防ぎ、MSIX evidenceはmechanism step成功時だけuploadするようにした。
+- workflow contract testを追加し、WindowsInstallerPackageTestsは最終5/5 PASS。
+
+### 敵対的レビュー
+
+採用:
+- solution force-evaluateでWindows SDK BuildTools lockのexact requested rangeが`[v]`からNuGet 10正規形`[v, v]`へ変わり、test 1件が失敗した。
+- driverとtestを生成形式へ同期した。source PackageReference、resolved version、contentHashは同じexact versionを維持する。
+
+棄却:
+- macOS artifact upload条件の統一は今回の実在failureではなく、facts fileを常に先に生成する既存設計なので変更しない。
+- exact rangeはmin=maxであり、version rangeを緩和していない。
+
+### 反映確認
+
+- WindowsInstallerPackageTests 5/5 PASS。
+- solution locked restore成功。
+- workflow/script/test/lock diagnostics 0件、`git diff --check`成功。
+
+**Status: PASS**
+
+## 16. B1-16 — baseline focused validation
+
+### 実行結果
+
+| 検証 | 実測結果 |
+|---|---|
+| solution locked restore | exit 0 |
+| version self-test | 14 assertions PASS |
+| Release build | exit 0、warning 0、error 0 |
+| DocumentationContractTests | 14/14 PASS |
+| WindowsInstallerPackageTests | 5/5 PASS |
+| MacOsPublishPackageTests | 2/2 PASS |
+| focused 3-class aggregate | 21/21 PASS |
+| RealData evidence contract | v4.3 requirements／SystemTest source identity assertion PASS |
+| workspace diagnostics | 0件 |
+| `git diff --check` | exit 0 |
+
+opt-in `RealDataSystemSmokeTests`とLive AIはB1-02および計画§5.1どおりrequired gateへ昇格せず、実行していない。
+
+### 敵対的レビュー
+
+採用:
+- 「RealData evidence contract」がopt-in E2Eかsource assertionか不明確だったため、計画B1-16へsource identity assertionであることと非実行範囲を明記した。
+- 現版のmacOS scopeはstatic source contractなので、追加で`MacOsPublishPackageTests` 2件を実行範囲へ明記した。
+
+棄却:
+- source identity assertion未実装という指摘は、`DocumentationContractTests`へv4.3の2 literalを検査するassertionが存在し、同class 14/14 PASSという実測と矛盾する。
+- `--no-build`が古いbinaryを使うという指摘は、同一sourceに対するRelease build成功後にfocused testsを実行し、assertion追加後もtest runnerによる再buildを伴う単独testが14/14 PASSしているため該当しない。
+- 本節未記載という指摘はタスク完了前のレビュー時点を観測したもので、実装欠陥ではない。本節で実測結果を記録した。
+
+### 反映確認
+
+- RealData evidence contractの意味と非実行範囲が計画に明記されている。
+- required検証と追加static contractは全てPASSし、failure/error 0。
+
+**Status: PASS**
+
+## 17. B1-17 — implementation status同期
+
+### 実行結果
+
+- current branch、HEAD、0.8.0、B1-16のlocked restore／build／focused test／diff-check実測値を記載した。
+- current candidateで未実行のWindows ZIP、full required regression、canonical technical E2Eを`NOT_RUN_CURRENT_CANDIDATE`とした。
+- 2026-09-02／03のUI、CLI、ZIP、sample、E2E、system smoke、optional evidenceを`Previous ... baseline`へ改称し、current gateへ未算入と明記した。
+- root SystemTest 25 scenario／TR-01〜29をcurrent documentation contractへ接続した。
+
+### 敵対的レビュー
+
+採用:
+- current表内の旧Windows ZIP 3/3や旧E2E結果は過去値との境界が弱かったため、各行を`Previous`化し、delivery statusへcurrent未実行行を追加した。
+
+棄却:
+- B1-17実行記録がないという指摘は、完了記録を再レビュー後に作る手順を観測したもので実装欠陥ではない。
+- 25 scenario／TR-29が未反映という指摘は、documentation contract行の明記と14/14 PASSに反する。
+
+### 反映確認
+
+- 再レビュー: current／previous境界、未実行3行、branch／HEAD／version、25 scenario／TR-29を確認し、unresolved Critical/High 0。
+- content data included = false。
+
+**Status: PASS**
+
+## 18. B1-18 — traceability同期
+
+### 実行結果
+
+- active planを2026-09-04 remediation planへ更新し、B1-16実測値を記載した。
+- AC-020／TR-19／TR-20は`NOT_RUN_CURRENT_CANDIDATE`、AC-023／TR-25はnon-public `PASS_MECHANISM`とした。
+- AC-021／022、TR-21／22はcurrent documentation evidenceにより`PASS_REQUIRED`とした。
+- AC-024／025、TR-26／27はsource-only static contract 2/2に限定して`PASS_REQUIRED`とし、production artifact／署名／公証／clean-host実測ではないと明記した。
+- AC-026〜028、TR-28〜29は後続task未完了のため`PLANNED`を維持した。AC-001〜028、TR-01〜29の欠番はない。
+
+### 敵対的レビュー
+
+採用:
+- `PASS_MECHANISM`へ非公開・非productionの意味を追加した。
+- macOS static `PASS_REQUIRED`をproduction `PASS_PRODUCTION`へ誤読しないsource-only境界を追加した。
+- TR-25へnon-public unsignedを明記した。
+
+棄却:
+- AC-020が`PASS_REQUIRED`、AC-024／025が`PLANNED`という指摘は、レビュー時の実fileが既にそれぞれ`NOT_RUN_CURRENT_CANDIDATE`／`PASS_REQUIRED`であり、現内容と一致しない。
+- AC-026〜028を現版scope外にする指摘は誤り。Windows ZIP setup／package exclusion／release matrixはv4.3 active scopeであり、未完了なので`PLANNED`が正しい。
+- docs evidence専用statusの追加は不要。直接deterministic documentation test成功は既存語彙`PASS_REQUIRED`で表す。
+
+### 反映確認
+
+- 再レビュー: AC／TR全件、static／mechanism／production境界、false PASSを確認し、unresolved Critical/High 0。
+- content data included = false。
+
+**Status: PASS**
+
+## 19. B1-19 — claim ledger同期
+
+### 実行結果
+
+- SystemTest v4.3 ST-UC-01〜25／TR-01〜29、2026-09-04 public Release／asset 0件、B1-16 focused evidenceをheaderへ記載した。
+- C-026／027／036〜038は`BLOCKED`、C-029／033は`VERIFIED`、C-034／035は`EXCLUDED`とした。
+- C-033の`VERIFIED`はdevelopment mechanism成功と非公開境界だけを指し、production readinessではないと定義した。
+- 2026-09-03の670件は0.8.0 current candidate required release gateへ算入しないと明記した。
+- 計画B1-19の旧「C-033〜038 BLOCKED」をv4.3実態へ修正した。
+
+### 敵対的レビュー
+
+採用:
+- claim単位の`VERIFIED`とproduction readinessの区別、および過去670件の非算入境界を強化した。
+
+棄却:
+- C-033を`BLOCKED`にする指摘は、claim自体が「development mechanismは成功し一般配布しない」であり、その限定事実を実測済みなので不正確。
+- READMEの「配布開始後」条件形は現在のasset存在を断定せず、「現在、公開済みの配布物はありません」と併記されるためC-026と矛盾しない。
+- macOS将来scopeの記述は現在の提供を断定せず、C-034／035を`EXCLUDED`に保持している。
+
+### 反映確認
+
+- 再レビュー: C-001〜038連番、指定status、public asset 0、25 scenario／TR-29、過去/current境界を確認し、unresolved Critical/High 0。
+- content data included = false。
+
+**Status: PASS**

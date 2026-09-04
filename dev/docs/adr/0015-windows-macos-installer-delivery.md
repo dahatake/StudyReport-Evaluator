@@ -1,20 +1,22 @@
-# ADR-0015: Windows MSIXとmacOS DMGによるセットアップ簡素化
+# ADR-0015: Platform delivery foundationと初回公開境界
 
 | 項目 | 内容 |
 |---|---|
 | 状態 | **承認済み・移行中** |
 | 決定日 | 2026-09-03 |
-| 要求正本 | `docs/requirements-definition.md` v4.2 |
-| 製品版 | `1.1.0` candidate |
+| 要求正本 | `docs/requirements-definition.md` v4.3 |
+| 製品版 | `0.8.0` candidate（2026-09-04、初回公開前に再baseline） |
 | Supersedes | ADR-0013の将来platform target。既存Windows ZIPの実測記録は保持 |
 | Carries forward | ADR-0012の機能契約、ADR-0014のSemVer/release identity、入力不変・privacy・2-project構成 |
 | 承認根拠 | 要求所有者の指示「不明点はデフォルトのプランを採用」「全てのタスクを実行」 |
+
+> 2026-09-04更新: 公開済み製品版がないため、製品所有者の指示で候補版を`1.1.0`から`0.8.0`へ再baselineした。続く指示「開発用のMSIXでOK」「外部ブロッカーの情報はない」により、初回公開はWindows unsigned ZIP、MSIXはnon-public development mechanism、macOS production deliveryは現版scope外へ改版した。
 
 ## Context
 
 現行repositoryで実装・検証済みの配布経路はWindows 11 x64向け.NET 10 self-contained unsigned ZIPとSHA-256 sidecarだけである。利用者はZIPとsidecarの取得、hash比較、展開、EXE起動を手作業で行う。macOS publish/package/sign/notary/launchのproduction証跡は存在しない。[ADR-0013](0013-windows-only-public-release.md)、[`README.md`](../../../README.md)、[`scripts/publish-windows.ps1`](../../../scripts/publish-windows.ps1)、[`WindowsPublishPackageTests.cs`](../../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs)
 
-要求所有者はWindowsとmacOSのセットアップを、setup scriptまたはinstallerによる短い手順へ簡素化するよう指示した。現行のengineering用PowerShellはPowerShell 7+を要求するため、end-user setup scriptをprimary pathにすると新しい利用者前提が増える。OS標準UIを使うinstaller/packageをprimary pathとする。
+要求所有者は当初WindowsとmacOSのsetup簡素化を指示した。その後、2026-09-04にdevelopment MSIXまでを採用し、外部production入力なしで初回公開を進めるようscopeを改版した。現行のengineering用PowerShellはPowerShell 7+を要求するため、development MSIXをend-user primary pathにはしない。
 
 .NET self-contained publishは対象端末への.NET runtime事前installを不要にするが、RID別artifactとOS native dependencyの検証は必要である。[Microsoft Learn: .NET application publishing](https://learn.microsoft.com/dotnet/core/deploying/)、[RID catalog](https://learn.microsoft.com/dotnet/core/rid-catalog)
 
@@ -24,26 +26,26 @@ macOS直接配布は`.app` bundle、Developer ID、hardened runtime、secure tim
 
 ## Decision
 
-1. 対応platformと配布形式の後方互換追加であるため、製品candidateをSemVer MINORの`1.1.0`、要求文書をv4.2とする。[ADR-0014](0014-product-versioning.md)、[`version-management.md`](../version-management.md)
-2. Windowsのprimary artifactはGitHub Releasesから直接配布する`StudyReportEvaluator-win-x64.msix`とする。Microsoft Store submissionは今回追加しない。
-3. Windows MSIXはproduction-trusted certificateで署名・timestampし、clean Windows 11 x64でinstall、launch、upgrade、repair、uninstallを実測した場合だけ正式配布する。self-signed certificateと、Publisher末尾に固定marker`OID.2.25.311729368913984317654407730594956997722=1`を持つWindows 11開発専用unsigned packageは`PASS_MECHANISM`に限定する。unsigned packageはsigned packageと別identityにし、管理者PowerShellの`Add-AppxPackage -AllowUnsigned`による全ユーザーinstallだけで試験し、一般利用者導線へ含めない。
-4. macOSのprimary artifactは`StudyReportEvaluator-osx-arm64.dmg`と`StudyReportEvaluator-osx-x64.dmg`を別々に作る。universal binaryやRosettaをnative architecture証跡の代わりにしない。
-5. 各DMGは.NET 10 self-contained `.app`、固定SDKと互換なbundled Copilot CLI、public documentationを含む。Developer ID signing、hardened runtime、notarization、app/DMGへのstapling、quarantine付きclean launchを通過した場合だけ正式配布する。
+1. 初回公開前の製品candidateを`0.8.0`、要求文書をv4.3とする。初回公開後に対応platformや配布形式を後方互換追加する場合はSemVer MINORを適用する。[ADR-0014](0014-product-versioning.md)、[`version-management.md`](../version-management.md)
+2. Windowsの初回public artifactはGitHub Releasesから直接配布する`StudyReportEvaluator-win-x64.zip`とSHA-256 sidecarとする。Microsoft Store submissionは追加しない。
+3. Windows MSIXはPublisher末尾に固定marker`OID.2.25.311729368913984317654407730594956997722=1`を持つWindows 11開発専用unsigned packageだけを`PASS_MECHANISM`として検証する。signed packageと別identityにし、一般利用者導線とGitHub Release assetへ含めない。installを追加検証する場合は使い捨て環境の管理者PowerShellから`Add-AppxPackage -AllowUnsigned`を使い、初回公開のrequired gateにはしない。
+4. macOSのpublish／bundle／sign／notary script foundationは保持するが、`StudyReportEvaluator-osx-arm64.dmg`と`StudyReportEvaluator-osx-x64.dmg`を現版のpublic artifactまたはrequired acceptanceとしない。universal binaryやRosettaをnative architecture証跡の代わりにしない。
+5. 将来macOSを公開scopeへ追加する場合だけ、.NET 10 self-contained `.app`、固定SDKと互換なbundled Copilot CLI、Developer ID signing、hardened runtime、notarization、app/DMGへのstapling、quarantine付きclean launchをrequired gateとする。
 6. macOS bundle identifierの既定値を`com.github.dahatake.study-report-evaluator`とする。Apple Team ID、Developer ID identity、notarization credentialは推測せずprotected secret storeから供給する。
-7. Windows package Identity Name、Publisher、DisplayNameはproduction signing identityと一致させる。Publisherを仮値のままproduction artifactへ入れない。
-8. end-user primary手順はWindowsを「MSIXを開く→Install→起動」、macOSを「DMGを開く→Applicationsへdrag→起動」の各3操作以内とする。PowerShell、shell、`chmod`、`xattr`、Gatekeeper無効化を要求しない。
-9. engineering用publish/package/verify scriptは維持するが、end-user primary pathとして案内しない。
-10. 現行Windows ZIPは移行中のregression/fallbackとして保持できる。MSIX production gate成功後にprimaryから外し、署名済みinstallerと混同しない。
+7. Windows development MSIXのIdentity Name、Publisher、DisplayNameはtest-only値とし、production identityと表示しない。
+8. end-user primary手順はWindows ZIPとsidecarの取得、SHA-256確認、展開、apphost起動とする。development MSIX、shell setup、未実測macOS手順を一般利用者へ案内しない。
+9. engineering用publish/package/verify scriptは維持するが、development MSIX scriptをend-user primary pathとして案内しない。
+10. Windows ZIPは初回public primary artifactであり、unsigned、non-installer、SmartScreen reputation非保証を明示する。
 11. Linux、Windows Arm64、macOS 13以前、universal macOS artifact、Mac App Store、Microsoft Storeは今回の対応対象外とする。
-12. current public claimは各artifactの`PASS_PRODUCTION`証跡が揃うまでADR-0013のWindows-only/unsigned ZIP境界を維持する。framework supportやcross-publishだけでREADMEを対応済みに変更しない。
+12. current public claimはADR-0013のWindows-only/unsigned ZIP境界とする。development MSIX、framework support、macOS cross-publishを対応済み表示またはpublic assetへ変換しない。
 
 ## Artifact contract
 
 | Platform | Artifact | Required evidence |
 |---|---|---|
-| Windows 11 x64 | `StudyReportEvaluator-win-x64.msix` + `.sha256` | trusted signature、timestamp、manifest/version/RID、package integrity、clean install/launch/upgrade/repair/uninstall、bundled CLI handshake |
-| macOS ARM64 | `StudyReportEvaluator-osx-arm64.dmg` + `.sha256` | native ARM64、Developer ID、hardened runtime、notary log、app/DMG staple、quarantine launch、bundled CLI handshake |
-| macOS x64 | `StudyReportEvaluator-osx-x64.dmg` + `.sha256` | native x64。Rosetta結果を代用しない。他はARM64と同じ |
+| Windows 11 x64 public | `StudyReportEvaluator-win-x64.zip` + `.sha256` | `PASS_REQUIRED`。self-contained、safe layout、version、package hash、clean extract/launch、bundled CLI identity |
+| Windows 11 x64 development | `StudyReportEvaluator-win-x64.unsigned.test.msix` + `.sha256` | `PASS_MECHANISM`のみ。manifest/version/RID、block map、package integrity、bundled CLI、policy negative、cleanup。public assetにしない |
+| macOS source foundation | public artifactなし | static contractのみ。将来のnative/sign/notary evidenceなしに対応表示しない |
 
 macOS 14、15、26はvendor support matrixから得た試験候補であり、本製品の対応表示ではない。exact OS build × architectureの実測行だけを公開support matrixへ載せる。[Avalonia: Supported platforms](https://docs.avaloniaui.net/docs/supported-platforms)
 
@@ -60,12 +62,10 @@ Copilot CLIを含むnested Mach-Oへの署名はfile bytesを変更し得るた�
 
 Appleが署名後のbundle変更をinvalid signatureとして扱うため、manifest更新後にouter bundleを署名する。[Apple: Resolving common notarization issues](https://developer.apple.com/documentation/security/resolving-common-notarization-issues)
 
-## External prerequisites
+## Future macOS external prerequisites（現版required release blockerではない）
 
 | Input | Owner role | 未提供時 |
 |---|---|---|
-| Windows production signing identity | Security / Release owner | Windows production releaseを`BLOCKED_EXTERNAL` |
-| Windows manifest Publisher / Identity | Release engineering / Signing administrator | placeholder検出でpackage failure |
 | Developer ID Application identity | Apple Account Holder / Release engineering | macOS signingを`BLOCKED_EXTERNAL` |
 | Notarization credential | Apple Account Holder / Release engineering | notarizationを`BLOCKED_EXTERNAL` |
 | approved visual assets | Product / Design owner | production packageを`BLOCKED_EXTERNAL` |
@@ -88,17 +88,17 @@ Appleが署名後のbundle変更をinvalid signatureとして扱うため、mani
 
 ### Positive
 
-- 利用者のprimary setupをOS標準UIだけの3操作以内へ短縮できる。
+- 外部production signing入力なしで、検証済みWindows ZIPを初回公開できる。
 - .NET、Copilot CLI、Officeの別installを要求しない既存契約を維持できる。
-- OS package trust、repair、uninstall、updateの検証をrelease gateへ統合できる。
-- macOS architectureと実測OS buildを明示し、framework一般論を製品保証へ変換しない。
+- development MSIX mechanismをproduction trustや一般配布と混同しない。
+- macOS framework一般論を製品保証へ変換しない。
 
 ### Trade-offs
 
-- trusted Windows signingとApple Developer ID/notarizationにはrepository外のidentity、credential、運用費用が必要である。
-- x64/ARM64の別artifact、別test host、別証跡を保守する。
-- MSIX container下のchild process、login state、user-selected workbook I/Oを本製品で実測する必要がある。成立しない場合はsigned per-user EXE installerを別ADRで選定する。
-- production credentialとmacOS clean hostsがない環境では全taskを実装しても正式公開を完了できない。
+- Windows ZIPはinstaller、Publisher identity、SmartScreen reputationを提供しない。
+- 利用者がZIPとsidecarを取得し、hash確認と展開を行う。
+- development MSIXの標準App Installer、non-admin install、production trustを保証しない。
+- macOS packageは現版で提供しない。
 
 ## Rejected alternatives
 
@@ -122,13 +122,12 @@ apphost、native dependency、bundled CLI、署名後manifestの統合証跡が�
 
 ## Transition and validation
 
-1. v4.2 requirement、architecture、detailed design、traceability、claim ledger、system testsを先に同期する。
-2. Windows MSIXとmacOS `.app`/DMG mechanismを実装し、test-only結果を`PASS_MECHANISM`へ限定する。
-3. CIはsecretなしのbuild/package structureを検査し、protected release workflowだけがproduction signing/notarizationを行う。
-4. claimed platform matrixのrequired行に`NOT_RUN`、`BLOCKED_EXTERNAL`、`FAIL`があれば、そのartifactとsupport claimを公開しない。
-5. package-installed appでinput不変、checkpoint/resume、final output、bundled CLI、privacy regressionを再実行する。
-6. public candidateをfresh downloadしてtrust/install/launch/uninstallを再確認した後だけREADME primary pathを切り替える。
+1. v4.3 requirement、architecture、detailed design、traceability、claim ledger、system testsを先に同期する。
+2. Windows ZIP regressionとdevelopment MSIX mechanismを実行し、後者を`PASS_MECHANISM`へ限定する。
+3. CIはsecretなしでbuild、test、ZIP、development MSIXを検査する。
+4. release matrixのWindows ZIP `publish=true`行が`PASS_REQUIRED`でなければ公開しない。development MSIXは`publish=false`とする。
+5. public ZIPをfresh downloadしてhash、layout、version、bundled CLI、clean launchを再確認した後だけ実在URLを文書へ記載する。
 
 ## Result
 
-**APPROVED — IMPLEMENTATION IN PROGRESS.** Windows MSIXとmacOS RID別DMGをtarget deliveryとして採用する。ただし本ADRだけではinstaller、署名、notarization、macOS supportを実装済みまたは公開済みにしない。各platformの`PASS_PRODUCTION`証跡が揃うまで、現行public claimはWindows unsigned ZIPだけである。
+**APPROVED — V4.3 SCOPE.** 初回public artifactはWindows 11 x64 unsigned ZIPとsidecar。Windows MSIXはnon-public development `PASS_MECHANISM`、macOSはsource/static contractのみとする。development packageや未実測platformを公開済み・対応済みと表示しない。

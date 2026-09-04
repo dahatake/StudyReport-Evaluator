@@ -103,7 +103,9 @@ public sealed class WindowsInstallerPackageTests
             .GetProperty("dependencies")
             .GetProperty("net10.0")
             .GetProperty("Microsoft.Windows.SDK.BuildTools");
-        Assert.Equal("[10.0.26100.4948]", dependency.GetProperty("requested").GetString());
+        Assert.Equal(
+            "[10.0.26100.4948, 10.0.26100.4948]",
+            dependency.GetProperty("requested").GetString());
         Assert.Equal("10.0.26100.4948", dependency.GetProperty("resolved").GetString());
         Assert.Equal(
             "o0T4CVaumDjPNNijKiM7p25vHKdyKqYvaVVLgQO02KTOoUDlgMYJVUQAXn1IG0G9/ZsdZ+bdgWxgQsrO/b37qw==",
@@ -125,6 +127,9 @@ public sealed class WindowsInstallerPackageTests
         Assert.Contains("Get-AuthenticodeSignature", source, StringComparison.Ordinal);
         Assert.Contains("O=Microsoft Corporation", source, StringComparison.Ordinal);
         Assert.Contains("System.Drawing.Common", source, StringComparison.Ordinal);
+        Assert.Contains("[AllowEmptyString()][string] $Value", source, StringComparison.Ordinal);
+        Assert.Contains("$versionResult = & $versionTool show -Json", source, StringComparison.Ordinal);
+        Assert.Contains("$packageVersion = \"$productVersion.0\"", source, StringComparison.Ordinal);
         Assert.Contains("Test-OwnedOutputSetValid", source, StringComparison.Ordinal);
         Assert.Contains("Assert-ExpectedPolicyFailure", source, StringComparison.Ordinal);
         Assert.Contains("INVALID_UNSIGNED_MARKER_REJECTED_WITH_OUTPUT_UNCHANGED", source, StringComparison.Ordinal);
@@ -136,13 +141,21 @@ public sealed class WindowsInstallerPackageTests
         Assert.Contains("PASS_MECHANISM", source, StringComparison.Ordinal);
         Assert.Contains("BLOCKED_EXTERNAL", source, StringComparison.Ordinal);
         Assert.Contains("NOT_RUN_REQUIRES_ELEVATED_DISPOSABLE_WINDOWS_11_HOST", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProductVersion = '0.8.0'", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("version = '0.8.0.0'", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Add-AppxPackage", source, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Import-Certificate", source, StringComparison.OrdinalIgnoreCase);
 
         string workflow = File.ReadAllText(Path.Combine(repositoryRoot, ".github", "workflows", "ci.yml"));
+        Assert.Contains("actions/setup-dotnet@v6", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("actions/setup-dotnet@v4", workflow, StringComparison.Ordinal);
+        Assert.Contains("Run product version tool self-tests", workflow, StringComparison.Ordinal);
+        Assert.Contains(".\\dev\\version.tests.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("Build and validate unsigned MSIX mechanism", workflow, StringComparison.Ordinal);
+        Assert.Contains("id: unsigned-msix", workflow, StringComparison.Ordinal);
         Assert.Contains(".\\scripts\\test-windows-msix-unsigned.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("StudyReportEvaluator-win-x64.unsigned.test.evidence.json", workflow, StringComparison.Ordinal);
+        Assert.Contains("steps.unsigned-msix.outcome == 'success'", workflow, StringComparison.Ordinal);
     }
 
     [Fact]

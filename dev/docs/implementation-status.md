@@ -2,45 +2,51 @@
 
 | 項目 | 値 |
 |---|---|
-| Current requirement | `docs/requirements-definition.md` v4.2 |
-| Scope ADR | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence） |
-| Product version | `1.1.0` candidate — `Directory.Build.props`の明示`VersionPrefix` |
+| Current requirement | `docs/requirements-definition.md` v4.3 |
+| Scope ADR | ADR-0012（機能）/ ADR-0015（Windows ZIP public / development MSIX）/ ADR-0013（Windows public evidence） |
+| Product version | `0.8.0` candidate — `Directory.Build.props`の明示`VersionPrefix` |
 | Version management | [`version-management.md`](version-management.md) / [`dev/version.ps1`](../version.ps1) / ADR-0014 |
-| Source baseline | `feature/setup-simplification-20260903`、base `5a1d1ebe5e6dcc5d934f959e58ac2582f9d9c326`。exact release commitはtag作成時に確定する |
-| Public release status | `IMPLEMENTATION_IN_PROGRESS — Windows/macOS delivery expansion` |
-| Release build | PASS、warning 0 / error 0（2026-09-03実行） |
-| Focused UI validation | `MainWindowTests` 8/8 PASS（2026-09-02実行） |
-| Bundled CLI validation | `CopilotClientFactoryTests` 14/14 PASS（2026-09-02実行） |
-| Documentation contract | 14/14 PASS（2026-09-03実行。root `SystemTest-prompt.md`、21 scenario、TR-01〜TR-24、canonical sample契約を含む） |
-| Screenshot generation | 7画像再生成、1440×1050、test 1/1 PASS、敵対review finding 0（2026-09-02実行） |
-| Windows package integration | publish/package/展開/resolver/clean launch/repackage、全class 3/3 PASS（2026-09-02実行） |
-| Independent adversarial review | task別reviewと最終3観点reviewを実施。再現可能な指摘を反映後、文書＋package契約16/16 PASS |
-| B-07 focused validation | canonical `sample/SampleReport.xlsx` exact path・identity・structure・input不変 1/1 PASS、synthetic fixture isolation 1/1 PASS（2026-09-03実行） |
-| Canonical technical E2E | 530行、2,650 normal evaluations、5 references、535 checkpoint updates、no-network primary application path 1/1 PASS（2026-09-03実行） |
-| 10-person system smoke | fixed 10-person fixtureのidentity/formula canaryとuninterrupted/interruption-resume同値性 2/2 PASS（2026-09-03 full run） |
-| Synthetic 531-row journey | fixed-seed local atomic journeyとdurable new/resume同値性 2/2 PASS（2026-09-03 full run） |
-| Previous functional baseline | Release 670/670 PASS、Core 190/190・App 480/480、failed/error/not-executed 0（2026-09-03、v1.0.1 recovery tree。1.1.0 delivery証跡へ流用しない） |
-| Optional live Copilot | `PASS` — fixed synthetic payload、required substitute false（2026-09-02実行） |
-| Optional external recalculation | `MIXED_ADVISORY` — syntheticはMicrosoft Excel 16.0でopen/recalculate/save・process cleanupまで`PASS`。canonical output copyは20,672 formula error 0だが、Excel保存時に生成されたoptional `/xl/calcChain.xml`だけに`Sem_MissingIndexedElement`が発生して`FAILED_ADVISORY`（2026-09-03実行） |
-| Version tool validation | show/verify/set/bump/dry-run/invalid rejection、複数Git pathでのtag/clean検証、14 assertions PASS（2026-09-03実行） |
-| Audit date | 2026-09-03 |
+| Source baseline | `fix/publication-readiness-20260904`、HEAD `1fdc9ab40c9e605fa6a49a131e232563d8b351e7`のbaseline checkpoint前working tree。exact release commitはtag作成時に確定する |
+| Public release status | `UNRELEASED_CANDIDATE — Windows ZIP、公開済みartifactなし` |
+| Release build | PASS、warning 0 / error 0（2026-09-04 B1-16実行） |
+| Baseline focused validation | locked restore、version self-test 14 assertions、DocumentationContractTests 14/14、WindowsInstallerPackageTests 5/5、MacOsPublishPackageTests 2/2、`git diff --check`が全てPASS（2026-09-04 B1-16実行） |
+| Previous focused UI baseline | `MainWindowTests` 8/8 PASS（2026-09-02実行。current candidate full gateへ未算入） |
+| Previous bundled CLI baseline | `CopilotClientFactoryTests` 14/14 PASS（2026-09-02実行。current candidate full gateへ未算入） |
+| Documentation contract | 14/14 PASS（2026-09-04実行。root `SystemTest-prompt.md`、25 scenario、TR-01〜TR-29、v4.3 canonical sample契約を含む） |
+| Previous screenshot baseline | 7画像再生成、1440×1050、test 1/1 PASS、敵対review finding 0（2026-09-02実行。current candidate full gateへ未算入） |
+| Previous Windows ZIP integration baseline | publish/package/展開/resolver/clean launch/repackage、全class 3/3 PASS（2026-09-02実行。current candidate gateへ流用しない） |
+| B1-16 adversarial review | RealData evidence contractの曖昧性を計画へ反映。source identity assertionはPASS、opt-in E2E／Live AIは非実行。未解決の再現可能なblocker/high finding 0 |
+| Previous canonical sample baseline | canonical `sample/SampleReport.xlsx` exact path・identity・structure・input不変 1/1 PASS、synthetic fixture isolation 1/1 PASS（2026-09-03実行。current candidate full gateへ未算入） |
+| Previous canonical technical E2E baseline | 530行、2,650 normal evaluations、5 references、535 checkpoint updates、no-network primary application path 1/1 PASS（2026-09-03実行。current candidate full gateへ未算入） |
+| Previous 10-person system smoke baseline | fixed 10-person fixtureのidentity/formula canaryとuninterrupted/interruption-resume同値性 2/2 PASS（2026-09-03 full run。current candidate full gateへ未算入） |
+| Previous synthetic 531-row journey baseline | fixed-seed local atomic journeyとdurable new/resume同値性 2/2 PASS（2026-09-03 full run。current candidate full gateへ未算入） |
+| Previous functional baseline | Release 670/670 PASS、Core 190/190・App 480/480、failed/error/not-executed 0（2026-09-03、v1.0.1 recovery tree。現在の0.8.0 delivery証跡へ流用しない） |
+| Previous optional live Copilot evidence | `PASS` — fixed synthetic payload、required substitute false（2026-09-02実行。current required gateへ算入しない） |
+| Previous optional external recalculation evidence | `MIXED_ADVISORY` — syntheticはMicrosoft Excel 16.0でopen/recalculate/save・process cleanupまで`PASS`。canonical output copyは20,672 formula error 0だが、Excel保存時に生成されたoptional `/xl/calcChain.xml`だけに`Sem_MissingIndexedElement`が発生して`FAILED_ADVISORY`（2026-09-03実行。current required gateへ算入しない） |
+| Version tool validation | show/verify/set/bump/dry-run/invalid rejection、複数Git pathでのtag/clean検証、14 assertions PASS（2026-09-04実行） |
+| Development MSIX mechanism | `PASS_MECHANISM` — package/unpack/hash/policy/cleanup、0.8.0.0、install未実行・非required（2026-09-04実行） |
+| macOS static source contract | 2/2 PASS — unsigned bundle最小contractとproduction trust順序のsource検証。production artifact／署名／公証の実測ではない（2026-09-04 B1-16実行） |
+| Audit date | 2026-09-04 |
 
-現在のdelivery実装は[`20260903-0923-windows-macos-setup-simplification-plan.md`](../../work/20260903-0923-windows-macos-setup-simplification-plan.md)と[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に従う。未公開`v1.0.1` recoveryは`1.1.0`へcarry forwardし、`v1.0.1` tag／Releaseを作成しない。Windows MSIX、macOS package、production signing/notarization、clean-machine証跡は本節の過去test結果から導出せず、完了までは`NOT_RUN`または`BLOCKED_EXTERNAL`である。
+現在のdelivery実装は[`20260904-publication-remediation-plan.md`](../../work/20260904-publication-remediation-plan.md)と[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に従う。未公開`v1.0.1` recoveryと`1.1.0` delivery candidateは`0.8.0`へ再baselineし、過去の1.x候補を公開版として扱わない。Windows public artifactはunsigned ZIP、development MSIXはnon-public `PASS_MECHANISM`、macOS production deliveryは現版scope外である。
 
-2026-09-03のdelivery変更前working treeを再buildしたfull solution testは670件中670件成功した。ユーザーが配置した`sample/SampleReport.xlsx`だけをcanonical sampleとし、exact path、470,806 bytes、SHA-256 `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA`、read-only検査前後のidentity不変を確認した。opt-in technical E2Eはnetwork/live AIを使わず530行を完走した。これらは機能regressionの比較baselineであり、1.1.0のMSIX／macOS／signing／notarization／quarantine結果ではない。delivery変更後は全required regressionを再実行する。
+2026-09-03のdelivery変更前working treeを再buildしたfull solution testは670件中670件成功した。ユーザーが配置した`sample/SampleReport.xlsx`だけをcanonical sampleとし、exact path、470,806 bytes、SHA-256 `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA`、read-only検査前後のidentity不変を確認した。opt-in technical E2Eはnetwork/live AIを使わず530行を完走した。これらは機能regressionの比較baselineであり、0.8.0のMSIX／macOS／signing／notarization／quarantine結果ではない。delivery変更後は全required regressionを再実行する。
 
-## v4.2 delivery transition
+2026-09-04のB1-16は現在のworking treeでlocked restore、Release build、version／documentation／development MSIX／macOS static source contractだけをfocused再検証した。Windows ZIP生成・展開・clean launch、opt-in RealData technical E2E、full required regressionは実行していないため、後続gateまで過去結果をcurrent candidateのPASSへ流用しない。
+
+## v4.3 delivery status
 
 | Surface | Current status | Completion evidence |
 |---|---|---|
-| Windows unsigned ZIP regression | `PASS_REQUIRED`（delivery変更前baseline。再実行予定） | publish/package/hash/extract/clean launch |
-| Windows MSIX mechanism | `NOT_RUN` | manifest/layout/test-sign/install/launch/repair/uninstall |
-| Windows production trust | `BLOCKED_EXTERNAL` | trusted signature/timestamp + clean target verification |
-| macOS `osx-arm64` publish/bundle | `NOT_RUN` | native bundle/Info.plist/mode/CLI manifest |
-| macOS `osx-x64` publish/bundle | `NOT_RUN` | native bundle/Info.plist/mode/CLI manifest |
-| macOS Developer ID/notarization | `BLOCKED_EXTERNAL` | nested/outer sign, notary log, app/DMG staple |
-| macOS clean-machine matrix | `BLOCKED_EXTERNAL` | exact OS build × native architecture quarantine launch |
-| 3-operation public setup docs | `NOT_RUN` | public artifact re-download後のdocumentation contract |
+| Windows public ZIP regression | `NOT_RUN_CURRENT_CANDIDATE` | publish/package/hash/extract/clean launchを0.8.xで再実行 |
+| Full required regression | `NOT_RUN_CURRENT_CANDIDATE` | Core/App full suiteとrequired system smokeを後続gateで再実行 |
+| Canonical technical E2E | `NOT_RUN_CURRENT_CANDIDATE` | opt-in no-network E2Eを後続full gateで再実行 |
+| Windows development MSIX mechanism | `PASS_MECHANISM` | manifest/version/RID、unpack、block map、payload、CLI、sidecar、policy negative、cleanup |
+| Development MSIX install/launch | `NOT_RUN_NOT_REQUIRED` | 現版のrequired gateではなく、一般配布しない |
+| macOS source foundation static contract | `PASS_REQUIRED` | `MacOsPublishPackageTests` 2/2。production signing／notary evidenceではない |
+| macOS production delivery | `EXCLUDED_CURRENT_SCOPE` | public artifact／support claimなし |
+| Windows ZIP public setup docs | `PASS_REQUIRED` | 14/14 documentation contract（公開URLはRelease後に追加） |
+| Release matrix/workflow | `NOT_RUN` | schema、validator、workflow contract、candidate re-download |
 
 ## 実装済みsurface
 
@@ -48,21 +54,21 @@
 |---|---|---|
 | `.xlsx` classification / immutable input | [`FileFormatClassifier.cs`](../../src/StudyReportEvaluator.App/Workbooks/Intake/FileFormatClassifier.cs)、[`InputSnapshotService.cs`](../../src/StudyReportEvaluator.App/Workbooks/Intake/InputSnapshotService.cs) | [`FileFormatClassifierTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Workbooks/Intake/FileFormatClassifierTests.cs)、[`InputSnapshotServiceTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Workbooks/Intake/InputSnapshotServiceTests.cs) |
 | picker / mapping | [`InputView.axaml.cs`](../../src/StudyReportEvaluator.App/Views/InputView.axaml.cs)、[`ColumnMappingSuggester.cs`](../../src/StudyReportEvaluator.App/Workbooks/Mapping/ColumnMappingSuggester.cs)、[`ColumnMappingValidator.cs`](../../src/StudyReportEvaluator.App/Workbooks/Mapping/ColumnMappingValidator.cs) | [`InputViewTests.cs`](../../tests/StudyReportEvaluator.App.Tests/UI/InputViewTests.cs)、[`ColumnMappingSuggesterTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Workbooks/Mapping/ColumnMappingSuggesterTests.cs) |
-| v4.1 definition / allocation / snapshot | [`Domain`](../../src/StudyReportEvaluator.Core/Domain/)、[`ScoringAllocationCalculator.cs`](../../src/StudyReportEvaluator.Core/Scoring/ScoringAllocationCalculator.cs)、[`QuantificationDefinitionValidator.cs`](../../src/StudyReportEvaluator.Core/Validation/QuantificationDefinitionValidator.cs) | [`Domain tests`](../../tests/StudyReportEvaluator.Core.Tests/Domain/)、[`Scoring tests`](../../tests/StudyReportEvaluator.Core.Tests/Scoring/)、[`QuantificationDefinitionValidatorTests.cs`](../../tests/StudyReportEvaluator.Core.Tests/Validation/QuantificationDefinitionValidatorTests.cs) |
+| v4 domain / allocation / snapshot | [`Domain`](../../src/StudyReportEvaluator.Core/Domain/)、[`ScoringAllocationCalculator.cs`](../../src/StudyReportEvaluator.Core/Scoring/ScoringAllocationCalculator.cs)、[`QuantificationDefinitionValidator.cs`](../../src/StudyReportEvaluator.Core/Validation/QuantificationDefinitionValidator.cs) | [`Domain tests`](../../tests/StudyReportEvaluator.Core.Tests/Domain/)、[`Scoring tests`](../../tests/StudyReportEvaluator.Core.Tests/Scoring/)、[`QuantificationDefinitionValidatorTests.cs`](../../tests/StudyReportEvaluator.Core.Tests/Validation/QuantificationDefinitionValidatorTests.cs) |
 | Prompt / selected-row payload | [`Prompting`](../../src/StudyReportEvaluator.Core/Prompting/) | [`Prompting tests`](../../tests/StudyReportEvaluator.Core.Tests/Prompting/) |
 | reference / normal / special / similarity Copilot operations | [`Copilot`](../../src/StudyReportEvaluator.App/Copilot/) | [`Copilot fake-runtime tests`](../../tests/StudyReportEvaluator.App.Tests/Copilot/) |
 | score / formula AST | [`Scoring`](../../src/StudyReportEvaluator.Core/Scoring/)、[`Formulas`](../../src/StudyReportEvaluator.Core/Formulas/) | [`Scoring tests`](../../tests/StudyReportEvaluator.Core.Tests/Scoring/)、[`Formula tests`](../../tests/StudyReportEvaluator.Core.Tests/Formulas/) |
 | Config / References / Results / Run / partial checkpoint / atomic output | [`Workbooks`](../../src/StudyReportEvaluator.App/Workbooks/)、[`Workflow`](../../src/StudyReportEvaluator.App/Workflow/) | [`Workbook tests`](../../tests/StudyReportEvaluator.App.Tests/Workbooks/)、[`Workflow tests`](../../tests/StudyReportEvaluator.App.Tests/Workflow/) |
 | 4-step UI / keyboard / 200% | [`Views`](../../src/StudyReportEvaluator.App/Views/)、[`ViewModels`](../../src/StudyReportEvaluator.App/ViewModels/) | [`UI headless tests`](../../tests/StudyReportEvaluator.App.Tests/UI/) |
 | Windows x64 unsigned ZIP / bundled CLI regression | [`publish-windows.ps1`](../../scripts/publish-windows.ps1)、[`package-windows.ps1`](../../scripts/package-windows.ps1)、[`CopilotClientFactory.cs`](../../src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs) | [`WindowsPublishPackageTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs)、[`CopilotClientFactoryTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Copilot/CopilotClientFactoryTests.cs) |
-| Windows MSIX | planned `eng/packaging/windows` + `scripts/package-windows-msix.ps1` | planned installer mechanism/production tests |
-| macOS RID別DMG | planned `eng/packaging/macos` + macOS publish/package scripts | planned bundle/sign/notary/quarantine tests |
+| Windows development MSIX | [`eng/packaging/windows`](../../eng/packaging/windows/)、[`package-windows-msix.ps1`](../../scripts/package-windows-msix.ps1)、[`test-windows-msix-unsigned.ps1`](../../scripts/test-windows-msix-unsigned.ps1) | [`WindowsInstallerPackageTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsInstallerPackageTests.cs)、mechanism evidence |
+| macOS source foundation | [`eng/packaging/macos`](../../eng/packaging/macos/)、macOS publish/package/sign/notary scripts | [`MacOsPublishPackageTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/MacOsPublishPackageTests.cs) static contract |
 
 詳細なAC/TR対応は[`traceability.md`](traceability.md)を参照してください。
 
 ## Historical v3 gate record
 
-以下はv3 gate後に閉じたgapの履歴であり、現在のv4.1 release acceptanceや今回のtest結果を表さない。
+以下はv3 gate後に閉じたgapの履歴であり、現在のv4.3 release acceptanceや今回のtest結果を表さない。
 
 ### IMPL-GAP-001 — CLOSED: Custom Promptのrun開始前再検査
 

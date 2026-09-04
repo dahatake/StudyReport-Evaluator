@@ -37,7 +37,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.400
           cache: true
@@ -63,11 +63,16 @@ jobs:
         shell: pwsh
         run: pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify
 
+      - name: Run product version tool self-tests
+        shell: pwsh
+        run: pwsh.exe -NoLogo -NoProfile -File .\dev\version.tests.ps1
+
       - name: Build Release
         shell: pwsh
         run: dotnet build .\StudyReportEvaluator.slnx --configuration Release --no-restore
 
       - name: Run deterministic tests
+        id: deterministic-tests
         shell: pwsh
         run: >-
           dotnet test .\StudyReportEvaluator.slnx
@@ -80,6 +85,7 @@ jobs:
           --logger "console;verbosity=minimal"
 
       - name: Build and validate unsigned MSIX mechanism
+        id: unsigned-msix
         shell: pwsh
         run: .\scripts\test-windows-msix-unsigned.ps1
 
@@ -101,16 +107,16 @@ jobs:
           }
 
       - name: Upload test results
-        if: always()
+        if: ${{ always() && steps.deterministic-tests.outcome != 'skipped' }}
         uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ github.run_id }}
           path: TestResults/ci/**/*.trx
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
       - name: Upload unsigned MSIX mechanism evidence
-        if: always()
+        if: ${{ steps.unsigned-msix.outcome == 'success' }}
         uses: actions/upload-artifact@v7
         with:
           name: unsigned-msix-mechanism-${{ github.run_id }}
@@ -136,7 +142,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.400
           cache: true

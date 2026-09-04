@@ -1,13 +1,14 @@
-# Requirement traceability — v4.2 delivery expansion baseline
+# Requirement traceability — v4.3 Windows ZIP release baseline
 
 | 項目 | 値 |
 |---|---|
-| Requirement | `docs/requirements-definition.md` v4.2 |
+| Requirement | `docs/requirements-definition.md` v4.3 |
 | Decision | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence） |
 | Detailed design | `dev/docs/detailed-design.md` |
-| Plan | `work/20260901-v4-implementation-plan.md` |
-| Previous validation | delivery変更前 Release build warning/error 0、full 670/670 PASS（Core 190 / App 480）。1.1.0 delivery evidenceへ流用しない |
-| Current status | IMPLEMENTATION_IN_PROGRESS — platform delivery |
+| Plan | `work/20260904-publication-remediation-plan.md` |
+| Previous validation | delivery変更前 Release build warning/error 0、full 670/670 PASS（Core 190 / App 480）。現在の0.8.0 delivery evidenceへ流用しない |
+| Current focused validation | 2026-09-04 B1-16: locked restore、Release build 0 warning/error、version 14、documentation 14/14、development MSIX contract 5/5、macOS static contract 2/2、`git diff --check` PASS |
+| Current status | IMPLEMENTATION_IN_PROGRESS — B1-16 PASS。Windows ZIP full regression / release matrix / workflowは未実行 |
 
 この表の`PLANNED`は未実装をPASSと称しない。task完了後にproduction symbol、direct test、gate identityへ更新する。旧v3 traceabilityはGit履歴とADR-0011に保持する。
 
@@ -16,6 +17,7 @@
 | Status | Meaning |
 |---|---|
 | `PLANNED` | owner/file/testを割当済み。実装またはpassing evidenceは未確認 |
+| `NOT_RUN_CURRENT_CANDIDATE` | sourceと過去evidenceはあるが、現在のworking treeに対するrequired regressionを未実行 |
 | `PASS_REQUIRED` | production behaviorとdirect deterministic testが成功 |
 | `PASS_EXTERNAL` | credentialed／platform external testを実行して成功 |
 | `NOT_RUN_EXTERNAL_PREREQUISITE` | source/pipelineは存在するがrequired credential／runnerがなく実行していない |
@@ -23,9 +25,11 @@
 | `BLOCKED_REVIEW` | 再現したblocker/high review findingが未解決 |
 | `NOT_REQUIRED` | v4 scope外。不要性を一般化しない |
 | `BLOCKED_EXTERNAL` | required input/artifactがrepository外にあり、安全なlocal代替がない |
-| `PASS_MECHANISM` | test certificateまたはunsigned artifactでpackage mechanismだけが成功 |
+| `PASS_MECHANISM` | test certificateまたはunsigned artifactでpackage mechanismだけが成功。非公開であり、production readinessを意味しない |
 | `PASS_PRODUCTION` | production trust pathとclean target OSで成功 |
 | `MIXED_ADVISORY` | optional evidenceを実行し、PASSとFAILED_ADVISORYが混在。required gateへ算入しない |
+
+AC-024／AC-025とTR-26／TR-27の`PASS_REQUIRED`は、現版でrequiredなmacOS static source contract 2件の成功だけを表す。production artifact、署名、公証、clean-host実行は現版scope外であり、`PASS_PRODUCTION`を表さない。
 
 ## Acceptance criteria mapping
 
@@ -50,15 +54,15 @@
 | AC-017 | exact warning text and nonblocking | U-04 | warning/accessibility tests | PASS_REQUIRED |
 | AC-018 | `--input`, repeated `--prompt`, explicit apply, no auto-run | L-01/U-02 | parser/startup/UI tests | PASS_REQUIRED |
 | AC-019 | selected same-row payload and no-content logs | C-05/A-02..04/W-01 | capability/logger/canary tests | PASS_REQUIRED |
-| AC-020 | Windows legacy self-contained ZIP regression | P-01 | packaging/launch smoke | PASS_REQUIRED |
+| AC-020 | Windows legacy self-contained ZIP regression | P-01 | packaging/launch smoke | NOT_RUN_CURRENT_CANDIDATE |
 | AC-021 | unverified platform/installer/signing claim exclusion | P-01..04/D-01..05 | documentation/package contract | PASS_REQUIRED |
-| AC-022 | user/dev docs and current delivery evidence | D-01..05 | documentation/screenshot tests | PLANNED |
-| AC-023 | trusted Windows x64 MSIX install/launch | P-02 | MSIX mechanism + production clean-machine test | BLOCKED_EXTERNAL |
-| AC-024 | macOS RID別bundle/DMG structure | P-03 | macOS publish/bundle tests | PLANNED |
-| AC-025 | macOS signing/notary/staple order | P-03 | production sign/notary validation | BLOCKED_EXTERNAL |
-| AC-026 | OS標準UIの3操作setup | P-02/P-03/D-01..05 | install journey + docs contract | PLANNED |
-| AC-027 | install lifecycleでuser workbook保持 | P-02/P-03 | install/repair/uninstall/removal E2E | PLANNED |
-| AC-028 | protected release matrix/secret boundary | P-04 | workflow contract + release evidence | PLANNED |
+| AC-022 | user/dev docs and current delivery evidence | D-01..05 | documentation/screenshot tests | PASS_REQUIRED |
+| AC-023 | non-public unsigned Windows development MSIX mechanism | P-02 | manifest/package/unpack/hash/policy/cleanup | PASS_MECHANISM |
+| AC-024 | macOS source foundationを非公開で保持（source-only） | P-03 | macOS static source contract | PASS_REQUIRED |
+| AC-025 | macOS future production order contract（source-only） | P-03 | sign/notary source contract | PASS_REQUIRED |
+| AC-026 | Windows ZIP取得/hash/展開/起動docs | P-01/D-01..05 | ZIP journey + docs contract | PLANNED |
+| AC-027 | public/development packageにuser workbookを含めない | P-01/P-02 | package layout + input identity | PLANNED |
+| AC-028 | publish flag/status matrixとrelease boundary | P-04 | workflow contract + release evidence | PLANNED |
 
 ## Test requirement mapping
 
@@ -82,17 +86,17 @@
 | TR-16 | selected-row/literal/no-content | C-05/A-02..04/X-03 | PASS_REQUIRED |
 | TR-17 | 4-step UI/warning/progress/accessibility | U-01..04 | PASS_REQUIRED |
 | TR-18 | launch options/Prompt/no auto-run | L-01/U-02 | PASS_REQUIRED |
-| TR-19 | Windows publish/package/bundled CLI/clean launch | P-01 | PASS_REQUIRED |
-| TR-20 | unsigned ZIP/hash/safe layout/reproducibility | P-01 | PASS_REQUIRED |
+| TR-19 | Windows publish/package/bundled CLI/clean launch | P-01 | NOT_RUN_CURRENT_CANDIDATE |
+| TR-20 | unsigned ZIP/hash/safe layout/reproducibility | P-01 | NOT_RUN_CURRENT_CANDIDATE |
 | TR-21 | unsupported platform/installer/signing claim exclusion | P-01/D-01..05 | PASS_REQUIRED |
 | TR-22 | docs/screenshots | D-01..04 | PASS_REQUIRED |
 | TR-23 | fixed-seed new/resume E2E | E-01/E-02 | PASS_REQUIRED |
 | TR-24 | optional live/recalculation | E-03 advisory | MIXED_ADVISORY |
-| TR-25 | Windows MSIX mechanism/production lifecycle | P-02 | BLOCKED_EXTERNAL |
-| TR-26 | macOS RID publish/bundle | P-03 | PLANNED |
-| TR-27 | macOS sign/notary/quarantine | P-03 | BLOCKED_EXTERNAL |
-| TR-28 | package-installed application E2E | P-02/P-03 | PLANNED |
-| TR-29 | platform matrix/secret/public re-download | P-04 | PLANNED |
+| TR-25 | non-public unsigned Windows development MSIX mechanism | P-02 | PASS_MECHANISM |
+| TR-26 | macOS source foundation static contract（source-only） | P-03 | PASS_REQUIRED |
+| TR-27 | macOS future trust order static contract（source-only） | P-03 | PASS_REQUIRED |
+| TR-28 | Windows ZIP launch/input不変 + MSIX package exclusion | P-01/P-02 | PLANNED |
+| TR-29 | publish matrix/secret/public re-download | P-04 | PLANNED |
 
 ## Mandatory safety surfaces
 
@@ -114,7 +118,7 @@
 | Warning no dependency | U-04 | zero acknowledgement/gate state | PASS_REQUIRED |
 | No CLI auto-run | L-01 | runner/session call count 0 after startup | PASS_REQUIRED |
 | Bundled CLI pinning | A-01/P-01 | PATH fallback and hash mismatch rejected | PASS_REQUIRED |
-| Platform claims | P-01..04/D-01..05 | `PASS_PRODUCTION`のexact OS/archだけを対応表示し、未実測artifactを公開しない | PLANNED |
+| Platform claims | P-01..04/D-01..05 | Windows ZIPだけを対応表示し、development MSIX/macOSを公開しない | PASS_REQUIRED |
 
 ## Review protocol
 
@@ -136,8 +140,8 @@
 3. 全required test、Release build、package testがPASS。
 4. sample input identity不変。
 5. unresolved reproducible blocker/high finding 0。
-6. Windows legacy ZIP regression、trusted MSIX install/launch/repair/uninstall、bundled CLIがPASS。
-7. claimed macOS RIDのDeveloper ID/sign/notary/staple/quarantine launch/bundled CLIが`PASS_PRODUCTION`。
-8. Linux、Windows Arm64、macOS 13以前、未実測artifactを対応済みと表示していない。
+6. Windows ZIP regression、sidecar、bundled CLI、clean extract/launchが`PASS_REQUIRED`。
+7. development MSIXのpackage/unpack/hash/policy/cleanupが`PASS_MECHANISM`で、install/launchはrequiredでなく未実行、release assetと一般利用者手順から除外されている。
+8. macOS、Linux、Windows Arm64、production-signed MSIX、未実測artifactを対応済みと表示していない。
 9. optional live Copilot／spreadsheet recalculationをrequired evidenceへ算入しない。
-10. docsとscreenshotsがcurrent UIと実在するplatform artifactへ同期。
+10. docsとscreenshotsがcurrent UI、Windows ZIP公開境界、実在assetへ同期。

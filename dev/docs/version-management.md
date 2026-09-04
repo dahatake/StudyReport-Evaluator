@@ -9,13 +9,13 @@
 | tool self-test | [`dev/version.tests.ps1`](../version.tests.ps1) |
 | 変更履歴 | [`CHANGELOG.md`](../../CHANGELOG.md) |
 | Decision | [ADR-0014](adr/0014-product-versioning.md) |
-| 最終更新 | 2026-09-02 |
+| 最終更新 | 2026-09-04 |
 
 ## 1. 目的と境界
 
 この手順は、同じ製品版がsource、App/Core project、公開binary、Git tag、変更履歴で一貫するように管理するための正本です。製品版を変更しただけで、test済み、公開済み、署名済み、またはGitHub Release作成済みとは扱いません。
 
-現在のsource candidate版は`1.1.0`です。初期導入では.NET SDKの暗黙評価と同じ`1.0.0`を`Directory.Build.props`へ明示し、未公開release recoveryで`1.0.1`へ更新後、Windows/macOS delivery追加を§3.1のMINOR規則へ適用して`1.1.0`へ更新しました。[調査証拠](../../work/20260902-version-management-investigation-evidence.json)、[ADR-0015](adr/0015-windows-macos-installer-delivery.md)
+現在のsource candidate版は`0.8.0`です。初回公開前であるため、2026-09-04に製品候補を0.x系列へ再baselineしました。過去の`1.0.0`、`1.0.1`、`1.1.0`は公開済み版ではなく、経緯は[調査証拠](../../work/20260902-version-management-investigation-evidence.json)、[release recovery記録](../../work/20260903-v1.0.1-release-recovery-plan.md)、[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に保持します。
 
 2026-09-02の公開API調査では公開GitHub Releaseとremote tagはいずれも0件でした。この観測はprivate draftの不存在を証明しません。[調査レポート §2.2](../../work/20260902-version-management-investigation-report.md#22-実測した主なcommand)
 
@@ -74,8 +74,8 @@
 
 | Version | 現在値 | 更新条件 | Source |
 |---|---:|---|---|
-| 製品版 | `1.1.0` candidate | 本手順の公開契約差分 | [`Directory.Build.props`](../../Directory.Build.props) |
-| 要求文書版 | `4.2` | 要求baseline変更 | [`requirements-definition.md`](../../docs/requirements-definition.md) |
+| 製品版 | `0.8.0` candidate | 本手順の公開契約差分 | [`Directory.Build.props`](../../Directory.Build.props) |
+| 要求文書版 | `4.3` | 要求baseline変更 | [`requirements-definition.md`](../../docs/requirements-definition.md) |
 | QuantificationDefinition schema | `4.0` | canonical definition format変更 | [`CanonicalDefinitionSerializer.cs`](../../src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs) |
 | checkpoint schema | `1` | checkpoint payload format変更 | [`CheckpointEnvelope.cs`](../../src/StudyReportEvaluator.App/Workbooks/Checkpoint/CheckpointEnvelope.cs) |
 | Copilot runtime manifest schema | `1` | `copilot-runtime.json` format変更 | [`StudyReportEvaluator.App.csproj`](../../src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj) |
@@ -113,13 +113,13 @@ pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 show -Json
 まずdry-runします。
 
 ```powershell
-pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 set -Version 1.1.0-rc.1 -DryRun
+pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 set -Version 0.8.0-rc.1 -DryRun
 ```
 
 確認後に反映します。
 
 ```powershell
-pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 set -Version 1.1.0-rc.1
+pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 set -Version 0.8.0-rc.1
 ```
 
 書換えは同じdirectoryの一時fileを経由して`Directory.Build.props`へ置換します。`CHANGELOG.md`は利用者影響を人が確認して更新するため、自動編集しません。
@@ -168,12 +168,12 @@ App/Core DLLについて、次を検証します。
 公開用commitとtagを作成した後に実行します。
 
 ```powershell
-pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify -Tag v1.1.0 -RequireClean
+pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify -Tag v0.8.0 -RequireClean
 ```
 
 追加検証:
 
-- `CHANGELOG.md`に`## [1.1.0] - YYYY-MM-DD`がちょうど1件ある。
+- `CHANGELOG.md`に`## [0.8.0] - YYYY-MM-DD`がちょうど1件ある。
 - tag名が`v` + 製品版と完全一致する。
 - tagがlightweightではなくannotated tagである。
 - tagが現在のHEADを指す。
@@ -220,13 +220,13 @@ pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify -Tag v1.1.0 -RequireC
 
 ### 6.5 publish/packageを検証
 
-1. [`scripts/publish-windows.ps1`](../../scripts/publish-windows.ps1)で`win-x64`をpublishし、legacy ZIP regressionを維持します。
-2. macOSは`osx-arm64`と`osx-x64`を別々にpublishします。
-3. `version.ps1 verify -PublishedDirectory ...`でRID別App/Core DLLを検証します。
-4. Windows MSIXはmanifest/version/layoutを検査し、test certificateを`PASS_MECHANISM`、trusted certificateとclean installを`PASS_PRODUCTION`として分離します。
-5. macOSは`.app` bundle、nested sign、shipped CLI hash manifest、outer sign、notary/staple、RID別DMGの順で検証します。
-6. package testで各artifactのlayout、sidecar、bundled CLI、clean launchを検証します。
-7. asset名は`StudyReportEvaluator-win-x64.msix`、`StudyReportEvaluator-osx-arm64.dmg`、`StudyReportEvaluator-osx-x64.dmg`と各`.sha256`です。製品版はGitHub Release tag、release notes、binary/package metadata、SHA-256の組で識別します。
+1. [`scripts/publish-windows.ps1`](../../scripts/publish-windows.ps1)で`win-x64`をpublishします。
+2. [`scripts/package-windows.ps1`](../../scripts/package-windows.ps1)でpublic ZIPとsidecarを作ります。
+3. `version.ps1 verify -PublishedDirectory ...`でApp/Core DLLを検証します。
+4. package testでZIPのsafe layout、sidecar、bundled CLI、clean extract/launch、再現性を検証します。
+5. development MSIXはmanifest/version/RID、unpack、block map、bundled CLI、sidecar、policy negative、cleanupを検証し、`PASS_MECHANISM`とします。install/launchはrequiredではなく、GitHub Release assetへ含めません。
+6. macOS publish/sign/notary scriptはstatic contractだけをrequiredとし、DMGまたはsupport claimを公開しません。
+7. public asset名は`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`です。製品版はGitHub Release tag、release notes、binary/package metadata、SHA-256の組で識別します。
 
 ### 6.6 release commitとtag
 
@@ -244,7 +244,7 @@ GitHub Releaseは既存annotated tagを対象に[release workflow](../../.github
 1. verified tagを選び、draft Releaseを作ります。
 2. ZIPと対応する`.sha256`をdraftへ添付します。
 3. asset名、size、SHA-256、tag、release notesを確認します。
-4. prerelease版ならGitHub Releaseもprereleaseにします。
+4. 現行production workflowはstable版だけを受理します。prerelease packageを作る場合は別workflow decisionを先に行います。
 5. assetが揃うまで公開しません。
 6. repositoryでImmutable Releasesを利用できる場合は、初回公開前に設定を確認します。公開後のtag移動とasset差替えを防ぎます。[GitHub Docs: Immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases)
 7. 公開後、実在するdownload URLを確認してから利用者文書へ記載します。
@@ -255,7 +255,7 @@ GitHubはdraftへ全assetを添付してから公開する手順を推奨して�
 
 現在のcheckpoint互換判定はapplication identityを`System.Version`で解析し、解析できない場合は文字列完全一致へfallbackします。[`DurableQuantificationOrchestrator.cs`](../../src/StudyReportEvaluator.App/Workflow/DurableQuantificationOrchestrator.cs)
 
-そのため`1.1.0-rc.1`と`1.1.0-rc.2`は同じMAJORでも、現在実装ではapplication identityが完全一致せず、同じcheckpointを再開できません。toolがprereleaseを受理することは、RC間checkpoint互換を保証しません。
+そのため`0.8.0-rc.1`と`0.8.0-rc.2`は同じMAJORでも、現在実装ではapplication identityが完全一致せず、同じcheckpointを再開できません。toolがprereleaseを受理することは、RC間checkpoint互換を保証しません。
 
 prerelease間でresumeを必要とするreleaseでは、次のどちらかをrelease前に決定します。
 

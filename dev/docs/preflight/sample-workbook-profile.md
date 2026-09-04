@@ -4,11 +4,11 @@
 |---|---|
 | Task | B-07 |
 | 状態 | **CURRENT STRUCTURAL PROFILE** |
-| Requirement | `docs/requirements-definition.md` v4.1 |
+| Requirement | `docs/requirements-definition.md` v4.3 |
 | Plan | `work/20260902-readme-end-user-release-plan.md` |
 | Scope decision | ADR-0012 / ADR-0013 |
 | Sample | `sample/SampleReport.xlsx` |
-| Verification date | 2026-09-03 |
+| Verification date | 2026-09-04 |
 | Inspection boundary | read-only metadata/header-role inspection; response bodies not recorded |
 
 ## Identity
@@ -81,4 +81,4 @@ App自体は任意の標準`.xlsx`を扱うため、runtime inputへ本sample ha
 
 ## Verification result
 
-**PASS.** 現sampleは要求v4.1／B-07の構造profileとして利用できる。これは定量化結果、教育評価精度、Copilot live処理のPASSを意味しない。
+**PASS.** 現sampleは要求v4.3／B-07の構造profileとして利用できる。これは定量化結果、教育評価精度、Copilot live処理のPASSを意味しない。

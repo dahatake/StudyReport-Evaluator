@@ -222,7 +222,7 @@ public sealed class DocumentationContractTests
     }
 
     [Fact]
-    public void Platform_and_unsigned_package_claims_match_the_windows_delivery_contract()
+    public void Platform_and_unpublished_package_claims_match_the_windows_delivery_contract()
     {
         string readme = Read("README.md");
         string userIndex = Read("docs/README.md");
@@ -236,15 +236,24 @@ public sealed class DocumentationContractTests
             "unsigned ZIP",
             "StudyReportEvaluator-win-x64.zip",
             "StudyReportEvaluator-win-x64.zip.sha256",
-            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v1.0.1/StudyReportEvaluator-win-x64.zip",
-            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v1.0.1/StudyReportEvaluator-win-x64.zip.sha256",
+            "現在、公開済みの配布物はありません",
+            "`0.8.0`は初回公開前の候補版",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases",
             "macOS、Linux、Windows Arm64は初版対応対象外",
             "installer、code signing、notarizationを提供しません");
+        Assert.DoesNotContain("/releases/download/", readme, StringComparison.OrdinalIgnoreCase);
         AssertContainsAll(
             userIndex,
             "Windows 11 x64",
             "unsigned ZIP",
+            "現在、公開済みの配布物はありません",
+            "development MSIXは検証専用で、一般配布しません",
             "macOS、Linux、Windows Arm64");
+        AssertContainsAll(
+            Read("docs/getting-started.md"),
+            "現在、公開済みの配布物はありません",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases",
+            "development MSIXは検証専用");
         AssertContainsAll(
             publishScript,
             "$RuntimeIdentifier = 'win-x64'",
@@ -434,6 +443,7 @@ public sealed class DocumentationContractTests
         string ledger = Read("dev/docs/readme-claim-ledger.md");
         string sampleProfile = Read("dev/docs/preflight/sample-workbook-profile.md");
         string prompts = Read("SystemTest-prompt.md");
+        string realDataSmoke = Read("tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs");
 
         Assert.False(
             File.Exists(Resolve(root, "tests/system-test-prompt.md")),
@@ -444,10 +454,10 @@ public sealed class DocumentationContractTests
 
         AssertContainsAll(
             requirements,
-            "| 文書版 | 4.2 |",
-            "| 基準日 | 2026-09-03 |",
+            "| 文書版 | 4.3 |",
+            "| 基準日 | 2026-09-04 |",
             "ADR-0013",
-            "| 対応環境 | target: Windows 11 x64、macOS 14 / 15 / 26 x64・Arm64。正式表示はplatform別実測後だけ |",
+            "| 対応環境 | Windows 11 x64。macOS、Linux、Windows Arm64は現版の正式公開対象外 |",
             "`sample/SampleReport.xlsx`",
             "| Bytes | 470,806 |",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
@@ -461,7 +471,8 @@ public sealed class DocumentationContractTests
             "A1:J531");
         AssertContainsAll(
             sampleProfile,
-            "| Verification date | 2026-09-03 |",
+            "| Requirement | `docs/requirements-definition.md` v4.3 |",
+            "| Verification date | 2026-09-04 |",
             "| Sample | `sample/SampleReport.xlsx` |",
             "| Bytes | 470,806 |",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
@@ -521,10 +532,10 @@ public sealed class DocumentationContractTests
             "real-data technical E2E / AC-009〜AC-016 / AC-019",
             "TR-24A advisory",
             "TR-24B advisory",
-            "TR-25 / AC-023 / AC-026 / AC-027",
-            "TR-26 / AC-024 / AC-026",
+            "TR-25 / AC-023 / AC-027",
+            "TR-26 / AC-024",
             "TR-27 / AC-025",
-            "TR-28 / TR-29 / AC-027 / AC-028",
+            "TR-28 / TR-29 / AC-026 / AC-027 / AC-028",
         ];
         Assert.Equal(
             expectedRequirementMappings,
@@ -543,13 +554,17 @@ public sealed class DocumentationContractTests
         Assert.Equal(Enumerable.Range(1, 29), coveredRequirementIds);
         AssertContainsAll(
             prompts,
-            "| 対象 | StudyReport Evaluator v4.2 |",
-            "| 基準日 | 2026-09-03 |",
-            "| 要求正本 | `docs/requirements-definition.md` v4.2 |",
+            "| 対象 | StudyReport Evaluator v4.3 |",
+            "| 基準日 | 2026-09-04 |",
+            "| 要求正本 | `docs/requirements-definition.md` v4.3 |",
             "`sample/SampleReport.xlsx`",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
             "他fileを列挙、fallback、代用しない");
         Assert.DoesNotContain("sample/realdata.xlsx", prompts, StringComparison.OrdinalIgnoreCase);
+        AssertContainsAll(
+            realDataSmoke,
+            "requirements = \"docs/requirements-definition.md v4.3\"",
+            "system_test_prompt = \"SystemTest-prompt.md v4.3\"");
     }
 
     [Fact]

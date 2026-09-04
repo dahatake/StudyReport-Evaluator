@@ -3,12 +3,15 @@
 | 項目 | 値 |
 |---|---|
 | 対象 | 正式公開用`README.md`とリンク先利用者文書 |
-| 要求 | `docs/requirements-definition.md` v4.2 |
-| Decision | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence） |
-| 更新日 | 2026-09-03 |
+| 要求 | `docs/requirements-definition.md` v4.3 |
+| Decision | ADR-0012（機能）/ ADR-0015（delivery scope）/ ADR-0013（Windows ZIP public evidence） |
+| 更新日 | 2026-09-04 |
+| SystemTest正本 | `SystemTest-prompt.md` v4.3、ST-UC-01〜25、TR-01〜29 |
+| Public release observation | 2026-09-04、GitHub Release／asset 0件 |
+| Current focused evidence | B1-16: documentation 14/14、development MSIX contract 5/5、macOS static contract 2/2 PASS。Windows ZIP full regressionは未実行 |
 | 状態語彙 | `VERIFIED` / `BLOCKED` / `EXCLUDED` |
 
-この台帳は公開文書の事実確認用であり、READMEまたは配布ZIPから利用者へ案内しない。`VERIFIED`だけを現在機能として断定できる。`BLOCKED`は解消までREADME本文へ断定形で書かない。`EXCLUDED`は非対応・非保証としてのみ記載できる。
+この台帳は公開文書の事実確認用であり、READMEまたは配布ZIPから利用者へ案内しない。`VERIFIED`だけをその行に限定した現在のclaimとして断定できる。たとえばC-033の`VERIFIED`はdevelopment mechanismの成功と非公開境界だけを確認し、production readinessを意味しない。`BLOCKED`は解消までREADME本文へ断定形で書かない。`EXCLUDED`は非対応・非保証としてのみ記載できる。
 
 ## Claim matrix
 
@@ -39,19 +42,19 @@
 | C-023 | shell rootに指定warningを常時non-modal表示し、run条件にしない。 | [`EthicsWarningText.cs`](../../src/StudyReportEvaluator.App/Resources/EthicsWarningText.cs)、[`MainWindow.axaml`](../../src/StudyReportEvaluator.App/Views/MainWindow.axaml) | [`EthicsWarningTests.cs`](../../tests/StudyReportEvaluator.App.Tests/UI/EthicsWarningTests.cs) | VERIFIED | READMEは正本文を完全一致で引用する。 |
 | C-024 | AI定量値、教育的妥当性、公平性、法的・組織policy適合性、不正行為を保証・判定しない。 | [`EthicsWarningText.cs`](../../src/StudyReportEvaluator.App/Resources/EthicsWarningText.cs)、[`requirements-definition.md`](../../docs/requirements-definition.md) | [`EthicsWarningTests.cs`](../../tests/StudyReportEvaluator.App.Tests/UI/EthicsWarningTests.cs)、documentation contract | VERIFIED | 類似度は不正行為の証明ではない。 |
 | C-025 | licenseはMITである。 | [`LICENSE`](../../LICENSE) | [`DocumentationContractTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Content/DocumentationContractTests.cs)、[`WindowsPublishPackageTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs) | VERIFIED | LICENSEをZIPへ含め、license本文を独自に変更しない。 |
-| C-026 | 正式release assetを実在URLからdownloadできる。 | repository public release API（2026-09-02確認時0件）、[`package-windows.ps1`](../../scripts/package-windows.ps1) | local ZIP生成は成功したがpublic assetは未作成 | BLOCKED | GitHub Release作成・asset upload・URL実在確認後にだけREADMEへ記載する。 |
-| C-027 | repository正規sampleの構造・identityを現在のrelease候補で再検証済みである。 | [`SampleWorkbookStructuralTests.cs`](../../tests/StudyReportEvaluator.App.Tests/E2E/SampleWorkbookStructuralTests.cs)、[`RealDataSystemSmokeTests.cs`](../../tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs)、[`sample-workbook-profile.md`](preflight/sample-workbook-profile.md) | canonical exact-path structural test 1/1 PASS、synthetic isolation 1/1 PASS、530-row no-network technical E2E 1/1 PASS、入力identity不変（2026-09-03） | VERIFIED | `sample/SampleReport.xlsx`だけを対象とし、回答/header本文やprivate pathを証跡へ出力しない。 |
+| C-026 | 正式release assetを実在URLからdownloadできる。 | repository public release API（2026-09-04確認時0件）、[`package-windows.ps1`](../../scripts/package-windows.ps1) | public Release／assetは未作成。current candidate ZIP full regressionも未実行 | BLOCKED | GitHub Release作成・asset upload・URL実在確認後にだけREADMEへ記載する。 |
+| C-027 | repository正規sampleの構造・identityを現在のrelease候補で再検証済みである。 | [`SampleWorkbookStructuralTests.cs`](../../tests/StudyReportEvaluator.App.Tests/E2E/SampleWorkbookStructuralTests.cs)、[`RealDataSystemSmokeTests.cs`](../../tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs)、[`sample-workbook-profile.md`](preflight/sample-workbook-profile.md) | 2026-09-03のdelivery変更前baselineではPASS。B1-16でcurrent candidateのopt-in technical E2Eは未実行 | BLOCKED | 後続full gateで再実行するまで過去evidenceをcurrent candidateへ流用しない。回答/header本文やprivate pathを証跡へ出力しない。 |
 | C-028 | READMEの画面画像はcurrent production UIを示す。 | [`DocumentationScreenshotTests.cs`](../../tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs) | 7画像再生成1/1 PASS、全て1440×1050、主要画面目視確認、RD-03敵対review finding 0（2026-09-02） | VERIFIED | synthetic/fake境界をcaptionと[`images/README.md`](../../images/README.md)へ記載済み。 |
-| C-029 | READMEからリンクする全利用者文書がv4.1 current contractと一致する。 | `docs/*.md` | relative link 20件・欠落0、warning完全一致、RD-02敵対review finding 0（2026-09-02） | VERIFIED | package同梱後も同じ文書を使う。 |
+| C-029 | READMEからリンクする全利用者文書がcurrent requirementと一致する。 | `docs/*.md` | v4.3 DocumentationContractTests 14/14 PASS（2026-09-04 B1-16） | VERIFIED | root SystemTest 25 scenario／TR-01〜29とv4.3 delivery claimを含む。 |
 | C-030 | 公開READMEに処理時間、token数、費用の保証値を載せる。 | なし | Windows performance testは特定synthetic scenarioだけを測定 | EXCLUDED | 未実測の実利用時間・AI待機・費用へ一般化しない。 |
 | C-031 | source build、commit、gate、test件数、ADR、traceabilityを利用者quick startの主導線へ載せる。 | なし | 正式公開READMEの目的外 | EXCLUDED | 必要な保守導線は`dev/docs/README.md`へ分離する。 |
-| C-032 | Linux、Windows Arm64、macOS 13以前、universal macOS artifact、Store配布を提供する。 | 該当production/packageなし | [ADR-0015](adr/0015-windows-macos-installer-delivery.md) | EXCLUDED | v4.2非対応としてだけ記載できる。 |
-| C-033 | trusted Windows x64 MSIXをOS標準UIからinstallできる。 | planned Windows MSIX manifest/package script | required test未実行、production signing identity未提供 | BLOCKED | mechanismとproduction trustの両方が完了するまで現在機能として書かない。 |
-| C-034 | macOS Apple Silicon向けsigned/notarized/stapled DMGを提供する。 | planned macOS package script | Developer ID/notary/clean Arm64 host未提供 | BLOCKED | cross-publishだけでVERIFIEDにしない。 |
-| C-035 | macOS Intel向けsigned/notarized/stapled DMGを提供する。 | planned macOS package script | Developer ID/notary/clean x64 host未提供 | BLOCKED | Rosetta結果をnative x64へ代用しない。 |
-| C-036 | Windows/macOSのprimary setupはOS標準UIの3操作以内である。 | [ADR-0015](adr/0015-windows-macos-installer-delivery.md) | public artifact journey未実行 | BLOCKED | artifact実在とclean journey後にだけREADMEを切り替える。 |
-| C-037 | install/upgrade/repair/uninstallまたはapp removalでuser workbookを保持する。 | planned installer/package lifecycle | package-installed E2E未実行 | BLOCKED | input/final/partialのbefore/after identityが必要。 |
-| C-038 | protected release workflowはrequired platform matrixだけを公開する。 | planned CI/release workflow | workflow未実装 | BLOCKED | secret isolationと未実測artifact非公開を直接検証する。 |
+| C-032 | macOS、Linux、Windows Arm64、production-signed/public MSIX、Store配布を提供する。 | 該当public packageなし | [ADR-0015](adr/0015-windows-macos-installer-delivery.md) | EXCLUDED | v4.3非対応としてだけ記載できる。 |
+| C-033 | Windows development MSIXはtest-only identityの`PASS_MECHANISM`で、一般配布しない。 | [`package-windows-msix.ps1`](../../scripts/package-windows-msix.ps1)、[`test-windows-msix-unsigned.ps1`](../../scripts/test-windows-msix-unsigned.ps1) | package/unpack/hash/policy/cleanupを2026-09-04実測、WindowsInstallerPackageTests 5/5 PASS | VERIFIED | standard App Installer、non-admin setup、production trustを主張しない。 |
+| C-034 | macOS Apple Silicon向けsigned/notarized/stapled DMGを提供する。 | source foundationのみ | production evidenceなし | EXCLUDED | 将来scopeへ改版するまで対応済みと書かない。 |
+| C-035 | macOS Intel向けsigned/notarized/stapled DMGを提供する。 | source foundationのみ | production evidenceなし | EXCLUDED | 将来scopeへ改版するまで対応済みと書かない。 |
+| C-036 | Windows public ZIPの取得、hash確認、展開、起動を案内し、別runtimeを要求しない。 | [`package-windows.ps1`](../../scripts/package-windows.ps1)、public docs | current candidate journeyとdocsを再検証する | BLOCKED | development MSIXを一般利用者手順へ含めない。 |
+| C-037 | public ZIPとdevelopment MSIXはsample/user workbookを含めず、package操作でinput/final/partialを変更しない。 | Windows package scripts | package layout/input identityを再検証する | BLOCKED | installer lifecycleの未実測claimへ拡張しない。 |
+| C-038 | release workflowはmatrixの`publish=true`かつrequired statusのartifactだけを公開する。 | planned CI/release workflow | workflow未実装 | BLOCKED | development MSIX、secret、未実測artifactの非公開を直接検証する。 |
 
 ## 外部仕様の確認記録
 
@@ -59,14 +62,14 @@
 |---|---|---|---|---|
 | EXT-001 | .NET版GitHub Copilot SDKはCLIをbundled dependencyとして扱える。 | [GitHub Copilot SDK — Bundled CLI](https://github.com/github/copilot-sdk/blob/main/docs/setup/bundled-cli.md)、local NuGet `GitHub.Copilot.SDK` 1.0.11 MSBuild targets | 2026-09-02 | SDK 1.0.11はCLI 1.0.79をRID別runtime directoryへ登録する。projectはさらにmanifest/hash/versionを検証する。 |
 | EXT-002 | .NET 10 self-contained publishはtarget machineへ.NET runtimeを事前installしない配布方法である。 | [Microsoft Learn — .NET application publishing overview](https://learn.microsoft.com/dotnet/core/deploying/) | 2026-09-02 | Windows package testで外部.NET無効化環境のstartupを確認する。 |
-| EXT-003 | direct MSIXはvalidかつtarget deviceでtrustedなcode-signing certificateを必要とする。 | [Microsoft Learn — Sign an MSIX package](https://learn.microsoft.com/windows/msix/package/signing-package-overview) | 2026-09-03 | test certificateをproduction claimへ使わない。 |
-| EXT-004 | macOS直接配布はDeveloper ID、hardened runtime、notarization、ticket staplingを必要とする。 | [Apple — Notarizing macOS software](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)、[Avalonia — macOS deployment](https://docs.avaloniaui.net/docs/deployment/macos) | 2026-09-03 | production credentialとclean hostがない間はBLOCKED。 |
+| EXT-003 | unsigned executable MSIXはWindows 11の開発試験用で、`-AllowUnsigned`と管理者権限を要し、広範配布しない。 | [Microsoft Learn — Create an unsigned MSIX package](https://learn.microsoft.com/windows/msix/package/unsigned-package) | 2026-09-04 | development MSIXをpublic assetへ含めない。 |
+| EXT-004 | macOS直接配布はDeveloper ID、hardened runtime、notarization、ticket staplingを必要とする。 | [Apple — Notarizing macOS software](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)、[Avalonia — macOS deployment](https://docs.avaloniaui.net/docs/deployment/macos) | 2026-09-03 | 現版scope外。source foundationをproduction対応へ読み替えない。 |
 
 GitHub Copilotのplan、料金、model availabilityは利用者accountとservice変更に依存するため、この台帳では固定claimにしない。公開READMEではGitHub公式のcurrent documentationへ案内し、アプリ内の「Copilot状態を確認」で実際のlogin/model availabilityを検証する。
 
 ## 2026-09-03 pre-v1.1.0 functional validation snapshot
 
-この節はdelivery変更前の監査記録でありREADMEへtest件数として転載せず、MSIX/macOS/sign/notary証跡へ流用しない。
+この節はdelivery変更前の監査記録でありREADMEへtest件数として転載せず、0.8.0 current candidateのrequired release gate、MSIX/macOS/sign/notary証跡へ流用しない。
 
 - Release build: warning 0 / error 0。
 - `MainWindowTests`: 8/8 PASS。

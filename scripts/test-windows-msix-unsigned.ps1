@@ -78,7 +78,7 @@ function Get-Sha256Hex {
 }
 
 function Get-Utf8Sha256Hex {
-    param([Parameter(Mandatory)][string] $Value)
+    param([Parameter(Mandatory)][AllowEmptyString()][string] $Value)
 
     return [System.Convert]::ToHexString(
         [System.Security.Cryptography.SHA256]::HashData($Utf8NoBom.GetBytes($Value)))
@@ -166,19 +166,19 @@ function Test-OwnedOutputSetValid {
                 [pscustomobject]@{ Name = 'Square44x44Logo.png'; Width = 44; Height = 44 },
                 [pscustomobject]@{ Name = 'Square150x150Logo.png'; Width = 150; Height = 150 },
                 [pscustomobject]@{ Name = 'StoreLogo.png'; Width = 50; Height = 50 })) {
-            $matches = @($assets | Where-Object { [string]$_.fileName -ceq $expectedAsset.Name })
-            $archiveMatches = @($inspection.SyntheticAssets | Where-Object {
+            $assetCandidates = @($assets | Where-Object { [string]$_.fileName -ceq $expectedAsset.Name })
+            $archiveCandidates = @($inspection.SyntheticAssets | Where-Object {
                     [string]$_.fileName -ceq $expectedAsset.Name
                 })
             $assetContractValid = $assetContractValid -and
-                $matches.Count -eq 1 -and
-                $archiveMatches.Count -eq 1 -and
-                [int]$matches[0].width -eq $expectedAsset.Width -and
-                [int]$matches[0].height -eq $expectedAsset.Height -and
-                [string]$matches[0].sha256 -match '^[0-9A-F]{64}$' -and
-                [int]$archiveMatches[0].width -eq $expectedAsset.Width -and
-                [int]$archiveMatches[0].height -eq $expectedAsset.Height -and
-                [string]$archiveMatches[0].sha256 -ceq [string]$matches[0].sha256
+                $assetCandidates.Count -eq 1 -and
+                $archiveCandidates.Count -eq 1 -and
+                [int]$assetCandidates[0].width -eq $expectedAsset.Width -and
+                [int]$assetCandidates[0].height -eq $expectedAsset.Height -and
+                [string]$assetCandidates[0].sha256 -match '^[0-9A-F]{64}$' -and
+                [int]$archiveCandidates[0].width -eq $expectedAsset.Width -and
+                [int]$archiveCandidates[0].height -eq $expectedAsset.Height -and
+                [string]$archiveCandidates[0].sha256 -ceq [string]$assetCandidates[0].sha256
         }
 
         return [int]$evidence.schemaVersion -eq 1 -and
@@ -207,7 +207,7 @@ function Test-OwnedOutputSetValid {
             [long]$evidence.package.bytes -eq (Get-Item -LiteralPath $PackagePath).Length -and
             [int]$evidence.package.entryCount -eq $inspection.EntryCount -and
             [string]$evidence.package.identityName -ceq $IdentityName -and
-            [string]$evidence.package.version -ceq '1.1.0.0' -and
+            [string]$evidence.package.version -ceq $packageVersion -and
             [string]$evidence.package.architecture -ceq 'x64' -and
             [int]$evidence.package.signatureEntryCount -eq 0 -and
             [string]$evidence.package.blockMapHashMethod -ceq 'http://www.w3.org/2001/04/xmlenc#sha256' -and
@@ -389,7 +389,7 @@ function Get-UnsignedMsixInspection {
             $identity = $manifest.Package.Identity
             if ([string]$identity.Name -cne $IdentityName -or
                 [string]$identity.Publisher -cne $Publisher -or
-                [string]$identity.Version -cne '1.1.0.0' -or
+                [string]$identity.Version -cne $packageVersion -or
                 [string]$identity.ProcessorArchitecture -cne 'x64') {
                 throw 'Unsigned MSIX manifest identity does not match the development contract.'
             }
@@ -472,6 +472,19 @@ function Get-UnsignedMsixInspection {
 
 Assert-SupportedHost
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$versionTool = Join-Path $repositoryRoot 'dev\version.ps1'
+if (-not (Test-Path -LiteralPath $versionTool -PathType Leaf)) {
+    throw "Required unsigned MSIX test input is missing: $versionTool"
+}
+
+$versionResult = & $versionTool show -Json | Out-String | ConvertFrom-Json
+if ([string]$versionResult.Status -cne 'PASS' -or
+    [string]$versionResult.Version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+    throw 'Unable to resolve a stable repository product version.'
+}
+
+$productVersion = [string]$versionResult.Version
+$packageVersion = "$productVersion.0"
 $nugetConfig = Join-Path $repositoryRoot 'NuGet.Config'
 $toolProject = Join-Path $repositoryRoot 'eng\packaging\windows\tools\WindowsSdkBuildTools.csproj'
 $toolLock = Join-Path $repositoryRoot 'eng\packaging\windows\tools\packages.lock.json'
@@ -503,7 +516,7 @@ if ($existingOutputCount -ne 0 -and
     }
 }
 
-foreach ($requiredPath in @($nugetConfig, $toolProject, $toolLock, $packageScript)) {
+foreach ($requiredPath in @($versionTool, $nugetConfig, $toolProject, $toolLock, $packageScript)) {
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
         throw "Required unsigned MSIX test input is missing: $requiredPath"
     }
@@ -543,7 +556,7 @@ if ((Get-Sha256Hex -Path $toolLock) -cne $lockHashBefore) {
 $lock = Get-Content -LiteralPath $toolLock -Raw | ConvertFrom-Json
 $lockedPackage = $lock.dependencies.'net10.0'.$BuildToolsPackageId
 if ($null -eq $lockedPackage -or
-    [string]$lockedPackage.requested -cne "[$BuildToolsVersion]" -or
+    [string]$lockedPackage.requested -cne "[$BuildToolsVersion, $BuildToolsVersion]" -or
     [string]$lockedPackage.resolved -cne $BuildToolsVersion -or
     [string]$lockedPackage.contentHash -cne $BuildToolsContentHash) {
     throw 'Windows SDK BuildTools lock identity does not match the approved test tool.'
@@ -594,7 +607,7 @@ try {
         Square44x44LogoPath = $square44
         Square150x150LogoPath = $square150
         StoreLogoPath = $storeLogo
-        ProductVersion = '1.1.0'
+        ProductVersion = $productVersion
         WindowsSdkBinDirectory = $windowsSdkBinDirectory
     }
     $invalidUnsignedParameters = [hashtable]$commonParameters.Clone()
@@ -698,7 +711,7 @@ try {
             entryCount = $entryCount
             identityName = $IdentityName
             publisher = $Publisher
-            version = '1.1.0.0'
+            version = $packageVersion
             architecture = 'x64'
             signatureEntryCount = 0
             blockMapHashMethod = 'http://www.w3.org/2001/04/xmlenc#sha256'

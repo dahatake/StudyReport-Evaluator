@@ -29,9 +29,13 @@ AIが作る値は確認対象です。最終的な評点と利用判断は、授
 
 `.xls`、`.xlsb`、CSV、PDF、`.xlsm`等のmacro-enabled file、password／rights-protected／暗号化workbook、安全境界に違反するpackageは対象外です。
 
-## 入手・SHA-256確認・起動
+## 公開状況・SHA-256確認・起動
 
-1. [v1.0.1のZIP](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v1.0.1/StudyReportEvaluator-win-x64.zip)と[SHA-256 sidecar](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v1.0.1/StudyReportEvaluator-win-x64.zip.sha256)を同じdirectoryへdownloadします。
+現在、公開済みの配布物はありません。`0.8.0`は初回公開前の候補版です。
+
+配布開始後は[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases)に実在する同一releaseの`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`を使用します。
+
+1. ZIPとSHA-256 sidecarを同じdirectoryへdownloadします。
 2. ZIPのSHA-256を確認します。
 3. sidecarの先頭64文字と完全一致することを確認します。
 4. ZIPを新しいdirectoryへ展開します。

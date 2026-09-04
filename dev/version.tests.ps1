@@ -52,7 +52,7 @@ $assertionCount = 0
 $show = ConvertFrom-ToolJson -Output @(& $toolPath show -RepositoryRoot $repositoryRoot -Json)
 Assert-Equal -Expected 'PASS' -Actual $show.Status -Message 'show status mismatch.'
 $assertionCount++
-Assert-Equal -Expected '1.0.1' -Actual $show.Version -Message 'repository version mismatch.'
+Assert-Equal -Expected '0.8.0' -Actual $show.Version -Message 'repository version mismatch.'
 $assertionCount++
 
 $verify = ConvertFrom-ToolJson -Output @(& $toolPath verify -RepositoryRoot $repositoryRoot -Json)
@@ -78,6 +78,16 @@ try {
         $destinationPath = Join-Path $temporaryRepository $relativePath
         [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($destinationPath))
         Copy-Item -LiteralPath (Join-Path $repositoryRoot $relativePath) -Destination $destinationPath -Force
+    }
+
+    $temporaryChangelogPath = Join-Path $temporaryRepository 'CHANGELOG.md'
+    $temporaryChangelog = [System.IO.File]::ReadAllText($temporaryChangelogPath)
+    $escapedVersion = [System.Text.RegularExpressions.Regex]::Escape([string]$show.Version)
+    if ($temporaryChangelog -notmatch "(?m)^## \[$escapedVersion\] - [0-9]{4}-[0-9]{2}-[0-9]{2}\r?$") {
+        [System.IO.File]::AppendAllText(
+            $temporaryChangelogPath,
+            "`n## [$($show.Version)] - 2000-01-01`n`n- Synthetic release entry for version tool self-test.`n",
+            [System.Text.UTF8Encoding]::new($false))
     }
 
     $pendingChanges = @(& $actualGitPath -C $temporaryRepository status --porcelain=v1 --untracked-files=all)

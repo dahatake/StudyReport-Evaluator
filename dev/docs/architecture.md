@@ -2,11 +2,11 @@
 
 | 項目 | 内容 |
 |---|---|
-| Current requirement | requirements v4.2 |
-| Current decision | ADR-0012（機能）/ ADR-0015（target delivery）。current public evidence境界はADR-0013 |
+| Current requirement | requirements v4.3 |
+| Current decision | ADR-0012（機能）/ ADR-0015（Windows ZIP public / development MSIX）。current public evidence境界はADR-0013 |
 | Detailed design | [`detailed-design.md`](detailed-design.md) |
 | Production projects | 2（Core / App） |
-| Target platform | Windows 11 x64 + evidence-gated macOS x64/Arm64 |
+| Target platform | Windows 11 x64。macOS source foundationは現版公開対象外 |
 
 本書はcomponent境界と実行data flowの正本である。型、sheet、formula、checkpoint encodingの詳細は[詳細設計書](detailed-design.md)と[Excel契約](excel-contract.md)を参照する。
 
@@ -135,26 +135,23 @@ checkpointとoutputはinput全体、Prompt、reference、AI resultを含むた�
 
 - End-user appはRID別.NET 10 self-containedで、.NET Runtime／SDKを別installしない。
 - SDK互換Copilot CLIをpackageに含め、manifestでRID、path、version、shipped file hashを固定する。PATHへfallbackしない。
-- Windows targetは`win-x64` self-contained payloadをproduction-trusted MSIXへ格納する。現行unsigned ZIPは移行中のregression/fallbackとして別contractで維持する。
-- macOS targetは`osx-arm64`と`osx-x64`を別々に`.app`へ組み立て、Developer ID署名、hardened runtime、notarization、stapling後にRID別DMGへ格納する。
+- Windows public targetは`win-x64` self-contained payloadをunsigned ZIPとSHA-256 sidecarへ格納する。development MSIXはnon-public `PASS_MECHANISM`として別contractで維持する。
+- macOSは`osx-arm64`と`osx-x64`のpublish／bundle／sign／notary source foundationだけを維持し、現版のpublic artifactまたはrequired acceptanceにしない。
 - macOSではnested CLIを署名してshipped hashをmanifestへ反映した後、outer `.app`を最後に署名する。outer署名後のbundle変更を禁止する。
-- Windows/MSIXとmacOS/DMGはいずれもOS標準UIの3操作以内をprimary setupとし、terminalや別runtime installを要求しない。
-- current public claimはplatform別`PASS_PRODUCTION`が揃うまでWindows 11 x64 unsigned ZIPだけとする。cross-publishやframework supportを製品証跡にしない。
-- Linux、Windows Arm64、macOS 13以前、universal macOS artifact、Store配布はv4.2 scope外である。
+- Windows primary setupはZIPとsidecarの取得、SHA-256確認、展開、apphost起動とし、別runtime installを要求しない。development MSIXを一般利用者手順へ含めない。
+- current public claimはWindows 11 x64 unsigned ZIPだけとする。development MSIX、cross-publish、framework supportを製品証跡にしない。
+- 同じrelease matrixへWindows ZIPの`publish=true`行とdevelopment MSIXの`publish=false`行を記録するが、Releaseへ進めるのはrequired statusを満たす`publish=true`行だけとする。
+- macOS、Linux、Windows Arm64、universal macOS artifact、Store配布はv4.3 public scope外である。
 
 ```mermaid
 flowchart LR
     Source[Tagged source] --> WinPublish[win-x64 self-contained]
-    Source --> MacArm[osx-arm64 self-contained]
-    Source --> MacX64[osx-x64 self-contained]
-    WinPublish --> MSIX[MSIX package + production signature]
-    MacArm --> MacSign[Bundle + nested sign + manifest + outer sign]
-    MacX64 --> MacSign
-    MacSign --> Notary[Notarize + staple]
-    Notary --> DMG[RID-specific DMG]
-    MSIX --> Matrix[Clean-machine evidence]
-    DMG --> Matrix
-    Matrix -->|PASS_PRODUCTION only| Release[Public release + docs]
+    WinPublish --> ZIP[Unsigned ZIP + SHA-256]
+    WinPublish --> DevMSIX[Development MSIX / non-public]
+    ZIP -->|publish=true / PASS_REQUIRED| Matrix[Release eligibility matrix]
+    DevMSIX -->|publish=false / PASS_MECHANISM evidence only| Matrix
+    Matrix -->|publish=true rows only| Release[Draft then protected public release]
+    Source -. future scope .-> Mac[macOS source foundation]
 ```
 
 ## 9. Validation timing
