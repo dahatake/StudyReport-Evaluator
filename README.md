@@ -31,7 +31,7 @@ AIが作る値は確認対象です。最終的な評点と利用判断は、授
 
 ## 公開状況・SHA-256確認・起動
 
-現在、公開済みの配布物はありません。`0.8.0`は初回公開前の候補版です。
+現在、公開済みの配布物はありません。`0.8.1`は初回公開前の候補版です。
 
 配布開始後は[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases)に実在する同一releaseの`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`を使用します。
 

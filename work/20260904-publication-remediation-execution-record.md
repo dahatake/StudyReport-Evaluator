@@ -799,3 +799,85 @@ opt-in `RealDataSystemSmokeTests`とLive AIはB1-02および計画§5.1どおり
 - content data included = false。
 
 **Status: PASS_STATIC_PENDING_DRAFT**
+
+## 29. V2-01 — current candidateのfull required gate
+
+### 実行結果
+
+- optional smokeを全て`0`に固定し、`SampleWorkbookStructuralTests`だけを除外したfull required deterministic gateを実行した。
+
+| 検証 | 実測結果 |
+|---|---|
+| Release build | exit 0、warning 0、error 0 |
+| Core tests | 190/190 PASS |
+| App tests | 506/506 PASS（Windows ZIP package 3件を含む、16 m 6 s） |
+| 合計 | 696/696 PASS、failed 0、skipped 0 |
+| version self-test | 15 assertions PASS |
+| locked restore | exit 0 |
+| `git diff --check` | exit 0 |
+
+- Live Copilot、external recalculation、RealData system smokeはrequired gateへ算入していない。
+
+### 敵対的レビュー
+
+採用:
+- 初回実行はversion self-testの期待値hard-codeで失敗した。V2-03のbumpに追随できない設計欠陥であるため、期待値を`Directory.Build.props`のXMLから独立して読み、stable semverであることも検証する方式へ変更した。assertionは14から15になった。
+- 2回目の実行はtest DLLが再buildされておらず旧`0.8.0`期待値で失敗した。残存`testhost`／test host processがDLLをlockしていたためで、processを停止して再buildした。lockが原因のbuild失敗を成功と誤認しないよう、build後にDLLとsourceのtimestamp順序を確認した。
+
+棄却:
+- `ReleaseMatrixContractTests`のfixture `ProductVersion = "0.8.0"`をbumpに追随させる指摘は不要。validatorは`-ExpectedProductVersion`を明示的に受け取り、fixture内で自己完結するため版非依存である。
+- dirty treeのまま`--no-build`で結果を採用する運用は、source変更が反映されない実失敗を起こしたため採用しない。
+
+### 反映確認
+
+- 696/696 PASS、build warning/error 0、diff-check exit 0。
+- content data included = false。
+
+**Status: PASS**
+
+## 30. V2-02 — CHANGELOGをv4.3実態へ同期
+
+### 実行結果
+
+- `[Unreleased]`のdelivery記述をv4.3のscopeへ同期した。
+- Windows公開物をself-contained ZIPとSHA-256 sidecarとし、draft作成とprotected publishの分離を追加した。
+- 「MSIXとDMGを公開するpipelineを追加中」「WindowsはMSIXのInstall、macOSはDMG配置」という旧v4.2記述を、development MSIXの非公開化とmacOS現版scope外へ置換した。
+- 要求参照をv4.2からv4.3へ更新した。
+
+### 敵対的レビュー
+
+- 公開済みと誤読させる断定、未実測platformの対応済み表示、存在しないasset URLは確認されなかった。
+- 過去の再baseline経緯はhistorical valueとして保持し、現在の提供内容と混同しない表現へ限定した。
+
+### 反映確認
+
+- `DocumentationContractTests`を含むfull gateで696/696 PASS。
+- content data included = false。
+
+**Status: PASS**
+
+## 31. V2-03 — PATCH bumpと版・lock・package再検証
+
+### 実行結果
+
+- `dev/version.ps1 bump -Part patch`で`0.8.0`→`0.8.1`へ更新した。`Changed=true`、`Status=PASS`。
+- `--force-evaluate`と`--locked-mode`のrestoreを順に実行し、両方exit 0。lock差分はApp tests lockのproject dependencyだけだった。
+- `CHANGELOG.md`へ`## [0.8.1] - 2026-09-04`を作成し、空の`[Unreleased]`を先頭に残した。
+- current版記述をREADME、developer index、implementation status、version management、ADR-0015、documentation contract testで`0.8.1`へ同期した。
+- `dev/version.ps1 verify`はApp/Core 2 projectとも`0.8.1`で`PASS`。
+
+### 敵対的レビュー
+
+採用:
+- version self-testの`0.8.0` hard-codeを正本XMLから読む方式へ変更した。同種のdriftはB1-05でMSIX driverに対して既に除去済みであり、self-testだけが残存していた。
+
+棄却:
+- `version-management.md`のprerelease例`0.8.0-rc.1`やtag例を一括置換する案は、手順の汎用例示であり現在の製品版を断定していないため変更しない。
+- ADR-0014や過去work記録の`0.8.0`はhistorical decisionの記録であり書き換えない。
+
+### 反映確認
+
+- 版`0.8.1`、locked restore exit 0、full gate 696/696 PASS、diff-check exit 0。
+- content data included = false。
+
+**Status: PASS**

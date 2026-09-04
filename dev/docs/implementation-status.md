@@ -4,7 +4,7 @@
 |---|---|
 | Current requirement | `docs/requirements-definition.md` v4.3 |
 | Scope ADR | ADR-0012（機能）/ ADR-0015（Windows ZIP public / development MSIX）/ ADR-0013（Windows public evidence） |
-| Product version | `0.8.0` candidate — `Directory.Build.props`の明示`VersionPrefix` |
+| Product version | `0.8.1` candidate — `Directory.Build.props`の明示`VersionPrefix` |
 | Version management | [`version-management.md`](version-management.md) / [`dev/version.ps1`](../version.ps1) / ADR-0014 |
 | Source baseline | `fix/publication-readiness-20260904`、HEAD `1fdc9ab40c9e605fa6a49a131e232563d8b351e7`のbaseline checkpoint前working tree。exact release commitはtag作成時に確定する |
 | Public release status | `UNRELEASED_CANDIDATE — Windows ZIP、公開済みartifactなし` |

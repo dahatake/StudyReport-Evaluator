@@ -5,7 +5,7 @@
 | 状態 | **承認済み・移行中** |
 | 決定日 | 2026-09-03 |
 | 要求正本 | `docs/requirements-definition.md` v4.3 |
-| 製品版 | `0.8.0` candidate（2026-09-04、初回公開前に再baseline） |
+| 製品版 | `0.8.1` candidate（2026-09-04、初回公開前に再baselineしPATCHを1つ進めた） |
 | Supersedes | ADR-0013の将来platform target。既存Windows ZIPの実測記録は保持 |
 | Carries forward | ADR-0012の機能契約、ADR-0014のSemVer/release identity、入力不変・privacy・2-project構成 |
 | 承認根拠 | 要求所有者の指示「不明点はデフォルトのプランを採用」「全てのタスクを実行」 |

@@ -4,6 +4,8 @@ StudyReport Evaluatorの利用者に影響する変更をこのファイルへ�
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-04
+
 ### Added
 
 - Windows 11 x64向けの.NET 10 self-containedデスクトップアプリ。
@@ -21,7 +23,7 @@ StudyReport Evaluatorの利用者に影響する変更をこのファイルへ�
 - 開発者向け文書を`dev/docs/`へ分離し、利用者向けREADMEと`docs/`を要求v4.3へ同期。
 - 初回公開のWindows配布物をself-contained ZIPとsidecarへ確定し、開発用unsigned MSIXは一般配布しない検証専用の位置づけへ変更。
 - macOSの署名・公証済みDMG提供は現版scope外とし、sourceと静的契約のみ維持。
-- 初回公開前の製品候補版を`0.8.0`へ再設定。
+- 初回公開版を`0.8.1`へ確定。公開前候補は`0.8.0`へ再baseline済み。
 
 ### Fixed
 

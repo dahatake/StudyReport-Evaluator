@@ -237,7 +237,7 @@ public sealed class DocumentationContractTests
             "StudyReportEvaluator-win-x64.zip",
             "StudyReportEvaluator-win-x64.zip.sha256",
             "現在、公開済みの配布物はありません",
-            "`0.8.0`は初回公開前の候補版",
+            "`0.8.1`は初回公開前の候補版",
             "https://github.com/dahatake/StudyReport-Evaluator/releases",
             "macOS、Linux、Windows Arm64は初版対応対象外",
             "installer、code signing、notarizationを提供しません");

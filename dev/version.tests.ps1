@@ -49,10 +49,20 @@ foreach ($requiredPath in @($toolPath, $sourcePath)) {
 }
 
 $assertionCount = 0
+
+# Read the canonical version independently so the self-test survives every version bump.
+$expectedVersion = ([string](
+        ([xml](Get-Content -LiteralPath $sourcePath -Raw)).SelectSingleNode(
+            '/Project/PropertyGroup/VersionPrefix').InnerText)).Trim()
+if ($expectedVersion -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+    throw "The repository must declare a stable VersionPrefix. Actual '$expectedVersion'."
+}
+$assertionCount++
+
 $show = ConvertFrom-ToolJson -Output @(& $toolPath show -RepositoryRoot $repositoryRoot -Json)
 Assert-Equal -Expected 'PASS' -Actual $show.Status -Message 'show status mismatch.'
 $assertionCount++
-Assert-Equal -Expected '0.8.0' -Actual $show.Version -Message 'repository version mismatch.'
+Assert-Equal -Expected $expectedVersion -Actual $show.Version -Message 'repository version mismatch.'
 $assertionCount++
 
 $verify = ConvertFrom-ToolJson -Output @(& $toolPath verify -RepositoryRoot $repositoryRoot -Json)
