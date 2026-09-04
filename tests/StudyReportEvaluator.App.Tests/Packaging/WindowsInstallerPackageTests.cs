@@ -181,6 +181,11 @@ public sealed class WindowsInstallerPackageTests
         Assert.Contains("windows-zip-required", driver, StringComparison.Ordinal);
         Assert.Contains("PASS_REQUIRED", driver, StringComparison.Ordinal);
         Assert.Contains("StudyReportEvaluator-win-x64.evidence.json", driver, StringComparison.Ordinal);
+        Assert.True(
+            driver.IndexOf("[AllowEmptyCollection()]", StringComparison.Ordinal) <
+            driver.IndexOf(
+                "[System.Collections.Generic.HashSet[string]] $Seen",
+                StringComparison.Ordinal));
         Assert.Contains("sourceStatusEntryCount = 0", driver, StringComparison.Ordinal);
         Assert.Contains("safeLayoutVerified = $true", driver, StringComparison.Ordinal);
         Assert.Contains("apphostLaunchVerified = $true", driver, StringComparison.Ordinal);

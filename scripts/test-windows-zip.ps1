@@ -105,6 +105,7 @@ function Assert-SafeArchiveEntry {
         [System.IO.Compression.ZipArchiveEntry] $Entry,
 
         [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
         [System.Collections.Generic.HashSet[string]] $Seen
     )
 
