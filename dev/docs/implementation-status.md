@@ -6,10 +6,11 @@
 | Scope ADR | ADR-0012（機能）/ ADR-0015（Windows ZIP public / development MSIX）/ ADR-0013（Windows public evidence） |
 | Product version | `0.8.1` candidate — `Directory.Build.props`の明示`VersionPrefix` |
 | Version management | [`version-management.md`](version-management.md) / [`dev/version.ps1`](../version.ps1) / ADR-0014 |
-| Source baseline | `fix/publication-readiness-20260904`、HEAD `1fdc9ab40c9e605fa6a49a131e232563d8b351e7`のbaseline checkpoint前working tree。exact release commitはtag作成時に確定する |
-| Public release status | `UNRELEASED_CANDIDATE — Windows ZIP、公開済みartifactなし` |
-| Release build | PASS、warning 0 / error 0（2026-09-04 B1-16実行） |
-| Baseline focused validation | locked restore、version self-test 14 assertions、DocumentationContractTests 14/14、WindowsInstallerPackageTests 5/5、MacOsPublishPackageTests 2/2、`git diff --check`が全てPASS（2026-09-04 B1-16実行） |
+| Source baseline | `main`、release commit `d0b03b9201d397b6c3333dafbb816b13b4dc003c`、annotated tag `v0.8.1` |
+| Public release status | `DRAFT_CREATED_UNPUBLISHED — v0.8.1 draftはZIPとsidecarの2 asset、公開未実行` |
+| Release build | PASS、warning 0 / error 0（2026-09-04 V2-01実行） |
+| Full required gate | 696/696 PASS（Core 190/190、App 506/506、failed 0、skipped 0、2026-09-04 V2-01実行） |
+| Baseline focused validation | locked restore、version self-test 15 assertions、DocumentationContractTests 14/14、WindowsInstallerPackageTests 6/6、MacOsPublishPackageTests 2/2、`git diff --check`が全てPASS（2026-09-04実行） |
 | Previous focused UI baseline | `MainWindowTests` 8/8 PASS（2026-09-02実行。current candidate full gateへ未算入） |
 | Previous bundled CLI baseline | `CopilotClientFactoryTests` 14/14 PASS（2026-09-02実行。current candidate full gateへ未算入） |
 | Documentation contract | 14/14 PASS（2026-09-04実行。root `SystemTest-prompt.md`、25 scenario、TR-01〜TR-29、v4.3 canonical sample契約を含む） |
@@ -23,8 +24,8 @@
 | Previous functional baseline | Release 670/670 PASS、Core 190/190・App 480/480、failed/error/not-executed 0（2026-09-03、v1.0.1 recovery tree。現在の0.8.0 delivery証跡へ流用しない） |
 | Previous optional live Copilot evidence | `PASS` — fixed synthetic payload、required substitute false（2026-09-02実行。current required gateへ算入しない） |
 | Previous optional external recalculation evidence | `MIXED_ADVISORY` — syntheticはMicrosoft Excel 16.0でopen/recalculate/save・process cleanupまで`PASS`。canonical output copyは20,672 formula error 0だが、Excel保存時に生成されたoptional `/xl/calcChain.xml`だけに`Sem_MissingIndexedElement`が発生して`FAILED_ADVISORY`（2026-09-03実行。current required gateへ算入しない） |
-| Version tool validation | show/verify/set/bump/dry-run/invalid rejection、複数Git pathでのtag/clean検証、14 assertions PASS（2026-09-04実行） |
-| Development MSIX mechanism | `PASS_MECHANISM` — package/unpack/hash/policy/cleanup、0.8.0.0、install未実行・非required（2026-09-04実行） |
+| Version tool validation | show/verify/set/bump/dry-run/invalid rejection、複数Git pathでのtag/clean検証、15 assertions PASS（2026-09-04実行） |
+| Development MSIX mechanism | `PASS_MECHANISM` — package/unpack/hash/policy/cleanup、0.8.1.0、install未実行・非required（2026-09-04実行） |
 | macOS static source contract | 2/2 PASS — unsigned bundle最小contractとproduction trust順序のsource検証。production artifact／署名／公証の実測ではない（2026-09-04 B1-16実行） |
 | Audit date | 2026-09-04 |
 
@@ -32,15 +33,15 @@
 
 2026-09-03のdelivery変更前working treeを再buildしたfull solution testは670件中670件成功した。ユーザーが配置した`sample/SampleReport.xlsx`だけをcanonical sampleとし、exact path、470,806 bytes、SHA-256 `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA`、read-only検査前後のidentity不変を確認した。opt-in technical E2Eはnetwork/live AIを使わず530行を完走した。これらは機能regressionの比較baselineであり、0.8.0のMSIX／macOS／signing／notarization／quarantine結果ではない。delivery変更後は全required regressionを再実行する。
 
-2026-09-04のB1-16は現在のworking treeでlocked restore、Release build、version／documentation／development MSIX／macOS static source contractだけをfocused再検証した。Windows ZIP生成・展開・clean launch、opt-in RealData technical E2E、full required regressionは実行していないため、後続gateまで過去結果をcurrent candidateのPASSへ流用しない。
+2026-09-04のV2-01はrelease commitのclean treeでlocked restore、Release build、full required deterministic gateを実行し、696件中696件が成功した。Windows ZIP regressionはhosted CIのclean checkoutとcandidate workflowでも`PASS_REQUIRED` evidenceを生成している。optional Live Copilot、external recalculation、RealData system smokeはrequired gateへ算入していない。
 
 ## v4.3 delivery status
 
 | Surface | Current status | Completion evidence |
 |---|---|---|
-| Windows public ZIP regression | `NOT_RUN_CURRENT_CANDIDATE` | publish/package/hash/extract/clean launchを0.8.xで再実行 |
-| Full required regression | `NOT_RUN_CURRENT_CANDIDATE` | Core/App full suiteとrequired system smokeを後続gateで再実行 |
-| Canonical technical E2E | `NOT_RUN_CURRENT_CANDIDATE` | opt-in no-network E2Eを後続full gateで再実行 |
+| Windows public ZIP regression | `PASS_REQUIRED` | clean checkoutでpublish/package/hash/safe layout/bundled CLI/clean launch/入力不変を検証し、closed evidenceを生成（hosted CIとcandidate workflow） |
+| Full required regression | `PASS_REQUIRED` | Core 190/190、App 506/506、合計696/696（2026-09-04 V2-01） |
+| Canonical technical E2E | `NOT_RUN_CURRENT_CANDIDATE` | opt-in no-network E2Eはrequired gate外。current candidateでは実行していない |
 | Windows development MSIX mechanism | `PASS_MECHANISM` | manifest/version/RID、unpack、block map、payload、CLI、sidecar、policy negative、cleanup |
 | Development MSIX install/launch | `NOT_RUN_NOT_REQUIRED` | 現版のrequired gateではなく、一般配布しない |
 | macOS source foundation static contract | `PASS_REQUIRED` | `MacOsPublishPackageTests` 2/2。production signing／notary evidenceではない |

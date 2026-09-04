@@ -921,9 +921,10 @@ opt-in `RealDataSystemSmokeTests`とLive AIはB1-02および計画§5.1どおり
 ### 未実行と引き継ぎ
 
 - **公開（publish）は実行していない。** `v0.8.1`はdraftのままである。
-- 理由: このrepositoryはImmutable Releasesが有効で公開後にtag/assetを変更できないこと、publish workflowが`environment: publish`のrequired reviewer承認を要求し、承認者は`dahatake`本人であることによる。
-- 公開手順: GitHub Actionsで`Publish release` workflowを`tag=v0.8.1`、`candidate_run_id=33848620387`でdispatchし、`publish` environmentのapprovalを承認する。workflowはtag/source/version/CHANGELOG/draft状態/asset集合/hash/matrixを再検証してから`--draft=false`だけを実行する。
-- 公開後に残る作業: unauthenticated fresh re-downloadによる最終確認と、実在URLを記載するpublic docs closure。
+- protected publish workflow run [`33854574594`](https://github.com/dahatake/StudyReport-Evaluator/actions/runs/33854574594)をdispatch済みで、`status=waiting`のまま`publish` environmentのapprovalを待っている。pending deploymentのreviewerは`dahatake`である。
+- 承認を代行しない理由: このrequired reviewer gateはR2-03で「自動化から人間の判断を分離する」ために設計したものであり、実行主体が自ら承認すると保護が無効化する。加えてImmutable Releasesにより公開後はtag／assetを変更・取り消しできない。
+- 残手順: GitHub ActionsのRun画面で`Review deployments`から`publish`を承認する。workflowはtag／source／version／CHANGELOG／draft状態／asset集合／hash／matrixを再検証してから`--draft=false`だけを実行する。
+- 公開後に残る作業: unauthenticated fresh re-downloadによる最終確認と、実在URLを記載するpublic docs closure（README、`docs/README.md`、`docs/getting-started.md`、C-026）。
 
 ### 反映確認
 
@@ -931,3 +932,30 @@ opt-in `RealDataSystemSmokeTests`とLive AIはB1-02および計画§5.1どおり
 - content data included = false。
 
 **Status: PASS_DRAFT_READY_PUBLISH_PENDING_APPROVAL**
+
+## 33. V2-05 — 状態文書をR2／V2実測へ同期
+
+### 実行結果
+
+- `implementation-status.md`のsource baselineをrelease commit `d0b03b9...`とtag `v0.8.1`へ、public release statusを`DRAFT_CREATED_UNPUBLISHED`へ更新した。
+- full required gate 696/696、version self-test 15 assertions、development MSIX `0.8.1.0`を実測値で記載した。
+- delivery statusのWindows ZIP regressionとfull required regressionを`NOT_RUN_CURRENT_CANDIDATE`から`PASS_REQUIRED`へ更新し、canonical technical E2Eはrequired gate外の未実行として維持した。
+- `traceability.md`のAC-020／026／027、TR-19／20／28を`PASS_REQUIRED`、AC-028を`PASS_REQUIRED`、TR-29を新語彙`PASS_REQUIRED_EXCEPT_PUBLIC_REDOWNLOAD`とした。
+- `readme-claim-ledger.md`のC-036／037／038を`VERIFIED`へ更新し、C-026はdraft段階であることを明記して`BLOCKED`を維持した。
+
+### 敵対的レビュー
+
+採用:
+- TR-29を単純な`PASS_REQUIRED`にすると、公開後にしか実行できないunauthenticated re-downloadまで実測済みと誤読される。実測範囲だけを表す語彙を追加し、定義を明記した。
+- C-026を`VERIFIED`にする案は、公開済みURLが存在しない現状で虚偽になるため採用しない。draft asset照合済みという事実だけを追記した。
+
+棄却:
+- AC-026をdocs journeyの実機操作未実施として`PLANNED`へ戻す指摘は、当該ACのrequired testがZIP journeyとdocs contractであり、両方が実測PASSしているため採用しない。
+- canonical technical E2Eを`PASS`扱いにする案は、opt-in E2Eをrequired gateへ昇格しない計画§5.1に反するため採用しない。
+
+### 反映確認
+
+- documentation contract testを含むfocused検証で回帰なし。
+- content data included = false。
+
+**Status: PASS**

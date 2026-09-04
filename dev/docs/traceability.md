@@ -7,8 +7,8 @@
 | Detailed design | `dev/docs/detailed-design.md` |
 | Plan | `work/20260904-publication-remediation-plan.md` |
 | Previous validation | delivery変更前 Release build warning/error 0、full 670/670 PASS（Core 190 / App 480）。現在の0.8.0 delivery evidenceへ流用しない |
-| Current focused validation | 2026-09-04 B1-16: locked restore、Release build 0 warning/error、version 14、documentation 14/14、development MSIX contract 5/5、macOS static contract 2/2、`git diff --check` PASS |
-| Current status | IMPLEMENTATION_IN_PROGRESS — B1-16 PASS。Windows ZIP full regression / release matrix / workflowは未実行 |
+| Current focused validation | 2026-09-04 V2-01: locked restore、Release build 0 warning/error、full required gate 696/696（Core 190 / App 506）、version self-test 15、documentation 14/14、`git diff --check` PASS |
+| Current status | DRAFT_CREATED_UNPUBLISHED — release matrix、candidate workflow、protected publish workflowを実装済み。`v0.8.1` draftは作成済みで、公開はenvironment approval待ち |
 
 この表の`PLANNED`は未実装をPASSと称しない。task完了後にproduction symbol、direct test、gate identityへ更新する。旧v3 traceabilityはGit履歴とADR-0011に保持する。
 
@@ -28,8 +28,11 @@
 | `PASS_MECHANISM` | test certificateまたはunsigned artifactでpackage mechanismだけが成功。非公開であり、production readinessを意味しない |
 | `PASS_PRODUCTION` | production trust pathとclean target OSで成功 |
 | `MIXED_ADVISORY` | optional evidenceを実行し、PASSとFAILED_ADVISORYが混在。required gateへ算入しない |
+| `PASS_REQUIRED_EXCEPT_PUBLIC_REDOWNLOAD` | matrix、workflow contract、draft asset照合までを実測。公開後にしか実行できないunauthenticated re-downloadだけが未実行 |
 
 AC-024／AC-025とTR-26／TR-27の`PASS_REQUIRED`は、現版でrequiredなmacOS static source contract 2件の成功だけを表す。production artifact、署名、公証、clean-host実行は現版scope外であり、`PASS_PRODUCTION`を表さない。
+
+AC-028／TR-29の判定は、release matrixの生成・semantic検証、candidate／publish workflowのcontract test、draft assetとmatrixのhash照合という実測に基づく。GitHub Releaseは`v0.8.1` draftの状態であり、公開済みassetのunauthenticated再取得は公開後にしか実行できない。
 
 ## Acceptance criteria mapping
 
@@ -54,15 +57,15 @@ AC-024／AC-025とTR-26／TR-27の`PASS_REQUIRED`は、現版でrequiredなmacOS
 | AC-017 | exact warning text and nonblocking | U-04 | warning/accessibility tests | PASS_REQUIRED |
 | AC-018 | `--input`, repeated `--prompt`, explicit apply, no auto-run | L-01/U-02 | parser/startup/UI tests | PASS_REQUIRED |
 | AC-019 | selected same-row payload and no-content logs | C-05/A-02..04/W-01 | capability/logger/canary tests | PASS_REQUIRED |
-| AC-020 | Windows legacy self-contained ZIP regression | P-01 | packaging/launch smoke | NOT_RUN_CURRENT_CANDIDATE |
+| AC-020 | Windows legacy self-contained ZIP regression | P-01 | packaging/launch smoke | PASS_REQUIRED |
 | AC-021 | unverified platform/installer/signing claim exclusion | P-01..04/D-01..05 | documentation/package contract | PASS_REQUIRED |
 | AC-022 | user/dev docs and current delivery evidence | D-01..05 | documentation/screenshot tests | PASS_REQUIRED |
 | AC-023 | non-public unsigned Windows development MSIX mechanism | P-02 | manifest/package/unpack/hash/policy/cleanup | PASS_MECHANISM |
 | AC-024 | macOS source foundationを非公開で保持（source-only） | P-03 | macOS static source contract | PASS_REQUIRED |
 | AC-025 | macOS future production order contract（source-only） | P-03 | sign/notary source contract | PASS_REQUIRED |
-| AC-026 | Windows ZIP取得/hash/展開/起動docs | P-01/D-01..05 | ZIP journey + docs contract | PLANNED |
-| AC-027 | public/development packageにuser workbookを含めない | P-01/P-02 | package layout + input identity | PLANNED |
-| AC-028 | publish flag/status matrixとrelease boundary | P-04 | workflow contract + release evidence | PLANNED |
+| AC-026 | Windows ZIP取得/hash/展開/起動docs | P-01/D-01..05 | ZIP journey + docs contract | PASS_REQUIRED |
+| AC-027 | public/development packageにuser workbookを含めない | P-01/P-02 | package layout + input identity | PASS_REQUIRED |
+| AC-028 | publish flag/status matrixとrelease boundary | P-04 | workflow contract + release evidence | PASS_REQUIRED |
 
 ## Test requirement mapping
 
@@ -86,8 +89,8 @@ AC-024／AC-025とTR-26／TR-27の`PASS_REQUIRED`は、現版でrequiredなmacOS
 | TR-16 | selected-row/literal/no-content | C-05/A-02..04/X-03 | PASS_REQUIRED |
 | TR-17 | 4-step UI/warning/progress/accessibility | U-01..04 | PASS_REQUIRED |
 | TR-18 | launch options/Prompt/no auto-run | L-01/U-02 | PASS_REQUIRED |
-| TR-19 | Windows publish/package/bundled CLI/clean launch | P-01 | NOT_RUN_CURRENT_CANDIDATE |
-| TR-20 | unsigned ZIP/hash/safe layout/reproducibility | P-01 | NOT_RUN_CURRENT_CANDIDATE |
+| TR-19 | Windows publish/package/bundled CLI/clean launch | P-01 | PASS_REQUIRED |
+| TR-20 | unsigned ZIP/hash/safe layout/reproducibility | P-01 | PASS_REQUIRED |
 | TR-21 | unsupported platform/installer/signing claim exclusion | P-01/D-01..05 | PASS_REQUIRED |
 | TR-22 | docs/screenshots | D-01..04 | PASS_REQUIRED |
 | TR-23 | fixed-seed new/resume E2E | E-01/E-02 | PASS_REQUIRED |
@@ -95,8 +98,8 @@ AC-024／AC-025とTR-26／TR-27の`PASS_REQUIRED`は、現版でrequiredなmacOS
 | TR-25 | non-public unsigned Windows development MSIX mechanism | P-02 | PASS_MECHANISM |
 | TR-26 | macOS source foundation static contract（source-only） | P-03 | PASS_REQUIRED |
 | TR-27 | macOS future trust order static contract（source-only） | P-03 | PASS_REQUIRED |
-| TR-28 | Windows ZIP launch/input不変 + MSIX package exclusion | P-01/P-02 | PLANNED |
-| TR-29 | publish matrix/secret/public re-download | P-04 | PLANNED |
+| TR-28 | Windows ZIP launch/input不変 + MSIX package exclusion | P-01/P-02 | PASS_REQUIRED |
+| TR-29 | publish matrix/secret/public re-download | P-04 | PASS_REQUIRED_EXCEPT_PUBLIC_REDOWNLOAD |
 
 ## Mandatory safety surfaces
 
