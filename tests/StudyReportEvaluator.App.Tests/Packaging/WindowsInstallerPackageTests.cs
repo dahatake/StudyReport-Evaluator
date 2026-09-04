@@ -159,6 +159,57 @@ public sealed class WindowsInstallerPackageTests
     }
 
     [Fact]
+    public void CI_runs_the_Windows_ZIP_regression_once_and_uploads_only_closed_evidence()
+    {
+        string repositoryRoot = FindRepositoryRoot();
+        string driver = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "scripts",
+            "test-windows-zip.ps1"));
+        string workflow = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            ".github",
+            "workflows",
+            "ci.yml"));
+
+        Assert.Contains("#Requires -Version 7.4", driver, StringComparison.Ordinal);
+        Assert.Contains("#Requires -PSEdition Core", driver, StringComparison.Ordinal);
+        Assert.Contains("WindowsPublishPackageTests", driver, StringComparison.Ordinal);
+        Assert.Contains("$RequiredTestCount = 3", driver, StringComparison.Ordinal);
+        Assert.Contains("must be generated from a clean source checkout", driver, StringComparison.Ordinal);
+        Assert.Contains("user-workbook-sentinel.xlsx", driver, StringComparison.Ordinal);
+        Assert.Contains("windows-zip-required", driver, StringComparison.Ordinal);
+        Assert.Contains("PASS_REQUIRED", driver, StringComparison.Ordinal);
+        Assert.Contains("StudyReportEvaluator-win-x64.evidence.json", driver, StringComparison.Ordinal);
+        Assert.Contains("sourceStatusEntryCount = 0", driver, StringComparison.Ordinal);
+        Assert.Contains("safeLayoutVerified = $true", driver, StringComparison.Ordinal);
+        Assert.Contains("apphostLaunchVerified = $true", driver, StringComparison.Ordinal);
+        Assert.Contains("inputUnchangedVerified = $true", driver, StringComparison.Ordinal);
+        Assert.DoesNotContain("PASS_PRODUCTION", driver, StringComparison.Ordinal);
+        Assert.True(
+            driver.IndexOf(
+                "Remove-Item -LiteralPath $evidencePath -Force",
+                StringComparison.Ordinal) <
+            driver.IndexOf("$statusBefore =", StringComparison.Ordinal));
+        Assert.True(
+            driver.LastIndexOf(
+                "if (Test-Path -LiteralPath $sentinelRoot)",
+                StringComparison.Ordinal) <
+            driver.IndexOf(
+                "Write-AtomicEvidence -Path $evidencePath",
+                StringComparison.Ordinal));
+
+        Assert.Contains("FullyQualifiedName!~StudyReportEvaluator.App.Tests.Packaging.WindowsPublishPackageTests", workflow, StringComparison.Ordinal);
+        Assert.Contains("Build and validate Windows ZIP regression", workflow, StringComparison.Ordinal);
+        Assert.Contains("id: windows-zip", workflow, StringComparison.Ordinal);
+        Assert.Contains(".\\scripts\\test-windows-zip.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("steps.windows-zip.outcome == 'success'", workflow, StringComparison.Ordinal);
+        Assert.Contains("windows-zip-regression-${{ github.run_id }}", workflow, StringComparison.Ordinal);
+        Assert.Contains("artifacts/package/StudyReportEvaluator-win-x64.zip", workflow, StringComparison.Ordinal);
+        Assert.Contains("artifacts/package/StudyReportEvaluator-win-x64.evidence.json", workflow, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Msix_mechanism_script_has_an_explicit_certificate_free_Windows_11_development_mode()
     {
         string repositoryRoot = FindRepositoryRoot();

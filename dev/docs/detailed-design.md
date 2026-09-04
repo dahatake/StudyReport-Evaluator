@@ -709,6 +709,18 @@ checkpointとRun sheetへ次を保存する。
 - release matrixで`publish=true`のWindows ZIP行が`PASS_REQUIRED`でなければ公開しない。development MSIXは`publish=false`かつ`PASS_MECHANISM`として分離する。
 - Live Copilot、canonical sample technical E2E、external spreadsheet recalculationは各scopeを分離し、未実行を成功扱いにしない。
 
+#### 13.5.1 Initial Windows release matrix v1
+
+- closed schema正本は[`eng/schemas/platform-release-matrix-v1.schema.json`](../../eng/schemas/platform-release-matrix-v1.schema.json)とする。root、row、nested descriptorは全て`additionalProperties:false`である。
+- semantic validator正本は[`scripts/validate-platform-release-matrix.ps1`](../../scripts/validate-platform-release-matrix.ps1)、direct regressionは[`ReleaseMatrixContractTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseMatrixContractTests.cs)とする。
+- rowはexactly 2件とする。
+    1. `windows-zip`: `publish=true`、`PASS_REQUIRED`、public assetは`StudyReportEvaluator-win-x64.zip`とsidecarだけ。
+    2. `windows-development-msix`: `publish=false`、`PASS_MECHANISM`。MSIX、sidecar、evidenceをmatrixへbindするがRelease assetへ含めない。
+- 各rowはWindows version/build、OS/process architecture、artifact／sidecar／evidenceのbasename、bytes、SHA-256を持つ。rootのstable product versionとlowercase 40桁source commitはvalidator invocationのexpected identityへ一致させる。
+- validatorはstrict UTF-8、duplicate JSON property、row重複、unsafe basename、reparse point、size/hash drift、sidecar exact bytes、artifact-kind別evidence contract、publishable asset集合をfail-closedで検査する。
+- matrix validatorの`PASS`はmatrix、local file、evidence identityの一致だけを意味する。ZIP clean launch、MSIX unpack等のpackage behaviorはupstream package testが生成した同一hashのevidenceを使い、candidate／publish workflowがsource commitとartifact hashを再bindする。M2 validator単体をpackage execution、production trust、custom cryptographic attestationの代替にしない。
+- 現版scope外のmacOS row、自由form status、任意metadata bag、未実測artifactをv1 matrixへ追加しない。
+
 ### 13.6 製品版
 
 - 製品SemVerの単一正本はroot `Directory.Build.props`の`VersionPrefix` / `VersionSuffix`とする。

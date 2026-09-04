@@ -79,10 +79,17 @@ jobs:
           --configuration Release
           --no-build
           --no-restore
-          --filter "FullyQualifiedName!~StudyReportEvaluator.App.Tests.E2E.SampleWorkbookStructuralTests"
+          --filter "FullyQualifiedName!~StudyReportEvaluator.App.Tests.E2E.SampleWorkbookStructuralTests&FullyQualifiedName!~StudyReportEvaluator.App.Tests.Packaging.WindowsPublishPackageTests"
           --results-directory .\TestResults\ci
           --logger "trx"
           --logger "console;verbosity=minimal"
+
+      - name: Build and validate Windows ZIP regression
+        id: windows-zip
+        shell: pwsh
+        run: >-
+          .\scripts\test-windows-zip.ps1
+          -ResultsDirectory .\TestResults\ci\windows-zip
 
       - name: Build and validate unsigned MSIX mechanism
         id: unsigned-msix
@@ -113,6 +120,19 @@ jobs:
           name: test-results-${{ github.run_id }}
           path: TestResults/ci/**/*.trx
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload Windows ZIP regression evidence
+        if: ${{ steps.windows-zip.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-zip-regression-${{ github.run_id }}
+          path: |
+            artifacts/package/StudyReportEvaluator-win-x64.zip
+            artifacts/package/StudyReportEvaluator-win-x64.zip.sha256
+            artifacts/package/StudyReportEvaluator-win-x64.evidence.json
+          if-no-files-found: error
+          compression-level: 0
           retention-days: 14
 
       - name: Upload unsigned MSIX mechanism evidence

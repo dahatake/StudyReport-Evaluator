@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:study-report-evaluator:platform-release-matrix:v1",
+  "title": "StudyReport Evaluator initial Windows release matrix v1",
+  "$comment": "Schema validation is necessary but not sufficient. scripts/validate-platform-release-matrix.ps1 must bind the matrix to the expected product version and source commit and verify every referenced local file by basename, size, SHA-256, and exact sidecar content.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "productVersion",
+    "sourceCommit",
+    "rows"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "productVersion": {
+      "$ref": "#/$defs/stableProductVersion"
+    },
+    "sourceCommit": {
+      "$ref": "#/$defs/sourceCommit"
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/windowsZipRow"
+          },
+          {
+            "$ref": "#/$defs/windowsDevelopmentMsixRow"
+          }
+        ]
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "required": ["artifactKind"],
+            "properties": {
+              "artifactKind": {
+                "const": "windows-zip"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": ["artifactKind"],
+            "properties": {
+              "artifactKind": {
+                "const": "windows-development-msix"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "stableProductVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "sourceCommit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9A-F]{64}$"
+    },
+    "positiveFileSize": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "windowsVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "osName",
+        "osVersion",
+        "osBuild",
+        "osArchitecture",
+        "processArchitecture"
+      ],
+      "properties": {
+        "osName": {
+          "const": "Windows 11"
+        },
+        "osVersion": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+        },
+        "osBuild": {
+          "type": "integer",
+          "minimum": 22000,
+          "maximum": 2147483647
+        },
+        "osArchitecture": {
+          "const": "X64"
+        },
+        "processArchitecture": {
+          "const": "X64"
+        }
+      }
+    },
+    "windowsZipArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileName", "bytes", "sha256"],
+      "properties": {
+        "fileName": {
+          "const": "StudyReportEvaluator-win-x64.zip"
+        },
+        "bytes": {
+          "$ref": "#/$defs/positiveFileSize"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "windowsZipSidecar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileName", "bytes", "sha256"],
+      "properties": {
+        "fileName": {
+          "const": "StudyReportEvaluator-win-x64.zip.sha256"
+        },
+        "bytes": {
+          "$ref": "#/$defs/positiveFileSize"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "windowsZipEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileName", "bytes", "sha256"],
+      "properties": {
+        "fileName": {
+          "const": "StudyReportEvaluator-win-x64.evidence.json"
+        },
+        "bytes": {
+          "$ref": "#/$defs/positiveFileSize"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "windowsDevelopmentMsixArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileName", "bytes", "sha256"],
+      "properties": {
+        "fileName": {
+          "const": "StudyReportEvaluator-win-x64.unsigned.test.msix"
+        },
+        "bytes": {
+          "$ref": "#/$defs/positiveFileSize"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "windowsDevelopmentMsixSidecar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileName", "bytes", "sha256"],
+      "properties": {
+        "fileName": {
+          "const": "StudyReportEvaluator-win-x64.unsigned.test.msix.sha256"
+        },
+        "bytes": {
+          "$ref": "#/$defs/positiveFileSize"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "windowsDevelopmentMsixEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileName", "bytes", "sha256"],
+      "properties": {
+        "fileName": {
+          "const": "StudyReportEvaluator-win-x64.unsigned.test.evidence.json"
+        },
+        "bytes": {
+          "$ref": "#/$defs/positiveFileSize"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "windowsZipRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactKind",
+        "platform",
+        "runtimeIdentifier",
+        "publish",
+        "status",
+        "verification",
+        "artifact",
+        "sidecar",
+        "evidence"
+      ],
+      "properties": {
+        "artifactKind": {
+          "const": "windows-zip"
+        },
+        "platform": {
+          "const": "windows"
+        },
+        "runtimeIdentifier": {
+          "const": "win-x64"
+        },
+        "publish": {
+          "const": true
+        },
+        "status": {
+          "const": "PASS_REQUIRED"
+        },
+        "verification": {
+          "$ref": "#/$defs/windowsVerification"
+        },
+        "artifact": {
+          "$ref": "#/$defs/windowsZipArtifact"
+        },
+        "sidecar": {
+          "$ref": "#/$defs/windowsZipSidecar"
+        },
+        "evidence": {
+          "$ref": "#/$defs/windowsZipEvidence"
+        }
+      }
+    },
+    "windowsDevelopmentMsixRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactKind",
+        "platform",
+        "runtimeIdentifier",
+        "publish",
+        "status",
+        "verification",
+        "artifact",
+        "sidecar",
+        "evidence"
+      ],
+      "properties": {
+        "artifactKind": {
+          "const": "windows-development-msix"
+        },
+        "platform": {
+          "const": "windows"
+        },
+        "runtimeIdentifier": {
+          "const": "win-x64"
+        },
+        "publish": {
+          "const": false
+        },
+        "status": {
+          "const": "PASS_MECHANISM"
+        },
+        "verification": {
+          "$ref": "#/$defs/windowsVerification"
+        },
+        "artifact": {
+          "$ref": "#/$defs/windowsDevelopmentMsixArtifact"
+        },
+        "sidecar": {
+          "$ref": "#/$defs/windowsDevelopmentMsixSidecar"
+        },
+        "evidence": {
+          "$ref": "#/$defs/windowsDevelopmentMsixEvidence"
+        }
+      }
+    }
+  }
+}

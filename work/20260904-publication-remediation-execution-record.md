@@ -567,3 +567,168 @@ opt-in `RealDataSystemSmokeTests`とLive AIはB1-02および計画§5.1どおり
 - remote SHA一致、content data included = false。
 
 **Status: PASS**
+
+## 21. B1-21 — hosted CI確認
+
+### 実行結果
+
+- CI run: [`33833693768`](https://github.com/dahatake/StudyReport-Evaluator/actions/runs/33833693768)、run number 4、`workflow_dispatch`。
+- evaluated head SHA: `855fec259104b772fc56e79b0696c622b54c7c7f`。
+- run全体は`completed/success`。Windows、`macos-15`、`macos-15-intel`の3/3 jobが`completed/success`、annotations 0。
+- Windows deterministic testsは679/679 PASS、version self-testは14 assertions PASS、development MSIXは`PASS_MECHANISM`。
+- macOS contractは各runner 17/17 PASS。
+- artifactsはtest results、unsigned MSIX mechanism、macOS 2 runnerの計4件。tempへdownloadしてnonzero file 8件、zero-byte 0、private-looking filename 0を確認後、tempを削除した。
+
+### 敵対的レビュー
+
+採用:
+- run／job／step／artifact APIとdownloaded artifact集合を照合し、uploadだけのfalse-greenでないことを確認した。
+
+棄却:
+- hosted deterministic testsを670件とするレビュー記述は旧delivery baselineの件数であり、今回runの実測679件と一致しない。
+- failed testでもTRXをuploadする条件は一次failure証跡を残す意図であり、step自体のfailureをsuccessへ変えないためfalse-greenではない。
+- Windows deterministic stepは9分12秒で成功し、job timeout 60分内。成功実測だけからperformance defectを作らない。
+
+### 反映確認
+
+- exact SHA、3 job、全required step、4 artifactが一致。
+- completion conditionを満たし、unresolved Critical/High 0、content data included = false。
+
+**Status: PASS**
+
+## 22. M2-01 — closed JSON Schema
+
+### 実行結果
+
+- `eng/schemas/platform-release-matrix-v1.schema.json`をdraft 2020-12で追加した。
+- root、row、nested descriptorを全てclosedとし、Windows ZIP 1行とdevelopment MSIX 1行だけを要求した。
+- ZIPは`publish=true`／`PASS_REQUIRED`、MSIXは`publish=false`／`PASS_MECHANISM`へ固定した。macOS rowは追加していない。
+- product version、source commit、exact Windows environment、artifact／sidecar／evidenceのbasename・bytes・SHA-256をrequiredにした。
+
+### 出典
+
+- repository: `docs/requirements-definition.md` v4.3 AC-028／TR-29、`SystemTest-prompt.md` ST-UC-25、`dev/docs/detailed-design.md` §13.5。
+- Microsoft Learn: [`Test-Json` PowerShell 7.6](https://learn.microsoft.com/powershell/module/microsoft.powershell.utility/test-json?view=powershell-7.6)。7.4以降はstrict JSON parsingとJsonSchema.NETを使用し、`-SchemaFile`でschema適合時だけ`$true`を返す。
+
+### 敵対的レビュー
+
+- PowerShell 7.6の実validatorで正例`True`、unknown root property`False`、missing row`False`を確認した。
+- schema／計画diagnostics 0件。
+- 再レビューはdraft、closure、row cardinality、publish/status/basename、macOS非追加、後続semantic境界を確認し、unresolved Critical/High 0。
+
+### 反映確認
+
+- 計画M2-01〜03の旧production-only記述をv4.3 initial Windows scopeへ同期した。
+- content data included = false。
+
+**Status: PASS**
+
+## 23. M2-02 — semantic validator
+
+### 実行結果
+
+- `scripts/validate-platform-release-matrix.ps1`を追加した。
+- PowerShell Core 7.4+／strict UTF-8／duplicate JSON property拒否／closed schemaを要求した。
+- expected product version／source commit、2 rowの一意性、publish/status/environment、safe basename、reparse point、実file bytes/SHA-256、sidecar exact bytes、evidence bytes/SHA-256を検証する。
+- ZIP evidenceをsource、product、host、package、8 required checkへbindした。
+- development MSIX evidenceをsource、clean status、host、exact BuildTools、MakeAppx trust、identity/publisher/version、block map、CLI、negative policy、limitations、synthetic assetへbindした。
+- outputのpublishable assetはWindows ZIPとsidecarの2件だけである。
+
+### 敵対的レビュー
+
+採用:
+- 初版はevidenceをvalid JSONとhashだけで受理し、`{}`へdescriptorを追随させるfalse PASSが可能だった。artifact-kind別closed property setとsemantic bindingを追加した。
+- PowerShell 7.6の`ConvertFrom-Json`がISO日時を型変換したため、`-DateKind String`で原文を保持した。
+- shapeだけだったMSIX tool／identity fieldを既知のexact契約へ固定した。
+
+棄却:
+- artifact、evidence、descriptor、trusted workflow sourceを全て同時改ざんする攻撃者に対するcustom attestation追加は、repository write compromiseの別境界であり、計画§5.1の非追加項目である。M2 validatorはpackage実行を重複せず、upstream package testと後続protected workflowが同一hashへbindする。
+- 4-byte synthetic artifactはmatrix/file identity testの隔離fixtureであり、production package evidenceではない。
+
+### 反映確認
+
+- parser／diagnostics 0件。
+- 正例、artifact hash改ざん、descriptor追随CRLF sidecar、descriptor追随evidence status改ざんを含むcontract tests 9/9 PASS。
+- 最終再レビューは責務境界と単一file/evidence改ざんを確認し、unresolved Critical/High 0。
+- content data included = false。
+
+**Status: PASS**
+
+## 24. M2-03 — matrix validator tests
+
+### 実行結果
+
+- `ReleaseMatrixContractTests.cs`を追加した。
+- valid、unknown property、duplicate artifact kind、missing row、non-PASS、artifact hash mismatch、descriptor追随sidecar mismatch、wrong basename、descriptor追随evidence tamperの9 caseを独立testにした。
+- 各testは一意なOS temp directoryだけを使用し、終了時に削除をassertする。workspace artifactは変更しない。
+
+### 敵対的レビュー
+
+採用:
+- 初回compileでnullable `string?[]`とexpected `string[]`の不一致を検出し、nullを明示拒否して修正した。
+- evidence hashだけを追随させる負例を、M2-02 adversarial findingの回帰testとして追加した。
+
+棄却:
+- test fixtureのsynthetic bytesをproduction artifactとみなす指摘は、test名・temp境界・evidence値がproduction claimを作らず、semantic validatorだけをisolated testする設計と一致しない。
+
+### 反映確認
+
+- 9/9 PASS、failed/skipped/warning/error 0。
+- 再レビューはcase独立性、temp cleanup、argument safety、required negative coverageを確認し、unresolved Critical/High 0。
+- content data included = false。
+
+**Status: PASS**
+
+## 25. M2-04 — detailed design link
+
+### 実行結果
+
+- `dev/docs/detailed-design.md` §13.5.1へschema、validator、direct testの正本pathを追加した。
+- exactly 2 row、artifact kindごとのpublish/status、Windows environment、file/evidence binding、exact public asset setを記載した。
+- validatorの`PASS`はmatrix／file／evidence identity一致だけを意味し、package execution、production trust、custom attestationの代替ではないと明記した。
+- macOS row、自由form status、任意metadata、未実測artifactをv1へ追加しない境界を記載した。
+
+### 敵対的レビュー
+
+- 要求AC-028／TR-29、ST-UC-25、schema、validator、9 direct testsへ照合した。
+- 実装していないpackage実行を保証する記述、path誤り、row/status矛盾、macOS production claimは確認されなかった。
+- 再レビューはunresolved Critical/High 0。
+
+### 反映確認
+
+- matrix 9件＋DocumentationContractTests 14件、aggregate 23/23 PASS。
+- warning/error 0、diagnostics 0件、`git diff --check` exit 0。
+- content data included = false。
+
+**Status: PASS**
+
+## 26. R2-01 — CIをWindows ZIP + development MSIX regressionへ確定
+
+### 実行結果
+
+- `scripts/test-windows-zip.ps1`を追加し、clean Windows 11 x64 checkoutだけで`WindowsPublishPackageTests` 3件を実行するrequired regressionとした。
+- driverはTRXのexact 3 PASS、ZIP／sidecarのnonzero・reparse point・exact LF sidecar、safe archive layout、required entry、bundled CLI hash、利用者workbook除外と外部sentinel不変を検証する。
+- closed evidenceは`windows-zip-required`／`PASS_REQUIRED`、exact source／product／host／package identityと8 required checkだけを記録する。`PASS_PRODUCTION`は生成しない。
+- CIのgeneral deterministic suiteから同classを除外し、専用stepで1回だけ実行する。step成功時だけZIP、sidecar、evidenceのexact 3 fileを独立Actions artifactへuploadする。
+- development MSIXは既存の別step／別control artifactで`PASS_MECHANISM`を維持し、MSIX本体をpublic Release assetにしていない。
+
+### 敵対的レビュー
+
+採用:
+- 初回レビューで、dirty sourceやsentinel cleanup失敗時に前runの`PASS_REQUIRED` evidenceが残り得るHigh findingを確認した。既存evidence削除をclean-source gateより前へ移し、atomic evidence commitをsentinel cleanup確認より後へ移した。
+- `WindowsInstallerPackageTests`へ「evidence削除 < clean gate < sentinel cleanup < evidence commit」の順序と、CI分離／conditional exact artifact pathを固定するstatic contractを追加した。
+- synthetic stale evidenceを置いたdirty checkoutでdriverを実行し、exit 1、stale evidence不存在を実測した。
+
+棄却:
+- 例外表示の行折り返しに依存する全文文字列照合はproduct contractではない。fail-closed判定は非zero exitとevidence不存在で確認した。
+- GitHub Actions artifact uploadをpublic GitHub Releaseとみなす解釈は誤り。R2-01はsecret-free CI control artifactだけを生成し、公開は後続R2-02／03の別境界で行う。
+
+### 反映確認
+
+- Windows ZIP package 3件＋Windows installer/static contract 6件、aggregate 9/9 PASS、failed/skipped 0。
+- workflow／PowerShell／C# diagnostics 0件、`git diff --check` exit 0。
+- post-fix read-only adversarial reviewはstale evidence、exactly-once実行、exact 3-file conditional upload、MSIX非公開境界、static contractを再確認し、unresolved Critical/High 0。
+- clean checkoutでのdriver全体成功とActions artifact実体はcheckpoint push後のexact-SHA hosted CIで確認するため、hosted completionは未実行のまま保持する。
+- content data included = false。
+
+**Status: PASS_LOCAL_PENDING_HOSTED_CI**

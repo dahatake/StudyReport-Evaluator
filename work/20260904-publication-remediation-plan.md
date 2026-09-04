@@ -407,23 +407,23 @@ OS標準UIのmanual journeyを実artifact生成前に自動化したことにで
 #### M2-01 closed JSON Schema
 
 - **新規file:** `eng/schemas/platform-release-matrix-v1.schema.json`。
-- **設計:** rootとrowは`additionalProperties:false`。Windows rowとmacOS rowを`oneOf`で分ける。
-- **最小required field:** schemaVersion、productVersion、sourceCommit、rows、platform、RID、exact OS version/build、native architecture、artifact basename/bytes/SHA-256、sidecar SHA-256、non-secret signer identity、macOS notary submission ID、lifecycle evidence basename/SHA-256、status。
-- **非追加:** 任意metadata bag、将来platform extension、自由form status。
+- **設計:** root、row、nested descriptorを全て`additionalProperties:false`とする。初回scopeはWindows ZIP rowとWindows development MSIX rowを`oneOf`で分け、各1行だけを要求する。
+- **最小required field:** schemaVersion、productVersion、sourceCommit、rows、artifactKind、platform、RID、publish、exact Windows version/build、OS/process architecture、artifact basename/bytes/SHA-256、sidecar basename/bytes/SHA-256、evidence basename/bytes/SHA-256、status。
+- **固定境界:** Windows ZIPは`publish=true`／`PASS_REQUIRED`、development MSIXは`publish=false`／`PASS_MECHANISM`。未実測macOS row、任意metadata bag、将来platform extension、自由form statusを追加しない。
 - **依存:** P0-01。
 
 #### M2-02 semantic validator
 
 - **新規file:** `scripts/validate-platform-release-matrix.ps1`。
 - **変更:** PowerShell 7 `Test-Json -SchemaFile`と明示semantic checksだけを実装する。
-- **検証内容:** source/version一意、row重複なし、required OS/arch組合せ、public asset名、実file size/hash、sidecar exact match、evidence hash、全status=`PASS_PRODUCTION`。
+- **検証内容:** expected source/version一致、row重複なし、Windows ZIP／development MSIX各1行、artifact kindごとのpublish/status、required OS/arch、実file size/hash、sidecar exact content/hash、evidence size/hash。
 - **禁止:** network、secret取得、artifact生成。
 - **依存:** M2-01。
 
 #### M2-03 matrix validator tests
 
 - **新規file:** `tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseMatrixContractTests.cs`。
-- **変更:** temp JSON/fileを使い、valid、unknown property、duplicate row、missing row、non-PASS、hash mismatch、wrong asset名を個別に検証する。
+- **変更:** temp JSON/fileを使い、valid、unknown property、duplicate row、missing row、non-PASS、hash mismatch、sidecar mismatch、wrong asset名を個別に検証する。
 - **依存:** M2-02。
 
 #### M2-04 detailed design link
@@ -431,6 +431,33 @@ OS標準UIのmanual journeyを実artifact生成前に自動化したことにで
 - **編集file:** `dev/docs/detailed-design.md`。
 - **変更:** matrix schema/validatorの正本pathと、required rowの意味だけを追記する。
 - **依存:** M2-01〜03。
+
+### Phase 2R — initial Windows release automation
+
+#### R2-01 CIをWindows ZIP + development MSIX regressionへ確定
+
+- **新規file:** `scripts/test-windows-zip.ps1`。
+- **編集file:** `.github/workflows/ci.yml`、`WindowsInstallerPackageTests.cs`。
+- **変更:** Windows ZIP 3 testをgeneral deterministic stepから分離し、clean sourceで1回だけ実行する。ZIP／sidecar／closed `PASS_REQUIRED` evidenceを独立artifactへuploadする。development MSIXは別stepの`PASS_MECHANISM`とし、MSIX本体をpublic Releaseへ含めない。
+- **検証:** local parser／static contract／ZIP focused tests、exact commitのhosted Windows + macOS 2 job、test／ZIP／MSIX／macOS evidence artifact。
+- **依存:** B1-21、M2-04。
+
+#### R2-02 draft-only Windows ZIP candidate workflow
+
+- **新規file:** 必要最小限のmatrix writer script。
+- **編集file:** `.github/workflows/release.yml`。
+- **変更:** stable annotated tagをcheckoutし、version／CHANGELOG／clean source、required tests、Windows ZIP、development MSIX、matrixを検証する。GitHub Releaseへ添付するのはZIPとsidecarだけで、常にdraftを作る。`draft=false`入力、既存Release上書き、asset clobber、prerelease暗黙公開を許可しない。
+- **control artifact:** matrix、ZIP evidence、development MSIX evidenceとvalidator入力をActions artifactへ保存する。development MSIXをdraft assetへ含めない。
+- **検証:** workflow contract test、local package/matrix gate、tag前はworkflow dispatchしない。
+- **依存:** R2-01、M2-04。
+
+#### R2-03 protected publish workflowとcontract tests
+
+- **新規file:** `.github/workflows/publish-release.yml`、`ReleaseWorkflowContractTests.cs`。
+- **変更:** existing draft tagとcandidate run IDを入力とし、protected environment approval後にcandidate control artifactとdraft ZIP／sidecarをfresh downloadする。tag／source／version／CHANGELOG／asset set／hash／matrixを再検証し、公開を最終write stepにする。
+- **禁止:** artifact生成・置換、`--clobber`、tag作成、non-draft編集、matrix不足時公開、development MSIX／secret／macOS artifactのRelease添付。
+- **検証:** positive/static contractとmissing matrix、wrong run/SHA、non-draft、asset drift、publish-before-validationのnegative contract。
+- **依存:** R2-02。
 
 ### Phase 3W — Windows production MSIX（SUPERSEDED — 実行しない）
 
