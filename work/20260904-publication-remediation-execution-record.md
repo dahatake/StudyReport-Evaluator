@@ -722,16 +722,20 @@ opt-in `RealDataSystemSmokeTests`とLive AIはB1-02および計画§5.1どおり
 棄却:
 - 例外表示の行折り返しに依存する全文文字列照合はproduct contractではない。fail-closed判定は非zero exitとevidence不存在で確認した。
 - GitHub Actions artifact uploadをpublic GitHub Releaseとみなす解釈は誤り。R2-01はsecret-free CI control artifactだけを生成し、公開は後続R2-02／03の別境界で行う。
+- 初回hosted失敗を受けて「ローカルでもdirty treeのままclean gateを迂回して全経路を実行する」案は採用しない。clean-source要求はevidenceの前提そのものであり、迂回はevidenceの意味を失わせる。checkpoint commitでworktreeをcleanにしてから実行する運用へ変更した。
 
 ### 反映確認
 
 - Windows ZIP package 3件＋Windows installer/static contract 6件、aggregate 9/9 PASS、failed/skipped 0。
 - workflow／PowerShell／C# diagnostics 0件、`git diff --check` exit 0。
 - post-fix read-only adversarial reviewはstale evidence、exactly-once実行、exact 3-file conditional upload、MSIX非公開境界、static contractを再確認し、unresolved Critical/High 0。
-- clean checkoutでのdriver全体成功とActions artifact実体はcheckpoint push後のexact-SHA hosted CIで確認するため、hosted completionは未実行のまま保持する。
+- 初回hosted CI run [`33837919361`](https://github.com/dahatake/StudyReport-Evaluator/actions/runs/33837919361)はZIP stepで失敗した。原因は`Assert-SafeArchiveEntry`の`$Seen`が空`HashSet`で`[Parameter(Mandatory)]`にbindできない実装欠陥である。最小再現で`Cannot bind argument to parameter 'Seen' because it is an empty collection.`を再現し、`[AllowEmptyCollection()]`追加で解消することを確認して修正し、順序をstatic contractへ固定した。dirty local treeではclean-source gateで早期終了するため、この経路はhosted CIまで到達していなかった。
+- 修正後はcommit `efc2aee...`のclean worktreeでdriverをローカル完全実行し、exit 0、ZIP 156,214,400 bytes、sidecar exact bytes一致、evidence `PASS_REQUIRED`／sourceCommit一致／checks 8件true、実行後もworktree cleanを実測した。
+- 同一SHAのhosted CI run [`33844318251`](https://github.com/dahatake/StudyReport-Evaluator/actions/runs/33844318251)は`success`。Windows／macOS 15／macOS 15 Intelの3/3 jobと全stepが成功した。
+- artifactは5件、全12 fileがnonempty、zero-byte 0、private-looking filename 0。ZIP artifactはZIP／sidecar／evidenceのexact 3 file、MSIX artifactはMSIX本体を含まないsidecar／evidenceの2 fileで`PASS_MECHANISM`かつ`PASS_PRODUCTION`不在だった。
 - content data included = false。
 
-**Status: PASS_LOCAL_PENDING_HOSTED_CI**
+**Status: PASS**
 
 ## 27. R2-02 — draft-only Windows ZIP candidate workflow
 

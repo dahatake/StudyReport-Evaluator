@@ -11,14 +11,16 @@ StudyReport Evaluatorの利用者に影響する変更をこのファイルへ�
 - student row単位のatomic checkpoint、中断後の再開、4 sheet構成のfinal workbook、criterion overrideの別名出力。
 - アプリケーション版の単一正本、開発者向け版管理手順、版操作・検証tool。
 - 利用者ガイド、現行UI画像、Prompt起動ガイド。
-- Windows 11 x64向けMSIXとmacOS ARM64/x64向けDMGを、署名・公証・clean-machine証跡が揃ったplatformだけ公開するdelivery pipelineを追加中。
+- Windows 11 x64向けself-contained ZIPとSHA-256 sidecarを、clean checkoutの回帰検証を通過した場合だけ公開するdelivery pipeline。
+- 公開前のdraft作成workflowと、承認必須のprotected publish workflowへの分離。
 
 ### Changed
 
 - 標準`.xlsx`をread-onlyで扱い、入力を変更せず別fileへatomic出力する契約へ統一。
 - AIへ送るworkbook値をcurrent rowの選択済みsourceへ限定し、application logへ回答・Prompt・reason・evidence・credentialを記録しない境界を明文化。
-- 開発者向け文書を`dev/docs/`へ分離し、利用者向けREADMEと`docs/`を要求v4.2へ同期。
-- end-user setupのprimary pathを、WindowsはMSIXのInstall、macOSはDMGからApplicationsへの配置という各3操作以内へ簡素化する。
+- 開発者向け文書を`dev/docs/`へ分離し、利用者向けREADMEと`docs/`を要求v4.3へ同期。
+- 初回公開のWindows配布物をself-contained ZIPとsidecarへ確定し、開発用unsigned MSIXは一般配布しない検証専用の位置づけへ変更。
+- macOSの署名・公証済みDMG提供は現版scope外とし、sourceと静的契約のみ維持。
 - 初回公開前の製品候補版を`0.8.0`へ再設定。
 
 ### Fixed
