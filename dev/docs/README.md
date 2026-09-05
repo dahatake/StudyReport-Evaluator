@@ -69,6 +69,14 @@ flowchart LR
 
 historical fileへ追加した先頭bannerはpost-gate navigation metadataです。本文内のbytes / SHA-256 / commit identityは、明記されたhistorical content commitのbytesを指し、banner追加後のworking-tree bytesを指しません。
 
+## 長時間エージェントの復旧
+
+- `model_max_prompt_tokens_exceeded`はCopilotへの入力コンテキスト超過であり、本アプリの例外やテスト失敗とは区別する。同じ要求の再送だけでは入力は減らない。
+- このworkspaceでは自動要約を有効にし、閾値をcontext windowの50%に設定する。`chat.agent.maxRequests=50`は反復回数の制限であり、token上限を増やす設定ではない。50%は本workspaceの予防的な設定値で、上限超過を必ず防ぐ保証ではない。
+- 既に超過した会話は`/compact`またはcontext windowメニューのCompact Conversationで縮約する。失敗する場合は新しい会話へ、commit、未完了項目、証跡のfile pathだけを引き継ぐ。会話保存fileの直接編集・削除は行わない。[VS Code — Manage session context](https://code.visualstudio.com/docs/agents/run/sessions/manage-sessions#_manage-session-context)
+- 大きなログ・同じ画像・読了済み資料を繰り返し添付しない。ログ調査はエラー行と集計を先に確認する。[VS Code — Troubleshoot AI](https://code.visualstudio.com/docs/agents/agent-troubleshooting/troubleshooting#_debug-chat-interactions)
+- build、test、publishは同じcheckoutで同時実行しない。複雑なPowerShell処理は`.ps1`として構文確認後に実行し、終了コードを確認する。`foreach (...) { ... }`の直後へ直接パイプを付けず、結果を変数に代入してから処理する。
+
 ## Pinned toolchain
 
 | Item | Pinned value | Source |
