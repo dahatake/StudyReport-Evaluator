@@ -455,15 +455,18 @@ public sealed class DocumentationContractTests
 
         AssertContainsAll(
             requirements,
-            "| 文書版 | 4.3 |",
-            "| 基準日 | 2026-09-04 |",
+            "| 文書版 | 4.4 |",
+            "| 基準日 | 2026-09-05 |",
             "ADR-0013",
             "| 対応環境 | Windows 11 x64。macOS、Linux、Windows Arm64は現版の正式公開対象外 |",
             "`sample/SampleReport.xlsx`",
             "| Bytes | 470,806 |",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
             "| package entries / relationships | 11 / 8 |",
-            "同directoryの他fileを列挙、fallback、代用しない");
+            "同directoryの他fileを列挙、fallback、代用しない",
+            "利用者が主回答列を選択した場合",
+            "交差セルが空または存在しない場合は質問文を空として扱い",
+            "`HEADER_METADATA_MISMATCH`で再読込を要求");
         AssertDoesNotContainAny(
             requirements,
             "sample/realdata.xlsx",
@@ -523,7 +526,7 @@ public sealed class DocumentationContractTests
             "TR-13 / TR-14 / AC-014 / AC-015",
             "TR-15 / AC-012 / AC-016",
             "TR-16 / AC-019",
-            "TR-17 / AC-016 / AC-017",
+            "TR-17 / AC-002 / AC-016 / AC-017",
             "TR-18 / AC-018",
             "TR-19 / AC-020",
             "TR-20 / AC-020",
@@ -555,17 +558,29 @@ public sealed class DocumentationContractTests
         Assert.Equal(Enumerable.Range(1, 29), coveredRequirementIds);
         AssertContainsAll(
             prompts,
-            "| 対象 | StudyReport Evaluator v4.3 |",
-            "| 基準日 | 2026-09-04 |",
-            "| 要求正本 | `docs/requirements-definition.md` v4.3 |",
+            "| 対象 | StudyReport Evaluator v4.4 |",
+            "| 基準日 | 2026-09-05 |",
+            "| 要求正本 | `docs/requirements-definition.md` v4.4 |",
             "`sample/SampleReport.xlsx`",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
-            "他fileを列挙、fallback、代用しない");
+            "他fileを列挙、fallback、代用しない",
+            "question row 1と2の各fixtureで主回答列を変更すると",
+            "Inputの主回答列ComboBoxを操作すると");
         Assert.DoesNotContain("sample/realdata.xlsx", prompts, StringComparison.OrdinalIgnoreCase);
         AssertContainsAll(
             realDataSmoke,
-            "requirements = \"docs/requirements-definition.md v4.3\"",
-            "system_test_prompt = \"SystemTest-prompt.md v4.3\"");
+            "requirements = \"docs/requirements-definition.md v4.4\"",
+            "system_test_prompt = \"SystemTest-prompt.md v4.4\"");
+        AssertContainsAll(
+            Read("docs/getting-started.md"),
+            "主回答列を選択すると",
+            "設問text**へ即座に表示",
+            "**見出し行を再読込**");
+        AssertContainsAll(
+            Read("docs/features.md"),
+            "設問textへそのまま即座に反映",
+            "空または存在しないheader cellには代替文を生成しません",
+            "同一Questionの主回答列と補助列に同じ列を重複指定することはできません");
     }
 
     [Fact]

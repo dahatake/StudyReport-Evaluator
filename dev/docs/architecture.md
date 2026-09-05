@@ -2,7 +2,7 @@
 
 | 項目 | 内容 |
 |---|---|
-| Current requirement | requirements v4.3 |
+| Current requirement | requirements v4.4 |
 | Current decision | ADR-0012（機能）/ ADR-0015（Windows ZIP public / development MSIX）。current public evidence境界はADR-0013 |
 | Detailed design | [`detailed-design.md`](detailed-design.md) |
 | Production projects | 2（Core / App） |
@@ -35,7 +35,7 @@ flowchart LR
 ```mermaid
 flowchart TD
     Launch[GUI / --input / --prompt] --> Input[native picker or path\nread-only xlsx]
-    Input --> Mapping[sheet / question row 1 or 2\nnormal + special columns]
+    Input --> Mapping[sheet / question row 1 or 2\nprimary column to question text\nnormal + special columns]
     Mapping --> Draft[v4 definition draft]
     Draft --> Snapshot[immutable canonical snapshot + SHA-256]
     Snapshot --> Admission[allocation / workbook / formula / request / model preflight]
@@ -141,7 +141,7 @@ checkpointとoutputはinput全体、Prompt、reference、AI resultを含むた�
 - Windows primary setupはZIPとsidecarの取得、SHA-256確認、展開、apphost起動とし、別runtime installを要求しない。development MSIXを一般利用者手順へ含めない。
 - current public claimはWindows 11 x64 unsigned ZIPだけとする。development MSIX、cross-publish、framework supportを製品証跡にしない。
 - 同じrelease matrixへWindows ZIPの`publish=true`行とdevelopment MSIXの`publish=false`行を記録するが、Releaseへ進めるのはrequired statusを満たす`publish=true`行だけとする。
-- macOS、Linux、Windows Arm64、universal macOS artifact、Store配布はv4.3 public scope外である。
+- macOS、Linux、Windows Arm64、universal macOS artifact、Store配布はv4.4 public scope外である。
 
 ```mermaid
 flowchart LR

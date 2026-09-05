@@ -12,7 +12,7 @@
 | [詳細設計書](detailed-design.md) | 開発、アーキテクト、QA | v4 domain、AI operation、formula、checkpoint、UI、Windows/macOS delivery設計 |
 | [Excel / formula契約](excel-contract.md) | 開発、Excel監査、QA | sheet、formula、blank、preflight、atomic commit |
 | [Traceability](traceability.md) | QA、リリース | AC / TR / implementation / test / gate対応 |
-| [要求定義書](../../docs/requirements-definition.md) | 要求所有者、QA | v4.3規範baseline |
+| [要求定義書](../../docs/requirements-definition.md) | 要求所有者、QA | v4.4規範baseline |
 | [ADR-0012](adr/0012-point-allocation-similarity-resume-portability.md) | アーキテクト | 配点、AI operation、formula、checkpoint、Prompt起動 |
 | [ADR-0013](adr/0013-windows-only-public-release.md) | アーキテクト、リリース | 現行platform/release scope decision |
 | [ADR-0014](adr/0014-product-versioning.md) | アーキテクト、リリース | 製品SemVer、単一正本、tag/release identity |
@@ -31,7 +31,8 @@ flowchart LR
     V4 -->|verified release scope| V41[requirements v4.1\nADR-0013]
     V41 --> V42[requirements v4.2\nADR-0015 delivery expansion]
     V42 --> V43[requirements v4.3\nWindows ZIP + development MSIX]
-    V43 --> IMPL[current source + deterministic tests]
+    V43 --> V44[requirements v4.4\nprimary column to question text]
+    V44 --> IMPL[current source + deterministic tests]
     IMPL --> GATE[generated gate evidence]
     GATE --> AUDIT[post-gate conformance audit\n2 gaps found]
     AUDIT --> CLOSE[commit 69e4b99\n2 gaps closed]
@@ -60,7 +61,7 @@ flowchart LR
 
 1. current production source
 2. current deterministic tests
-3. current requirements v4.3 / ADR-0012 / ADR-0013 / ADR-0014 / ADR-0015 / detailed design / version-management
+3. current requirements v4.4 / ADR-0012 / ADR-0013 / ADR-0014 / ADR-0015 / detailed design / version-management
 4. generated ignored gate・performance・package evidence
 5. historical ADR・preflight
 
@@ -72,7 +73,7 @@ historical fileへ追加した先頭bannerはpost-gate navigation metadataです
 
 | Item | Pinned value | Source |
 |---|---:|---|
-| Product version | `0.8.1` candidate | [`Directory.Build.props`](../../Directory.Build.props)、[版管理手順](version-management.md) |
+| Product version | `0.8.2` candidate | [`Directory.Build.props`](../../Directory.Build.props)、[版管理手順](version-management.md) |
 | .NET SDK | 10.0.400、latestPatch | [`global.json`](../../global.json) |
 | Target framework | `net10.0` | [`Directory.Build.props`](../../Directory.Build.props) |
 | Avalonia | 12.1.1 | [`Directory.Packages.props`](../../Directory.Packages.props) |

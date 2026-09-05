@@ -4,7 +4,7 @@
 
 ## Provenance
 
-- 生成日: 2026-09-02
+- 生成日: 2026-09-05
 - renderer: Avalonia 12.1.1 Headless + Skia
 - size: 1440 × 1050 pixels
 - generator source: `tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs`（repositoryでのみ利用。配布ZIPにはsourceを含めない）
@@ -25,8 +25,8 @@
 |---|---|---|
 | [`01-input-workbook.png`](01-input-workbook.png) | 入力画面上部 | native picker、full path、read-only読込、sheet、質問文行、回答行、候補 |
 | [`02-input-mapping.png`](02-input-mapping.png) | 入力mapping | question表示名、設問text、primary / supporting columns |
-| [`03-design-knowledge.png`](03-design-knowledge.png) | Knowledge設計 | evaluator、range、criterion、read-only semantic Prompt |
-| [`04-design-custom-prompt.png`](04-design-custom-prompt.png) | Custom設計 | editable Prompt、required placeholders、criterion |
+| [`03-design-knowledge.png`](03-design-knowledge.png) | 設問一覧とKnowledge選択 | 採点計算式、現在値、2設問カード、選択カード |
+| [`04-design-custom-prompt.png`](04-design-custom-prompt.png) | Custom設計 | 採点計算式、適用先、editable Prompt、required placeholders、criterion |
 | [`05-execution-auto.png`](05-execution-auto.png) | 実行準備 | fake login、Auto、concurrency 2、new/resume、output directory |
 | [`06-results-review.png`](06-results-review.png) | 結果review | 402 operations、自動final path、row別配点・減点・Final score |
 | [`07-output-export.png`](07-output-export.png) | override出力 | synthetic raw/overrideと未使用の別名output path |

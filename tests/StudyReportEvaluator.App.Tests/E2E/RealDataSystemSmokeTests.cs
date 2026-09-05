@@ -291,8 +291,8 @@ public sealed partial class RealDataSystemSmokeTests
                     commit = Environment.GetEnvironmentVariable(SourceCommitEnvironmentVariable) ?? "UNRECORDED",
                     worktree_status_sha256 = Environment.GetEnvironmentVariable(SourceStatusHashEnvironmentVariable) ?? "UNRECORDED",
                     test_driver = "tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs",
-                    requirements = "docs/requirements-definition.md v4.3",
-                    system_test_prompt = "SystemTest-prompt.md v4.3",
+                    requirements = "docs/requirements-definition.md v4.4",
+                    system_test_prompt = "SystemTest-prompt.md v4.4",
                 },
                 environment = new
                 {

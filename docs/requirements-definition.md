@@ -2,17 +2,17 @@
 
 | 項目 | 内容 |
 |---|---|
-| 文書版 | 4.3 |
-| 基準日 | 2026-09-04 |
+| 文書版 | 4.4 |
+| 基準日 | 2026-09-05 |
 | 状態 | Windows ZIP初回公開・development MSIX検証 baseline |
 | 入力 | Microsoft Forms または Google Forms から export した標準 `.xlsx` 1ファイル |
 | 出力 | 入力を変更せず作成する別の標準 `.xlsx` 1ファイル |
 | 対応環境 | Windows 11 x64。macOS、Linux、Windows Arm64は現版の正式公開対象外 |
 | UI / Runtime | Avalonia / .NET 10 self-contained |
 | AI | GitHub Copilot SDK for .NET。通常評価は利用者選択model、参照回答と類似度は `auto` |
-| 旧版 | v4.2の機能契約をcarry forwardし、外部production signing入力なしで成立する初回公開境界へdelivery scopeを改版。v3.0はv4.0により全面的にsupersede済み |
+| 旧版 | v4.3の機能・delivery契約をcarry forwardし、主回答列選択時の設問text同期を追加。v3.0はv4.0により全面的にsupersede済み |
 
-> 本版は、v4.2までの機能契約に加え、2026-09-04の要求所有者指示「開発用のMSIXでOK」「外部ブロッカーの情報はない」を反映する。初回公開は[ADR-0013](../dev/docs/adr/0013-windows-only-public-release.md)のWindows 11 x64 self-contained unsigned ZIPとSHA-256 sidecarを使用する。MSIXは証明書不要のdevelopment mechanism検証に限定し、一般利用者へ配布しない。macOS用source foundationは保持するが、Developer ID、notarization、approved icon、native clean-host evidenceがないため現版の公開対象・required acceptanceに含めない。[ADR-0015](../dev/docs/adr/0015-windows-macos-installer-delivery.md)はこのscope変更へ同期する。
+> 本版は、v4.3までの機能・delivery契約に加え、2026-09-05の要求所有者指示「主回答列を選択したら、その列のExcelのシートの値を設問 textに表示」を反映する。初回公開は[ADR-0013](../dev/docs/adr/0013-windows-only-public-release.md)のWindows 11 x64 self-contained unsigned ZIPとSHA-256 sidecarを使用する。MSIXは証明書不要のdevelopment mechanism検証に限定し、一般利用者へ配布しない。macOS用source foundationは保持するが、Developer ID、notarization、approved icon、native clean-host evidenceがないため現版の公開対象・required acceptanceに含めない。[ADR-0015](../dev/docs/adr/0015-windows-macos-installer-delivery.md)のv4.3 delivery決定は本版でも維持する。
 >
 > 本書の「AI評価」は成績を確定する自動判定ではない。AIは定量化候補を作り、最終的な評点と利用判断の責任は利用者が負う。
 
@@ -104,6 +104,10 @@ Microsoft Excel、Office、LibreOffice、COM automationはrequired runtimeでは
 6. 各設問は、質問文、主回答列、0件以上の補助列を持つ。
 7. mapping候補は自動提示するが、すべて画面で変更できる。
 8. 同一質問内で主回答列と補助列を重複させない。別質問間で同じ列を使うことは許可する。
+9. 利用者が主回答列を選択した場合、選択中worksheetの質問文行と当該列が交差する1セルの値を、同じ設問の質問文へ即時反映する。回答行や列全体の値は連結しない。
+10. 主回答列を選び直すたびに質問文を新しい交差セルの値で置き換える。反映後も利用者は質問文を手動変更できるが、その後に主回答列を再選択した場合は再び交差セルの値を反映する。
+11. 交差セルが空または存在しない場合は質問文を空として扱い、列名や代替文を生成しない。質問文の必須検証を表示し、利用者の手入力で解消できるようにする。
+12. 質問文行を変更してmetadataを再読込する前は、以前の質問文行の値を反映しない。現在の質問文を保持し、質問文行とmetadataの不一致を解消する再読込を要求する。
 
 ### 4.4 サンプルworkbook
 
@@ -523,7 +527,7 @@ run開始時、完成名に対応する次のfileを作る。
    - 完了／一部失敗／取消を明示
    - finalまたはpartial path
    - 行ごとのQuestionEarned、SpecialEarned、SimilarityPenalty、FinalRaw、FinalScore
-   - output folderを開く操作
+   - criterion overrideの確認と、override反映版を既存fileへ上書きせず任意の別workbookとして出力する操作
 
 ### 11.1 完了表示
 
@@ -638,6 +642,7 @@ run開始時、完成名に対応する次のfileを作る。
 |---|---|
 | 空の通常回答 | AI callなし、通常評価率0、QuestionEarned 0、similarity 0 |
 | 空の固有項目 | AI callなし、当該special score 0 |
+| 質問文行とmetadataの不一致 | 現在のQuestionTextを保持し、以前の質問文行の値を反映せず、`HEADER_METADATA_MISMATCH`で再読込を要求 |
 | invalid definition / 配点不一致 | AI call前に具体的field error |
 | `auto` unavailable | AI call前に停止。別modelへfallbackしない |
 | reference generation failure | reference / similarity / FinalRaw / FinalScore blank、技術status |
@@ -654,7 +659,7 @@ run開始時、完成名に対応する次のfileを作る。
 
 ## 17. Scope
 
-### 17.1 v4.3 required scope
+### 17.1 v4.4 required scope
 
 - Windows 11 x64
 - RID別.NET 10 self-contained app
@@ -692,7 +697,7 @@ run開始時、完成名に対応する次のfileを作る。
 | ID | 条件 |
 |---|---|
 | AC-001 | native pickerまたはpathから標準 `.xlsx`を選び、元本を変更せず別 `.xlsx`を作る。 |
-| AC-002 | question text rowを1または2から選び、sheet、回答行、質問／通常回答／固有項目列を変更可能な候補として表示する。 |
+| AC-002 | question text rowを1または2から選び、sheet、回答行、質問／通常回答／固有項目列を変更可能な候補として表示する。主回答列を選択すると、同じsheet・question text rowの交差セル値を当該設問textへ即時反映する。 |
 | AC-003 | 指定sampleでF〜Jをprimary候補、G/Jを学生Prompt primary候補、H/Kをsupporting候補、KをJの初期supporting候補として提示し、元本identityを維持する。 |
 | AC-004 | base既定60、special既定0、similarity weight既定0.1を表示・変更できる。 |
 | AC-005 | 設問Pointsの初期値が`(100-base-special)/有効設問数`となり、明示的な均等配分以外で手動値を変更しない。 |
@@ -706,7 +711,7 @@ run開始時、完成名に対応する次のfileを作る。
 | AC-013 | `result/eval-yyyyMMdd-HHmm[-NN].xlsx`をno-overwrite atomic commitし、元全sheetと4 app-owned sheetsを保持する。 |
 | AC-014 | run開始時に`.partial.xlsx`を作り、参照生成および各学生行完了後にatomic checkpointする。 |
 | AC-015 | input、definition、model、runtime identity一致時だけ再開し、参照回答と完了行を再実行しない。 |
-| AC-016 | 進捗、処理段階、完了／一部失敗、final／partial pathと件数を画面表示する。 |
+| AC-016 | 進捗、処理段階、完了／一部失敗、final／partial pathと件数を画面表示する。各stepは対応する最小window幅でhorizontal overflowを発生させず、項目増加時はvertical scrollで全操作へ到達でき、responsive reflow後もkeyboard操作、Automation ID、virtualizationを維持する。 |
 | AC-017 | 指定警告文を全stepで常時nonblocking表示する。 |
 | AC-018 | `--input`と複数`--prompt`でGUIを事前入力し、利用者操作なしにAI実行しない。 |
 | AC-019 | selected same-row dataだけをAIへ送り、本文／Prompt／reason／evidence／credentialをlogへ残さない。 |
@@ -722,7 +727,7 @@ run開始時、完成名に対応する次のfileを作る。
 
 ## 19. Test requirements
 
-1. Microsoft Forms型、Google Forms型、question row 1/2の匿名化synthetic workbook test。
+1. Microsoft Forms型、Google Forms型、question row 1/2の匿名化synthetic workbook test。各rowで主回答列変更後の設問textが同列の交差セル値へ一致すること、および質問文行変更後・metadata再読込前は旧行の値を反映せず`HEADER_METADATA_MISMATCH`で再読込を要求することを含む。
 2. sample identity、sheet、dimension、F〜K role suggestion、input不変test。
 3. native picker cancel/select、path direct input、unsupported format test。
 4. base/special/question pointsの初期配分、最後の設問への端数、手動値保持、均等配分test。
@@ -738,7 +743,7 @@ run開始時、完成名に対応する次のfileを作る。
 14. checkpoint schema/input/definition/model/runtime mismatchと完了行skip test。
 15. auth、timeout、network、schema、cleanup、cancel、no-send-after-cancel test。
 16. selected-column／same-row isolation、literal string、no-content log test。
-17. 4-step UI、warning exact text/nonblock、progress、resume、completion、keyboard、200% scale test。
+17. 4-step UI、warning exact text/nonblock、progress、resume、completion、keyboard、200% scale test。1024×720 shell、760×600 standalone view、長い日本語名／path、多数結果行でhorizontal overflowがなく、必要なvertical scrollbarが表示され最下部へ到達でき、virtualizationを維持することを含む。Input画面の主回答列ComboBox操作後に、可視の設問textが交差セル値へ更新されることを含む。
 18. CLI option parser、UTF-8 Prompt file、複数Prompt、明示適用、no-auto-run test。
 19. Windows x64 legacy publish/package layout、bundled CLI、clean launch test。
 20. unsigned ZIP、SHA-256 sidecar、safe layout、再現可能な再package regression test。
@@ -800,6 +805,7 @@ run開始時、完成名に対応する次のfileを作る。
 | Release-scope update source | 2026-09-02の正式公開README実装指示とADR-0013 |
 | Sample consolidation source | 2026-09-03の`sample/SampleReport.xlsx`を唯一のsampleとして扱う要求所有者指示 |
 | Setup simplification source | 2026-09-03の「WindowsとMac OSでのセットアップをシンプルに」「不明点はデフォルトのプラン」「全てのタスクを実行」指示 |
+| Question text synchronization source | 2026-09-05の「主回答列を選択したら、その列のExcelのシートの値を設問 textに表示」要求所有者指示 |
 | Delivery decision | [ADR-0015](../dev/docs/adr/0015-windows-macos-installer-delivery.md) |
 | Approved scope | 本書§1〜§21。既存機能、Windows unsigned ZIP公開、non-public development MSIX mechanism、Windows ZIP release matrixを含む。macOS production deliveryは現版scope外 |
 | Delivery scope revision | 2026-09-04の要求所有者指示「開発用のMSIXでOKです」「外部ブロッカーの情報はないです」 |

@@ -2,9 +2,10 @@
 
 | 項目 | 内容 |
 |---|---|
-| 対象要求 | `docs/requirements-definition.md` v4.3 |
+| 対象要求 | `docs/requirements-definition.md` v4.4 |
 | 設計決定 | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence boundary） |
 | 作成日 | 2026-09-02 |
+| 更新日 | 2026-09-05 |
 | 状態 | Windows ZIP初回公開・development MSIX検証baseline |
 | Production topology | Core + App の2 projectを維持 |
 
@@ -563,6 +564,8 @@ lock fileやglobal reservation serviceは追加しない。
 
 ## 10. UI
 
+- shellの`ShellScrollViewer`は縦scrollだけを担当し、horizontal scrollを`Disabled`にする。二次元scrollが必要なstep viewは各view内のScrollViewerで閉じ、page全体を左右へscrollさせない。
+
 ### 10.1 Input
 
 - `ファイルを選択` buttonを追加。
@@ -570,6 +573,14 @@ lock fileやglobal reservation serviceは追加しない。
 - `.xlsx` filterはUX補助であり、loaderのformat validationを省略しない。
 - question text row labelを「質問文の行（1または2）」へ変更する。
 - special mappingはDesign画面の各special itemでsourceを選ぶ。
+- `WorkbookMetadataReader`が選択済みquestion text rowから取得した各`WorkbookHeaderCell.Value`を、`SourceColumnOption.HeaderText`として列名と対応付ける。値はtrim、正規化、代替生成を行わない。
+- 利用者が通常Questionのprimary columnを選択した場合、`InputViewModel.SetPrimaryColumn`は同じimmutable question更新で`PrimarySourceColumn`、対応するraw `QuestionText`、primaryと重複しない`SupportingSourceColumns`をcommitする。既存の`CommitDraft`→`SynchronizeQuestionItems`→`InputQuestionMappingViewModel.Synchronize`の通知経路だけを使用し、View event handlerを追加しない。
+- 対応header cellが空または存在しない場合は`QuestionText`を空にし、fallback文字列を生成しない。既存の`REQUIRED` validationで遷移をblockし、TextBoxからの手入力は許可する。
+- `HeaderRow != WorkbookMetadata.HeaderRowNumber`の間はstale metadataを参照せず、現在の`QuestionText`を保持する。既存の`HEADER_METADATA_MISMATCH`を表示し、見出し行の再読込後に新metadataを使用する。
+- UI候補にないcolumnがprogrammaticに渡された場合もheader値を推測せず、`QuestionText`を保持したまま既存のsource column validationへ委ねる。
+- `InputScrollViewer`は縦scrollだけを担当し、horizontal scrollを`Disabled`にする。contentが有限幅で計測されるため、`Grid`のstar columnがcontent長ではなくavailable widthで解決される。root gridは固定`MinWidth`を持たない。
+- RANGEとX-02 SUGGESTIONSは単一の`Grid#InputMappingHost`（`2*,3*` / `Auto,Auto`）へ配置する。`Container.Sizing="Width"`で公開したcontainer幅が880未満では両cardを縦積み、880以上では横並びにする。切替は`ContainerQuery`のstyle setter（`Grid.Row`／`Grid.Column`／`Grid.ColumnSpan`／spacing）だけで行い、ViewModelへ表示幅stateを持ち込まない。
+- 候補cardは列名を`Auto`列、role／header／support textを残余列に置き`TextWrapping="Wrap"`とする。文字数による切り詰めを行わず、高さの変動は`MappingSuggestionList`のvirtualized scroll内へ収める。
 
 ### 10.2 Design
 
@@ -594,6 +605,9 @@ imported Prompt card:
 - selected Prompt preview
 - target: selected Custom evaluatorまたはselected special item
 - `Promptを適用` button
+- `QuantificationDesignScrollViewer`はhorizontal scrollを`Disabled`、vertical scrollを`Auto`とし、rootへ固定幅を設定しない。
+- question／evaluator／criterion navigatorはstar列の`Grid`で利用可能幅へ収め、表示名と動的summaryをwrapする。
+- add／copy／reorder／disable／deleteの操作群は`WrapPanel`で折り返し、既存のbinding、command、Automation ID、virtualized listを維持する。
 
 ### 10.3 Execution
 
@@ -601,6 +615,8 @@ imported Prompt card:
 - final／partial path previewとoutput directory選択を表示する。
 - new run／resumeを明確に分ける。
 - stage、reference、row、unit progressを表示する。
+- `ExecutionScrollViewer`はhorizontal scrollを`Disabled`、vertical scrollを`Auto`とし、rootへ固定幅を設定しない。
+- path、認証、実行status、進捗、validationの動的文言をwrapし、start／cancel操作は`WrapPanel`で折り返す。
 
 ### 10.4 Results
 
@@ -610,12 +626,20 @@ imported Prompt card:
 - row counts、technical failure count
 - per row: QuestionEarned、SpecialEarned、SimilarityPenalty、FinalRaw、FinalScore
 - cleanup warning
+- `ResultsOutputScrollViewer`と内側の結果listはhorizontal scrollを`Disabled`、vertical scrollを`Auto`とし、1120／1050の固定幅を持たない。
+- formula previewはrow／final、QuestionEarned、Special／Penalty／Rawの意味単位、criterion reviewはidentity、status／AI raw／override、effective／normalized／evaluator／overallの意味単位でcard化する。
+- `ResultsList`の固定viewport高と`VirtualizingStackPanel`を維持し、大量行を全件realizeせず縦scrollできるようにする。export／cancel操作は`WrapPanel`で折り返す。
 
-finalizationはrunの一部なので、旧「検証して出力」buttonは削除する。結果からfolderを開く操作だけを提供する。
+finalizationはrunの一部として自動実行する。Resultsでは既存finalを上書きせず、criterion override反映版を任意の別名workbookとして検証・出力できる。
 
 ### 10.5 Warning
 
 `EthicsWarningText.Message`を要求のexact文面へ置換する。shell rootの既存non-focusable bannerを再利用する。
+
+### 10.6 Startup error
+
+- `StartupErrorWindow`は最小420×220を維持し、contentを`StartupErrorScrollViewer`で包む。
+- horizontal scrollを`Disabled`、vertical scrollを`Auto`とし、長いguidanceと終了buttonへ縦scrollで到達できるようにする。
 
 ## 11. Command-line launch
 
@@ -773,6 +797,8 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 ### 16.2 App adapters
 
 - Microsoft Forms型／Google Forms型synthetic header row 1/2
+- row 1／2の各metadataでprimary column変更後のQuestionTextが同じrow・columnのraw header値へexact一致
+- 空または欠落header columnではQuestionTextを空にして`REQUIRED`、HeaderRow変更後の再読込前は旧headerを反映せず`HEADER_METADATA_MISMATCH`
 - picker boundary select/cancel
 - 4 Copilot operationのsingle tool／permission／retry／cleanup
 - Config／References／Results／Run writerとreopen validation
@@ -783,12 +809,20 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 ### 16.3 UI
 
 - exact warning text／nonblocking
+- Inputのprimary column ComboBox操作後に、同じQuestion cardの可視QuestionText TextBoxがraw header値へ更新
+- 手編集後のprimary再選択による上書きと、primary/supporting重複の同時除去
 - root points／equalize／validation
 - special editor
 - imported Prompt order／reuse／explicit apply／no AI send
 - output／partial path、new/resume
 - stage/row progress、cancel、completion、cleanup warning
 - keyboard、focus、200% scroll
+- Input mapping paneの幅がavailable widthだけで決まり、workbook読込前後で不変
+- 狭い幅でInput mapping paneが縦積みへreflowし、horizontal overflowが発生しない
+- Input mapping paneがcontainer幅879／880／881で、`min-width:880`の境界どおり縦積み／横並びへ切り替わる
+- 1024×720 shellと760×600 standaloneの全stepでhorizontal overflowがなく、必要なvertical scrollbarが可視になり最下部へ到達できる
+- 長い日本語名／pathが親幅を拡張せずwrapされ、530結果行でもoverride editorを全件realizeしない
+- 420×220の起動エラー画面とResults内のformula／criterion listで、vertical scrollbar表示と最下部到達を検証する
 
 ### 16.4 E2E
 
@@ -840,7 +874,7 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 
 ## 18. Definition of done
 
-- 要求v4.3のAC-001〜028がdirect deterministicまたはmechanism evidenceへ適切に接続される。
+- 要求v4.4のAC-001〜028がdirect deterministicまたはmechanism evidenceへ適切に接続される。
 - 各implementation taskでtarget tests、Release build、diff checkが成功する。
 - 各taskの敵対的reviewで再現したfindingを修正し、同じ観点のfollow-upで0件を確認する。
 - full required testsが成功する。

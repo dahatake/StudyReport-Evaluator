@@ -9,7 +9,7 @@
 | tool self-test | [`dev/version.tests.ps1`](../version.tests.ps1) |
 | 変更履歴 | [`CHANGELOG.md`](../../CHANGELOG.md) |
 | Decision | [ADR-0014](adr/0014-product-versioning.md) |
-| 最終更新 | 2026-09-04 |
+| 最終更新 | 2026-09-05 |
 
 ## 1. 目的と境界
 
@@ -74,8 +74,8 @@
 
 | Version | 現在値 | 更新条件 | Source |
 |---|---:|---|---|
-| 製品版 | `0.8.1` candidate | 本手順の公開契約差分 | [`Directory.Build.props`](../../Directory.Build.props) |
-| 要求文書版 | `4.3` | 要求baseline変更 | [`requirements-definition.md`](../../docs/requirements-definition.md) |
+| 製品版 | `0.8.2` candidate | 本手順の公開契約差分 | [`Directory.Build.props`](../../Directory.Build.props) |
+| 要求文書版 | `4.4` | 要求baseline変更 | [`requirements-definition.md`](../../docs/requirements-definition.md) |
 | QuantificationDefinition schema | `4.0` | canonical definition format変更 | [`CanonicalDefinitionSerializer.cs`](../../src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs) |
 | checkpoint schema | `1` | checkpoint payload format変更 | [`CheckpointEnvelope.cs`](../../src/StudyReportEvaluator.App/Workbooks/Checkpoint/CheckpointEnvelope.cs) |
 | Copilot runtime manifest schema | `1` | `copilot-runtime.json` format変更 | [`StudyReportEvaluator.App.csproj`](../../src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj) |

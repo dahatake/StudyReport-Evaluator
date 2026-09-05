@@ -1,5 +1,7 @@
 # README・v1.0.0正式公開計画
 
+> **歴史資料:** この計画は完了済みの旧v1.0.0公開作業を記録したもので、現在の要求・製品版・受入状態を表しません。現在判断には[`dev/docs/implementation-status.md`](../dev/docs/implementation-status.md)と[`dev/docs/traceability.md`](../dev/docs/traceability.md)を使用します。
+
 | 項目 | 内容 |
 |---|---|
 | 対象 | `README.md`、利用者文書、Windows x64 package、Git tag、GitHub Release |

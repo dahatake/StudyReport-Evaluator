@@ -1,14 +1,15 @@
-# Requirement traceability — v4.3 Windows ZIP release baseline
+# Requirement traceability — v4.4 input synchronization baseline
 
 | 項目 | 値 |
 |---|---|
-| Requirement | `docs/requirements-definition.md` v4.3 |
+| Requirement | `docs/requirements-definition.md` v4.4 |
 | Decision | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence） |
 | Detailed design | `dev/docs/detailed-design.md` |
 | Plan | `work/20260904-publication-remediation-plan.md` |
 | Previous validation | delivery変更前 Release build warning/error 0、full 670/670 PASS（Core 190 / App 480）。現在の0.8.0 delivery evidenceへ流用しない |
-| Current focused validation | 2026-09-04 V2-01: locked restore、Release build 0 warning/error、full required gate 696/696（Core 190 / App 506）、version self-test 15、documentation 14/14、`git diff --check` PASS |
-| Current status | PUBLISHED — `v0.8.1`を2026-09-04に公開し、認証なしre-downloadでasset identityを確認済み |
+| Current focused validation | 2026-09-05: InputViewTests 21、WorkbookMetadataReaderTests 11、ColumnMappingSuggesterTests 14、計46/46 PASS。DocumentationContractTests 14/14 PASS |
+| Current full required validation | 2026-09-05: locked restore、Release build、Core 190/190、App 527/527、合計717/717 PASS。failed 0、skipped 0 |
+| Current status | v4.4 implementation validation PASS。現行candidateは`0.8.2`、公開済みreleaseは`v0.8.1` |
 
 この表の`PLANNED`は未実装をPASSと称しない。task完了後にproduction symbol、direct test、gate identityへ更新する。旧v3 traceabilityはGit履歴とADR-0011に保持する。
 
@@ -38,7 +39,7 @@ AC-028／TR-29の判定は、release matrixの生成・semantic検証、candidat
 | AC | Requirement surface | Production task | Required test owner | Status |
 |---|---|---|---|---|
 | AC-001 | picker/path、immutable input、separate output | X-01/U-01/X-04 | input/path/atomic tests | PASS_REQUIRED |
-| AC-002 | question row 1/2、sheet/rows/normal/special mapping | X-01/U-01/U-02 | metadata/mapping/UI tests | PASS_REQUIRED |
+| AC-002 | question row 1/2、sheet/rows/normal/special mapping、primary選択時のquestion text同期 | X-01/U-01/U-02 | metadata/mapping/Input UI tests | PASS_REQUIRED |
 | AC-003 | canonical repository sample F〜K candidate、input identity | X-01 | sample structural test | PASS_REQUIRED |
 | AC-004 | base 60、special 0、similarity weight 0.1 | C-01/U-02 | domain/design tests | PASS_REQUIRED |
 | AC-005 | equal initial question points、explicit equalize、manual preservation | C-02/U-02 | allocation/UI tests | PASS_REQUIRED |
@@ -70,7 +71,7 @@ AC-028／TR-29の判定は、release matrixの生成・semantic検証、candidat
 
 | TR | Requirement | Required evidence owner | Status |
 |---|---|---|---|
-| TR-01 | Forms synthetic row 1/2 | X-01 tests | PASS_REQUIRED |
+| TR-01 | Forms synthetic row 1/2とprimary columnからquestion textへの同期 | X-01/U-01 tests | PASS_REQUIRED |
 | TR-02 | sample structure/identity | X-01 E2E | PASS_REQUIRED |
 | TR-03 | picker and format | U-01/input tests | PASS_REQUIRED |
 | TR-04 | allocation | C-02/U-02 | PASS_REQUIRED |
@@ -86,7 +87,7 @@ AC-028／TR-29の判定は、release matrixの生成・semantic検証、candidat
 | TR-14 | resume mismatch/skip | W-02 | PASS_REQUIRED |
 | TR-15 | AI failure/retry/cancel | A-02..04/W-02 | PASS_REQUIRED |
 | TR-16 | selected-row/literal/no-content | C-05/A-02..04/X-03 | PASS_REQUIRED |
-| TR-17 | 4-step UI/warning/progress/accessibility | U-01..04 | PASS_REQUIRED |
+| TR-17 | 4-step UI/warning/progress/accessibilityとInput binding同期 | U-01..04 | PASS_REQUIRED |
 | TR-18 | launch options/Prompt/no auto-run | L-01/U-02 | PASS_REQUIRED |
 | TR-19 | Windows publish/package/bundled CLI/clean launch | P-01 | PASS_REQUIRED |
 | TR-20 | unsigned ZIP/hash/safe layout/reproducibility | P-01 | PASS_REQUIRED |

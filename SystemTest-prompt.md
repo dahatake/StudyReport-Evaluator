@@ -1,11 +1,11 @@
-# StudyReport Evaluator v4.3 システムテスト Prompt集
+# StudyReport Evaluator v4.4 システムテスト Prompt集
 
 | 項目 | 内容 |
 |---|---|
 | 文書用途 | ソフトウェアエンジニアまたはテスト支援AIが、ユースケース単位でコピーして実行するPrompt集 |
-| 対象 | StudyReport Evaluator v4.3 |
-| 基準日 | 2026-09-04 |
-| 要求正本 | `docs/requirements-definition.md` v4.3 |
+| 対象 | StudyReport Evaluator v4.4 |
+| 基準日 | 2026-09-05 |
+| 要求正本 | `docs/requirements-definition.md` v4.4 |
 | 設計正本 | `dev/docs/detailed-design.md`、ADR-0012、ADR-0013、ADR-0015 |
 | 対象環境 | Windows 11 x64。public artifactはunsigned ZIP、development MSIXはnon-public mechanism、macOSはsource foundationのみ |
 | 必須決定的fixture | `tests/fixtures/system-test/SystemTest-10Students.xlsx` |
@@ -189,7 +189,7 @@ Kは、設問(4)(5)に関連してPrompt作成時に工夫した点、観点、�
 
 | Scenario | 内容 | Test Requirement / Acceptance Criteria |
 |---|---|---|
-| ST-UC-01 | Forms/Google row 1/2、10人fixture identity・mapping | TR-01 / AC-001、AC-002 |
+| ST-UC-01 | Forms/Google row 1/2、10人fixture identity・mapping・設問text同期 | TR-01 / AC-001、AC-002 |
 | ST-UC-02 | Canonical SampleReport identity・role候補 | TR-02 / AC-003 |
 | ST-UC-03 | picker、direct path、unsupported形式 | TR-03 / AC-001、AC-002 |
 | ST-UC-04 | 配点、均等化、range、validation | TR-04、TR-05 / AC-004〜AC-006、AC-008 |
@@ -200,7 +200,7 @@ Kは、設問(4)(5)に関連してPrompt作成時に工夫した点、観点、�
 | ST-UC-09 | checkpoint、fault、resume mismatch | TR-13、TR-14 / AC-014、AC-015 |
 | ST-UC-10 | auth／timeout／network／schema／cleanup／cancel | TR-15 / AC-012、AC-016 |
 | ST-UC-11 | same-row privacy、literal、no-content log | TR-16 / AC-019 |
-| ST-UC-12 | 4-step UI、warning、progress、accessibility | TR-17 / AC-016、AC-017 |
+| ST-UC-12 | 4-step UI、mapping同期、warning、progress、accessibility | TR-17 / AC-002、AC-016、AC-017 |
 | ST-UC-13 | command-line Prompt launch | TR-18 / AC-018 |
 | ST-UC-14 | Windows publish、bundled CLI、clean launch | TR-19 / AC-020 |
 | ST-UC-15 | ZIP integrity、sidecar、再現性、tamper | TR-20 / AC-020 |
@@ -222,7 +222,7 @@ Kは、設問(4)(5)に関連してPrompt作成時に工夫した点、観点、�
 ### ST-UC-01: Forms／Google question row 1/2と10人fixture mapping
 
 ```text
-あなたはStudyReport Evaluator v4.3のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のシステムテスト担当者です。
 Test ID: ST-UC-01
 Requirement: TR-01 / AC-001 / AC-002
 
@@ -261,6 +261,9 @@ Requirement: TR-01 / AC-001 / AC-002
 - header semanticからnormal answer、student Prompt、Prompt considerations候補を作る。
 - 10人fixtureではprimary F/G/H/I/J、Jのsupporting K、A〜E/Lは初期対象外となる。
 - candidateは利用者が変更でき、列位置だけで固定mappingしない。
+- question row 1と2の各fixtureで主回答列を変更すると、同じrow・columnの交差セル値が同じ設問textへ即時反映される。
+- 設問textを手入力した後に主回答列を選び直すと、新しい交差セル値で置き換わる。空または欠落headerでは代替文を生成せず、`REQUIRED`で手入力を要求する。
+- question row変更後・metadata再読込前に主回答列を変更しても旧rowの値を反映せず、`HEADER_METADATA_MISMATCH`で再読込を要求する。
 - fixtureにはformula、macro、external link、DDE、defined nameがなく、`= + - @` canaryはliteral stringである。
 - F〜Jはそれぞれ空または空白primaryがexactly 1件ある。
 - 読込前後のSHA-256、size、last-write UTCが一致する。
@@ -273,7 +276,7 @@ UIで未観測の内部候補はmetadata/mapping testの結果として報告し
 ### ST-UC-02: Canonical SampleReport identityとF〜K role候補
 
 ```text
-あなたはStudyReport Evaluator v4.3のcanonical repository sampleシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のcanonical repository sampleシステムテスト担当者です。
 Test ID: ST-UC-02
 Requirement: TR-02 / AC-003 / docs/requirements-definition.md §4.4
 
@@ -319,7 +322,7 @@ Requirement: TR-02 / AC-003 / docs/requirements-definition.md §4.4
 ### ST-UC-03: Native picker、direct path、unsupported input
 
 ```text
-あなたはStudyReport Evaluator v4.3のinput workflowシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のinput workflowシステムテスト担当者です。
 Test ID: ST-UC-03
 Requirement: TR-03 / AC-001 / AC-002
 
@@ -355,7 +358,7 @@ Requirement: TR-03 / AC-001 / AC-002
 ### ST-UC-04: 絶対配点、均等化、range、run前validation
 
 ```text
-あなたはStudyReport Evaluator v4.3の採点設計システムテスト担当者です。
+あなたはStudyReport Evaluator v4.4の採点設計システムテスト担当者です。
 Test ID: ST-UC-04
 Requirement: TR-04 / TR-05 / AC-004 / AC-005 / AC-006 / AC-008
 
@@ -403,7 +406,7 @@ validation matrix:
 ### ST-UC-05: Knowledge／Custom／Special Promptとclosed tool schema
 
 ```text
-あなたはStudyReport Evaluator v4.3のPrompt・structured resultシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のPrompt・structured resultシステムテスト担当者です。
 Test ID: ST-UC-05
 Requirement: TR-06 / AC-007 / AC-008
 
@@ -437,7 +440,7 @@ Requirement: TR-06 / AC-007 / AC-008
 ### ST-UC-06: Reference-firstとnormal／special／similarity境界
 
 ```text
-あなたはStudyReport Evaluator v4.3の4 AI operationシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4の4 AI operationシステムテスト担当者です。
 Test ID: ST-UC-06
 Requirement: TR-07 / TR-08 / AC-009 / AC-010 / AC-012
 
@@ -484,7 +487,7 @@ attempt/session/call countとcheckpoint順はtest double/store記録から取得
 ### ST-UC-07: Score hand oracleとConfig参照formula
 
 ```text
-あなたはStudyReport Evaluator v4.3のscore・Excel formulaシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のscore・Excel formulaシステムテスト担当者です。
 Test ID: ST-UC-07
 Requirement: TR-09 / TR-10 / AC-006 / AC-011 / AC-012
 
@@ -538,7 +541,7 @@ formula surface:
 ### ST-UC-08: Final workbook、output path、no-overwrite atomic commit
 
 ```text
-あなたはStudyReport Evaluator v4.3のfinal workbook・output commitシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のfinal workbook・output commitシステムテスト担当者です。
 Test ID: ST-UC-08
 Requirement: TR-11 / TR-12 / AC-013
 
@@ -587,7 +590,7 @@ atomic final oracle:
 ### ST-UC-09: Checkpoint、atomic fault、resume mismatch
 
 ```text
-あなたはStudyReport Evaluator v4.3のdurable checkpoint・resumeシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のdurable checkpoint・resumeシステムテスト担当者です。
 Test ID: ST-UC-09
 Requirement: TR-13 / TR-14 / AC-014 / AC-015
 
@@ -645,7 +648,7 @@ resume期待:
 ### ST-UC-10: Auth／timeout／network／schema／cleanup／cancel
 
 ```text
-あなたはStudyReport Evaluator v4.3のAI failure・cancelシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のAI failure・cancelシステムテスト担当者です。
 Test ID: ST-UC-10
 Requirement: TR-15 / AC-012 / AC-016
 
@@ -680,7 +683,7 @@ normal、reference、special、similarityの各operationで単一原因ごとに
 ### ST-UC-11: Selected same-row privacy、literal text、no-content log
 
 ```text
-あなたはStudyReport Evaluator v4.3のprivacy・formula injectionシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のprivacy・formula injectionシステムテスト担当者です。
 Test ID: ST-UC-11
 Requirement: TR-16 / AC-019
 
@@ -720,9 +723,9 @@ logging oracle:
 ### ST-UC-12: 4-step UI、warning、progress、keyboard、200% scale
 
 ```text
-あなたはStudyReport Evaluator v4.3のuser-visible UI・accessibilityシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のuser-visible UI・accessibilityシステムテスト担当者です。
 Test ID: ST-UC-12
-Requirement: TR-17 / AC-016 / AC-017
+Requirement: TR-17 / AC-002 / AC-016 / AC-017
 
 捏造禁止。manual UIで観測していない項目を目視PASSと書きません。headless deterministic testで補完した項目はその方法を明記します。実在回答やprivate pathをscreen captureへ含めません。repositoryを変更、stash、reset、clean、commitしません。PowerShellはpwsh.exe -NoLogo -NoProfile、7+ Coreだけを使います。
 
@@ -743,6 +746,7 @@ warning oracle:
 
 control／navigation oracle:
 - Input: native picker、direct path、question row 1/2、sheet、row範囲、mappingへTabで到達する。
+- Inputの主回答列ComboBoxを操作すると、同じQuestion cardの可視設問text TextBoxが、選択中sheet・question row・columnの交差セル値へ即時更新される。別Questionは変更されない。
 - Design: Base/Special/Similarity、Question Points、equalize、Knowledge/Custom、special editor、Imported Promptへ到達する。
 - Execution: auth、model、`auto` availability、concurrency、新規/resume、output directory/partial path、start/cancelへ到達する。
 - Results: row-level QuestionEarned、SpecialEarned、SimilarityPenalty、FinalRaw、FinalScore、final/partial path、cleanup warning、output folder操作を表示する。
@@ -771,7 +775,7 @@ apphost起動時に`Copilot 状態を確認`や`定量化を開始`を押す必�
 ### ST-UC-13: `--input`／`--prompt`、explicit apply、no-auto-run
 
 ```text
-あなたはStudyReport Evaluator v4.3のcommand-line Prompt launchシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のcommand-line Prompt launchシステムテスト担当者です。
 Test ID: ST-UC-13
 Requirement: TR-18 / AC-018
 
@@ -815,7 +819,7 @@ explicit apply oracle:
 ### ST-UC-14: Windows x64 publish、bundled CLI、clean launch
 
 ```text
-あなたはStudyReport Evaluator v4.3のWindows public ZIP deliveryシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のWindows public ZIP deliveryシステムテスト担当者です。
 Test ID: ST-UC-14
 Requirement: TR-19 / AC-020
 
@@ -859,7 +863,7 @@ clean launch:
 ### ST-UC-15: Unsigned ZIP integrity、sidecar、再現性、tamper
 
 ```text
-あなたはStudyReport Evaluator v4.3のWindows public ZIP package integrityシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のWindows public ZIP package integrityシステムテスト担当者です。
 Test ID: ST-UC-15
 Requirement: TR-20 / AC-020
 
@@ -899,7 +903,7 @@ negative case:
 ### ST-UC-16: Windows-only claim、documentation、screenshots
 
 ```text
-あなたはStudyReport Evaluator v4.3の公開scope・documentation整合システムテスト担当者です。
+あなたはStudyReport Evaluator v4.4の公開scope・documentation整合システムテスト担当者です。
 Test ID: ST-UC-16
 Requirement: TR-21 / TR-22 / AC-021 / AC-022
 
@@ -911,7 +915,7 @@ Requirement: TR-21 / TR-22 / AC-021 / AC-022
 3. repository外にevidence directoryを作り、locked restore後、`DocumentationContractTests`、`DocumentationScreenshotTests`、`WindowsPublishPackageTests`をReleaseで実行します。
 
 Delivery transition oracle:
-- 要求v4.3とADR-0015はWindows unsigned ZIPをpublic artifact、development MSIXをnon-public mechanism、macOSをsource foundationとする。
+- 要求v4.4はADR-0015のv4.3 delivery決定をcarry forwardし、Windows unsigned ZIPをpublic artifact、development MSIXをnon-public mechanism、macOSをsource foundationとする。
 - current READMEと利用者文書はWindows 11 x64 unsigned ZIPだけを対応範囲とする。
 - scripts/package testsは`win-x64` ZIPをpublic regression、development MSIXを`PASS_MECHANISM`として分離する。
 - development MSIX、macOS、installer、code signing、notarization、SmartScreen／Gatekeeper結果を対応済みまたはpublic assetと記載しない。
@@ -942,7 +946,7 @@ read-onlyでdocument inventory、local link、claim文字列、script/package en
 ### ST-UC-17: 10人fixture new→interrupt→resume E2E
 
 ```text
-あなたはStudyReport Evaluator v4.3の10人synthetic durable E2Eシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4の10人synthetic durable E2Eシステムテスト担当者です。
 Test ID: ST-UC-17
 Requirement: supplemental deterministic scenario / AC-009〜AC-016 / AC-019
 
@@ -995,7 +999,7 @@ Requirement: supplemental deterministic scenario / AC-009〜AC-016 / AC-019
 ### ST-UC-18: Fixed-seed 531-row synthetic new/resume E2E
 
 ```text
-あなたはStudyReport Evaluator v4.3の531-row fixed-seed synthetic E2Eシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4の531-row fixed-seed synthetic E2Eシステムテスト担当者です。
 Test ID: ST-UC-18
 Requirement: TR-23 / AC-009〜AC-016 / AC-019
 
@@ -1044,7 +1048,7 @@ fixture／definition:
 ### ST-UC-19: Canonical SampleReport no-network technical durable E2E
 
 ```text
-あなたはStudyReport Evaluator v4.3のcanonical SampleReport technical durable E2Eシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.4のcanonical SampleReport technical durable E2Eシステムテスト担当者です。
 Test ID: ST-UC-19
 Requirement: real-data technical E2E / AC-009〜AC-016 / AC-019
 
@@ -1062,8 +1066,8 @@ Requirement: real-data technical E2E / AC-009〜AC-016 / AC-019
 8. evidenceはrepository外の一意なdirectoryへ保存します。
 
 正本:
-- `docs/requirements-definition.md` v4.3
-- `SystemTest-prompt.md` v4.3
+- `docs/requirements-definition.md` v4.4
+- `SystemTest-prompt.md` v4.4
 - `docs/getting-started.md`
 - `docs/privacy-and-data-handling.md`
 - `tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs`
@@ -1145,7 +1149,7 @@ technical oracle:
 19. external recalculation statusはadvisoryとしてrequired pathから分離する。
 
 evidence整合性:
-- JSONのsource requirements=`docs/requirements-definition.md v4.3`、system_test_prompt=`SystemTest-prompt.md v4.3`。
+- JSONのsource requirements=`docs/requirements-definition.md v4.4`、system_test_prompt=`SystemTest-prompt.md v4.4`。
 - driver固定run IDを今回のunique external run IDと誤認せず、`NON_UNIQUE_DRIVER_RUN_ID`として記録する。
 - runtime CLI identityがtest value／zero hashであるため、bundled production CLI検証済みと報告しない。
 - JSON privacy flagだけを信用せず、input absolute path、user profile path、16文字以上のworkbook文字列が完全一致で混入していないことを値非表示で再確認する。
@@ -1186,7 +1190,7 @@ Required technical E2Eは全technical oracleを今回確認した場合だけPAS
 ### ST-UC-20: Optional authenticated synthetic Copilot smoke
 
 ```text
-あなたはStudyReport Evaluator v4.3のoptional authenticated synthetic Copilot smoke担当者です。
+あなたはStudyReport Evaluator v4.4のoptional authenticated synthetic Copilot smoke担当者です。
 Test ID: ST-UC-20
 Requirement: TR-24A advisory
 
@@ -1219,7 +1223,7 @@ PASSはsession/tool/schema/cleanupの1件のtechnical smoke成功だけを意味
 ### ST-UC-21: Optional external spreadsheet recalculation
 
 ```text
-あなたはStudyReport Evaluator v4.3のoptional external spreadsheet recalculation smoke担当者です。
+あなたはStudyReport Evaluator v4.4のoptional external spreadsheet recalculation smoke担当者です。
 Test ID: ST-UC-21
 Requirement: TR-24B advisory
 
@@ -1254,7 +1258,7 @@ PASSは登録済みspreadsheet 1環境でsynthetic formulaが再計算された�
 ### ST-UC-22: Windows development MSIX mechanismと非公開境界
 
 ```text
-あなたはStudyReport Evaluator v4.3のWindows development MSIX mechanismテスト担当者です。
+あなたはStudyReport Evaluator v4.4のWindows development MSIX mechanismテスト担当者です。
 Test ID: ST-UC-22
 Requirement: TR-25 / AC-023 / AC-027
 
@@ -1277,7 +1281,7 @@ install／launch／upgrade／repair／uninstallは現版のrequired scopeでは�
 ### ST-UC-23: macOS source foundation static contract
 
 ```text
-あなたはStudyReport Evaluator v4.3のmacOS source foundationテスト担当者です。
+あなたはStudyReport Evaluator v4.4のmacOS source foundationテスト担当者です。
 Test ID: ST-UC-23
 Requirement: TR-26 / AC-024
 
@@ -1296,7 +1300,7 @@ Requirement: TR-26 / AC-024
 ### ST-UC-24: macOS future trust order static contract
 
 ```text
-あなたはStudyReport Evaluator v4.3のmacOS future trust order contractテスト担当者です。
+あなたはStudyReport Evaluator v4.4のmacOS future trust order contractテスト担当者です。
 Test ID: ST-UC-24
 Requirement: TR-27 / AC-025
 
@@ -1316,7 +1320,7 @@ Requirement: TR-27 / AC-025
 ### ST-UC-25: Windows ZIP E2Eとrelease matrix
 
 ```text
-あなたはStudyReport Evaluator v4.3のplatform release gate担当者です。
+あなたはStudyReport Evaluator v4.4のplatform release gate担当者です。
 Test ID: ST-UC-25
 Requirement: TR-28 / TR-29 / AC-026 / AC-027 / AC-028
 

@@ -2,19 +2,23 @@
 
 | 項目 | 値 |
 |---|---|
-| Current requirement | `docs/requirements-definition.md` v4.3 |
+| Current requirement | `docs/requirements-definition.md` v4.4 |
 | Scope ADR | ADR-0012（機能）/ ADR-0015（Windows ZIP public / development MSIX）/ ADR-0013（Windows public evidence） |
-| Product version | `0.8.1` candidate — `Directory.Build.props`の明示`VersionPrefix` |
+| Product version | `0.8.2` candidate — `Directory.Build.props`の明示`VersionPrefix` |
 | Version management | [`version-management.md`](version-management.md) / [`dev/version.ps1`](../version.ps1) / ADR-0014 |
 | Source baseline | `main`、release commit `d0b03b9201d397b6c3333dafbb816b13b4dc003c`、annotated tag `v0.8.1` |
 | Public release status | `PUBLISHED — v0.8.1、2026-09-04T08:52:49Z公開、ZIPとsidecarの2 asset` |
-| Release build | PASS、warning 0 / error 0（2026-09-04 V2-01実行） |
-| Full required gate | 696/696 PASS（Core 190/190、App 506/506、failed 0、skipped 0、2026-09-04 V2-01実行） |
+| Current v4.4 Release build | PASS、warning 0 / error 0（2026-09-05実行） |
+| Previous v4.3 full required gate | 696/696 PASS（Core 190/190、App 506/506、failed 0、skipped 0、2026-09-04 V2-01実行） |
+| Current v4.4 focused input validation | 46/46 PASS（InputViewTests 21、WorkbookMetadataReaderTests 11、ColumnMappingSuggesterTests 14。failed 0、skipped 0、2026-09-05実行） |
+| Current v4.4 full required gate | locked restore、Release build、Core 190/190、App 527/527、合計717/717 PASS。failed 0、skipped 0（2026-09-05実行） |
 | Baseline focused validation | locked restore、version self-test 15 assertions、DocumentationContractTests 14/14、WindowsInstallerPackageTests 6/6、MacOsPublishPackageTests 2/2、`git diff --check`が全てPASS（2026-09-04実行） |
 | Previous focused UI baseline | `MainWindowTests` 8/8 PASS（2026-09-02実行。current candidate full gateへ未算入） |
 | Previous bundled CLI baseline | `CopilotClientFactoryTests` 14/14 PASS（2026-09-02実行。current candidate full gateへ未算入） |
-| Documentation contract | 14/14 PASS（2026-09-04実行。root `SystemTest-prompt.md`、25 scenario、TR-01〜TR-29、v4.3 canonical sample契約を含む） |
+| Previous documentation contract | 14/14 PASS（2026-09-04実行。root `SystemTest-prompt.md`、25 scenario、TR-01〜TR-29、v4.3 canonical sample契約を含む） |
+| Current v4.4 documentation contract | 14/14 PASS（2026-09-05実行。requirements、利用者文書、root `SystemTest-prompt.md`、25 scenario、TR-01〜TR-29、input synchronization契約を含む） |
 | Previous screenshot baseline | 7画像再生成、1440×1050、test 1/1 PASS、敵対review finding 0（2026-09-02実行。current candidate full gateへ未算入） |
+| Current v4.4 screenshot validation | 7画像再生成1/1 PASS、全画像1440×1050、全7画像目視確認（2026-09-05実行） |
 | Previous Windows ZIP integration baseline | publish/package/展開/resolver/clean launch/repackage、全class 3/3 PASS（2026-09-02実行。current candidate gateへ流用しない） |
 | B1-16 adversarial review | RealData evidence contractの曖昧性を計画へ反映。source identity assertionはPASS、opt-in E2E／Live AIは非実行。未解決の再現可能なblocker/high finding 0 |
 | Previous canonical sample baseline | canonical `sample/SampleReport.xlsx` exact path・identity・structure・input不変 1/1 PASS、synthetic fixture isolation 1/1 PASS（2026-09-03実行。current candidate full gateへ未算入） |
@@ -24,10 +28,10 @@
 | Previous functional baseline | Release 670/670 PASS、Core 190/190・App 480/480、failed/error/not-executed 0（2026-09-03、v1.0.1 recovery tree。現在の0.8.0 delivery証跡へ流用しない） |
 | Previous optional live Copilot evidence | `PASS` — fixed synthetic payload、required substitute false（2026-09-02実行。current required gateへ算入しない） |
 | Previous optional external recalculation evidence | `MIXED_ADVISORY` — syntheticはMicrosoft Excel 16.0でopen/recalculate/save・process cleanupまで`PASS`。canonical output copyは20,672 formula error 0だが、Excel保存時に生成されたoptional `/xl/calcChain.xml`だけに`Sem_MissingIndexedElement`が発生して`FAILED_ADVISORY`（2026-09-03実行。current required gateへ算入しない） |
-| Version tool validation | show/verify/set/bump/dry-run/invalid rejection、複数Git pathでのtag/clean検証、15 assertions PASS（2026-09-04実行） |
+| Version tool validation | `0.8.2`でshow/verify/set/bump/dry-run/invalid rejection、複数Git pathでのtag/clean検証、15 assertions PASS（2026-09-05実行） |
 | Development MSIX mechanism | `PASS_MECHANISM` — package/unpack/hash/policy/cleanup、0.8.1.0、install未実行・非required（2026-09-04実行） |
 | macOS static source contract | 2/2 PASS — unsigned bundle最小contractとproduction trust順序のsource検証。production artifact／署名／公証の実測ではない（2026-09-04 B1-16実行） |
-| Audit date | 2026-09-04 |
+| Audit date | 2026-09-05 |
 
 現在のdelivery実装は[`20260904-publication-remediation-plan.md`](../../work/20260904-publication-remediation-plan.md)と[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に従う。未公開`v1.0.1` recoveryと`1.1.0` delivery candidateは`0.8.0`へ再baselineし、過去の1.x候補を公開版として扱わない。Windows public artifactはunsigned ZIP、development MSIXはnon-public `PASS_MECHANISM`、macOS production deliveryは現版scope外である。
 
@@ -54,7 +58,7 @@
 | Surface | Production owner | Required evidence |
 |---|---|---|
 | `.xlsx` classification / immutable input | [`FileFormatClassifier.cs`](../../src/StudyReportEvaluator.App/Workbooks/Intake/FileFormatClassifier.cs)、[`InputSnapshotService.cs`](../../src/StudyReportEvaluator.App/Workbooks/Intake/InputSnapshotService.cs) | [`FileFormatClassifierTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Workbooks/Intake/FileFormatClassifierTests.cs)、[`InputSnapshotServiceTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Workbooks/Intake/InputSnapshotServiceTests.cs) |
-| picker / mapping | [`InputView.axaml.cs`](../../src/StudyReportEvaluator.App/Views/InputView.axaml.cs)、[`ColumnMappingSuggester.cs`](../../src/StudyReportEvaluator.App/Workbooks/Mapping/ColumnMappingSuggester.cs)、[`ColumnMappingValidator.cs`](../../src/StudyReportEvaluator.App/Workbooks/Mapping/ColumnMappingValidator.cs) | [`InputViewTests.cs`](../../tests/StudyReportEvaluator.App.Tests/UI/InputViewTests.cs)、[`ColumnMappingSuggesterTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Workbooks/Mapping/ColumnMappingSuggesterTests.cs) |
+| picker / mapping / question text synchronization | [`InputViewModel.cs`](../../src/StudyReportEvaluator.App/ViewModels/InputViewModel.cs)、[`InputView.axaml.cs`](../../src/StudyReportEvaluator.App/Views/InputView.axaml.cs)、[`ColumnMappingSuggester.cs`](../../src/StudyReportEvaluator.App/Workbooks/Mapping/ColumnMappingSuggester.cs)、[`ColumnMappingValidator.cs`](../../src/StudyReportEvaluator.App/Workbooks/Mapping/ColumnMappingValidator.cs) | [`InputViewTests.cs`](../../tests/StudyReportEvaluator.App.Tests/UI/InputViewTests.cs)、[`WorkbookMetadataReaderTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Workbooks/Reading/WorkbookMetadataReaderTests.cs)、[`ColumnMappingSuggesterTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Workbooks/Mapping/ColumnMappingSuggesterTests.cs) |
 | v4 domain / allocation / snapshot | [`Domain`](../../src/StudyReportEvaluator.Core/Domain/)、[`ScoringAllocationCalculator.cs`](../../src/StudyReportEvaluator.Core/Scoring/ScoringAllocationCalculator.cs)、[`QuantificationDefinitionValidator.cs`](../../src/StudyReportEvaluator.Core/Validation/QuantificationDefinitionValidator.cs) | [`Domain tests`](../../tests/StudyReportEvaluator.Core.Tests/Domain/)、[`Scoring tests`](../../tests/StudyReportEvaluator.Core.Tests/Scoring/)、[`QuantificationDefinitionValidatorTests.cs`](../../tests/StudyReportEvaluator.Core.Tests/Validation/QuantificationDefinitionValidatorTests.cs) |
 | Prompt / selected-row payload | [`Prompting`](../../src/StudyReportEvaluator.Core/Prompting/) | [`Prompting tests`](../../tests/StudyReportEvaluator.Core.Tests/Prompting/) |
 | reference / normal / special / similarity Copilot operations | [`Copilot`](../../src/StudyReportEvaluator.App/Copilot/) | [`Copilot fake-runtime tests`](../../tests/StudyReportEvaluator.App.Tests/Copilot/) |
@@ -69,7 +73,7 @@
 
 ## Historical v3 gate record
 
-以下はv3 gate後に閉じたgapの履歴であり、現在のv4.3 release acceptanceや今回のtest結果を表さない。
+以下はv3 gate後に閉じたgapの履歴であり、現在のv4.4 requirement acceptanceや今回のtest結果を表さない。
 
 ### IMPL-GAP-001 — CLOSED: Custom Promptのrun開始前再検査
 
