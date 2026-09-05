@@ -4,14 +4,14 @@
 |---|---|
 | Current requirement | `docs/requirements-definition.md` v4.4 |
 | Scope ADR | ADR-0012（機能）/ ADR-0015（Windows ZIP public / development MSIX）/ ADR-0013（Windows public evidence） |
-| Product version | `0.8.2` candidate — `Directory.Build.props`の明示`VersionPrefix` |
+| Product version | `0.8.3` candidate — `Directory.Build.props`の明示`VersionPrefix` |
 | Version management | [`version-management.md`](version-management.md) / [`dev/version.ps1`](../version.ps1) / ADR-0014 |
 | Source baseline | `main`、release commit `d0b03b9201d397b6c3333dafbb816b13b4dc003c`、annotated tag `v0.8.1` |
 | Public release status | `PUBLISHED — v0.8.1、2026-09-04T08:52:49Z公開、ZIPとsidecarの2 asset` |
 | Current v4.4 Release build | PASS、warning 0 / error 0（2026-09-05実行） |
 | Previous v4.3 full required gate | 696/696 PASS（Core 190/190、App 506/506、failed 0、skipped 0、2026-09-04 V2-01実行） |
 | Current v4.4 focused input validation | 46/46 PASS（InputViewTests 21、WorkbookMetadataReaderTests 11、ColumnMappingSuggesterTests 14。failed 0、skipped 0、2026-09-05実行） |
-| Current v4.4 full required gate | locked restore、Release build、Core 190/190、App 527/527、合計717/717 PASS。failed 0、skipped 0（2026-09-05実行） |
+| Current v4.4 full required gate | locked restore、Release build、Core 190/190、App 528/528、合計718/718 PASS。Appはnamespace／E2E class別に分割実行し、failed 0、skipped 0（2026-09-05実行） |
 | Baseline focused validation | locked restore、version self-test 15 assertions、DocumentationContractTests 14/14、WindowsInstallerPackageTests 6/6、MacOsPublishPackageTests 2/2、`git diff --check`が全てPASS（2026-09-04実行） |
 | Previous focused UI baseline | `MainWindowTests` 8/8 PASS（2026-09-02実行。current candidate full gateへ未算入） |
 | Previous bundled CLI baseline | `CopilotClientFactoryTests` 14/14 PASS（2026-09-02実行。current candidate full gateへ未算入） |
@@ -19,6 +19,7 @@
 | Current v4.4 documentation contract | 14/14 PASS（2026-09-05実行。requirements、利用者文書、root `SystemTest-prompt.md`、25 scenario、TR-01〜TR-29、input synchronization契約を含む） |
 | Previous screenshot baseline | 7画像再生成、1440×1050、test 1/1 PASS、敵対review finding 0（2026-09-02実行。current candidate full gateへ未算入） |
 | Current v4.4 screenshot validation | 7画像再生成1/1 PASS、全画像1440×1050、全7画像目視確認（2026-09-05実行） |
+| Current Windows ZIP package validation | 3/3 PASS。publish、package、sidecar、safe layout、clean launch、再現性を検証し、App/CoreのAssembly/File/Product versionが0.8.3で一致（2026-09-05実行） |
 | Previous Windows ZIP integration baseline | publish/package/展開/resolver/clean launch/repackage、全class 3/3 PASS（2026-09-02実行。current candidate gateへ流用しない） |
 | B1-16 adversarial review | RealData evidence contractの曖昧性を計画へ反映。source identity assertionはPASS、opt-in E2E／Live AIは非実行。未解決の再現可能なblocker/high finding 0 |
 | Previous canonical sample baseline | canonical `sample/SampleReport.xlsx` exact path・identity・structure・input不変 1/1 PASS、synthetic fixture isolation 1/1 PASS（2026-09-03実行。current candidate full gateへ未算入） |
@@ -28,8 +29,8 @@
 | Previous functional baseline | Release 670/670 PASS、Core 190/190・App 480/480、failed/error/not-executed 0（2026-09-03、v1.0.1 recovery tree。現在の0.8.0 delivery証跡へ流用しない） |
 | Previous optional live Copilot evidence | `PASS` — fixed synthetic payload、required substitute false（2026-09-02実行。current required gateへ算入しない） |
 | Previous optional external recalculation evidence | `MIXED_ADVISORY` — syntheticはMicrosoft Excel 16.0でopen/recalculate/save・process cleanupまで`PASS`。canonical output copyは20,672 formula error 0だが、Excel保存時に生成されたoptional `/xl/calcChain.xml`だけに`Sem_MissingIndexedElement`が発生して`FAILED_ADVISORY`（2026-09-03実行。current required gateへ算入しない） |
-| Version tool validation | `0.8.2`でshow/verify/set/bump/dry-run/invalid rejection、複数Git pathでのtag/clean検証、15 assertions PASS（2026-09-05実行） |
-| Development MSIX mechanism | `PASS_MECHANISM` — package/unpack/hash/policy/cleanup、0.8.1.0、install未実行・非required（2026-09-04実行） |
+| Version tool validation | `0.8.3`でshow/verify/set/bump/dry-run/invalid rejection、複数Git pathでのtag/clean検証、15 assertions PASS（2026-09-05実行） |
+| Development MSIX mechanism | `PASS_MECHANISM` — package/unpack/hash/policy/cleanup、0.8.3.0、install未実行・非required（2026-09-05実行） |
 | macOS static source contract | 2/2 PASS — unsigned bundle最小contractとproduction trust順序のsource検証。production artifact／署名／公証の実測ではない（2026-09-04 B1-16実行） |
 | Audit date | 2026-09-05 |
 

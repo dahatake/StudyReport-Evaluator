@@ -641,6 +641,15 @@ finalizationはrunの一部として自動実行する。Resultsでは既存fina
 - `StartupErrorWindow`は最小420×220を維持し、contentを`StartupErrorScrollViewer`で包む。
 - horizontal scrollを`Disabled`、vertical scrollを`Auto`とし、長いguidanceと終了buttonへ縦scrollで到達できるようにする。
 
+### 10.7 Layout decision sources and limits
+
+- Avaloniaは、再利用可能なcomponentをwindow全体ではなくancestor controlの実際のsizeへ適応させる手段として`Container.Name`、`Container.Sizing`、`ContainerQuery`を示している。[Avalonia — Responsive layouts](https://github.com/AvaloniaUI/avalonia-docs/blob/main/docs/layout/responsive-layouts.md)
+- Microsoftは、responsive breakpointを物理screenではなくapp windowの利用可能領域とeffective pixelで判断し、小さいwindowでは縦積み、大きいwindowでは複数列へreflowする手法を示している。[Microsoft Learn — Screen sizes and breakpoints](https://learn.microsoft.com/windows/apps/design/layout/screen-sizes-and-breakpoints-for-responsive-design)、[Responsive design techniques](https://learn.microsoft.com/windows/apps/design/layout/responsive-design)
+- W3CのReflowは、意味または機能上二次元配置が必要な部分を除き、情報・機能を失わず二方向scrollを避けることを求める。Understanding文書は、二次元表示が必要なtable等を専用scroll containerへ限定し、page全体はreflowさせる例を示す。[WCAG 2.2 SC 1.4.10 Reflow](https://www.w3.org/TR/WCAG22/#reflow)、[Understanding Reflow](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html)
+- W3CのResize Textは、captionとtext imageを除くtextを200%まで拡大してもcontentまたはfunctionalityを失わないことを求める。[WCAG 2.2 SC 1.4.4 Resize Text](https://www.w3.org/TR/WCAG22/#resize-text)
+- `880` DIPはMicrosoft、W3C、Avaloniaが規定する汎用breakpointではなく、このcomponent固有の実装値である。採用根拠は`InputViewTests`の879／880／881境界、760 DIP standalone、1024 DIP shell、1180 DIP wide、および200% render scalingでの直接検証に限定する。
+- 上記WCAG資料はdesktop UIの設計heuristicとして使用する。本製品全体のWCAG適合宣言または第三者認証を意味しない。
+
 ## 11. Command-line launch
 
 ### 11.1 Parser

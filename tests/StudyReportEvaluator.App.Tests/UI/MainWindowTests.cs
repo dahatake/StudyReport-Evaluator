@@ -217,6 +217,42 @@ public sealed class MainWindowTests
     }
 
     [AvaloniaFact]
+    public void Design_view_height_tracks_the_window_client_height()
+    {
+        MainWindowViewModel viewModel = new(
+            new WorkflowNavigator(),
+            new InputViewModel(),
+            new QuantificationDesignViewModel());
+        MainWindow window = new(viewModel)
+        {
+            Width = 1180,
+            Height = 720,
+        };
+
+        try
+        {
+            window.Show();
+            viewModel.NextCommand.Execute(null);
+            Render();
+
+            QuantificationDesignView designView = Assert.Single(
+                window.GetVisualDescendants().OfType<QuantificationDesignView>());
+            double compactHeight = window.ClientSize.Height;
+            Assert.Equal(compactHeight, designView.MaxHeight);
+
+            window.Height = 1000;
+            Render();
+
+            Assert.True(window.ClientSize.Height > compactHeight);
+            Assert.Equal(window.ClientSize.Height, designView.MaxHeight);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task Shell_round_trips_loaded_input_mapping_and_quantification_design_without_losing_edits()
     {
         using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
@@ -395,6 +431,13 @@ public sealed class MainWindowTests
     private static T Required<T>(Control root, string name)
         where T : Control =>
         Assert.IsType<T>(root.FindControl<T>(name));
+
+    private static void Render()
+    {
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Dispatcher.UIThread.RunJobs();
+    }
 
     private static void AssertNoDevelopmentTaskText(Control root) =>
         Assert.DoesNotContain(

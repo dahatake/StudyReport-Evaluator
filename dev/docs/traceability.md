@@ -8,8 +8,8 @@
 | Plan | `work/20260904-publication-remediation-plan.md` |
 | Previous validation | delivery変更前 Release build warning/error 0、full 670/670 PASS（Core 190 / App 480）。現在の0.8.0 delivery evidenceへ流用しない |
 | Current focused validation | 2026-09-05: InputViewTests 21、WorkbookMetadataReaderTests 11、ColumnMappingSuggesterTests 14、計46/46 PASS。DocumentationContractTests 14/14 PASS |
-| Current full required validation | 2026-09-05: locked restore、Release build、Core 190/190、App 527/527、合計717/717 PASS。failed 0、skipped 0 |
-| Current status | v4.4 implementation validation PASS。現行candidateは`0.8.2`、公開済みreleaseは`v0.8.1` |
+| Current full required validation | 2026-09-05: locked restore、Release build、Core 190/190、App 528/528、合計718/718 PASS。Appはnamespace／E2E class別に分割実行し、failed 0、skipped 0 |
+| Current status | v4.4 implementation validation PASS。現行candidateは`0.8.3`、公開済みreleaseは`v0.8.1` |
 
 この表の`PLANNED`は未実装をPASSと称しない。task完了後にproduction symbol、direct test、gate identityへ更新する。旧v3 traceabilityはGit履歴とADR-0011に保持する。
 

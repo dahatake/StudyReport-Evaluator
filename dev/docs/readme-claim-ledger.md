@@ -8,7 +8,7 @@
 | 更新日 | 2026-09-05 |
 | SystemTest正本 | `SystemTest-prompt.md` v4.4、ST-UC-01〜25、TR-01〜29 |
 | Public release observation | 2026-09-04、`v0.8.1`とZIP／sidecarの2 assetを公開 |
-| Current evidence | v4.4 input regression 46/46、DocumentationContractTests 14/14、full required regression 717/717 PASS（Core 190、App 527） |
+| Current evidence | v4.4 input regression 46/46、DocumentationContractTests 14/14、full required regression 718/718 PASS（Core 190、App 528） |
 | 状態語彙 | `VERIFIED` / `BLOCKED` / `EXCLUDED` |
 
 この台帳は公開文書の事実確認用であり、READMEまたは配布ZIPから利用者へ案内しない。`VERIFIED`だけをその行に限定した現在のclaimとして断定できる。たとえばC-033の`VERIFIED`はdevelopment mechanismの成功と非公開境界だけを確認し、production readinessを意味しない。`BLOCKED`は解消までREADME本文へ断定形で書かない。`EXCLUDED`は非対応・非保証としてのみ記載できる。
