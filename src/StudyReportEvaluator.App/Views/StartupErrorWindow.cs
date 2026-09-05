@@ -1,5 +1,6 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using StudyReportEvaluator.App.Launch;
 
@@ -38,23 +39,31 @@ public sealed class StartupErrorWindow : Window
         };
         AutomationProperties.SetAutomationId(close, "CloseStartupError");
         close.Click += (_, _) => Close();
-        Content = new StackPanel
+        ScrollViewer scrollViewer = new()
         {
-            Margin = new Avalonia.Thickness(24),
-            Spacing = 14,
-            Children =
+            Name = "StartupErrorScrollViewer",
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = new StackPanel
             {
-                new TextBlock
+                Margin = new Avalonia.Thickness(24),
+                Spacing = 14,
+                Children =
                 {
-                    Text = "起動optionを確認してください",
-                    FontSize = 22,
-                    FontWeight = Avalonia.Media.FontWeight.Bold,
+                    new TextBlock
+                    {
+                        Text = "起動optionを確認してください",
+                        FontSize = 22,
+                        FontWeight = Avalonia.Media.FontWeight.Bold,
+                    },
+                    code,
+                    guidance,
+                    close,
                 },
-                code,
-                guidance,
-                close,
             },
         };
+        AutomationProperties.SetAutomationId(scrollViewer, "StartupErrorScrollViewer");
+        Content = scrollViewer;
     }
 
     public override string ToString() =>

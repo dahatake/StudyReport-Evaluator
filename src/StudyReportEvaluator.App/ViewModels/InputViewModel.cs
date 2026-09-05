@@ -912,16 +912,21 @@ public sealed class InputViewModel : UiObservableObject
     public void SetQuestionEnabled(string questionId, bool enabled) =>
         UpdateQuestion(questionId, question => question with { Enabled = enabled });
 
-    public void SetPrimaryColumn(string questionId, string columnName) =>
+    public void SetPrimaryColumn(string questionId, string columnName)
+    {
+        string primaryColumn = columnName ?? string.Empty;
+        bool updateQuestionText = TryGetQuestionTextForPrimaryColumn(
+            primaryColumn,
+            out string questionText);
         UpdateQuestion(questionId, question =>
         {
-            string primaryColumn = columnName ?? string.Empty;
             ImmutableArray<string> supportingColumns = question.SupportingSourceColumns.IsDefault
                 ? []
                 : question.SupportingSourceColumns;
             return question with
             {
                 PrimarySourceColumn = primaryColumn,
+                QuestionText = updateQuestionText ? questionText : question.QuestionText,
                 SupportingSourceColumns =
                 [
                     .. supportingColumns.Where(column => !string.Equals(
@@ -931,6 +936,7 @@ public sealed class InputViewModel : UiObservableObject
                 ],
             };
         });
+    }
 
     public void SetSupportingColumn(string questionId, string columnName, bool selected)
     {
@@ -1394,6 +1400,34 @@ public sealed class InputViewModel : UiObservableObject
         }
 
         return index;
+    }
+
+    private bool TryGetQuestionTextForPrimaryColumn(
+        string columnName,
+        out string questionText)
+    {
+        questionText = string.Empty;
+        if (metadata is null
+            || metadata.HeaderRowNumber != (uint)HeaderRow
+            || !metadata.Worksheets.Any(worksheet => string.Equals(
+                worksheet.Name,
+                SelectedSheet,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        SourceColumnOption? option = availableColumnItems.FirstOrDefault(item => string.Equals(
+            item.ColumnName,
+            columnName,
+            StringComparison.OrdinalIgnoreCase));
+        if (option is null)
+        {
+            return false;
+        }
+
+        questionText = option.HeaderText;
+        return true;
     }
 
     private static int FindColumnIndex(ImmutableArray<string> columns, string columnName)

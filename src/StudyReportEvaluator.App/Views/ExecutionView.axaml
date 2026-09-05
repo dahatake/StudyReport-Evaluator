@@ -38,9 +38,11 @@
     <Style Selector="TextBlock.heading">
       <Setter Property="FontSize" Value="18" />
       <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style Selector="TextBlock.label">
       <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style Selector="TextBlock.muted">
       <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}" />
@@ -65,26 +67,26 @@
 
   <ScrollViewer
       x:Name="ExecutionScrollViewer"
-      HorizontalScrollBarVisibility="Auto"
+      HorizontalScrollBarVisibility="Disabled"
       VerticalScrollBarVisibility="Auto"
       AutomationProperties.AutomationId="ExecutionScrollViewer">
     <StackPanel
-        Width="900"
+        HorizontalAlignment="Stretch"
         Margin="24"
         Spacing="16"
         KeyboardNavigation.TabNavigation="Continue">
       <Border Background="{DynamicResource AppHeroBrush}" CornerRadius="18" Padding="22">
-        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+        <Grid ColumnDefinitions="2*,*" ColumnSpacing="16">
           <StackPanel Spacing="6">
-            <TextBlock Text="STEP 03 · EXECUTION" Foreground="#9FABFF" FontWeight="SemiBold" LetterSpacing="1.1" />
-            <TextBlock Text="snapshot-bound quantification" Foreground="White" FontSize="27" FontWeight="Bold" />
+            <TextBlock Text="STEP 03 · EXECUTION" Foreground="#9FABFF" FontWeight="SemiBold" LetterSpacing="1.1" TextWrapping="Wrap" />
+            <TextBlock Text="snapshot-bound quantification" Foreground="White" FontSize="27" FontWeight="Bold" TextWrapping="Wrap" />
             <TextBlock
                 Text="既存の Copilot CLI login を確認し、選択した model で行 × 質問 × evaluator を実行します。"
                 Foreground="{DynamicResource AppHeroMutedBrush}"
                 TextWrapping="Wrap" />
           </StackPanel>
-          <Border Grid.Column="1" Padding="12,8" CornerRadius="10" Background="#20AAB6FF" VerticalAlignment="Top">
-            <TextBlock Text="NO SECRET INPUT · EPHEMERAL SESSIONS" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+          <Border Grid.Column="1" Padding="12,8" CornerRadius="10" Background="#20AAB6FF" HorizontalAlignment="Right" VerticalAlignment="Top">
+            <TextBlock Text="NO SECRET INPUT · EPHEMERAL SESSIONS" Foreground="White" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap" />
           </Border>
         </Grid>
       </Border>
@@ -128,7 +130,7 @@
                 TabIndex="2"
                 AutomationProperties.AutomationId="ExecutionConcurrency"
                 AutomationProperties.Name="評価の最大並列度 1 から 3" />
-            <TextBlock Text="{Binding ConcurrencyText}" Classes="muted" FontSize="12" />
+            <TextBlock Text="{Binding ConcurrencyText}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
           </StackPanel>
         </Border>
       </Grid>
@@ -150,6 +152,7 @@
             <TextBox
                 x:Name="OutputDirectoryTextBox"
                 Text="{Binding OutputDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                TextWrapping="Wrap"
                 TabIndex="4"
                 AutomationProperties.AutomationId="ExecutionOutputDirectory"
                 AutomationProperties.Name="finalとpartialを作成するdirectory" />
@@ -159,6 +162,7 @@
             <TextBox
                 x:Name="ResumePartialPathTextBox"
                 Text="{Binding ResumePartialPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                TextWrapping="Wrap"
                 TabIndex="4"
                 AutomationProperties.AutomationId="ExecutionResumePartialPath"
                 AutomationProperties.Name="再開する既存 partial xlsx path" />
@@ -175,7 +179,7 @@
               Text="run 開始後の draft 編集は次回だけへ反映され、現在の Prompt・schema・range・weight・formula layout は変わりません。"
               Classes="muted"
               TextWrapping="Wrap" />
-          <StackPanel Orientation="Horizontal" Spacing="10">
+          <WrapPanel ItemSpacing="10" LineSpacing="8">
             <Button
                 x:Name="StartRunButton"
                 Classes="primary"
@@ -192,7 +196,7 @@
                 TabIndex="6"
                 AutomationProperties.AutomationId="CancelQuantification"
                 AutomationProperties.Name="新規 evaluator の送信を停止して部分結果を保持" />
-          </StackPanel>
+          </WrapPanel>
         </StackPanel>
       </Border>
 
@@ -200,7 +204,7 @@
         <StackPanel Spacing="10">
           <TextBlock Text="PROGRESS" Classes="kicker" />
           <TextBlock Text="{Binding RunStatusText}" Classes="heading" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding StageText}" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding StageText}" FontWeight="SemiBold" TextWrapping="Wrap" />
           <ProgressBar
               x:Name="RunProgressBar"
               Minimum="0"

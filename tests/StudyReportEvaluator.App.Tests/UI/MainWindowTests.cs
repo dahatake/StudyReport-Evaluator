@@ -195,7 +195,7 @@ public sealed class MainWindowTests
             Button next = Required<Button>(window, "NextStepButton");
 
             Assert.Equal(2d, window.RenderScaling);
-            Assert.Equal(ScrollBarVisibility.Auto, scrollViewer.HorizontalScrollBarVisibility);
+            Assert.Equal(ScrollBarVisibility.Disabled, scrollViewer.HorizontalScrollBarVisibility);
             Assert.Equal(ScrollBarVisibility.Auto, scrollViewer.VerticalScrollBarVisibility);
             Assert.True(input.MinHeight >= 44d);
             Assert.True(input.MinWidth >= 44d);

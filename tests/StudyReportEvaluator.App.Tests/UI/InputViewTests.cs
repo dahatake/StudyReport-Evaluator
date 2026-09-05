@@ -99,6 +99,215 @@ public sealed class InputViewTests
     }
 
     [Fact]
+    public async Task Changing_primary_column_replaces_manual_question_text_and_removes_duplicate_supporting_column()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        InputViewModel viewModel = new();
+        await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        InputQuestionMappingViewModel question = viewModel.Questions[0];
+        SourceColumnOption selectedColumn = Assert.Single(
+            viewModel.AvailableColumns,
+            option => option.ColumnName == "G");
+
+        question.QuestionText = "MANUAL-QUESTION-TEXT";
+        question.SetSupportingColumn("G", selected: true);
+        QuestionDefinition before = Assert.Single(
+            viewModel.DefinitionDraft.Questions,
+            item => item.Id == question.Id);
+
+        question.PrimarySourceColumn = "G";
+
+        QuestionDefinition updated = Assert.Single(
+            viewModel.DefinitionDraft.Questions,
+            item => item.Id == question.Id);
+        Assert.Equal(selectedColumn.HeaderText, question.QuestionText);
+        Assert.Equal(selectedColumn.HeaderText, updated.QuestionText);
+        Assert.NotEqual("MANUAL-QUESTION-TEXT", updated.QuestionText);
+        Assert.Equal("G", updated.PrimarySourceColumn);
+        Assert.DoesNotContain("G", updated.SupportingSourceColumns, StringComparer.OrdinalIgnoreCase);
+        Assert.False(Assert.Single(
+            question.SupportingColumns,
+            column => column.ColumnName == "G").IsSelected);
+        Assert.Equal(before.Id, updated.Id);
+        Assert.Equal(before.DisplayName, updated.DisplayName);
+        Assert.Equal(before.Points, updated.Points);
+        Assert.Equal(before.Enabled, updated.Enabled);
+        Assert.Equal(before.Evaluators.Select(evaluator => evaluator.Id), updated.Evaluators.Select(evaluator => evaluator.Id));
+        Assert.Equal(
+            before.SpecialEvaluations.Select(special => special.Id),
+            updated.SpecialEvaluations.Select(special => special.Id));
+        Assert.True(viewModel.CanContinue);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task Changing_primary_column_uses_the_loaded_question_text_row_for_supported_form_profiles(
+        int questionTextRow)
+    {
+        await AssertPrimaryColumnQuestionTextAsync(
+            X02SyntheticWorkbookFactory.CreateMicrosoftFormsLikeProfile((uint)questionTextRow),
+            questionTextRow,
+            initialColumn: "F",
+            selectedColumn: "I",
+            expectedQuestionText: "Report answer 2");
+        await AssertPrimaryColumnQuestionTextAsync(
+            X02SyntheticWorkbookFactory.CreateGoogleFormsLikeProfile((uint)questionTextRow),
+            questionTextRow,
+            initialColumn: "C",
+            selectedColumn: "E",
+            expectedQuestionText: "Report answer 2");
+    }
+
+    private static async Task AssertPrimaryColumnQuestionTextAsync(
+        X02TemporaryWorkbook workbook,
+        int questionTextRow,
+        string initialColumn,
+        string selectedColumn,
+        string expectedQuestionText)
+    {
+        using (workbook)
+        {
+            InputViewModel viewModel = new()
+            {
+                HeaderRow = questionTextRow,
+            };
+            await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+            InputQuestionMappingViewModel question = Assert.Single(
+                viewModel.Questions,
+                item => item.PrimarySourceColumn == initialColumn);
+
+            question.PrimarySourceColumn = selectedColumn;
+
+            Assert.Equal((uint)questionTextRow, viewModel.Metadata!.HeaderRowNumber);
+            Assert.Equal(expectedQuestionText, question.QuestionText);
+            Assert.Equal(
+                expectedQuestionText,
+                Assert.Single(viewModel.DefinitionDraft.Questions, item => item.Id == question.Id).QuestionText);
+            Assert.True(viewModel.CanContinue);
+        }
+    }
+
+    [Fact]
+    public async Task Selecting_a_column_without_a_header_clears_question_text_and_requires_manual_input()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
+            "Responses",
+            headerRow: 1,
+            lastRow: 4,
+            lastColumn: 3,
+            new X02Header(2, "Report answer"));
+        InputViewModel viewModel = new();
+        await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        InputQuestionMappingViewModel question = Assert.Single(viewModel.Questions);
+        Assert.Equal(string.Empty, Assert.Single(
+            viewModel.AvailableColumns,
+            option => option.ColumnName == "A").HeaderText);
+        question.QuestionText = "MANUAL-QUESTION-TEXT";
+
+        question.PrimarySourceColumn = "A";
+
+        Assert.Equal(string.Empty, question.QuestionText);
+        Assert.Equal(
+            string.Empty,
+            Assert.Single(viewModel.DefinitionDraft.Questions, item => item.Id == question.Id).QuestionText);
+        InputValidationError error = Assert.Single(
+            viewModel.ValidationErrors,
+            item => item.Code == "REQUIRED"
+                && item.NodeId == question.Id
+                && item.Field == "QuestionText");
+        Assert.Equal("REQUIRED", error.Code);
+        Assert.False(viewModel.CanContinue);
+    }
+
+    [Fact]
+    public async Task Changing_primary_column_while_header_metadata_is_stale_preserves_question_text()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        InputViewModel viewModel = new();
+        await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        InputQuestionMappingViewModel question = viewModel.Questions[0];
+        const string ManualQuestionText = "MANUAL-QUESTION-TEXT";
+        question.QuestionText = ManualQuestionText;
+        string staleHeaderText = Assert.Single(
+            viewModel.AvailableColumns,
+            option => option.ColumnName == "G").HeaderText;
+        Assert.NotEqual(ManualQuestionText, staleHeaderText);
+
+        viewModel.HeaderRow = 2;
+        question.PrimarySourceColumn = "G";
+
+        QuestionDefinition updated = Assert.Single(
+            viewModel.DefinitionDraft.Questions,
+            item => item.Id == question.Id);
+        Assert.Equal("G", updated.PrimarySourceColumn);
+        Assert.Equal(ManualQuestionText, question.QuestionText);
+        Assert.Equal(ManualQuestionText, updated.QuestionText);
+        Assert.DoesNotContain(
+            viewModel.ValidationErrors,
+            error => error.Code == "REQUIRED" && error.Field == "QuestionText");
+        Assert.Contains(viewModel.ValidationErrors, error => error.Code == "HEADER_METADATA_MISMATCH");
+        Assert.False(viewModel.CanContinue);
+    }
+
+    [AvaloniaFact]
+    public async Task Selecting_primary_column_in_the_view_updates_the_visible_question_text()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        InputViewModel viewModel = new();
+        await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        InputQuestionMappingViewModel question = viewModel.Questions[0];
+        (string Id, string PrimarySourceColumn, string QuestionText)[] otherQuestionsBefore =
+            viewModel.DefinitionDraft.Questions
+                .Skip(1)
+                .Select(item => (item.Id, item.PrimarySourceColumn, item.QuestionText))
+                .ToArray();
+        InputView view = new(viewModel);
+        Window window = new()
+        {
+            Width = 1180,
+            Height = 820,
+            Content = view,
+        };
+
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+
+            ComboBox primaryColumn = Assert.Single(
+                view.GetVisualDescendants().OfType<ComboBox>(),
+                comboBox => AutomationProperties.GetAutomationId(comboBox) == question.PrimaryAutomationId);
+            TextBox questionText = Assert.Single(
+                view.GetVisualDescendants().OfType<TextBox>(),
+                textBox => ReferenceEquals(textBox.DataContext, question)
+                    && AutomationProperties.GetName(textBox) == "評価する設問 text");
+            const string ExpectedQuestionText = "質問 1 の学生プロンプト";
+
+            primaryColumn.SelectedItem = "G";
+            Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+
+            Assert.Equal("G", question.PrimarySourceColumn);
+            Assert.Equal(ExpectedQuestionText, questionText.Text);
+            Assert.Equal(
+                ExpectedQuestionText,
+                Assert.Single(viewModel.DefinitionDraft.Questions, item => item.Id == question.Id).QuestionText);
+            Assert.Equal(
+                otherQuestionsBefore,
+                viewModel.DefinitionDraft.Questions
+                    .Skip(1)
+                    .Select(item => (item.Id, item.PrimarySourceColumn, item.QuestionText))
+                    .ToArray());
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
     public async Task Editing_the_file_path_invalidates_loaded_metadata_snapshot_and_suggestions()
     {
         using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
@@ -364,7 +573,7 @@ public sealed class InputViewTests
 
             Assert.Same(viewModel, view.DataContext);
             Assert.Equal(2d, window.RenderScaling);
-            Assert.Equal(ScrollBarVisibility.Auto, scroll.HorizontalScrollBarVisibility);
+            Assert.Equal(ScrollBarVisibility.Disabled, scroll.HorizontalScrollBarVisibility);
             Assert.Equal(ScrollBarVisibility.Auto, scroll.VerticalScrollBarVisibility);
             Assert.Equal("InputFilePath", AutomationProperties.GetAutomationId(filePath));
             Assert.Equal("LoadInputWorkbook", AutomationProperties.GetAutomationId(load));
@@ -387,6 +596,11 @@ public sealed class InputViewTests
             Assert.Contains(view.GetVisualDescendants(), descendant => descendant is VirtualizingStackPanel);
             Assert.Null(view.FindControl<Border>("EthicsWarningBanner"));
 
+            Border scaledRange = Required<Border>(view, "InputRangeCard");
+            Border scaledSuggestions = Required<Border>(view, "InputSuggestionCard");
+            Assert.Equal(scaledRange.Bounds.Y, scaledSuggestions.Bounds.Y, 1d);
+            Assert.True(scroll.Extent.Width <= scroll.Viewport.Width + 1d);
+
             Press(window, Key.Tab);
             Assert.NotSame(filePath, window.FocusManager?.GetFocusedElement());
             Assert.True(load.Focus(NavigationMethod.Tab, KeyModifiers.None));
@@ -399,9 +613,187 @@ public sealed class InputViewTests
         }
     }
 
+    [AvaloniaFact]
+    public async Task Mapping_panes_split_by_available_width_instead_of_loaded_content_length()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        InputViewModel viewModel = new();
+        InputView view = new(viewModel);
+        Window window = new()
+        {
+            Width = 1180,
+            Height = 820,
+            Content = view,
+        };
+
+        try
+        {
+            window.Show();
+            Render();
+
+            Border range = Required<Border>(view, "InputRangeCard");
+            Border suggestions = Required<Border>(view, "InputSuggestionCard");
+            ScrollViewer scroll = Required<ScrollViewer>(view, "InputScrollViewer");
+            double emptyRangeWidth = range.Bounds.Width;
+            double emptySuggestionWidth = suggestions.Bounds.Width;
+
+            await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+            Render();
+
+            Assert.NotEmpty(viewModel.MappingSuggestions);
+            Assert.Equal(emptyRangeWidth, range.Bounds.Width, 1d);
+            Assert.Equal(emptySuggestionWidth, suggestions.Bounds.Width, 1d);
+            Assert.Equal(0, Grid.GetRow(range));
+            Assert.Equal(0, Grid.GetColumn(range));
+            Assert.Equal(0, Grid.GetRow(suggestions));
+            Assert.Equal(1, Grid.GetColumn(suggestions));
+            Assert.Equal(range.Bounds.Y, suggestions.Bounds.Y, 1d);
+            Assert.Equal(18d, suggestions.Bounds.X - range.Bounds.Right, 1d);
+            Assert.Equal(1.5d, suggestions.Bounds.Width / range.Bounds.Width, 2);
+            Assert.True(scroll.Extent.Width <= scroll.Viewport.Width + 1d);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Mapping_panes_stack_vertically_when_the_view_is_too_narrow_for_two_columns()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        InputViewModel viewModel = new();
+        await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        InputView view = new(viewModel);
+        Window window = new()
+        {
+            Width = 720,
+            Height = 900,
+            Content = view,
+        };
+
+        try
+        {
+            window.Show();
+            Render();
+
+            Border range = Required<Border>(view, "InputRangeCard");
+            Border suggestions = Required<Border>(view, "InputSuggestionCard");
+            ScrollViewer scroll = Required<ScrollViewer>(view, "InputScrollViewer");
+
+            Assert.Equal(range.Bounds.Width, suggestions.Bounds.Width, 1d);
+            Assert.Equal(0, Grid.GetRow(range));
+            Assert.Equal(2, Grid.GetColumnSpan(range));
+            Assert.Equal(1, Grid.GetRow(suggestions));
+            Assert.Equal(2, Grid.GetColumnSpan(suggestions));
+            Assert.True(suggestions.Bounds.Y >= range.Bounds.Bottom);
+            Assert.Equal(ScrollBarVisibility.Disabled, scroll.HorizontalScrollBarVisibility);
+            Assert.True(scroll.Extent.Width <= scroll.Viewport.Width + 1d);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void Mapping_panes_switch_at_the_documented_880_dip_container_boundary()
+    {
+        InputView view = new(new InputViewModel());
+        Window window = new()
+        {
+            Width = 1180,
+            Height = 3000,
+            Content = view,
+        };
+
+        try
+        {
+            window.Show();
+            Render();
+
+            Grid root = Required<Grid>(view, "InputContentRoot");
+            Border range = Required<Border>(view, "InputRangeCard");
+            Border suggestions = Required<Border>(view, "InputSuggestionCard");
+            double widthOutsideContainer = window.ClientSize.Width - root.Bounds.Width;
+
+            window.Width = 879d + widthOutsideContainer;
+            Render();
+            Assert.InRange(root.Bounds.Width, 878.5d, 879.5d);
+            Assert.Equal(1, Grid.GetRow(suggestions));
+            Assert.Equal(2, Grid.GetColumnSpan(range));
+
+            window.Width = 880d + widthOutsideContainer;
+            Render();
+            Assert.InRange(root.Bounds.Width, 879.5d, 880.5d);
+            Assert.Equal(0, Grid.GetRow(suggestions));
+            Assert.Equal(1, Grid.GetColumn(suggestions));
+            Assert.Equal(1, Grid.GetColumnSpan(range));
+
+            window.Width = 881d + widthOutsideContainer;
+            Render();
+            Assert.InRange(root.Bounds.Width, 880.5d, 881.5d);
+            Assert.Equal(0, Grid.GetRow(suggestions));
+            Assert.Equal(1, Grid.GetColumn(suggestions));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Long_unbreakable_header_text_does_not_widen_the_input_layout()
+    {
+        const string LongHeader =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJ";
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
+            "Original",
+            headerRow: 1,
+            lastRow: 12,
+            lastColumn: 2,
+            new X02Header(1, LongHeader),
+            new X02Header(2, LongHeader + "-supporting"));
+        InputViewModel viewModel = new();
+        await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        InputView view = new(viewModel);
+        Window window = new()
+        {
+            Width = 1180,
+            Height = 820,
+            Content = view,
+        };
+
+        try
+        {
+            window.Show();
+            Render();
+
+            Assert.Contains(viewModel.AvailableColumns, column => column.HeaderText == LongHeader);
+            Border range = Required<Border>(view, "InputRangeCard");
+            Border suggestions = Required<Border>(view, "InputSuggestionCard");
+            ScrollViewer scroll = Required<ScrollViewer>(view, "InputScrollViewer");
+
+            Assert.Equal(1.5d, suggestions.Bounds.Width / range.Bounds.Width, 2);
+            Assert.True(suggestions.Bounds.Right <= view.Bounds.Width + 1d);
+            Assert.True(scroll.Extent.Width <= scroll.Viewport.Width + 1d);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     private static T Required<T>(Control root, string name)
         where T : Control =>
         Assert.IsType<T>(root.FindControl<T>(name));
+
+    private static void Render()
+    {
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Dispatcher.UIThread.RunJobs();
+    }
 
     private static void Press(TopLevel window, Key key)
     {

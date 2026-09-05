@@ -37,15 +37,19 @@
               HorizontalAlignment="Center"
               VerticalAlignment="Center" />
         </Border>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7">
-          <TextBlock Text="{Binding NumberText}" Classes="step-number" />
-          <TextBlock Text="{Binding Title}" Classes="step-title" />
-        </StackPanel>
-        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6">
-          <TextBlock Text="{Binding EnglishTitle}" Classes="step-english" />
-          <TextBlock Text="·" Classes="step-english" />
-          <TextBlock Text="{Binding StatusText}" Classes="step-status" />
-        </StackPanel>
+        <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="7">
+          <TextBlock Text="{Binding NumberText}" Classes="step-number" VerticalAlignment="Center" />
+          <TextBlock
+              Grid.Column="1"
+              Text="{Binding Title}"
+              Classes="step-title"
+              TextTrimming="CharacterEllipsis" />
+        </Grid>
+        <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="6">
+          <TextBlock Text="{Binding EnglishTitle}" Classes="step-english" TextTrimming="CharacterEllipsis" />
+          <TextBlock Grid.Column="1" Text="·" Classes="step-english" />
+          <TextBlock Grid.Column="2" Text="{Binding StatusText}" Classes="step-status" TextTrimming="CharacterEllipsis" />
+        </Grid>
       </Grid>
     </DataTemplate>
   </Window.Resources>
@@ -177,10 +181,9 @@
     <ScrollViewer
         x:Name="ShellScrollViewer"
         Grid.Row="1"
-        HorizontalScrollBarVisibility="Auto"
+        HorizontalScrollBarVisibility="Disabled"
         VerticalScrollBarVisibility="Auto">
       <Grid
-          MinWidth="880"
           Margin="24"
           RowDefinitions="Auto,Auto,Auto,*,Auto"
           RowSpacing="20">
@@ -217,7 +220,8 @@
                 Foreground="{DynamicResource AppAccentStrongBrush}"
                 FontSize="11"
                 FontWeight="SemiBold"
-                LetterSpacing="0.8" />
+                LetterSpacing="0.8"
+                TextWrapping="Wrap" />
           </Border>
         </Grid>
 
@@ -234,7 +238,8 @@
               Text="Tab / Enter で操作できます"
               Classes="muted"
               FontSize="12"
-              VerticalAlignment="Bottom" />
+              VerticalAlignment="Bottom"
+              TextTrimming="CharacterEllipsis" />
         </Grid>
 
         <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
@@ -308,7 +313,7 @@
                 <views:InputView DataContext="{Binding}" />
               </DataTemplate>
               <DataTemplate DataType="{x:Type viewModels:QuantificationDesignViewModel}" x:DataType="viewModels:QuantificationDesignViewModel">
-                <views:QuantificationDesignView DataContext="{Binding}" />
+                <views:QuantificationDesignView DataContext="{Binding}" Height="720" />
               </DataTemplate>
               <DataTemplate DataType="{x:Type viewModels:ExecutionViewModel}" x:DataType="viewModels:ExecutionViewModel">
                 <views:ExecutionView DataContext="{Binding}" />
@@ -479,12 +484,16 @@
             <TextBlock
                 Text="{Binding CurrentStepStatusText}"
                 FontWeight="SemiBold"
-                HorizontalAlignment="Center" />
+                HorizontalAlignment="Center"
+                TextWrapping="Wrap"
+                TextAlignment="Center" />
             <TextBlock
                 Text="{Binding NavigationProgressText}"
                 Classes="muted"
                 FontSize="12"
-                HorizontalAlignment="Center" />
+                HorizontalAlignment="Center"
+                TextWrapping="Wrap"
+                TextAlignment="Center" />
           </StackPanel>
           <Button
               x:Name="NextStepButton"

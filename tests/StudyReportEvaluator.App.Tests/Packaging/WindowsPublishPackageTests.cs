@@ -12,6 +12,12 @@ using Xunit;
 
 namespace StudyReportEvaluator.App.Tests.Packaging;
 
+[CollectionDefinition(DisableParallelization = true)]
+public sealed class WindowsPublishPackageCollection
+{
+}
+
+[Collection<WindowsPublishPackageCollection>]
 public sealed class WindowsPublishPackageTests
 {
     private const string PackageRootName = "StudyReportEvaluator-win-x64";

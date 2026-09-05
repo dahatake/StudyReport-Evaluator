@@ -6,6 +6,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using StudyReportEvaluator.App.ViewModels;
@@ -395,7 +396,7 @@ public sealed class QuantificationDesignViewTests
     }
 
     [AvaloniaFact]
-    public void Large_valid_definition_virtualizes_navigators_and_realizes_only_the_selected_editors()
+    public void Large_valid_definition_realizes_question_summaries_and_virtualizes_nested_navigators()
     {
         QuantificationDesignViewModel viewModel = new(CreateLargeDefinition());
         QuantificationDesignView view = new(viewModel);
@@ -419,9 +420,172 @@ public sealed class QuantificationDesignViewTests
                 1_000,
                 viewModel.Questions.Sum(question => question.Evaluators.Sum(evaluator => evaluator.Criteria.Count)));
             Assert.True(viewModel.BuildSnapshot().HasValidHash());
+            Assert.Equal(
+                10,
+                view.GetVisualDescendants().OfType<Border>().Count(border =>
+                    (AutomationProperties.GetAutomationId(border) ?? string.Empty).StartsWith(
+                        "DesignQuestion-",
+                        StringComparison.Ordinal)));
             Assert.True(view.GetVisualDescendants().OfType<VirtualizingStackPanel>().Count() >= 3);
-            Assert.InRange(view.GetVisualDescendants().OfType<TextBox>().Count(), 1, 30);
+            Assert.InRange(view.GetVisualDescendants().OfType<TextBox>().Count(), 1, 60);
             Assert.Equal(2d, window.RenderScaling);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void Formula_guide_remains_fixed_and_reflects_current_values()
+    {
+        QuantificationDesignViewModel viewModel = new();
+        QuantificationDesignView view = new(viewModel);
+        Window window = new()
+        {
+            Width = 1260,
+            Height = 900,
+            Content = view,
+        };
+
+        try
+        {
+            window.Show();
+            Render();
+
+            ScrollViewer scroll = Required<ScrollViewer>(view, "QuantificationDesignScrollViewer");
+            Border formulaGuide = Required<Border>(view, "FormulaGuide");
+            TextBlock baseValue = RequiredByAutomationId<TextBlock>(view, "FormulaBaseValue");
+            TextBlock specialValue = RequiredByAutomationId<TextBlock>(view, "FormulaSpecialValue");
+            TextBlock similarityValue = RequiredByAutomationId<TextBlock>(view, "FormulaSimilarityValue");
+
+            Assert.Equal(ScrollBarVisibility.Disabled, scroll.HorizontalScrollBarVisibility);
+            Assert.DoesNotContain(
+                formulaGuide.GetVisualAncestors(),
+                ancestor => ReferenceEquals(ancestor, scroll));
+            Assert.Equal("60", baseValue.Text);
+            Assert.Equal("0", specialValue.Text);
+            Assert.Equal("0.1", similarityValue.Text);
+            Assert.Contains(
+                formulaGuide.GetVisualDescendants().OfType<TextBlock>(),
+                text => string.Equals(text.Text, "設問獲得点", StringComparison.Ordinal));
+            Assert.Contains(
+                formulaGuide.GetVisualDescendants().OfType<TextBlock>(),
+                text => string.Equals(text.Text, "FinalRaw", StringComparison.Ordinal));
+            Assert.Contains(
+                formulaGuide.GetVisualDescendants().OfType<TextBlock>(),
+                text => string.Equals(text.Text, "FinalScore", StringComparison.Ordinal));
+            TextBlock earnedLabel = Assert.Single(
+                formulaGuide.GetVisualDescendants().OfType<TextBlock>(),
+                text => string.Equals(text.Text, "設問獲得点", StringComparison.Ordinal));
+            TextBlock penaltyLabel = Assert.Single(
+                formulaGuide.GetVisualDescendants().OfType<TextBlock>(),
+                text => string.Equals(text.Text, "設問減点", StringComparison.Ordinal));
+            Assert.Contains(
+                "通常評価率 Rq",
+                ToolTip.GetTip(earnedLabel)?.ToString() ?? string.Empty,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                "類似度 Lq",
+                ToolTip.GetTip(penaltyLabel)?.ToString() ?? string.Empty,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                formulaGuide.GetVisualDescendants().OfType<TextBlock>(),
+                text => (text.Text ?? string.Empty).Contains(
+                    "FinalRaw がblankならblank",
+                    StringComparison.Ordinal));
+            Assert.Contains(
+                formulaGuide.GetVisualDescendants().OfType<Border>(),
+                border => (ToolTip.GetTip(border)?.ToString() ?? string.Empty).Contains(
+                    "有効設問間でも等分平均",
+                    StringComparison.Ordinal));
+
+            Point before = formulaGuide.TranslatePoint(default, window)
+                ?? throw new InvalidOperationException("Formula guide position is unavailable.");
+            Assert.True(scroll.Extent.Height > scroll.Viewport.Height);
+            scroll.Offset = new Vector(0d, Math.Min(300d, scroll.Extent.Height - scroll.Viewport.Height));
+            Render();
+            Point after = formulaGuide.TranslatePoint(default, window)
+                ?? throw new InvalidOperationException("Formula guide position is unavailable after scrolling.");
+            Assert.InRange(Math.Abs(after.Y - before.Y), 0d, 1d);
+
+            viewModel.BasePoints = 55m;
+            viewModel.SpecialPoints = 5m;
+            viewModel.SimilarityPenaltyWeight = 0.25m;
+            Render();
+
+            Assert.Equal("55", baseValue.Text);
+            Assert.Equal("5", specialValue.Text);
+            Assert.Equal("0.25", similarityValue.Text);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void Multiple_questions_render_together_and_identify_the_prompt_target()
+    {
+        QuantificationDesignViewModel viewModel = new();
+        QuestionDesignItemViewModel first = Assert.Single(viewModel.Questions);
+        first.DisplayName = "設問A";
+        QuestionDesignItemViewModel second = viewModel.DuplicateQuestion(first.Id);
+        second.DisplayName = "設問B";
+        viewModel.EqualizeQuestionPoints();
+        EvaluatorDesignItemViewModel custom = viewModel.AddEvaluator(first.Id, EvaluatorType.CustomPrompt);
+        first.SelectedEvaluator = custom;
+        viewModel.SelectedQuestion = first;
+        QuantificationDesignView view = new(viewModel);
+        Window window = new()
+        {
+            Width = 1260,
+            Height = 900,
+            Content = view,
+        };
+
+        try
+        {
+            window.Show();
+            Render();
+
+            WrapPanel questionPanel = Assert.Single(
+                view.GetVisualDescendants().OfType<WrapPanel>(),
+                panel => AutomationProperties.GetAutomationId(panel) == "QuestionCardPanel");
+            TextBlock promptTarget = RequiredByAutomationId<TextBlock>(view, "SelectedPromptTargetSummary");
+
+            Assert.Equal(Orientation.Horizontal, questionPanel.Orientation);
+            Assert.Equal($"設問A → Custom: {custom.DisplayName}", promptTarget.Text);
+            Assert.Equal(
+                2,
+                view.GetVisualDescendants().OfType<Border>().Count(border =>
+                    (AutomationProperties.GetAutomationId(border) ?? string.Empty).StartsWith(
+                        "DesignQuestion-",
+                        StringComparison.Ordinal)));
+
+            SpecialEvaluationDesignItemViewModel special = viewModel.AddSpecialEvaluation(first.Id);
+            first.SelectedSpecialEvaluation = special;
+            viewModel.SelectedPromptTarget = ImportedPromptTarget.SpecialEvaluation;
+            Render();
+            Assert.Equal($"設問A → 固有評価: {special.DisplayName}", promptTarget.Text);
+
+            viewModel.SelectedPromptTarget = ImportedPromptTarget.CustomEvaluator;
+
+            viewModel.SelectedQuestion = second;
+            Render();
+
+            Assert.Equal("設問B → Custom評価方法を選択してください", promptTarget.Text);
+            ListBoxItem selectedCard = Assert.Single(
+                view.GetVisualDescendants().OfType<ListBoxItem>(),
+                item => ReferenceEquals(item.DataContext, second));
+            Assert.True(selectedCard.IsSelected);
+            Assert.Equal(new Thickness(3d), selectedCard.BorderThickness);
+
+            viewModel.DeleteQuestion(second.Id);
+            Render();
+
+            Assert.Same(first, viewModel.SelectedQuestion);
+            Assert.Equal($"設問A → Custom: {custom.DisplayName}", promptTarget.Text);
         }
         finally
         {
@@ -464,7 +628,7 @@ public sealed class QuantificationDesignViewTests
 
             Assert.Same(viewModel, view.DataContext);
             Assert.Equal(2d, window.RenderScaling);
-            Assert.Equal(ScrollBarVisibility.Auto, scroll.HorizontalScrollBarVisibility);
+            Assert.Equal(ScrollBarVisibility.Disabled, scroll.HorizontalScrollBarVisibility);
             Assert.Equal(ScrollBarVisibility.Auto, scroll.VerticalScrollBarVisibility);
             Assert.Equal("DesignQuestions", AutomationProperties.GetAutomationId(questions));
             Assert.Equal("DesignValidationSummary", AutomationProperties.GetAutomationId(validation));
@@ -570,6 +734,19 @@ public sealed class QuantificationDesignViewTests
     private static T Required<T>(Control root, string name)
         where T : Control =>
         Assert.IsType<T>(root.FindControl<T>(name));
+
+    private static T RequiredByAutomationId<T>(Control root, string automationId)
+        where T : Control =>
+        Assert.Single(
+            root.GetVisualDescendants().OfType<T>(),
+            control => AutomationProperties.GetAutomationId(control) == automationId);
+
+    private static void Render()
+    {
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Dispatcher.UIThread.RunJobs();
+    }
 
     private static void Press(TopLevel window, Key key)
     {

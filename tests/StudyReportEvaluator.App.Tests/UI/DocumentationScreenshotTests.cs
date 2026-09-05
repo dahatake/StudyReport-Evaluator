@@ -164,14 +164,32 @@ public sealed class DocumentationScreenshotTests
             knowledgeQuestion.SelectedEvaluator = knowledgeEvaluator;
             QuantificationDesignView designView = Assert.Single(
                 window.GetVisualDescendants().OfType<QuantificationDesignView>());
+            Border formulaGuide = Required<Border>(designView, "FormulaGuide");
+            ListBox questionCards = Required<ListBox>(designView, "QuestionEditorList");
             TextBox knowledgePrompt = window.GetVisualDescendants()
                 .OfType<TextBox>()
                 .Single(control => string.Equals(
                     AutomationProperties.GetAutomationId(control),
                     knowledgeEvaluator.KnowledgePromptPreviewAutomationId,
                     StringComparison.Ordinal));
-            knowledgePrompt.BringIntoView();
+            designView.BringIntoView();
             Render();
+            questionCards.BringIntoView();
+            Render();
+            Assert.Equal(
+                2,
+                designView.GetVisualDescendants().OfType<Border>().Count(border =>
+                    (AutomationProperties.GetAutomationId(border) ?? string.Empty).StartsWith(
+                        "DesignQuestion-",
+                        StringComparison.Ordinal)));
+            AssertContainedInViewport(formulaGuide, window);
+            foreach (Border card in designView.GetVisualDescendants().OfType<Border>().Where(border =>
+                         (AutomationProperties.GetAutomationId(border) ?? string.Empty).StartsWith(
+                             "DesignQuestion-",
+                             StringComparison.Ordinal)))
+            {
+                AssertContainedInViewport(card, window);
+            }
             Capture(window, imageDirectory, ScreenshotFileNames[2]);
 
             QuestionDesignItemViewModel customQuestion = design.Questions[1];
@@ -187,6 +205,12 @@ public sealed class DocumentationScreenshotTests
                     StringComparison.Ordinal));
             customPrompt.BringIntoView();
             Render();
+            designView.BringIntoView();
+            Render();
+            Assert.True(customPrompt.IsEffectivelyVisible);
+            Assert.True(formulaGuide.IsEffectivelyVisible);
+            AssertContainedInViewport(formulaGuide, window);
+            AssertContainedInViewport(customPrompt, window);
             Capture(window, imageDirectory, ScreenshotFileNames[3]);
 
             viewModel.NextCommand.Execute(null);
@@ -494,6 +518,18 @@ public sealed class DocumentationScreenshotTests
 
     private static void ResetScroll(ScrollViewer scrollViewer) =>
         scrollViewer.Offset = default;
+
+    private static void AssertContainedInViewport(Control control, TopLevel viewport)
+    {
+        Point origin = control.TranslatePoint(default, viewport)
+            ?? throw new InvalidOperationException("The screenshot target position is unavailable.");
+        Assert.True(
+            origin.X >= 0d
+                && origin.Y >= 0d
+                && origin.X + control.Bounds.Width <= viewport.ClientSize.Width
+                && origin.Y + control.Bounds.Height <= viewport.ClientSize.Height,
+            $"{control.GetType().Name} is not fully contained in the screenshot viewport.");
+    }
 
     private static T Required<T>(Control root, string name)
         where T : Control =>

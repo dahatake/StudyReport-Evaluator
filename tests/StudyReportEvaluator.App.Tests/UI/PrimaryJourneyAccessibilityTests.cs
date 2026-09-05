@@ -58,7 +58,7 @@ public sealed class PrimaryJourneyAccessibilityTests
 
             Assert.Same(viewModel, view.DataContext);
             Assert.Equal(2d, window.RenderScaling);
-            Assert.Equal(ScrollBarVisibility.Auto, scroll.HorizontalScrollBarVisibility);
+            Assert.Equal(ScrollBarVisibility.Disabled, scroll.HorizontalScrollBarVisibility);
             Assert.Equal(ScrollBarVisibility.Auto, scroll.VerticalScrollBarVisibility);
             Assert.Equal("CheckCopilotAuthentication", AutomationProperties.GetAutomationId(auth));
             Assert.Equal("ExecutionModel", AutomationProperties.GetAutomationId(model));
@@ -130,7 +130,7 @@ public sealed class PrimaryJourneyAccessibilityTests
 
             Assert.Same(viewModel, view.DataContext);
             Assert.Equal(2d, window.RenderScaling);
-            Assert.Equal(ScrollBarVisibility.Auto, scroll.HorizontalScrollBarVisibility);
+            Assert.Equal(ScrollBarVisibility.Disabled, scroll.HorizontalScrollBarVisibility);
             Assert.Equal(ScrollBarVisibility.Auto, scroll.VerticalScrollBarVisibility);
             Assert.Equal("ResultsReviewList", AutomationProperties.GetAutomationId(results));
             Assert.Equal("ResultsRowScores", AutomationProperties.GetAutomationId(rowScores));

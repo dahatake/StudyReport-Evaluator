@@ -1087,7 +1087,10 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
 
             if (SetProperty(ref selectedPromptTarget, value))
             {
-                OnPropertiesChanged(nameof(SelectedPromptTargetChoice), nameof(CanApplyImportedPrompt));
+                OnPropertiesChanged(
+                    nameof(SelectedPromptTargetChoice),
+                    nameof(SelectedPromptTargetSummary),
+                    nameof(CanApplyImportedPrompt));
                 applyImportedPromptCommand.RaiseCanExecuteChanged();
             }
         }
@@ -1107,6 +1110,21 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
 
     public string ImportedPromptPreview => SelectedImportedPrompt?.Content
         ?? "command lineで --prompt を指定するとここに表示されます。";
+
+    public string SelectedPromptTargetSummary => SelectedQuestion is not { } question
+        ? "設問を選択してください"
+        : SelectedPromptTarget switch
+        {
+            ImportedPromptTarget.CustomEvaluator when question.SelectedEvaluator?.IsCustom == true =>
+                $"{question.DisplayName} → Custom: {question.SelectedEvaluator.DisplayName}",
+            ImportedPromptTarget.CustomEvaluator =>
+                $"{question.DisplayName} → Custom評価方法を選択してください",
+            ImportedPromptTarget.SpecialEvaluation when question.SelectedSpecialEvaluation is not null =>
+                $"{question.DisplayName} → 固有評価: {question.SelectedSpecialEvaluation.DisplayName}",
+            ImportedPromptTarget.SpecialEvaluation =>
+                $"{question.DisplayName} → 固有評価を選択してください",
+            _ => throw new ArgumentOutOfRangeException(nameof(SelectedPromptTarget)),
+        };
 
     public bool CanApplyImportedPrompt => SelectedImportedPrompt is not null
         && SelectedQuestion is not null
@@ -1606,7 +1624,7 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
 
     internal void NotifyPromptTargetChanged()
     {
-        OnPropertyChanged(nameof(CanApplyImportedPrompt));
+        OnPropertiesChanged(nameof(SelectedPromptTargetSummary), nameof(CanApplyImportedPrompt));
         applyImportedPromptCommand.RaiseCanExecuteChanged();
     }
 
@@ -1751,6 +1769,7 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             nameof(AllocationRemaining),
             nameof(IsAllocationValid),
             nameof(AllocationSummary),
+            nameof(SelectedPromptTargetSummary),
             nameof(HierarchySummary));
         equalizeQuestionPointsCommand.RaiseCanExecuteChanged();
     }
