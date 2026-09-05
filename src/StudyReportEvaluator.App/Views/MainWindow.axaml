@@ -55,6 +55,12 @@
   </Window.Resources>
 
   <Window.Styles>
+    <Style Selector="ScrollViewer#ShellScrollViewer">
+      <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+    </Style>
+    <Style Selector="ScrollViewer#ShellScrollViewer.design">
+      <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
+    </Style>
     <Style Selector="Border.surface-card">
       <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
@@ -181,8 +187,8 @@
     <ScrollViewer
         x:Name="ShellScrollViewer"
         Grid.Row="1"
-        HorizontalScrollBarVisibility="Disabled"
-        VerticalScrollBarVisibility="Auto">
+        Classes.design="{Binding DesignStep.IsCurrent}"
+        HorizontalScrollBarVisibility="Disabled">
       <Grid
           Margin="24"
           RowDefinitions="Auto,Auto,Auto,*,Auto"
@@ -313,7 +319,7 @@
                 <views:InputView DataContext="{Binding}" />
               </DataTemplate>
               <DataTemplate DataType="{x:Type viewModels:QuantificationDesignViewModel}" x:DataType="viewModels:QuantificationDesignViewModel">
-                <views:QuantificationDesignView DataContext="{Binding}" MaxHeight="{Binding $parent[Window].ClientSize.Height}" />
+                <views:QuantificationDesignView DataContext="{Binding}" />
               </DataTemplate>
               <DataTemplate DataType="{x:Type viewModels:ExecutionViewModel}" x:DataType="viewModels:ExecutionViewModel">
                 <views:ExecutionView DataContext="{Binding}" />

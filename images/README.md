@@ -2,12 +2,15 @@
 
 このフォルダーは、StudyReport Evaluatorの操作説明に使う実際のAvalonia viewのPNGを保存します。
 
+> **対象版:** 7枚の画像は**UNRELEASED（未リリース）の`0.8.3`候補**のUI説明用で、公開`0.8.1`の画面を示すものではありません。設問text同期・固定表示の採点計算式・幅に応じたカード配置を`0.8.1`の機能として扱わないでください。既存PNGは生成後のcode/UI変更の検証証跡ではありません。
+
 ## Provenance
 
 - 生成日: 2026-09-05
 - renderer: Avalonia 12.1.1 Headless + Skia
 - size: 1440 × 1050 pixels
 - generator source: `tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs`（repositoryでのみ利用。配布ZIPにはsourceを含めない）
+- definition/question/evaluator/criterion IDs: fixture内で固定し、同一環境での2回描画が一致することを検証。本番のID生成は変更しない
 - input state: header 1行 + 回答100行 × 2設問を模した合成workbook metadata
 - displayed path: `C:\Synthetic\StudyReport-100x2.xlsx`
 - design state: Base 60、Special 0、Question points 20/20、Similarity penalty weight 0.1
@@ -36,11 +39,18 @@
 PowerShell 7でrepository rootからvisual documentation testを明示的にopt-inして再生成します。
 
 ```powershell
-$env:STUDY_REPORT_EVALUATOR_GENERATE_DOC_IMAGES = '1'
-dotnet test tests\StudyReportEvaluator.App.Tests\StudyReportEvaluator.App.Tests.csproj --no-restore -c Release --filter 'FullyQualifiedName~DocumentationScreenshotTests'
+$previousGenerateImages = $env:STUDY_REPORT_EVALUATOR_GENERATE_DOC_IMAGES
+try {
+	$env:STUDY_REPORT_EVALUATOR_GENERATE_DOC_IMAGES = '1'
+	dotnet test tests\StudyReportEvaluator.App.Tests\StudyReportEvaluator.App.Tests.csproj --no-restore -c Release --filter 'FullyQualifiedName~DocumentationScreenshotTests'
+	if ($LASTEXITCODE -ne 0) { throw 'Documentation screenshot validation failed.' }
+}
+finally {
+	$env:STUDY_REPORT_EVALUATOR_GENERATE_DOC_IMAGES = $previousGenerateImages
+}
 ```
 
-通常のtest runは既存PNGの存在、file size、pixel dimensionsだけを検証し、画像を書き換えません。
+通常のtest runも現行UIを一時directoryへ描画し、主要controlの位置、pixel dimensions、2回生成の一致を検証します。既存PNGの存在・file size・pixel dimensionsも検査しますが、repository画像を書き換えるのは上記opt-in時だけです。一時画像はtest後に削除します。同一環境での再現性を別OS／font／DPIのpixel一致へ一般化しません。
 
 ## Source
 

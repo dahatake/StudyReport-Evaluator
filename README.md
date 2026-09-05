@@ -39,7 +39,7 @@ AIが作る値は確認対象です。最終的な評点と利用判断は、授
 4. ZIPを新しいdirectoryへ展開します。
 5. `StudyReportEvaluator-win-x64\StudyReportEvaluator.App.exe`を起動します。
 
-PowerShell 7でSHA-256を確認する例:
+PowerShell 7が既にある場合のSHA-256確認例（任意）です。PowerShell 7の導入は必須ではなく、Windows 11標準の`certutil`を使う方法は[はじめに](docs/getting-started.md)を参照してください。
 
 ```powershell
 (Get-FileHash -Algorithm SHA256 .\StudyReportEvaluator-win-x64.zip).Hash
@@ -48,6 +48,8 @@ PowerShell 7でSHA-256を確認する例:
 配布ZIPはunsignedです。code signing済み、installer形式、SmartScreen reputation確立済みとは表示していません。入手元とhashを確認できない場合は実行しないでください。
 
 ## 5分クイックスタート
+
+> **画面・追加操作の対象版:** 以下の画像と、利用者ガイドの設問text自動同期・固定表示の採点計算式・幅に応じて折り返す設問カードは、**UNRELEASED（未リリース）の`0.8.3`候補**を対象にしています。公開`0.8.1`でこれらの追加UI／動作を前提にしないでください。手順の対象版は[はじめに](docs/getting-started.md)を参照してください。
 
 ### 1. 入力
 

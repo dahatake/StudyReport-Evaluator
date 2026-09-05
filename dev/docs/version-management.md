@@ -206,7 +206,7 @@ pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify -Tag v0.8.0 -RequireC
 
 ### 6.4 buildとtest
 
-現行repositoryは[CI workflow](../../.github/workflows/ci.yml)でsample非依存のlocked restore、Release build、決定的testを実行します。`sample/SampleReport.xlsx`はGit追跡しないprivate local inputなので、正式公開前はWindows 11 x64上でcanonical sampleを含むmanual final gateも実行し、CIで代用しません。[詳細設計 §13.3](detailed-design.md#133-自動化境界)
+現行repositoryは[CI workflow](../../.github/workflows/ci.yml)でsample非依存のlocked restore、Release build、決定的testを実行します。`sample/SampleReport.xlsx`はGit追跡しないprivate local inputなので、正式公開前はWindows 11 x64上でcanonical sampleを含むmanual final gateも実行し、CIで代用しません。[詳細設計 §13.5](detailed-design.md#135-自動化境界)
 
 1. locked restore。
 2. Release build。

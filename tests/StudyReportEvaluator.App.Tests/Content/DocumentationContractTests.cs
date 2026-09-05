@@ -203,6 +203,54 @@ public sealed class DocumentationContractTests
     }
 
     [Fact]
+    public void Current_documents_link_to_existing_local_markdown_headings()
+    {
+        string root = FindRepositoryRoot();
+        IEnumerable<string> paths = PublicDocumentPaths.Select(path => Resolve(root, path))
+            .Concat(Directory.EnumerateFiles(Resolve(root, "dev/docs"), "*.md"))
+            .Distinct();
+        List<string> broken = [];
+        foreach (string path in paths)
+        {
+            foreach (Match match in Regex.Matches(File.ReadAllText(path), @"!?\[[^\]]*\]\((?<target>[^)]+)\)"))
+            {
+                string target = match.Groups["target"].Value.Trim().Trim('<', '>');
+                if (Regex.IsMatch(target, @"^[a-z]+:", RegexOptions.IgnoreCase))
+                {
+                    continue;
+                }
+
+                string[] parts = target.Split('#', 2);
+                if (parts.Length != 2 || parts[1].Length == 0)
+                {
+                    continue;
+                }
+
+                string destination = parts[0].Length == 0 ? path : Path.GetFullPath(
+                    Uri.UnescapeDataString(parts[0]), Path.GetDirectoryName(path)!);
+                if (Path.GetExtension(destination).Equals(".md", StringComparison.OrdinalIgnoreCase)
+                    && (!File.Exists(destination) || !MarkdownAnchors(File.ReadAllText(destination))
+                        .Contains(Uri.UnescapeDataString(parts[1]))))
+                {
+                    broken.Add($"{Path.GetRelativePath(root, path)} -> {target}");
+                }
+            }
+        }
+
+        Assert.True(broken.Count == 0, string.Join(Environment.NewLine, broken));
+    }
+
+    [Fact]
+    public void Heading_anchor_check_ignores_code_and_detects_missing_targets()
+    {
+        HashSet<string> anchors = MarkdownAnchors("## Evidence integrity and storage\n```text\n## Not a heading\n```\n### 主なvalidation\n");
+        Assert.Contains("evidence-integrity-and-storage", anchors);
+        Assert.Contains("主なvalidation", anchors);
+        Assert.DoesNotContain("not-a-heading", anchors);
+        Assert.DoesNotContain("missing", anchors);
+    }
+
+    [Fact]
     public void Ethics_warning_is_exact_in_readme_and_user_guides()
     {
         foreach (string path in new[]
@@ -415,6 +463,25 @@ public sealed class DocumentationContractTests
             Assert.True(File.Exists(Resolve(FindRepositoryRoot(), "images/" + fileName)));
             Assert.Contains(fileName, manifest, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public void Unreleased_ui_and_screenshots_are_explicitly_distinguished_from_the_public_release()
+    {
+        foreach (string path in new[]
+                 {
+                     "README.md",
+                     "docs/README.md",
+                     "docs/getting-started.md",
+                     "docs/features.md",
+                     "images/README.md",
+                 })
+        {
+            AssertContainsAll(Read(path), "UNRELEASED", "`0.8.3`候補", "`0.8.1`");
+        }
+
+        AssertContainsAll(Read("images/README.md"), "一時directoryへ描画", "2回生成の一致", "finally");
+        AssertContainsAll(Read("docs/getting-started.md"), "PowerShell 7の導入は必須ではありません", "certutil");
     }
 
     [Fact]
@@ -650,6 +717,36 @@ public sealed class DocumentationContractTests
 
     private static string Read(string relativePath) =>
         File.ReadAllText(Resolve(FindRepositoryRoot(), relativePath));
+
+    private static HashSet<string> MarkdownAnchors(string content)
+    {
+        HashSet<string> anchors = new(StringComparer.Ordinal);
+        Dictionary<string, int> counts = new(StringComparer.Ordinal);
+        bool fenced = false;
+        foreach (string line in content.Split('\n'))
+        {
+            string text = line.Trim();
+            if (text.StartsWith("```", StringComparison.Ordinal) || text.StartsWith("~~~", StringComparison.Ordinal))
+            {
+                fenced = !fenced;
+                continue;
+            }
+
+            Match heading = Regex.Match(text, @"^#{1,6}\s+(?<title>.+?)\s*#*$");
+            if (fenced || !heading.Success)
+            {
+                continue;
+            }
+
+            string slug = Regex.Replace(heading.Groups["title"].Value.ToLowerInvariant(), @"[^\p{L}\p{M}\p{N}_\- ]", string.Empty)
+                .Replace(' ', '-');
+            int count = counts.GetValueOrDefault(slug);
+            counts[slug] = count + 1;
+            anchors.Add(count == 0 ? slug : $"{slug}-{count}");
+        }
+
+        return anchors;
+    }
 
     private static string Resolve(string root, string relativePath) =>
         Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));

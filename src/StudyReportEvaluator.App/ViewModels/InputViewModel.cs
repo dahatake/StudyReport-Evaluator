@@ -508,6 +508,7 @@ public sealed class InputViewModel : UiObservableObject
     private bool isBusy;
     private bool isUsingSuggestedMapping;
     private bool launchAutoLoadPending;
+    private bool updatingInputChoices;
     private long loadSequence;
 
     public InputViewModel()
@@ -591,7 +592,13 @@ public sealed class InputViewModel : UiObservableObject
             item.Name,
             SelectedSheet,
             StringComparison.OrdinalIgnoreCase));
-        set => SelectedSheet = value?.Name ?? string.Empty;
+        set
+        {
+            if (!updatingInputChoices)
+            {
+                SelectedSheet = value?.Name ?? string.Empty;
+            }
+        }
     }
 
     public int HeaderRow
@@ -746,7 +753,10 @@ public sealed class InputViewModel : UiObservableObject
         await LoadAsync(cancellationToken);
     }
 
-    public async Task LoadAsync(CancellationToken cancellationToken = default)
+    public Task LoadAsync(CancellationToken cancellationToken = default) =>
+        LoadCoreAsync(preserveMapping: false, cancellationToken);
+
+    private async Task LoadCoreAsync(bool preserveMapping, CancellationToken cancellationToken)
     {
         long sequence = Interlocked.Increment(ref loadSequence);
         if (string.IsNullOrWhiteSpace(FilePath))
@@ -785,7 +795,7 @@ public sealed class InputViewModel : UiObservableObject
                 return;
             }
 
-            ApplyLoadResult(result);
+            ApplyLoadResult(result, preserveMapping);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -837,7 +847,7 @@ public sealed class InputViewModel : UiObservableObject
     }
 
     public Task RefreshHeaderAsync(CancellationToken cancellationToken = default) =>
-        LoadAsync(cancellationToken);
+        LoadCoreAsync(preserveMapping: true, cancellationToken);
 
     public void ApplySuggestedMapping()
     {
@@ -852,11 +862,14 @@ public sealed class InputViewModel : UiObservableObject
     public InputQuestionMappingViewModel AddQuestion()
     {
         string primaryColumn = availableColumnNameItems.FirstOrDefault() ?? "A";
+        string questionText = TryGetQuestionTextForPrimaryColumn(primaryColumn, out string headerText)
+            ? headerText
+            : string.Empty;
         QuestionDefinition question = CreateDefaultQuestion(
             NewId("question"),
             questionItems.Count + 1,
             primaryColumn,
-            questionText: "評価する設問を入力してください。",
+            questionText: questionText,
             studentPrompt: false,
             supportingColumns: []);
         CommitDraft(definitionDraft.AddQuestion(question), suggested: false);
@@ -914,6 +927,11 @@ public sealed class InputViewModel : UiObservableObject
 
     public void SetPrimaryColumn(string questionId, string columnName)
     {
+        if (updatingInputChoices)
+        {
+            return;
+        }
+
         string primaryColumn = columnName ?? string.Empty;
         bool updateQuestionText = TryGetQuestionTextForPrimaryColumn(
             primaryColumn,
@@ -1004,29 +1022,45 @@ public sealed class InputViewModel : UiObservableObject
         CommitDraft(next, suggested: false);
     }
 
-    private void ApplyLoadResult(InputWorkbookLoadResult result)
+    private void ApplyLoadResult(InputWorkbookLoadResult result, bool preserveMapping)
     {
+        QuantificationDefinition? retained = preserveMapping && HasLoadedWorkbook
+            ? definitionDraft
+            : null;
         snapshot = result.Snapshot;
         metadata = result.Metadata;
         suggestions = result.Suggestions;
-        worksheetItems.Clear();
-        foreach (WorksheetMetadata worksheet in metadata.Worksheets)
+        updatingInputChoices = true;
+        try
         {
-            worksheetItems.Add(new WorksheetChoiceViewModel(worksheet));
-        }
+            worksheetItems.Clear();
+            foreach (WorksheetMetadata worksheet in metadata.Worksheets)
+            {
+                worksheetItems.Add(new WorksheetChoiceViewModel(worksheet));
+            }
 
-        selectedSheet = result.Suggestions.SuggestedWorksheetName
-            ?? metadata.Worksheets.FirstOrDefault(worksheet => worksheet.State == WorkbookSheetState.Visible)?.Name
-            ?? metadata.Worksheets[0].Name;
-        OnPropertyChanged(nameof(SelectedSheet));
-        OnPropertyChanged(nameof(SelectedWorksheetChoice));
-        OnPropertiesChanged(
-            nameof(Metadata),
-            nameof(Snapshot),
-            nameof(HasLoadedWorkbook),
-            nameof(WorkbookSummary),
-            nameof(StatusText));
-        ApplyWorksheetSelection(applySuggestion: true);
+            selectedSheet = retained?.SourceSheet
+                ?? result.Suggestions.SuggestedWorksheetName
+                ?? metadata.Worksheets.FirstOrDefault(worksheet => worksheet.State == WorkbookSheetState.Visible)?.Name
+                ?? metadata.Worksheets[0].Name;
+            OnPropertyChanged(nameof(SelectedSheet));
+            OnPropertyChanged(nameof(SelectedWorksheetChoice));
+            OnPropertiesChanged(
+                nameof(Metadata),
+                nameof(Snapshot),
+                nameof(HasLoadedWorkbook),
+                nameof(WorkbookSummary),
+                nameof(StatusText));
+            ApplyWorksheetSelection(applySuggestion: retained is null);
+            if (retained is not null)
+            {
+                SynchronizeQuestionItems();
+            }
+        }
+        finally
+        {
+            updatingInputChoices = false;
+        }
     }
 
     private void ApplyWorksheetSelection(bool applySuggestion)
@@ -1128,7 +1162,7 @@ public sealed class InputViewModel : UiObservableObject
                     NewId("question"),
                     questions.Count + 1,
                     candidate.ColumnName,
-                    headers.GetValueOrDefault(candidate.ColumnName, $"質問 {questions.Count + 1}"),
+                    headers.GetValueOrDefault(candidate.ColumnName, string.Empty),
                     candidate.IsStudentPromptPrimaryCandidate,
                     candidate.SuggestedSupportingColumns));
             }
@@ -1141,7 +1175,7 @@ public sealed class InputViewModel : UiObservableObject
                 NewId("question"),
                 1,
                 primary,
-                headers.GetValueOrDefault(primary, "評価する設問を入力してください。"),
+                headers.GetValueOrDefault(primary, string.Empty),
                 studentPrompt: false,
                 supportingColumns: []));
         }
@@ -1194,9 +1228,7 @@ public sealed class InputViewModel : UiObservableObject
         {
             Id = id,
             DisplayName = $"質問 {ordinal.ToString(CultureInfo.InvariantCulture)}",
-            QuestionText = string.IsNullOrWhiteSpace(questionText)
-                ? $"質問 {ordinal.ToString(CultureInfo.InvariantCulture)}"
-                : questionText,
+            QuestionText = questionText,
             PrimarySourceColumn = primaryColumn,
             SupportingSourceColumns = [.. supportingColumns],
             Points = 0m,

@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -47,13 +48,29 @@ public sealed class DocumentationScreenshotTests
     {
         string repositoryRoot = FindRepositoryRoot();
         string imageDirectory = Path.Combine(repositoryRoot, "images");
-        if (string.Equals(
+        bool updateDocumentation = string.Equals(
                 Environment.GetEnvironmentVariable(GenerateEnvironmentVariable),
                 "1",
-                StringComparison.Ordinal))
+                StringComparison.Ordinal);
+        string renderedDirectory = Path.Combine(Path.GetTempPath(), "StudyReportEvaluator-Captures-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(renderedDirectory);
+        try
         {
-            Directory.CreateDirectory(imageDirectory);
-            await GenerateAsync(imageDirectory);
+            await GenerateAsync(renderedDirectory);
+            foreach (string fileName in ScreenshotFileNames)
+            {
+                string renderedPath = Path.Combine(renderedDirectory, fileName);
+                using Bitmap rendered = new(renderedPath);
+                Assert.Equal(new PixelSize(ScreenshotWidth, ScreenshotHeight), rendered.PixelSize);
+                if (updateDocumentation)
+                {
+                    File.Copy(renderedPath, Path.Combine(imageDirectory, fileName), overwrite: true);
+                }
+            }
+        }
+        finally
+        {
+            Directory.Delete(renderedDirectory, recursive: true);
         }
 
         foreach (string fileName in ScreenshotFileNames)
@@ -67,6 +84,29 @@ public sealed class DocumentationScreenshotTests
             Assert.Equal(
                 new PixelSize(ScreenshotWidth, ScreenshotHeight),
                 bitmap.PixelSize);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Synthetic_screenshot_renders_are_repeatable()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "StudyReportEvaluator-CaptureRepeat-" + Guid.NewGuid().ToString("N"));
+        string first = Directory.CreateDirectory(Path.Combine(directory, "first")).FullName;
+        string second = Directory.CreateDirectory(Path.Combine(directory, "second")).FullName;
+        try
+        {
+            await GenerateAsync(first);
+            await GenerateAsync(second);
+            foreach (string fileName in ScreenshotFileNames)
+            {
+                string before = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(first, fileName))));
+                string after = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(second, fileName))));
+                Assert.True(before == after, $"Synthetic screenshot is not repeatable: {fileName}");
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
         }
     }
 
@@ -93,6 +133,19 @@ public sealed class DocumentationScreenshotTests
         input.Questions[0].DisplayName = "設問1：機械学習の基礎";
         input.Questions[1].DisplayName = "設問2：活用方法の説明";
         input.Questions[1].SetSupportingColumn("D", selected: true);
+        QuantificationDefinition screenshotDefinition = input.DefinitionDraft with
+        {
+            Id = "documentation-definition",
+            Questions = [.. input.DefinitionDraft.Questions.Select((question, index) => question with
+            {
+                Id = $"documentation-question-{index + 1}",
+                Evaluators = [question.Evaluators[0] with
+                {
+                    Id = $"documentation-evaluator-{index + 1}",
+                    Criteria = [question.Evaluators[0].Criteria[0] with { Id = $"documentation-criterion-{index + 1}" }],
+                }],
+            })],
+        };
 
         CopilotRuntimeIdentity runtimeIdentity = new(
             @"C:\Synthetic\StudyReportEvaluator-win-x64\runtimes\win-x64\native\copilot.exe",
@@ -119,12 +172,15 @@ public sealed class DocumentationScreenshotTests
             new RecordingAuthenticationBoundary(authenticationSnapshot),
             runBoundary);
         ResultsOutputViewModel results = new(new RecordingOutputBoundary());
+        WorkflowNavigator navigator = new();
+        navigator.MoveNext();
         MainWindowViewModel viewModel = new(
-            new WorkflowNavigator(),
+            navigator,
             input,
-            new QuantificationDesignViewModel(input.DefinitionDraft),
+            new QuantificationDesignViewModel(screenshotDefinition),
             execution,
             results);
+        viewModel.PreviousCommand.Execute(null);
         MainWindow window = new(viewModel)
         {
             Width = ScreenshotWidth,

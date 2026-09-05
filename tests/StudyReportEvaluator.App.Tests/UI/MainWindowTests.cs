@@ -217,7 +217,7 @@ public sealed class MainWindowTests
     }
 
     [AvaloniaFact]
-    public void Design_view_height_tracks_the_window_client_height()
+    public void Design_view_height_tracks_the_available_shell_height()
     {
         MainWindowViewModel viewModel = new(
             new WorkflowNavigator(),
@@ -237,14 +237,15 @@ public sealed class MainWindowTests
 
             QuantificationDesignView designView = Assert.Single(
                 window.GetVisualDescendants().OfType<QuantificationDesignView>());
-            double compactHeight = window.ClientSize.Height;
-            Assert.Equal(compactHeight, designView.MaxHeight);
+            double compactHeight = designView.Bounds.Height;
+            Assert.True(compactHeight > 0d);
+            Assert.True(compactHeight < window.ClientSize.Height);
 
             window.Height = 1000;
             Render();
 
-            Assert.True(window.ClientSize.Height > compactHeight);
-            Assert.Equal(window.ClientSize.Height, designView.MaxHeight);
+            Assert.True(designView.Bounds.Height > compactHeight);
+            Assert.True(designView.Bounds.Height < window.ClientSize.Height);
         }
         finally
         {
@@ -295,6 +296,40 @@ public sealed class MainWindowTests
             Assert.Equal(3, viewModel.DesignViewModel.Draft.FirstDataRow);
             Assert.Single(window.GetVisualDescendants().OfType<QuantificationDesignView>());
             Assert.False(Required<Grid>(window, "CurrentStepPlaceholderHost").IsVisible);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void Design_formula_and_editor_stay_inside_the_shell_after_shrinking_and_scrolling()
+    {
+        MainWindow window = new ServiceRegistration().CreateMainWindow();
+        window.Width = 1024;
+        window.Height = 1000;
+        try
+        {
+            window.Show();
+            window.ViewModel.NextCommand.Execute(null);
+            Render();
+            window.Height = 720;
+            Render();
+            QuantificationDesignView view = Assert.Single(window.GetVisualDescendants().OfType<QuantificationDesignView>());
+            ScrollViewer shell = Required<ScrollViewer>(window, "ShellScrollViewer");
+            ScrollViewer body = Required<ScrollViewer>(view, "QuantificationDesignScrollViewer");
+            Border guide = Required<Border>(view, "FormulaGuide");
+            Point before = guide.TranslatePoint(default, window)!.Value;
+            body.ScrollToEnd();
+            shell.ScrollToEnd();
+            Render();
+
+            Assert.Equal(before.Y, guide.TranslatePoint(default, window)!.Value.Y, 1d);
+            Point editorOrigin = body.TranslatePoint(default, window)!.Value;
+            Assert.True(body.Viewport.Height >= 100d);
+            Assert.True(editorOrigin.Y >= 0d);
+            Assert.True(editorOrigin.Y + body.Bounds.Height <= window.ClientSize.Height + 1d);
         }
         finally
         {

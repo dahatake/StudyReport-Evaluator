@@ -7,6 +7,8 @@ StudyReport Evaluatorは、標準`.xlsx`の回答をGitHub Copilotで定量化�
 > [!WARNING]
 > 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません
 
+**対象版の注意:** 画面画像と新しい入力／設計UIの説明（設問text同期、固定表示の採点計算式、折り返しカード）は**UNRELEASED（未リリース）の`0.8.3`候補**向けです。公開`0.8.1`の機能・画面とは区別し、[はじめに](getting-started.md)の対象版注記に従ってください。
+
 ## 読者別ガイド
 
 | 読者 | ガイド | 内容 |
@@ -17,7 +19,7 @@ StudyReport Evaluatorは、標準`.xlsx`の回答をGitHub Copilotで定量化�
 | Promptファイルで準備する人 | [Promptファイルから起動](prompt-launch.md) | `--input`、複数`--prompt`、明示適用 |
 | 情報管理・運用担当 | [データとprivacy](privacy-and-data-handling.md) | AIへ送る情報、log、final/partialの機密性 |
 | 問題を解決したい人 | [トラブルシューティング](troubleshooting.md) | 入力、設計、Copilot、checkpoint、出力 |
-| 画面を確認したい人 | [画面一覧](../images/README.md) | synthetic dataで生成した現行画面 |
+| 画面を確認したい人 | [画面一覧](../images/README.md) | UNRELEASED `0.8.3`候補のsynthetic画面 |
 
 ## 対応範囲
 

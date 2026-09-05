@@ -453,8 +453,12 @@ public sealed class QuantificationDesignViewTests
             window.Show();
             Render();
 
+            Required<Expander>(view, "FormulaDetailsExpander").IsExpanded = true;
+            Render();
+
             ScrollViewer scroll = Required<ScrollViewer>(view, "QuantificationDesignScrollViewer");
             Border formulaGuide = Required<Border>(view, "FormulaGuide");
+            Border formulaDetails = Required<Border>(view, "FormulaDetails");
             TextBlock baseValue = RequiredByAutomationId<TextBlock>(view, "FormulaBaseValue");
             TextBlock specialValue = RequiredByAutomationId<TextBlock>(view, "FormulaSpecialValue");
             TextBlock similarityValue = RequiredByAutomationId<TextBlock>(view, "FormulaSimilarityValue");
@@ -466,20 +470,21 @@ public sealed class QuantificationDesignViewTests
             Assert.Equal("60", baseValue.Text);
             Assert.Equal("0", specialValue.Text);
             Assert.Equal("0.1", similarityValue.Text);
+            Assert.Contains("計算の各段階", ToolTip.GetTip(Required<TextBox>(view, "RoundingDigitsTextBox"))?.ToString() ?? string.Empty);
             Assert.Contains(
-                formulaGuide.GetVisualDescendants().OfType<TextBlock>(),
+                formulaDetails.GetVisualDescendants().OfType<TextBlock>(),
                 text => string.Equals(text.Text, "設問獲得点", StringComparison.Ordinal));
             Assert.Contains(
-                formulaGuide.GetVisualDescendants().OfType<TextBlock>(),
+                formulaDetails.GetVisualDescendants().OfType<TextBlock>(),
                 text => string.Equals(text.Text, "FinalRaw", StringComparison.Ordinal));
             Assert.Contains(
-                formulaGuide.GetVisualDescendants().OfType<TextBlock>(),
+                formulaDetails.GetVisualDescendants().OfType<TextBlock>(),
                 text => string.Equals(text.Text, "FinalScore", StringComparison.Ordinal));
             TextBlock earnedLabel = Assert.Single(
-                formulaGuide.GetVisualDescendants().OfType<TextBlock>(),
+                formulaDetails.GetVisualDescendants().OfType<TextBlock>(),
                 text => string.Equals(text.Text, "設問獲得点", StringComparison.Ordinal));
             TextBlock penaltyLabel = Assert.Single(
-                formulaGuide.GetVisualDescendants().OfType<TextBlock>(),
+                formulaDetails.GetVisualDescendants().OfType<TextBlock>(),
                 text => string.Equals(text.Text, "設問減点", StringComparison.Ordinal));
             Assert.Contains(
                 "通常評価率 Rq",
@@ -495,7 +500,7 @@ public sealed class QuantificationDesignViewTests
                     "FinalRaw がblankならblank",
                     StringComparison.Ordinal));
             Assert.Contains(
-                formulaGuide.GetVisualDescendants().OfType<Border>(),
+                formulaDetails.GetVisualDescendants().OfType<Border>(),
                 border => (ToolTip.GetTip(border)?.ToString() ?? string.Empty).Contains(
                     "有効設問間でも等分平均",
                     StringComparison.Ordinal));
@@ -517,6 +522,48 @@ public sealed class QuantificationDesignViewTests
             Assert.Equal("55", baseValue.Text);
             Assert.Equal("5", specialValue.Text);
             Assert.Equal("0.25", similarityValue.Text);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void Many_long_question_names_leave_a_usable_editor_viewport()
+    {
+        QuantificationDefinition seed = new QuantificationDesignViewModel().Draft;
+        QuantificationDefinition definition = seed with
+        {
+            Questions = [.. Enumerable.Range(1, 40).Select(index => seed.Questions[0] with
+            {
+                Id = $"question-{index}",
+                DisplayName = new string('設', 256) + index,
+                Points = 1m,
+                Evaluators = [seed.Questions[0].Evaluators[0] with
+                {
+                    Id = $"evaluator-{index}",
+                    Criteria = [seed.Questions[0].Evaluators[0].Criteria[0] with { Id = $"criterion-{index}" }],
+                }],
+            })],
+        };
+        QuantificationDesignViewModel viewModel = new(definition);
+        QuantificationDesignView view = new(viewModel);
+        Window window = new() { Width = 760, Height = 600, Content = view };
+        try
+        {
+            window.Show();
+            Render();
+            ScrollViewer scroll = Required<ScrollViewer>(view, "QuantificationDesignScrollViewer");
+            Assert.True(scroll.Viewport.Height >= 200d,
+                $"Question names consumed the editor viewport: {scroll.Viewport.Height:F1} DIP.");
+
+            Button validate = RequiredByAutomationId<Button>(view, "ValidateDesignDraft");
+            validate.BringIntoView();
+            Render();
+            Point origin = validate.TranslatePoint(default, scroll)!.Value;
+            Assert.InRange(origin.Y, 0d, scroll.Viewport.Height - validate.Bounds.Height + 1d);
+            Assert.True(validate.Focus(NavigationMethod.Tab));
         }
         finally
         {

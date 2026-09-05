@@ -564,12 +564,12 @@ lock fileやglobal reservation serviceは追加しない。
 
 ## 10. UI
 
-- shellの`ShellScrollViewer`は縦scrollだけを担当し、horizontal scrollを`Disabled`にする。二次元scrollが必要なstep viewは各view内のScrollViewerで閉じ、page全体を左右へscrollさせない。
+- shellの`ShellScrollViewer`はhorizontal scrollを`Disabled`にする。Design以外は縦scrollを許可し、Designでは外側の縦scrollも無効にして残余の有限高を渡す。Design本文のscrollと固定された計算式概要を分離し、page全体を左右へscrollさせない。
 
 ### 10.1 Input
 
 - `ファイルを選択` buttonを追加。
-- View code-behindはStorageProviderで1fileを選び、ViewModelの`SelectFileAsync(path)`だけを呼ぶ。
+- View code-behindはStorageProviderで1fileを選び、ViewModelの`SetFilePathAsync(path)`を呼ぶ。
 - `.xlsx` filterはUX補助であり、loaderのformat validationを省略しない。
 - question text row labelを「質問文の行（1または2）」へ変更する。
 - special mappingはDesign画面の各special itemでsourceを選ぶ。
@@ -577,6 +577,8 @@ lock fileやglobal reservation serviceは追加しない。
 - 利用者が通常Questionのprimary columnを選択した場合、`InputViewModel.SetPrimaryColumn`は同じimmutable question更新で`PrimarySourceColumn`、対応するraw `QuestionText`、primaryと重複しない`SupportingSourceColumns`をcommitする。既存の`CommitDraft`→`SynchronizeQuestionItems`→`InputQuestionMappingViewModel.Synchronize`の通知経路だけを使用し、View event handlerを追加しない。
 - 対応header cellが空または存在しない場合は`QuestionText`を空にし、fallback文字列を生成しない。既存の`REQUIRED` validationで遷移をblockし、TextBoxからの手入力は許可する。
 - `HeaderRow != WorkbookMetadata.HeaderRowNumber`の間はstale metadataを参照せず、現在の`QuestionText`を保持する。既存の`HEADER_METADATA_MISMATCH`を表示し、見出し行の再読込後に新metadataを使用する。
+- 見出し行の再読込は選択sheet、行範囲、質問ID、手入力text、配点、評価設定を保持し、metadataだけを更新する。候補一覧の更新中はUIの一時的な空選択を書き戻さない。明示した候補再適用とは区別する。
+- 初回候補と質問追加も空headerへ代替文を生成しない。metadata不一致時の質問追加はtextを空にして手入力／再読込を求める。
 - UI候補にないcolumnがprogrammaticに渡された場合もheader値を推測せず、`QuestionText`を保持したまま既存のsource column validationへ委ねる。
 - `InputScrollViewer`は縦scrollだけを担当し、horizontal scrollを`Disabled`にする。contentが有限幅で計測されるため、`Grid`のstar columnがcontent長ではなくavailable widthで解決される。root gridは固定`MinWidth`を持たない。
 - RANGEとX-02 SUGGESTIONSは単一の`Grid#InputMappingHost`（`2*,3*` / `Auto,Auto`）へ配置する。`Container.Sizing="Width"`で公開したcontainer幅が880未満では両cardを縦積み、880以上では横並びにする。切替は`ContainerQuery`のstyle setter（`Grid.Row`／`Grid.Column`／`Grid.ColumnSpan`／spacing）だけで行い、ViewModelへ表示幅stateを持ち込まない。
@@ -606,6 +608,7 @@ imported Prompt card:
 - target: selected Custom evaluatorまたはselected special item
 - `Promptを適用` button
 - `QuantificationDesignScrollViewer`はhorizontal scrollを`Disabled`、vertical scrollを`Auto`とし、rootへ固定幅を設定しない。
+- 固定部は短い計算式とBase／Special／Wの現在値だけとし、設問数・表示名長で高さを増やさない。式の詳説は本文内の展開欄、設問配点は各設問cardへ表示する。
 - question／evaluator／criterion navigatorはstar列の`Grid`で利用可能幅へ収め、表示名と動的summaryをwrapする。
 - add／copy／reorder／disable／deleteの操作群は`WrapPanel`で折り返し、既存のbinding、command、Automation ID、virtualized listを維持する。
 
@@ -736,7 +739,7 @@ checkpointとRun sheetへ次を保存する。
 
 ### 13.5 自動化境界
 
-- [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)はsecretなしでlocked restore、Release build、決定的test、Windows legacy package、MSIX mechanism、macOS RID publish/bundle structureを検査する。
+- [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)はsecretなしでlocked restore、Release build、決定的test、Windows legacy package、MSIX mechanismを検査する。macOS jobsはlocked restore／Release build後に`MacOsPublishPackageTests`のstatic source contractと`CopilotClientFactoryTests`のresolver contractを実行するだけで、macOS RID publish／bundle生成／署名／公証／実app起動は実施しない。
 - `sample/SampleReport.xlsx`はprivate local inputとしてGit追跡・package同梱を禁止する。platform package acceptanceはsynthetic fixtureで行い、canonical sampleのlocal technical E2Eと分離する。
 - [`.github/workflows/release.yml`](../../.github/workflows/release.yml)はWindows ZIPとsidecarをdraftへ添付する。development MSIXを添付せず、PR/forkへwrite権限を渡さない。
 - release matrixで`publish=true`のWindows ZIP行が`PASS_REQUIRED`でなければ公開しない。development MSIXは`publish=false`かつ`PASS_MECHANISM`として分離する。

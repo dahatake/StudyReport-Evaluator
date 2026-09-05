@@ -128,10 +128,46 @@
     <Border
         x:Name="FormulaGuide"
         Grid.Row="0"
-        Margin="24,24,24,0"
+        Margin="24,12,24,0"
         Classes="formula-guide"
         AutomationProperties.AutomationId="DesignFormulaGuide"
         AutomationProperties.Name="採点計算式と現在の設定値">
+      <StackPanel Spacing="4">
+        <WrapPanel ItemSpacing="10" LineSpacing="4">
+          <TextBlock Text="採点計算式" FontWeight="SemiBold" FontSize="16" VerticalAlignment="Center" />
+          <Border Classes="formula-chip formula-base">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="Base" />
+              <TextBlock x:Name="FormulaBaseValue" Text="{Binding BasePoints, StringFormat='{}{0:G29}'}" AutomationProperties.AutomationId="FormulaBaseValue" />
+            </StackPanel>
+          </Border>
+          <Border Classes="formula-chip formula-special">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="Special" />
+              <TextBlock x:Name="FormulaSpecialValue" Text="{Binding SpecialPoints, StringFormat='{}{0:G29}'}" AutomationProperties.AutomationId="FormulaSpecialValue" />
+            </StackPanel>
+          </Border>
+          <Border Classes="formula-chip formula-penalty">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="係数 W" />
+              <TextBlock x:Name="FormulaSimilarityValue" Text="{Binding SimilarityPenaltyWeight, StringFormat='{}{0:G29}'}" AutomationProperties.AutomationId="FormulaSimilarityValue" />
+            </StackPanel>
+          </Border>
+        </WrapPanel>
+        <TextBlock Text="FinalRaw = Base + Σ(Pq × Rq) + SpecialEarned − Σ(Pq × Lq × W)" TextWrapping="Wrap" />
+        <TextBlock Text="FinalScore = FinalRaw がblankならblank、それ以外は clamp(FinalRaw, 0, 100)" FontSize="12" TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+
+    <ScrollViewer
+      x:Name="QuantificationDesignScrollViewer"
+      Grid.Row="1"
+      HorizontalScrollBarVisibility="Disabled"
+      VerticalScrollBarVisibility="Auto"
+      AutomationProperties.AutomationId="QuantificationDesignScrollViewer">
+    <StackPanel Margin="24,14,24,24" Spacing="14" HorizontalAlignment="Stretch" KeyboardNavigation.TabNavigation="Continue">
+    <Expander x:Name="FormulaDetailsExpander" Header="計算式の詳細（記号と評価率の説明）" HorizontalAlignment="Stretch">
+    <Border x:Name="FormulaDetails" Classes="card">
       <StackPanel Spacing="8">
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
           <StackPanel Spacing="2">
@@ -209,59 +245,14 @@
           <TextBlock Text="= FinalRaw がblankならblank、それ以外は clamp(FinalRaw, 0, 100)" VerticalAlignment="Center" TextWrapping="Wrap" />
         </WrapPanel>
 
-        <WrapPanel Orientation="Horizontal" ItemSpacing="7" LineSpacing="7">
-          <Border Classes="formula-chip formula-base" ToolTip.Tip="現在のBase pointsです。定義情報のBase pointsと同じ値です。">
-            <WrapPanel Orientation="Horizontal" ItemSpacing="4">
-              <TextBlock Text="Base" FontWeight="SemiBold" />
-              <TextBlock x:Name="FormulaBaseValue" Text="{Binding BasePoints, StringFormat='{}{0:G29}'}" AutomationProperties.AutomationId="FormulaBaseValue" />
-            </WrapPanel>
-          </Border>
-          <Border Classes="formula-chip formula-special" ToolTip.Tip="現在のSpecial pointsです。0の場合は固有評価AIを実行しません。正の値には1件以上の有効な固有評価が必要です。">
-            <WrapPanel Orientation="Horizontal" ItemSpacing="4">
-              <TextBlock Text="Special" FontWeight="SemiBold" />
-              <TextBlock x:Name="FormulaSpecialValue" Text="{Binding SpecialPoints, StringFormat='{}{0:G29}'}" AutomationProperties.AutomationId="FormulaSpecialValue" />
-            </WrapPanel>
-          </Border>
-          <Border Classes="formula-chip formula-penalty" ToolTip.Tip="現在の類似度減点係数です。0なら類似度による減点はありません。">
-            <WrapPanel Orientation="Horizontal" ItemSpacing="4">
-              <TextBlock Text="係数 W" FontWeight="SemiBold" />
-              <TextBlock x:Name="FormulaSimilarityValue" Text="{Binding SimilarityPenaltyWeight, StringFormat='{}{0:G29}'}" AutomationProperties.AutomationId="FormulaSimilarityValue" />
-            </WrapPanel>
-          </Border>
-          <ItemsControl ItemsSource="{Binding Questions}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <WrapPanel Orientation="Horizontal" ItemSpacing="7" LineSpacing="7" />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="viewModels:QuestionDesignItemViewModel">
-                <Border Classes="formula-chip formula-question" ToolTip.Tip="この設問の絶対配点です。全設問の配点とBase、Specialの合計を正確に100にします。">
-                  <WrapPanel Orientation="Horizontal" ItemSpacing="4">
-                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding Points, StringFormat='{}{0:G29} pt'}" />
-                  </WrapPanel>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </WrapPanel>
-
         <TextBlock
-          Text="通常評価、必要な固有評価、参照回答、類似度の技術的失敗は0点に変換せずblankとしてFinalRawとFinalScoreへ伝播します。丸め桁数は表示用で、配点合計は丸めず正確に100を判定します。"
+          Text="通常評価、必要な固有評価、参照回答、類似度の技術的失敗は0点に変換せずblankとしてFinalRawとFinalScoreへ伝播します。丸め桁数は計算の各段階に適用するため結果にも影響します。配点合計は丸めず正確に100を判定します。"
             Classes="muted"
             FontSize="12"
             TextWrapping="Wrap" />
       </StackPanel>
     </Border>
-
-    <ScrollViewer
-      x:Name="QuantificationDesignScrollViewer"
-      Grid.Row="1"
-      HorizontalScrollBarVisibility="Disabled"
-      VerticalScrollBarVisibility="Auto"
-      AutomationProperties.AutomationId="QuantificationDesignScrollViewer">
-    <StackPanel Margin="24,14,24,24" Spacing="14" HorizontalAlignment="Stretch" KeyboardNavigation.TabNavigation="Continue">
+    </Expander>
       <Border Background="{DynamicResource AppHeroBrush}" CornerRadius="18" Padding="20">
         <StackPanel Spacing="6">
           <TextBlock Text="STEP 02 · QUANTIFICATION DESIGN" Foreground="#9FABFF" FontWeight="SemiBold" />
@@ -345,7 +336,7 @@
           <TextBlock Text="revision" Classes="label" />
           <TextBox Text="{Binding Revision, Mode=TwoWay}" ToolTip.Tip="授業内で設計の版を区別する文字列を入力します。採点計算そのものには使いません。" />
           <TextBlock Text="丸め桁数（0～6）" Classes="label" />
-          <TextBox Text="{Binding RoundingDigits, Mode=TwoWay}" ToolTip.Tip="表示する小数点以下の桁数を0～6で入力します。配点合計の正確な100判定には丸め値を使いません。" />
+          <TextBox x:Name="RoundingDigitsTextBox" Text="{Binding RoundingDigits, Mode=TwoWay}" ToolTip.Tip="計算の各段階で丸める小数点以下の桁数を0～6で入力します。最終点にも影響しますが、配点合計の正確な100判定には丸め値を使いません。" />
           <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
             <StackPanel Grid.Column="0" Spacing="5">
               <TextBlock Text="Base points" Classes="label" />

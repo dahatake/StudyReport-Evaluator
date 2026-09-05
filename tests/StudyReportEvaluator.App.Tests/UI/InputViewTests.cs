@@ -308,6 +308,145 @@ public sealed class InputViewTests
     }
 
     [Fact]
+    public async Task Refreshing_headers_preserves_the_selected_sheet_and_manual_mapping()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        InputViewModel viewModel = new();
+        await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        viewModel.SelectedSheet = "Final";
+        InputQuestionMappingViewModel question = viewModel.Questions[0];
+        question.DisplayName = "Manually named question";
+        question.QuestionText = "Manually edited question";
+        question.Weight = 7m;
+        question.SetSupportingColumn("B", selected: true);
+        viewModel.FirstDataRow = 3;
+        viewModel.LastDataRow = 100;
+        QuantificationDefinition before = viewModel.DefinitionDraft;
+
+        await viewModel.RefreshHeaderAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("Final", viewModel.SelectedSheet);
+        Assert.Equal(before.FirstDataRow, viewModel.FirstDataRow);
+        Assert.Equal(before.LastDataRow, viewModel.LastDataRow);
+        Assert.Equal(before.Questions.Select(item => item.Id), viewModel.Questions.Select(item => item.Id));
+        QuestionDefinition updated = viewModel.DefinitionDraft.Questions[0];
+        Assert.Equal(before.Questions[0].DisplayName, updated.DisplayName);
+        Assert.Equal(before.Questions[0].QuestionText, updated.QuestionText);
+        Assert.Equal(7m, updated.Points);
+        Assert.Equal(before.Questions[0].SupportingSourceColumns, updated.SupportingSourceColumns);
+        Assert.Equal(before.Questions[0].Evaluators, updated.Evaluators);
+        Assert.False(viewModel.IsUsingSuggestedMapping);
+    }
+
+    [Fact]
+    public async Task Loading_or_adding_a_question_with_an_empty_header_does_not_invent_question_text()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
+            "Responses", 1, 4, 2);
+        InputViewModel viewModel = new();
+        await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+
+        Assert.Equal(string.Empty, Assert.Single(viewModel.Questions).QuestionText);
+        InputQuestionMappingViewModel added = viewModel.AddQuestion();
+        Assert.Equal(string.Empty, added.QuestionText);
+        Assert.Contains(viewModel.ValidationErrors, error =>
+            error.Code == "REQUIRED" && error.NodeId == added.Id && error.Field == "QuestionText");
+        Assert.False(viewModel.CanContinue);
+    }
+
+    [Fact]
+    public async Task Adding_a_question_does_not_copy_a_stale_header()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
+            "Responses", 1, 4, 2, new X02Header(1, "Report answer from row 1"));
+        InputViewModel viewModel = new();
+        await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        viewModel.HeaderRow = 2;
+
+        InputQuestionMappingViewModel question = viewModel.AddQuestion();
+
+        Assert.Equal(string.Empty, question.QuestionText);
+        Assert.Contains(viewModel.ValidationErrors, error => error.Code == "HEADER_METADATA_MISMATCH");
+    }
+
+    [AvaloniaFact]
+    public async Task Refreshing_headers_in_the_bound_view_preserves_edited_question_fields()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        InputViewModel viewModel = new();
+        await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        InputView view = new(viewModel);
+        Window window = new() { Width = 1180, Height = 820, Content = view };
+        try
+        {
+            window.Show();
+            Render();
+            InputQuestionMappingViewModel question = viewModel.Questions[0];
+            question.PrimarySourceColumn = "G";
+            question.SetSupportingColumn("H", true);
+            question.QuestionText = "Manually edited visible text";
+            Render();
+
+            await viewModel.RefreshHeaderAsync(TestContext.Current.CancellationToken);
+            Render();
+
+            Assert.Same(question, viewModel.Questions[0]);
+            Assert.Equal("G", question.PrimarySourceColumn);
+            Assert.Equal("Manually edited visible text", question.QuestionText);
+            Assert.Equal("H", Assert.Single(question.SupportingColumns, column => column.IsSelected).ColumnName);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Long_worksheet_and_supporting_names_remain_identifiable_in_the_input_view()
+    {
+        string sheetPrefix = new('表', 30);
+        string header = new('補', 256);
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.Create(
+            new X02SheetSpec(sheetPrefix + "A", 1, 4, 2, [new X02Header(1, "Report answer"), new X02Header(2, header)]),
+            new X02SheetSpec(sheetPrefix + "B", 1, 4, 2, [new X02Header(1, "Report answer"), new X02Header(2, header)]));
+        InputViewModel viewModel = new();
+        await viewModel.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        InputView view = new(viewModel);
+        Window window = new() { Width = 1024, Height = 720, Content = view };
+        try
+        {
+            window.Show();
+            Render();
+            ComboBox sheets = Required<ComboBox>(view, "WorksheetComboBox");
+            sheets.SelectedItem = viewModel.Worksheets[1];
+            Render();
+            Assert.Equal(sheetPrefix + "B", viewModel.SelectedSheet);
+            Assert.Equal(viewModel.SelectedWorksheetChoice!.DisplayText, ToolTip.GetTip(sheets));
+            Assert.All(sheets.GetVisualDescendants().OfType<TextBlock>().Where(text =>
+                text.Text == viewModel.SelectedWorksheetChoice.DisplayText), text =>
+                Assert.Equal(Avalonia.Media.TextWrapping.Wrap, text.TextWrapping));
+
+            Required<ListBox>(view, "InputQuestionList").BringIntoView();
+            Render();
+            ListBox columns = Assert.Single(view.GetVisualDescendants().OfType<ListBox>(), list =>
+                AutomationProperties.GetAutomationId(list) == viewModel.Questions[0].SupportingAutomationId);
+            columns.ScrollIntoView(1);
+            Render();
+            CheckBox supporting = Assert.Single(view.GetVisualDescendants().OfType<CheckBox>(), check =>
+                check.DataContext is SupportingColumnSelectionViewModel column && column.ColumnName == "B");
+            TextBlock label = Assert.IsType<TextBlock>(supporting.Content);
+            Assert.Equal(Avalonia.Media.TextWrapping.Wrap, label.TextWrapping);
+            Assert.Equal("B · " + header, ToolTip.GetTip(supporting));
+            supporting.IsChecked = true;
+            Assert.True(Assert.Single(viewModel.Questions[0].SupportingColumns, column => column.ColumnName == "B").IsSelected);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
     public async Task Editing_the_file_path_invalidates_loaded_metadata_snapshot_and_suggestions()
     {
         using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();

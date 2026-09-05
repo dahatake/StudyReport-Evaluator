@@ -7,17 +7,31 @@
 | Detailed design | `dev/docs/detailed-design.md` |
 | Plan | `work/20260904-publication-remediation-plan.md` |
 | Previous validation | delivery変更前 Release build warning/error 0、full 670/670 PASS（Core 190 / App 480）。現在の0.8.0 delivery evidenceへ流用しない |
-| Current focused validation | 2026-09-05: InputViewTests 21、WorkbookMetadataReaderTests 11、ColumnMappingSuggesterTests 14、計46/46 PASS。DocumentationContractTests 14/14 PASS |
-| Current full required validation | 2026-09-05: locked restore、Release build、Core 190/190、App 528/528、合計718/718 PASS。Appはnamespace／E2E class別に分割実行し、failed 0、skipped 0 |
-| Current status | v4.4 implementation validation PASS。現行candidateは`0.8.3`、公開済みreleaseは`v0.8.1` |
+| Recorded focused validation | 2026-09-05: InputViewTests 21、WorkbookMetadataReaderTests 11、ColumnMappingSuggesterTests 14、計46/46 PASS。DocumentationContractTests 14/14 PASS |
+| Audited full required validation | 2026-09-05、source `20c8121`のbaseline: Core 190 + App deterministic 524 + sample構造 1 + Windows ZIP 3 = 718/718 PASS（App計528、failed 0、skipped 0）。opt-inの未実行経路を含む |
+| Current status | 監査済み`20c8121`のv4.4 baselineはPASS。現行`0.8.3` candidateはUNRELEASED、公開済みreleaseは`v0.8.1`。今回修正版の最終判定は以下のreview summaryと対象sourceの照合で行う |
 
 この表の`PLANNED`は未実装をPASSと称しない。task完了後にproduction symbol、direct test、gate identityへ更新する。旧v3 traceabilityはGit履歴とADR-0011に保持する。
+
+## Evidence integrity and storage
+
+監査済みcandidateのsource identityは`20c8121c2474a13f409c0d7f0fde9d4c41f74698`、product versionは`0.8.3`である。集約記録は`artifacts/test/final-recovery-20c8121/phases.json`。以下のPASS系statusはこのsource、または明記した履歴の範囲に限定する。
+
+- 集約記録のrestore、build、version、version-self-test、deterministic、sample、windows-zip、windows-msix、release-matrixの9工程はすべてexit code 0。件数は同directoryの各phase logに基づき、718/718は上表の4群の合計である。
+- test runnerのPASS集計には、opt-in未指定で`NOT_RUN`としてreturnする経路やpolicy経路の成功を含む。skipped 0でも、実際のLive AI、外部Excel再計算、RealData処理はこのbaselineで`NOT_RUN`。sample構造確認やfake/synthetic実行をそれらの実処理完了へ読み替えない。
+- `artifacts/`はGit対象外の生成物で、再実行により変化し、公開checkoutでの存在を保証しない。pathはcode spanとして記録し、公開Markdownリンクや永続release evidenceの代わりにしない。source commit、製品版、実行条件、phase log、および対象artifactのbytes／SHA-256を照合して読む。
+- source commitの記載とexit codeだけで、未commit差分の不存在、全実行経路、production trustを証明しない。公開`v0.8.1`のrelease identityと、`0.8.3`のlocal matrix／package検証は別の証拠である。
+
+今回reviewの文書修正およびその後のcode/UI変更はこのbaselineの検証対象外であり、変更後のsourceで再検証が必要。既存gateやPNGを、新しい変更の検証済み証拠として扱わない。
+
+今回の[修正記録](../../work/20260905-adversarial-review.md)に対応する最終実行の正本は`artifacts/test/adversarial-review/final/summary.json`。`sourceCommit`一致、前後clean、全体`PASSED`、各TRXの件数／outcome／assembly／SHA-256が揃う場合だけ、そのsourceの完了と判定する。記録なし、`RUNNING`、`FAILED`は合格ではない。再実行で前回記録を上書きせず、別run directoryへ保存する。
 
 ## Status vocabulary
 
 | Status | Meaning |
 |---|---|
 | `PLANNED` | owner/file/testを割当済み。実装またはpassing evidenceは未確認 |
+| `NOT_RUN` | 対象の実処理を実行していない。test methodのPASSや過去evidenceで置き換えない |
 | `NOT_RUN_CURRENT_CANDIDATE` | sourceと過去evidenceはあるが、現在のworking treeに対するrequired regressionを未実行 |
 | `PASS_REQUIRED` | production behaviorとdirect deterministic testが成功 |
 | `PASS_EXTERNAL` | credentialed／platform external testを実行して成功 |
@@ -32,7 +46,7 @@
 
 AC-024／AC-025とTR-26／TR-27の`PASS_REQUIRED`は、現版でrequiredなmacOS static source contract 2件の成功だけを表す。production artifact、署名、公証、clean-host実行は現版scope外であり、`PASS_PRODUCTION`を表さない。
 
-AC-028／TR-29の判定は、release matrixの生成・semantic検証、candidate／publish workflowのcontract test、draft assetとmatrixのhash照合、および公開後の認証なしre-downloadによるasset identity確認という実測に基づく。
+AC-028／TR-29では、公開済み`v0.8.1`のdraft asset／matrix hash照合・公開後の認証なしre-downloadという履歴と、`20c8121`（`0.8.3`）のlocal matrix生成・semantic検証／workflow contract testのbaselineを区別する。後者は`0.8.3`の公開workflowや公開後re-downloadの完了を示さない。
 
 ## Acceptance criteria mapping
 
@@ -94,7 +108,7 @@ AC-028／TR-29の判定は、release matrixの生成・semantic検証、candidat
 | TR-21 | unsupported platform/installer/signing claim exclusion | P-01/D-01..05 | PASS_REQUIRED |
 | TR-22 | docs/screenshots | D-01..04 | PASS_REQUIRED |
 | TR-23 | fixed-seed new/resume E2E | E-01/E-02 | PASS_REQUIRED |
-| TR-24 | optional live/recalculation | E-03 advisory | MIXED_ADVISORY |
+| TR-24 | optional live/recalculation | E-03 advisory（2026-09-02〜03の履歴はMIXED_ADVISORY） | NOT_RUN |
 | TR-25 | non-public unsigned Windows development MSIX mechanism | P-02 | PASS_MECHANISM |
 | TR-26 | macOS source foundation static contract（source-only） | P-03 | PASS_REQUIRED |
 | TR-27 | macOS future trust order static contract（source-only） | P-03 | PASS_REQUIRED |

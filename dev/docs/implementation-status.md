@@ -4,22 +4,24 @@
 |---|---|
 | Current requirement | `docs/requirements-definition.md` v4.4 |
 | Scope ADR | ADR-0012（機能）/ ADR-0015（Windows ZIP public / development MSIX）/ ADR-0013（Windows public evidence） |
-| Product version | `0.8.3` candidate — `Directory.Build.props`の明示`VersionPrefix` |
+| Product version | `0.8.3` candidate（UNRELEASED）— `Directory.Build.props`の明示`VersionPrefix` |
 | Version management | [`version-management.md`](version-management.md) / [`dev/version.ps1`](../version.ps1) / ADR-0014 |
-| Source baseline | `main`、release commit `d0b03b9201d397b6c3333dafbb816b13b4dc003c`、annotated tag `v0.8.1` |
+| Public release source | release commit `d0b03b9201d397b6c3333dafbb816b13b4dc003c`、annotated tag `v0.8.1` |
 | Public release status | `PUBLISHED — v0.8.1、2026-09-04T08:52:49Z公開、ZIPとsidecarの2 asset` |
-| Current v4.4 Release build | PASS、warning 0 / error 0（2026-09-05実行） |
+| Audited candidate source | `20c8121c2474a13f409c0d7f0fde9d4c41f74698`（`0.8.3`、UNRELEASED） |
+| Audited v4.4 Release build | source `20c8121`でPASS、warning 0 / error 0（2026-09-05実行） |
 | Previous v4.3 full required gate | 696/696 PASS（Core 190/190、App 506/506、failed 0、skipped 0、2026-09-04 V2-01実行） |
-| Current v4.4 focused input validation | 46/46 PASS（InputViewTests 21、WorkbookMetadataReaderTests 11、ColumnMappingSuggesterTests 14。failed 0、skipped 0、2026-09-05実行） |
-| Current v4.4 full required gate | locked restore、Release build、Core 190/190、App 528/528、合計718/718 PASS。Appはnamespace／E2E class別に分割実行し、failed 0、skipped 0（2026-09-05実行） |
+| Recorded v4.4 focused input validation | 46/46 PASS（InputViewTests 21、WorkbookMetadataReaderTests 11、ColumnMappingSuggesterTests 14。failed 0、skipped 0、2026-09-05実行） |
+| Audited v4.4 full required gate | source `20c8121`のbaseline: Core 190 + App deterministic 524 + sample構造 1 + Windows ZIP 3 = 718/718 PASS（App計528、failed 0、skipped 0、2026-09-05実行） |
+| Current review validation | [修正記録](../../work/20260905-adversarial-review.md)と`artifacts/test/adversarial-review/final/summary.json`を参照。対象source一致かつ全体`PASSED`・TRX検査成功時だけ合格。未生成／`RUNNING`／`FAILED`は未完了 |
 | Baseline focused validation | locked restore、version self-test 15 assertions、DocumentationContractTests 14/14、WindowsInstallerPackageTests 6/6、MacOsPublishPackageTests 2/2、`git diff --check`が全てPASS（2026-09-04実行） |
 | Previous focused UI baseline | `MainWindowTests` 8/8 PASS（2026-09-02実行。current candidate full gateへ未算入） |
 | Previous bundled CLI baseline | `CopilotClientFactoryTests` 14/14 PASS（2026-09-02実行。current candidate full gateへ未算入） |
 | Previous documentation contract | 14/14 PASS（2026-09-04実行。root `SystemTest-prompt.md`、25 scenario、TR-01〜TR-29、v4.3 canonical sample契約を含む） |
-| Current v4.4 documentation contract | 14/14 PASS（2026-09-05実行。requirements、利用者文書、root `SystemTest-prompt.md`、25 scenario、TR-01〜TR-29、input synchronization契約を含む） |
+| Recorded v4.4 documentation contract | 14/14 PASS（2026-09-05実行。requirements、利用者文書、root `SystemTest-prompt.md`、25 scenario、TR-01〜TR-29、input synchronization契約を含む） |
 | Previous screenshot baseline | 7画像再生成、1440×1050、test 1/1 PASS、敵対review finding 0（2026-09-02実行。current candidate full gateへ未算入） |
-| Current v4.4 screenshot validation | 7画像再生成1/1 PASS、全画像1440×1050、全7画像目視確認（2026-09-05実行） |
-| Current Windows ZIP package validation | 3/3 PASS。publish、package、sidecar、safe layout、clean launch、再現性を検証し、App/CoreのAssembly/File/Product versionが0.8.3で一致（2026-09-05実行） |
+| Recorded v4.4 screenshot validation | 7画像再生成1/1 PASS、全画像1440×1050、全7画像目視確認（2026-09-05実行） |
+| Audited Windows ZIP package validation | source `20c8121`で3/3 PASS。publish、package、sidecar、safe layout、clean launch、再現性を検証し、App/CoreのAssembly/File/Product versionが0.8.3で一致（2026-09-05実行） |
 | Previous Windows ZIP integration baseline | publish/package/展開/resolver/clean launch/repackage、全class 3/3 PASS（2026-09-02実行。current candidate gateへ流用しない） |
 | B1-16 adversarial review | RealData evidence contractの曖昧性を計画へ反映。source identity assertionはPASS、opt-in E2E／Live AIは非実行。未解決の再現可能なblocker/high finding 0 |
 | Previous canonical sample baseline | canonical `sample/SampleReport.xlsx` exact path・identity・structure・input不変 1/1 PASS、synthetic fixture isolation 1/1 PASS（2026-09-03実行。current candidate full gateへ未算入） |
@@ -34,25 +36,27 @@
 | macOS static source contract | 2/2 PASS — unsigned bundle最小contractとproduction trust順序のsource検証。production artifact／署名／公証の実測ではない（2026-09-04 B1-16実行） |
 | Audit date | 2026-09-05 |
 
+監査済みgateの集約記録は`artifacts/test/final-recovery-20c8121/phases.json`。718/718 PASSは`20c8121`に限定し、opt-in未指定で`NOT_RUN`としてreturnする経路やpolicy経路を含む。実際のLive AI、外部Excel再計算、RealData処理は`NOT_RUN`で、sample構造確認やfake/synthetic testとは区別する。focused／screenshot等の既存記録も各記録日時点のbaselineであり、今回reviewの修正を検証したものではない。証拠の保存・適用限界は[Evidence integrity and storage](traceability.md#evidence-integrity-and-storage)を参照。
+
 現在のdelivery実装は[`20260904-publication-remediation-plan.md`](../../work/20260904-publication-remediation-plan.md)と[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に従う。未公開`v1.0.1` recoveryと`1.1.0` delivery candidateは`0.8.0`へ再baselineし、過去の1.x候補を公開版として扱わない。Windows public artifactはunsigned ZIP、development MSIXはnon-public `PASS_MECHANISM`、macOS production deliveryは現版scope外である。
 
 2026-09-03のdelivery変更前working treeを再buildしたfull solution testは670件中670件成功した。ユーザーが配置した`sample/SampleReport.xlsx`だけをcanonical sampleとし、exact path、470,806 bytes、SHA-256 `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA`、read-only検査前後のidentity不変を確認した。opt-in technical E2Eはnetwork/live AIを使わず530行を完走した。これらは機能regressionの比較baselineであり、0.8.0のMSIX／macOS／signing／notarization／quarantine結果ではない。delivery変更後は全required regressionを再実行する。
 
 2026-09-04のV2-01はrelease commitのclean treeでlocked restore、Release build、full required deterministic gateを実行し、696件中696件が成功した。Windows ZIP regressionはhosted CIのclean checkoutとcandidate workflowでも`PASS_REQUIRED` evidenceを生成している。optional Live Copilot、external recalculation、RealData system smokeはrequired gateへ算入していない。
 
-## v4.3 delivery status
+## Delivery status — v0.8.1公開履歴 / 0.8.3 local baseline
 
 | Surface | Current status | Completion evidence |
 |---|---|---|
-| Windows public ZIP regression | `PASS_REQUIRED` | clean checkoutでpublish/package/hash/safe layout/bundled CLI/clean launch/入力不変を検証し、closed evidenceを生成（hosted CIとcandidate workflow） |
-| Full required regression | `PASS_REQUIRED` | Core 190/190、App 506/506、合計696/696（2026-09-04 V2-01） |
+| Windows public ZIP regression | `PASS_REQUIRED` | 公開`v0.8.1`の履歴: clean checkoutでpublish/package/hash/safe layout/bundled CLI/clean launch/入力不変を検証し、closed evidenceを生成（hosted CIとcandidate workflow） |
+| Full required regression（公開v0.8.1履歴） | `PASS_REQUIRED` | Core 190/190、App 506/506、合計696/696（2026-09-04 V2-01） |
 | Canonical technical E2E | `NOT_RUN_CURRENT_CANDIDATE` | opt-in no-network E2Eはrequired gate外。current candidateでは実行していない |
-| Windows development MSIX mechanism | `PASS_MECHANISM` | manifest/version/RID、unpack、block map、payload、CLI、sidecar、policy negative、cleanup |
+| Windows development MSIX mechanism | `PASS_MECHANISM` | `20c8121`（`0.8.3`）でmanifest/version/RID、unpack、block map、payload、CLI、sidecar、policy negative、cleanup |
 | Development MSIX install/launch | `NOT_RUN_NOT_REQUIRED` | 現版のrequired gateではなく、一般配布しない |
 | macOS source foundation static contract | `PASS_REQUIRED` | `MacOsPublishPackageTests` 2/2。production signing／notary evidenceではない |
 | macOS production delivery | `EXCLUDED_CURRENT_SCOPE` | public artifact／support claimなし |
-| Windows ZIP public setup docs | `PASS_REQUIRED` | 14/14 documentation contract（公開URLはRelease後に追加） |
-| Release matrix/workflow | `NOT_RUN` | schema、validator、workflow contract、candidate re-download |
+| Windows ZIP public setup docs | `PASS_REQUIRED`（baselineのみ） | `20c8121`のdocumentation contract 14/14はbaseline。今回の文書修正は上表のCurrent review validationで別に判定 |
+| Release matrix/workflow | `PASS_REQUIRED`（0.8.3 localのみ） | `v0.8.1`は公開／public re-download確認済みの履歴。`0.8.3`は`20c8121`でlocal matrix生成・semantic検証PASSであり、公開workflow完了・公開後re-downloadを意味しない |
 
 ## 実装済みsurface
 
@@ -80,7 +84,7 @@
 
 ### Normative requirement
 
-未知placeholder、未閉鎖brace等は実行前に拒否し、invalid definitionはrun開始前にfield errorを表示する必要があります。[要求定義書 §7.3](../../docs/requirements-definition.md#73-placeholder)、[§13.2](../../docs/requirements-definition.md#132-failure)
+未知placeholder、未閉鎖brace等は実行前に拒否し、invalid definitionはrun開始前にfield errorを表示する必要があります。現行対応節: [要求定義書 §5.4](../../docs/requirements-definition.md#54-prompt-placeholder)、[§16](../../docs/requirements-definition.md#16-failure-behavior)
 
 ### Closure evidence
 
@@ -95,7 +99,7 @@ Closure commit: `69e4b992711c243fe7c70b0defff5e6abf03865c`。
 
 ### Normative requirement
 
-Results列数、formula長、function arguments、request budget等から実行可能上限をrun前に計算し、超過definitionを黙って切り詰めず拒否する必要があります。[要求定義書 §9.6](../../docs/requirements-definition.md#96-formula-rules)、[§14](../../docs/requirements-definition.md#14-performance-and-limits)
+Results列数、formula長、function arguments、request budget等から実行可能上限をrun前に計算し、超過definitionを黙って切り詰めず拒否する必要があります。現行対応節: [要求定義書 §8.5](../../docs/requirements-definition.md#85-formula-ownership)、[§15](../../docs/requirements-definition.md#15-performancecapacity)
 
 ### Closure evidence
 

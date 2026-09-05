@@ -2,6 +2,8 @@
 
 このガイドでは、StudyReport Evaluatorの評価単位、配点、status、出力workbookを説明します。
 
+> **対象版:** 次節の主回答列から設問textへの即時同期は**UNRELEASED（未リリース）の`0.8.3`候補**の追加動作で、公開`0.8.1`の機能として扱いません。UIの固定計算式ガイド・折り返しカード・掲載画像の対象版も[はじめに](getting-started.md)で確認してください。
+
 ## 評価定義
 
 1つの定義は、Base points、Special points、Similarity penalty weight、丸め桁数と、1件以上のQuestionを持ちます。

@@ -17,7 +17,7 @@
 | [ADR-0013](adr/0013-windows-only-public-release.md) | アーキテクト、リリース | 現行platform/release scope decision |
 | [ADR-0014](adr/0014-product-versioning.md) | アーキテクト、リリース | 製品SemVer、単一正本、tag/release identity |
 | [ADR-0015](adr/0015-windows-macos-installer-delivery.md) | アーキテクト、リリース、QA | Windows ZIP public、development MSIX、macOS source foundation |
-| [Screenshot manifest](../../images/README.md) | UI開発、QA、利用者支援 | 7枚のproduction view renderと合成fixture provenance |
+| [Screenshot manifest](../../images/README.md) | UI開発、QA、利用者支援 | 7枚のUNRELEASED `0.8.3`候補view renderと合成fixture provenance |
 
 ## 履歴文書
 
@@ -33,7 +33,7 @@ flowchart LR
     V42 --> V43[requirements v4.3\nWindows ZIP + development MSIX]
     V43 --> V44[requirements v4.4\nprimary column to question text]
     V44 --> IMPL[current source + deterministic tests]
-    IMPL --> GATE[generated gate evidence]
+    V3 --> GATE[historical v3 gate evidence]
     GATE --> AUDIT[post-gate conformance audit\n2 gaps found]
     AUDIT --> CLOSE[commit 69e4b99\n2 gaps closed]
     CLOSE --> REGATE[new GATE-ACCEPTANCE\nPASS at 3f4227e]
@@ -67,6 +67,10 @@ flowchart LR
 
 `artifacts/`は再実行で変化し、Gitへcommitされないため、永続するrelease noteの代わりにはなりません。根拠: [`traceability.md`](traceability.md#evidence-integrity-and-storage)。
 
+監査済み`0.8.3`候補のbaselineはsource `20c8121c2474a13f409c0d7f0fde9d4c41f74698`（集約記録: `artifacts/test/final-recovery-20c8121/phases.json`）です。公開`v0.8.1`の証跡と区別し、今回reviewの編集・その後の変更は再検証完了までこのPASSに含めません。
+
+今回の[敵対的レビューと修正記録](../../work/20260905-adversarial-review.md)の最終検証は、`artifacts/test/adversarial-review/final/summary.json`で対象commit、全体status、TRX件数・SHA-256、前後のsource不変を照合してください。記録がない／`RUNNING`／`FAILED`の場合は完了扱いにしません。
+
 historical fileへ追加した先頭bannerはpost-gate navigation metadataです。本文内のbytes / SHA-256 / commit identityは、明記されたhistorical content commitのbytesを指し、banner追加後のworking-tree bytesを指しません。
 
 ## 長時間エージェントの復旧
@@ -81,7 +85,7 @@ historical fileへ追加した先頭bannerはpost-gate navigation metadataです
 
 | Item | Pinned value | Source |
 |---|---:|---|
-| Product version | `0.8.3` candidate | [`Directory.Build.props`](../../Directory.Build.props)、[版管理手順](version-management.md) |
+| Product version | `0.8.3` candidate（UNRELEASED） | [`Directory.Build.props`](../../Directory.Build.props)、[版管理手順](version-management.md) |
 | .NET SDK | 10.0.400、latestPatch | [`global.json`](../../global.json) |
 | Target framework | `net10.0` | [`Directory.Build.props`](../../Directory.Build.props) |
 | Avalonia | 12.1.1 | [`Directory.Packages.props`](../../Directory.Packages.props) |
