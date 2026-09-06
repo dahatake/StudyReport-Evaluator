@@ -1,6 +1,15 @@
 # Promptファイルから起動する
 
-StudyReport Evaluatorは、入力workbookと複数の評価Promptを起動時に事前入力できます。この機能はGUIの準備だけを行い、AI処理を自動開始しません。
+StudyReport Evaluatorは、入力workbookと複数の評価Promptを起動時に事前入力できます。この機能はGUIの準備だけを行い、loginやAI処理を自動開始しません。
+
+これは任意の高度な起動方法です。**通常のGUI起動に、利用者のterminal操作やcommand入力は不要です。**
+
+## 対象版と確認範囲
+
+- **未公開候補`0.8.4`（UNRELEASED・単一EXE）**: 配布名は`StudyReportEvaluator-win-x64.exe`です。以下の候補版の例は取得済みのEXEを使うもので、公開済みとは扱わず、未公開のdownload URLも案内しません。
+- **現在の公開版`v0.8.1`（ZIP）**: `StudyReportEvaluator-win-x64.zip`を展開した`StudyReportEvaluator.App.exe`を使います。この起動名と引数は従来どおり維持します。
+
+> **既存P06の確認範囲:** 開発host上の実GUIで日本語pathの入力workbookと複数Promptの指定順維持を確認済みで、P06全7件PASS・review未解決指摘0です。追加ソフト未導入のfresh OS（clean-host）での試験と利用者本人のloginは`NOT_RUN`であり、その成功や候補EXEの公開完了を示しません。
 
 ## 2種類のPrompt
 
@@ -11,8 +20,16 @@ StudyReport Evaluatorは、入力workbookと複数の評価Promptを起動時に
 
 ## 起動option
 
+未公開`0.8.4`候補の単一EXE:
+
 ```text
-StudyReportEvaluator.App.exe --input <xlsx-path> --prompt <txt-path> [--prompt <txt-path> ...]
+StudyReportEvaluator-win-x64.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prompt "<txt-path>" ...]
+```
+
+公開`v0.8.1`のZIPを展開したEXE（従来の起動方法）:
+
+```text
+StudyReportEvaluator.App.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prompt "<txt-path>" ...]
 ```
 
 | Option | 回数 | 動作 |
@@ -21,9 +38,9 @@ StudyReportEvaluator.App.exe --input <xlsx-path> --prompt <txt-path> [--prompt <
 | `--prompt` | 0回以上 | 指定順でImported Promptsへ読込 |
 
 - option名は大文字・小文字を区別しません。
-- relative pathは起動時のworking directoryを基準にabsolute化します。
-- 同じPrompt pathの重複は最初の1件だけを使います。
-- unknown option、重複`--input`、値なし、`.txt`以外は起動errorです。
+- relative pathは起動時のworking directory（cwd）を基準にabsolute化します。基準は起動元のdirectoryのままで、EXE配置先や単一EXEの抽出cacheへ変更しません。
+- absolute化後の同じPrompt pathの重複は最初の1件だけを使い、残りの指定順を維持します。Windowsではpathの大文字・小文字を区別しません。
+- unknown option、重複`--input`、値なし、不正path、`--prompt`に指定した`.txt`以外のfileは起動errorです。
 - `--run`や`--resume`はありません。
 
 ## 評価Prompt file
@@ -35,37 +52,50 @@ StudyReportEvaluator.App.exe --input <xlsx-path> --prompt <txt-path> [--prompt <
 
 Prompt本文はDesign画面で確認し、対象を選んで**Promptを適用**した時だけtemplate欄へcopyします。filenameによる自動割当は行いません。
 
+起動引数やPrompt適用からloginやAI処理を自動開始しません。AI評価の開始にはExecution画面の**定量化を開始**を利用者自身が選ぶ必要があります。候補版の**GitHubにログイン**も別の明示操作です。
+
 ## PowerShellから起動する例
 
+既にPowerShell 7がある場合の任意の例です。通常のGUI起動のためにPowerShellを導入したり、terminalへcommandを入力したりする必要はありません。
+
+未公開`0.8.4`候補の単一EXE:
+
 ```powershell
-& ".\StudyReportEvaluator.App.exe" --input "C:\Data\responses.xlsx" --prompt "C:\Data\prompts\content.txt" --prompt "C:\Data\prompts\student-prompt.txt"
+& "C:\配布 アプリ\StudyReportEvaluator-win-x64.exe" --input "C:\授業 データ\回答.xlsx" --prompt "C:\授業 データ\評価 Prompt\内容 評価.txt" --prompt "C:\授業 データ\評価 Prompt\学生 Prompt.txt"
 ```
 
-日本語や空白を含むpathは1つのargumentとして引用します。起動しただけではCopilot sessionやAI送信を開始しません。
+公開`v0.8.1`のZIPを展開したEXE:
+
+```powershell
+& "C:\配布 アプリ\StudyReportEvaluator-win-x64\StudyReportEvaluator.App.exe" --input "C:\授業 データ\回答.xlsx" --prompt "C:\授業 データ\評価 Prompt\内容 評価.txt" --prompt "C:\授業 データ\評価 Prompt\学生 Prompt.txt"
+```
+
+日本語や空白を含むpathは1つのargumentとして引用します。relative pathを使う場合も起動元のcwdを維持し、EXEのdirectoryや抽出cacheへ移動しません。起動しただけではCopilot session、login、AI送信を開始しません。
 
 ## GitHub Copilotへ貼る起動依頼例
 
-`<...>`を実在pathへ置き換えます。
+`<...>`を実在pathへ置き換え、引用符を残します。アプリには取得済みの未公開`0.8.4`候補の単一EXE、または公開`v0.8.1`のZIPを展開したEXEのどちらか1つを指定します。
 
 ```text
 ローカルのStudyReport Evaluatorを、次の入力と評価Promptを事前入力して起動してください。
 
 アプリ:
-<展開済み StudyReportEvaluator.App.exe のabsolute path>
+"<StudyReportEvaluator-win-x64.exe または ZIP内 StudyReportEvaluator.App.exe のabsolute path>"
 
 入力workbook:
-<標準 .xlsx のabsolute path>
+"<標準 .xlsx のabsolute path>"
 
 評価Prompt file（順序を維持）:
-1. <UTF-8 .txt のabsolute path>
-2. <UTF-8 .txt のabsolute path>
+1. "<UTF-8 .txt のabsolute path>"
+2. "<UTF-8 .txt のabsolute path>"
 
 条件:
 - fileの存在とextensionだけを確認し、workbook本文を開いたりchatへ表示したりしないでください。
 - 入力workbookと既存Prompt fileを変更しないでください。
-- argumentは--inputを1回、--promptを上記順に渡してください。
+- argumentは--inputを1回、--promptを上記順に渡し、各pathを引用して1つのargumentとして扱ってください。
+- 起動元のworking directory（cwd）を維持し、EXEのdirectoryや抽出cacheへ移動しないでください。
 - --inputと--prompt以外のoptionを追加しないでください。
-- GUIを起動したら停止し、画面clickやAI評価を自動実行しないでください。
+- GUIを起動したら停止し、login、画面clickやAI評価を自動実行しないでください。
 - fileが見つからない場合は別pathを推測せず、不足しているpathだけを知らせてください。
 ```
 

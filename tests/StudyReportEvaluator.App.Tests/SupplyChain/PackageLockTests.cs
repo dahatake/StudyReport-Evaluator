@@ -7,6 +7,9 @@ namespace StudyReportEvaluator.App.Tests.SupplyChain;
 
 public sealed partial class PackageLockTests
 {
+    private const string CanonicalAppLockPath = "src/StudyReportEvaluator.App/packages.lock.json";
+    private const string SingleFileAppLockPath = "src/StudyReportEvaluator.App/packages.win-x64-singlefile.lock.json";
+
     private static readonly string[] ProjectPaths =
     [
         "src/StudyReportEvaluator.Core/StudyReportEvaluator.Core.csproj",
@@ -114,6 +117,112 @@ public sealed partial class PackageLockTests
         Assert.StartsWith("https://", (string?)sources[0].Attribute("value"), StringComparison.OrdinalIgnoreCase);
         Assert.Equal("true", XDocument.Load(Path.Combine(root, "Directory.Build.props"))
             .Descendants("RestorePackagesWithLockFile").Single().Value);
+    }
+
+    [Fact]
+    public void Single_file_lock_is_version_two_with_only_net10_and_win_x64_targets()
+    {
+        string root = FindRepositoryRoot();
+        string lockPath = Path.Combine(root, SingleFileAppLockPath);
+        Assert.True(File.Exists(lockPath), "Missing dedicated App single-file lock file.");
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(lockPath));
+
+        Assert.Equal(2, document.RootElement.GetProperty("version").GetInt32());
+        string[] expectedTargets = ["net10.0", "net10.0/win-x64"];
+        Assert.Equal(expectedTargets, document.RootElement.GetProperty("dependencies")
+            .EnumerateObject().Select(target => target.Name).Order(StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
+    public void Single_file_lock_preserves_canonical_net10_package_fields_and_dependencies()
+    {
+        string root = FindRepositoryRoot();
+        using JsonDocument canonical = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(root, CanonicalAppLockPath)));
+        using JsonDocument singleFile = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(root, SingleFileAppLockPath)));
+        JsonElement canonicalPackages = canonical.RootElement.GetProperty("dependencies").GetProperty("net10.0");
+        JsonElement singleFilePackages = singleFile.RootElement.GetProperty("dependencies").GetProperty("net10.0");
+
+        foreach (JsonProperty package in canonicalPackages.EnumerateObject())
+        {
+            Assert.True(singleFilePackages.TryGetProperty(package.Name, out JsonElement actual),
+                $"Canonical package is missing from the single-file lock: {package.Name}");
+            Assert.True(JsonElement.DeepEquals(package.Value, actual),
+                $"Single-file package fields or dependencies differ from the canonical lock: {package.Name}");
+        }
+    }
+
+    [Fact]
+    public void Single_file_lock_adds_only_the_pinned_build_only_ILLink_package()
+    {
+        const string buildOnlyPackage = "Microsoft.NET.ILLink.Tasks";
+        string root = FindRepositoryRoot();
+        using JsonDocument canonical = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(root, CanonicalAppLockPath)));
+        using JsonDocument singleFile = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(root, SingleFileAppLockPath)));
+        JsonElement canonicalPackages = canonical.RootElement.GetProperty("dependencies").GetProperty("net10.0");
+        JsonElement singleFilePackages = singleFile.RootElement.GetProperty("dependencies").GetProperty("net10.0");
+
+        Assert.False(canonicalPackages.TryGetProperty(buildOnlyPackage, out _),
+            "The single-file build-only package must not enter the canonical App lock.");
+        string[] expectedPackages = canonicalPackages.EnumerateObject().Select(package => package.Name)
+            .Append(buildOnlyPackage).Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(expectedPackages, singleFilePackages.EnumerateObject().Select(package => package.Name)
+            .Order(StringComparer.Ordinal).ToArray());
+
+        JsonElement buildOnly = singleFilePackages.GetProperty(buildOnlyPackage);
+        string[] expectedFields = ["contentHash", "requested", "resolved", "type"];
+        Assert.Equal(expectedFields, buildOnly.EnumerateObject().Select(field => field.Name)
+            .Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal("Direct", buildOnly.GetProperty("type").GetString());
+        Assert.Equal("[10.0.11, )", buildOnly.GetProperty("requested").GetString());
+        Assert.Equal("10.0.11", buildOnly.GetProperty("resolved").GetString());
+        Assert.Equal("IBf7lbovvjGWVWXZX5cJ/cO0WXbId0Zq4BuSeT94mGZuOAP66oMeH9PTBZ9Jpp3Jb6jtK0qm/NyUbPRo1gC/wQ==",
+            buildOnly.GetProperty("contentHash").GetString());
+    }
+
+    [Fact]
+    public void Single_file_win_x64_package_fields_and_dependencies_match_canonical()
+    {
+        string root = FindRepositoryRoot();
+        using JsonDocument canonical = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(root, CanonicalAppLockPath)));
+        using JsonDocument singleFile = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(root, SingleFileAppLockPath)));
+        JsonElement canonicalPackages = canonical.RootElement.GetProperty("dependencies").GetProperty("net10.0");
+        JsonElement ridPackages = singleFile.RootElement.GetProperty("dependencies").GetProperty("net10.0/win-x64");
+        string[] expectedPackages =
+        [
+            "Avalonia.Angle.Windows.Natives",
+            "Avalonia.Native",
+            "HarfBuzzSharp.NativeAssets.Linux",
+            "HarfBuzzSharp.NativeAssets.macOS",
+            "HarfBuzzSharp.NativeAssets.Win32",
+            "SkiaSharp.NativeAssets.Linux",
+            "SkiaSharp.NativeAssets.macOS",
+            "SkiaSharp.NativeAssets.Win32",
+        ];
+        Assert.Equal(expectedPackages.Order(StringComparer.Ordinal).ToArray(),
+            ridPackages.EnumerateObject().Select(package => package.Name).Order(StringComparer.Ordinal).ToArray());
+
+        foreach (JsonProperty package in ridPackages.EnumerateObject())
+        {
+            Assert.True(canonicalPackages.TryGetProperty(package.Name, out JsonElement expected),
+                $"RID package is absent from the canonical App lock: {package.Name}");
+            Assert.True(JsonElement.DeepEquals(expected, package.Value),
+                $"RID package fields or dependencies differ from the canonical lock: {package.Name}");
+        }
+    }
+
+    [Fact]
+    public void Core_remains_dependency_free_without_a_dedicated_single_file_lock()
+    {
+        string coreDirectory = Path.Combine(FindRepositoryRoot(), "src/StudyReportEvaluator.Core");
+        XDocument project = XDocument.Load(Path.Combine(coreDirectory, "StudyReportEvaluator.Core.csproj"));
+        Assert.Empty(project.Descendants("PackageReference"));
+
+        string lockPath = Assert.Single(Directory.EnumerateFiles(coreDirectory, "packages*.lock.json"));
+        Assert.Equal("packages.lock.json", Path.GetFileName(lockPath));
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(lockPath));
+        JsonProperty target = Assert.Single(document.RootElement.GetProperty("dependencies").EnumerateObject());
+        Assert.Equal("net10.0", target.Name);
+        Assert.Empty(target.Value.EnumerateObject());
     }
 
     [GeneratedRegex(@"^\d+(?:\.\d+){1,3}$", RegexOptions.CultureInvariant)]

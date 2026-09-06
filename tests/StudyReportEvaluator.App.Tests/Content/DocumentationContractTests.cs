@@ -86,6 +86,11 @@ public sealed class DocumentationContractTests
             "dev/docs/README.md",
             "dev/docs/version-management.md",
             "dev/docs/adr/0014-product-versioning.md",
+            "dev/docs/adr/0016-windows-one-action-startup.md",
+            "dev/docs/preflight/windows-singlefile-feasibility.md",
+            "src/StudyReportEvaluator.App/Properties/PublishProfiles/WindowsSingleFile.pubxml",
+            "scripts/package-windows-singlefile.ps1",
+            "scripts/test-windows-singlefile.ps1",
         ];
         foreach (string relativePath in requiredPaths)
         {
@@ -138,7 +143,17 @@ public sealed class DocumentationContractTests
         AssertContainsAll(
             Read("dev/docs/README.md"),
             "[アプリケーション版管理手順](version-management.md)",
-            "[ADR-0014](adr/0014-product-versioning.md)");
+            "[ADR-0014](adr/0014-product-versioning.md)",
+            "[ADR-0016](adr/0016-windows-one-action-startup.md)",
+            "[Windows単一EXEの方式適合](preflight/windows-singlefile-feasibility.md)",
+            "`PASS_DEVELOPMENT`",
+            "CH-01〜06");
+        AssertContainsAll(
+            Read("dev/README.md"),
+            "[Windows単一EXEの設計決定](docs/adr/0016-windows-one-action-startup.md)",
+            "[`WindowsSingleFile.pubxml`](../src/StudyReportEvaluator.App/Properties/PublishProfiles/WindowsSingleFile.pubxml)",
+            "[`package-windows-singlefile.ps1`](../scripts/package-windows-singlefile.ps1)",
+            "[`test-windows-singlefile.ps1`](../scripts/test-windows-singlefile.ps1)");
         AssertContainsAll(
             Read("dev/version.ps1"),
             "#Requires -Version 7.0",
@@ -281,11 +296,14 @@ public sealed class DocumentationContractTests
             readme,
             "Windows 11 x64",
             ".NET 10 self-contained",
-            "unsigned ZIP",
+            "公開`v0.8.1`はunsigned ZIP",
             "StudyReportEvaluator-win-x64.zip",
             "StudyReportEvaluator-win-x64.zip.sha256",
+            "StudyReportEvaluator-win-x64.exe",
+            "StudyReportEvaluator-win-x64.exe.sha256",
             "現在の公開版は`0.8.1`です",
             "https://github.com/dahatake/StudyReport-Evaluator/releases",
+            "clean-host試験と本人loginは`NOT_RUN`",
             "macOS、Linux、Windows Arm64は初版対応対象外",
             "installer、code signing、notarizationを提供しません");
 
@@ -294,19 +312,23 @@ public sealed class DocumentationContractTests
         AssertContainsAll(
             userIndex,
             "Windows 11 x64",
-            "unsigned ZIP",
+            "公開ZIP／候補EXEともunsigned",
             "現在の公開版は`0.8.1`です",
+            "単一EXEはまだ公開されておらず",
+            "clean-host試験と本人loginは`NOT_RUN`",
             "development MSIXは検証専用で、一般配布しません",
             "macOS、Linux、Windows Arm64");
         AssertContainsAll(
             Read("docs/getting-started.md"),
-            "現在の公開版は`0.8.1`です",
+            "現在の公開版は`v0.8.1`です",
             "https://github.com/dahatake/StudyReport-Evaluator/releases",
-            "development MSIXは検証専用");
+            "fresh Windowsのclean-host試験CH-01〜06と本人loginは`NOT_RUN`",
+            "development MSIXは非公開の開発検証専用");
         AssertContainsAll(
             publishScript,
             "$RuntimeIdentifier = 'win-x64'",
             "--self-contained",
+            "[switch] $SingleFile",
             "Assert-BundledCopilotRuntime");
         AssertContainsAll(
             packageScript,
@@ -320,7 +342,7 @@ public sealed class DocumentationContractTests
         string publicContent = string.Join(Environment.NewLine, PublicDocumentPaths.Select(Read));
         AssertContainsAll(
             publicContent,
-            "ZIPへ同梱したGitHub Copilot CLI",
+            "配布物へ同梱したGitHub Copilot CLI",
             "PATH上の別CLIへfallbackしません",
             "runtimes\\win-x64\\native\\copilot.exe");
         AssertDoesNotContainAny(
@@ -398,10 +420,12 @@ public sealed class DocumentationContractTests
         AssertContainsAll(
             readme,
             "StudyReportEvaluator.App.exe --input <xlsx-path> --prompt <txt-path> [--prompt <txt-path> ...]",
+            "StudyReportEvaluator-win-x64.exe --input <xlsx-path> --prompt <txt-path> [--prompt <txt-path> ...]",
             "`--input`は0または1回",
             "`--prompt`は0回以上",
             "strict UTF-8",
-            "AI処理はExecution画面の明示操作まで開始しない");
+            "起動引数やPrompt適用ではloginもAI処理も自動開始しません",
+            "AI処理はExecution画面の明示操作まで開始しません");
         AssertContainsAll(
             guide,
             "BOMあり／なしを受理",
@@ -477,11 +501,15 @@ public sealed class DocumentationContractTests
                      "images/README.md",
                  })
         {
-            AssertContainsAll(Read(path), "UNRELEASED", "`0.8.3`候補", "`0.8.1`");
+            AssertContainsAll(Read(path), "UNRELEASED", "`0.8.4`候補", "`0.8.1`");
         }
 
         AssertContainsAll(Read("images/README.md"), "一時directoryへ描画", "2回生成の一致", "finally");
-        AssertContainsAll(Read("docs/getting-started.md"), "PowerShell 7の導入は必須ではありません", "certutil");
+        AssertContainsAll(
+            Read("docs/getting-started.md"),
+            "確認のためだけにPowerShell等を導入する必要はありません",
+            "certutil",
+            "fresh Windowsのclean-host試験CH-01〜06と本人loginは`NOT_RUN`");
     }
 
     [Fact]
@@ -522,10 +550,13 @@ public sealed class DocumentationContractTests
 
         AssertContainsAll(
             requirements,
-            "| 文書版 | 4.4 |",
-            "| 基準日 | 2026-09-05 |",
+            "| 文書版 | 4.5 |",
+            "| 基準日 | 2026-09-06 |",
             "ADR-0013",
+            "ADR-0016",
             "| 対応環境 | Windows 11 x64。macOS、Linux、Windows Arm64は現版の正式公開対象外 |",
+            "StudyReportEvaluator-win-x64.exe",
+            "CH-01〜06",
             "`sample/SampleReport.xlsx`",
             "| Bytes | 470,806 |",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
@@ -556,9 +587,15 @@ public sealed class DocumentationContractTests
             "469,995",
             "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D",
             "A1:J531");
-        AssertSequentialTableIds(requirements, "AC-", 28);
-        AssertSequentialTableIds(ledger, "C-", 38);
+        AssertSequentialTableIds(requirements, "AC-", 34);
+        AssertSequentialTableIds(ledger, "C-", 44);
         AssertContainsAll(ledger, "VERIFIED", "BLOCKED", "EXCLUDED");
+        AssertContainsAll(
+            ledger,
+            "`docs/requirements-definition.md` v4.5",
+            "`SystemTest-prompt.md` v4.5、ST-UC-01〜26、TR-01〜33",
+            "`PASS_DEVELOPMENT`",
+            "fresh user本人login／再起動後確認のCH-06は`NOT_RUN`");
 
         int[] scenarioHeadingIds = Regex.Matches(
                 prompts,
@@ -566,7 +603,7 @@ public sealed class DocumentationContractTests
                 RegexOptions.Multiline | RegexOptions.CultureInvariant)
             .Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))
             .ToArray();
-        Assert.Equal(Enumerable.Range(1, 25), scenarioHeadingIds);
+        Assert.Equal(Enumerable.Range(1, 26), scenarioHeadingIds);
 
         Match[] standalonePrompts = Regex.Matches(
                 prompts,
@@ -575,7 +612,7 @@ public sealed class DocumentationContractTests
             .Cast<Match>()
             .ToArray();
         Assert.Equal(
-            Enumerable.Range(1, 25),
+            Enumerable.Range(1, 26),
             standalonePrompts.Select(match => int.Parse(
                 match.Groups[1].Value,
                 System.Globalization.CultureInfo.InvariantCulture)));
@@ -607,6 +644,7 @@ public sealed class DocumentationContractTests
             "TR-26 / AC-024",
             "TR-27 / AC-025",
             "TR-28 / TR-29 / AC-026 / AC-027 / AC-028",
+            "TR-30 / TR-31 / TR-32 / TR-33 / AC-029 / AC-030 / AC-031 / AC-032 / AC-033 / AC-034",
         ];
         Assert.Equal(
             expectedRequirementMappings,
@@ -622,12 +660,14 @@ public sealed class DocumentationContractTests
             .Distinct()
             .Order()
             .ToArray();
-        Assert.Equal(Enumerable.Range(1, 29), coveredRequirementIds);
+        Assert.Equal(Enumerable.Range(1, 33), coveredRequirementIds);
         AssertContainsAll(
             prompts,
-            "| 対象 | StudyReport Evaluator v4.4 |",
-            "| 基準日 | 2026-09-05 |",
-            "| 要求正本 | `docs/requirements-definition.md` v4.4 |",
+            "| 対象 | StudyReport Evaluator v4.5 |",
+            "| 基準日 | 2026-09-06 |",
+            "| 要求正本 | `docs/requirements-definition.md` v4.5 |",
+            "ST-UC-26",
+            "CH-01〜CH-06",
             "`sample/SampleReport.xlsx`",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
             "他fileを列挙、fallback、代用しない",
@@ -636,8 +676,8 @@ public sealed class DocumentationContractTests
         Assert.DoesNotContain("sample/realdata.xlsx", prompts, StringComparison.OrdinalIgnoreCase);
         AssertContainsAll(
             realDataSmoke,
-            "requirements = \"docs/requirements-definition.md v4.4\"",
-            "system_test_prompt = \"SystemTest-prompt.md v4.4\"");
+            "requirements = \"docs/requirements-definition.md v4.5\"",
+            "system_test_prompt = \"SystemTest-prompt.md v4.5\"");
         AssertContainsAll(
             Read("docs/getting-started.md"),
             "主回答列を選択すると",

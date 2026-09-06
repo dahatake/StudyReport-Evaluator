@@ -2,9 +2,17 @@
 
 | 項目 | 値 |
 |---|---|
-| Current requirement | `docs/requirements-definition.md` v4.4 |
-| Scope ADR | ADR-0012（機能）/ ADR-0015（Windows ZIP public / development MSIX）/ ADR-0013（Windows public evidence） |
-| Product version | `0.8.3` candidate（UNRELEASED）— `Directory.Build.props`の明示`VersionPrefix` |
+| Current requirement | `docs/requirements-definition.md` v4.5 |
+| Scope ADR | ADR-0012（機能）/ ADR-0015（Windows ZIP public / development MSIX）/ ADR-0013（Windows public evidence）/ ADR-0016（Windows単一EXE 1操作起動） |
+| Product version | `0.8.4` candidate（UNRELEASED）— `Directory.Build.props`の明示`VersionPrefix` |
+| One-action startup implementation | App限定single-file profile、EXE package、login専用service／UI、matrix v2、candidate／protected publish contractを実装済み。公開済みではない |
+| One-action startup deterministic validation | P01〜P07／A01〜A03／C01〜C07の直接検証とレビューを実施。C03は18/18 PASS。V01は0.8.4最終artifactで実行済み |
+| Latest development-host EXE evidence | `PASS_DEVELOPMENT` — V01再package後の0.8.4 EXE 282,949,002 bytes、SHA-256 `E03553BE…C382E`。開発hostのみの観測でありclean-host証跡ではない |
+| V01 full opt-in gate | Core 190/190 + App 805/805 = 995/995 PASS（failed 0、skipped 0、opt-in artifact／package testを含む、2026-09-06実行） |
+| R03 version status | `PASS` — `0.8.3`から`0.8.4`へPATCHし、Unreleasedへ変更を追記。0.8.4の最終EXE／ZIPをV01で再生成・再検証済み |
+| V02 fresh-host validation | `SKIPPED_BY_INSTRUCTION` — 2026-09-06、要求所有者の明示指示によりfresh Windows clean-host試験を実施していない。実施済みやPASSへ読み替えない |
+| Fresh Windows clean-host / personal login | `NOT_RUN_EXTERNAL_PREREQUISITE` — CH-01〜CH-06は未実施。開発host、fake、CLI help、contract testで代用しない |
+| New single-file public release | `BLOCKED_EXTERNAL` — exact最終EXEのCH-01〜06、別途の公開指示、candidate／protected publish実行まで公開しない |
 | Version management | [`version-management.md`](version-management.md) / [`dev/version.ps1`](../version.ps1) / ADR-0014 |
 | Public release source | release commit `d0b03b9201d397b6c3333dafbb816b13b4dc003c`、annotated tag `v0.8.1` |
 | Public release status | `PUBLISHED — v0.8.1、2026-09-04T08:52:49Z公開、ZIPとsidecarの2 asset` |
@@ -34,20 +42,25 @@
 | Version tool validation | `0.8.3`でshow/verify/set/bump/dry-run/invalid rejection、複数Git pathでのtag/clean検証、15 assertions PASS（2026-09-05実行） |
 | Development MSIX mechanism | `PASS_MECHANISM` — package/unpack/hash/policy/cleanup、0.8.3.0、install未実行・非required（2026-09-05実行） |
 | macOS static source contract | 2/2 PASS — unsigned bundle最小contractとproduction trust順序のsource検証。production artifact／署名／公証の実測ではない（2026-09-04 B1-16実行） |
-| Audit date | 2026-09-05 |
+| Audit date | 2026-09-06 |
 
 監査済みgateの集約記録は`artifacts/test/final-recovery-20c8121/phases.json`。718/718 PASSは`20c8121`に限定し、opt-in未指定で`NOT_RUN`としてreturnする経路やpolicy経路を含む。実際のLive AI、外部Excel再計算、RealData処理は`NOT_RUN`で、sample構造確認やfake/synthetic testとは区別する。focused／screenshot等の既存記録も各記録日時点のbaselineであり、今回reviewの修正を検証したものではない。証拠の保存・適用限界は[Evidence integrity and storage](traceability.md#evidence-integrity-and-storage)を参照。
 
-現在のdelivery実装は[`20260904-publication-remediation-plan.md`](../../work/20260904-publication-remediation-plan.md)と[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に従う。未公開`v1.0.1` recoveryと`1.1.0` delivery candidateは`0.8.0`へ再baselineし、過去の1.x候補を公開版として扱わない。Windows public artifactはunsigned ZIP、development MSIXはnon-public `PASS_MECHANISM`、macOS production deliveryは現版scope外である。
+公開済みdeliveryの履歴は[`20260904-publication-remediation-plan.md`](../../work/20260904-publication-remediation-plan.md)と[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に従い、`v0.8.1`のunsigned ZIP／sidecar 2件を維持する。現行v4.5 candidateは[ADR-0016](adr/0016-windows-one-action-startup.md)に従い、unsigned単一EXEを将来の主配布、ZIPを代替として実装した。単一EXEはfresh clean-host CH-01〜06とprotected publish完了まで未公開である。development MSIXはnon-public `PASS_MECHANISM`、macOS production deliveryは現版scope外のままである。
 
 2026-09-03のdelivery変更前working treeを再buildしたfull solution testは670件中670件成功した。ユーザーが配置した`sample/SampleReport.xlsx`だけをcanonical sampleとし、exact path、470,806 bytes、SHA-256 `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA`、read-only検査前後のidentity不変を確認した。opt-in technical E2Eはnetwork/live AIを使わず530行を完走した。これらは機能regressionの比較baselineであり、0.8.0のMSIX／macOS／signing／notarization／quarantine結果ではない。delivery変更後は全required regressionを再実行する。
 
 2026-09-04のV2-01はrelease commitのclean treeでlocked restore、Release build、full required deterministic gateを実行し、696件中696件が成功した。Windows ZIP regressionはhosted CIのclean checkoutとcandidate workflowでも`PASS_REQUIRED` evidenceを生成している。optional Live Copilot、external recalculation、RealData system smokeはrequired gateへ算入していない。
 
-## Delivery status — v0.8.1公開履歴 / 0.8.3 local baseline
+## Delivery status — v0.8.1公開履歴 / v4.5 current candidate
 
 | Surface | Current status | Completion evidence |
 |---|---|---|
+| Windows single-file profile／package／login deterministic contract | `PASS_REQUIRED`（実装・開発host範囲） | App限定profile、最終EXE／sidecar、標準抽出、CLI integrity、cwd／Prompt、cache fault、login process所有境界の直接test。本人loginやclean-hostを含まない |
+| Windows single-file development-host evidence | `PASS_DEVELOPMENT`（再package待ち） | P07で実EXEの7 package testと9観測を照合。後続文書変更でbundle bytesが変わるため最終候補へ流用しない |
+| Windows single-file clean-host CH-01〜06 | `NOT_RUN_EXTERNAL_PREREQUISITE` | fresh Windows 11 x64標準user、MOTW／保護状態、本人loginの実測待ち |
+| Matrix v2／candidate／protected publish contract | `PASS_REQUIRED`（deterministic contractのみ） | closed 3 rows、public 4 assets、MSIX非公開、candidate identity、clean-host JSON、公開直前再検証をC01〜C07で検証。live workflowは未実行 |
+| New single-file public release | `BLOCKED_EXTERNAL` | clean-host証跡、別途のtag／push／draft／公開指示、実workflow実行が未完了 |
 | Windows public ZIP regression | `PASS_REQUIRED` | 公開`v0.8.1`の履歴: clean checkoutでpublish/package/hash/safe layout/bundled CLI/clean launch/入力不変を検証し、closed evidenceを生成（hosted CIとcandidate workflow） |
 | Full required regression（公開v0.8.1履歴） | `PASS_REQUIRED` | Core 190/190、App 506/506、合計696/696（2026-09-04 V2-01） |
 | Canonical technical E2E | `NOT_RUN_CURRENT_CANDIDATE` | opt-in no-network E2Eはrequired gate外。current candidateでは実行していない |
@@ -56,7 +69,7 @@
 | macOS source foundation static contract | `PASS_REQUIRED` | `MacOsPublishPackageTests` 2/2。production signing／notary evidenceではない |
 | macOS production delivery | `EXCLUDED_CURRENT_SCOPE` | public artifact／support claimなし |
 | Windows ZIP public setup docs | `PASS_REQUIRED`（baselineのみ） | `20c8121`のdocumentation contract 14/14はbaseline。今回の文書修正は上表のCurrent review validationで別に判定 |
-| Release matrix/workflow | `PASS_REQUIRED`（0.8.3 localのみ） | `v0.8.1`は公開／public re-download確認済みの履歴。`0.8.3`は`20c8121`でlocal matrix生成・semantic検証PASSであり、公開workflow完了・公開後re-downloadを意味しない |
+| Release matrix/workflow | `PASS_REQUIRED`（local deterministic contractのみ） | `v0.8.1`は公開／public re-download確認済みの履歴。v4.5 matrix v2とcandidate／protected publish contractはlocal test済みだが、現行candidateのworkflow実行・公開後re-downloadを意味しない |
 
 ## 実装済みsurface
 
@@ -70,6 +83,8 @@
 | score / formula AST | [`Scoring`](../../src/StudyReportEvaluator.Core/Scoring/)、[`Formulas`](../../src/StudyReportEvaluator.Core/Formulas/) | [`Scoring tests`](../../tests/StudyReportEvaluator.Core.Tests/Scoring/)、[`Formula tests`](../../tests/StudyReportEvaluator.Core.Tests/Formulas/) |
 | Config / References / Results / Run / partial checkpoint / atomic output | [`Workbooks`](../../src/StudyReportEvaluator.App/Workbooks/)、[`Workflow`](../../src/StudyReportEvaluator.App/Workflow/) | [`Workbook tests`](../../tests/StudyReportEvaluator.App.Tests/Workbooks/)、[`Workflow tests`](../../tests/StudyReportEvaluator.App.Tests/Workflow/) |
 | 4-step UI / keyboard / 200% | [`Views`](../../src/StudyReportEvaluator.App/Views/)、[`ViewModels`](../../src/StudyReportEvaluator.App/ViewModels/) | [`UI headless tests`](../../tests/StudyReportEvaluator.App.Tests/UI/) |
+| Windows x64 unsigned single-file EXE | [`WindowsSingleFile.pubxml`](../../src/StudyReportEvaluator.App/Properties/PublishProfiles/WindowsSingleFile.pubxml)、[`publish-windows.ps1`](../../scripts/publish-windows.ps1)、[`package-windows-singlefile.ps1`](../../scripts/package-windows-singlefile.ps1) | [`WindowsSingleFileProfileTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsSingleFileProfileTests.cs)、[`WindowsSingleFilePublishTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsSingleFilePublishTests.cs)、[`WindowsSingleFileArtifactTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsSingleFileArtifactTests.cs)、[`WindowsSingleFilePackageTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsSingleFilePackageTests.cs) |
+| Bundled CLI login initiation | [`BundledCopilotLoginService.cs`](../../src/StudyReportEvaluator.App/Copilot/BundledCopilotLoginService.cs)、[`ExecutionViewModel.cs`](../../src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs) | [`BundledCopilotLoginServiceTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Copilot/BundledCopilotLoginServiceTests.cs)、[`CopilotLoginCommandTests.cs`](../../tests/StudyReportEvaluator.App.Tests/UI/CopilotLoginCommandTests.cs)。本人loginはCH-06待ち |
 | Windows x64 unsigned ZIP / bundled CLI regression | [`publish-windows.ps1`](../../scripts/publish-windows.ps1)、[`package-windows.ps1`](../../scripts/package-windows.ps1)、[`CopilotClientFactory.cs`](../../src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs) | [`WindowsPublishPackageTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs)、[`CopilotClientFactoryTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Copilot/CopilotClientFactoryTests.cs) |
 | Windows development MSIX | [`eng/packaging/windows`](../../eng/packaging/windows/)、[`package-windows-msix.ps1`](../../scripts/package-windows-msix.ps1)、[`test-windows-msix-unsigned.ps1`](../../scripts/test-windows-msix-unsigned.ps1) | [`WindowsInstallerPackageTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsInstallerPackageTests.cs)、mechanism evidence |
 | macOS source foundation | [`eng/packaging/macos`](../../eng/packaging/macos/)、macOS publish/package/sign/notary scripts | [`MacOsPublishPackageTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/MacOsPublishPackageTests.cs) static contract |

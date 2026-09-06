@@ -2,17 +2,19 @@
 
 | 項目 | 内容 |
 |---|---|
-| 文書版 | 4.4 |
-| 基準日 | 2026-09-05 |
-| 状態 | Windows ZIP初回公開・development MSIX検証 baseline |
+| 文書版 | 4.5 |
+| 基準日 | 2026-09-06 |
+| 状態 | 要求承認済み・実装進行中。Windows単一EXEの公開判定は未完了 |
 | 入力 | Microsoft Forms または Google Forms から export した標準 `.xlsx` 1ファイル |
 | 出力 | 入力を変更せず作成する別の標準 `.xlsx` 1ファイル |
 | 対応環境 | Windows 11 x64。macOS、Linux、Windows Arm64は現版の正式公開対象外 |
-| UI / Runtime | Avalonia / .NET 10 self-contained |
-| AI | GitHub Copilot SDK for .NET。通常評価は利用者選択model、参照回答と類似度は `auto` |
-| 旧版 | v4.3の機能・delivery契約をcarry forwardし、主回答列選択時の設問text同期を追加。v3.0はv4.0により全面的にsupersede済み |
+| UI / Runtime | Avalonia `12.1.1` / .NET `10.0.11` self-contained。build SDK `10.0.400`を固定 |
+| AI | GitHub Copilot SDK for .NET `1.0.11` / bundled CLI `1.0.79`を固定。通常評価は利用者選択model、参照回答と類似度は `auto` |
+| 旧版 | v4.4の業務・入力・採点・数式・checkpoint・privacy要件と主回答列選択時の設問text同期をcarry forwardし、承認されたdelivery追加だけを反映。v3.0はv4.0により全面的にsupersede済み |
 
-> 本版は、v4.3までの機能・delivery契約に加え、2026-09-05の要求所有者指示「主回答列を選択したら、その列のExcelのシートの値を設問 textに表示」を反映する。初回公開は[ADR-0013](../dev/docs/adr/0013-windows-only-public-release.md)のWindows 11 x64 self-contained unsigned ZIPとSHA-256 sidecarを使用する。MSIXは証明書不要のdevelopment mechanism検証に限定し、一般利用者へ配布しない。macOS用source foundationは保持するが、Developer ID、notarization、approved icon、native clean-host evidenceがないため現版の公開対象・required acceptanceに含めない。[ADR-0015](../dev/docs/adr/0015-windows-macos-installer-delivery.md)のv4.3 delivery決定は本版でも維持する。
+> 本版はv4.4の要求を継承し、2026-09-06に承認された[1操作起動プラン](../work/20260906-0617-one-action-startup-plan.md)、[実行上書き](../work/20260906-one-action-startup-execution.md)、[ADR-0016](../dev/docs/adr/0016-windows-one-action-startup.md)に基づき、Windows 11 x64 self-contained unsigned単一EXEを主配布へ追加する。[ADR-0013](../dev/docs/adr/0013-windows-only-public-release.md)・[ADR-0015](../dev/docs/adr/0015-windows-macos-installer-delivery.md)のZIPとSHA-256 sidecarは代替経路として維持する。既存のnon-public development MSIX sourceと機構回帰は保持するだけで拡張せず、一般利用者へ配布しない。macOS source/static contractと公開対象外の境界は変更しない。
+>
+> [S01/G1](../dev/docs/preflight/windows-singlefile-feasibility.md)は固定version・開発hostでの.NET標準App限定single-file全内容展開の方式適合だけを確認した。clean-host、MOTW／Windows保護、本人loginは`NOT_RUN`であり、本書は新EXEの実装完了・公開済み・OS-only受入完了を示さない。
 >
 > 本書の「AI評価」は成績を確定する自動判定ではない。AIは定量化候補を作り、最終的な評点と利用判断の責任は利用者が負う。
 
@@ -27,7 +29,7 @@
 5. ベース点、設問配点、固有設定配点、類似度減点はExcel数式で計算する。
 6. 元本全体を保持した別workbookを作成し、元本は一切変更しない。
 7. 長時間処理の進捗を表示し、プロセス終了後もcheckpointから再開できるようにする。
-8. Windows 11 x64で、言語runtimeやSDKを別途導入せず起動できるself-contained ZIPとSHA-256 sidecarを提供する。
+8. Windows 11 x64で、取得済みのself-contained単一EXEを開く1操作から入力画面へ到達する配布経路とSHA-256 sidecarを提供し、ZIPとsidecarも代替として残す。追加runtime導入・手動展開を主導線に要求せず、OS保護・本人認証は§13の別条件として明示する。
 
 ## 2. 対象利用者と基本原則
 
@@ -63,17 +65,24 @@
 
 ### 3.2 GitHub Copilot
 
-AI処理にはGitHub Copilotを利用できるaccountと対話loginが必要である。
+AI処理にはGitHub Copilotを利用できるaccount、本人の対話login、必要なnetwork接続と組織policy上の利用許可が必要である。これらはGUI起動の前提とは分離する。
 
 - 配布物は、固定したGitHub Copilot SDKと互換なCopilot CLI runtimeを同梱する。
 - PATH上の任意CLIへ黙ってfallbackしない。
-- loginは利用者本人がGitHubとの対話で行う。アプリはPAT、password、client secretを入力・保存しない。
+- loginは利用者本人がCLI／ブラウザーを通じてGitHubとの対話で行う。アプリはPAT、password、client secret、token、device codeを入力・収集・解析・保存しない。
 - CLIまたはloginが利用できない場合、アプリ起動、Excel読込、mapping、設計編集、checkpoint確認は利用できるが、新しいAI処理は開始できない。
-- 利用できない理由と、loginを再試行する操作をExecution画面へ表示する。
+- 利用できない理由、明示的な「GitHubにログイン」開始・取消、既存の「Copilot 状態を確認」による再確認をExecution画面へ表示する。D-06は採用済みとし、動作とprocess所有範囲は§11.3に従う。
 
 ### 3.3 Spreadsheet runtime
 
 Microsoft Excel、Office、LibreOffice、COM automationはrequired runtimeではない。formula対応spreadsheetで開く場合にExcel数式が再計算されるよう設定するが、アプリ内previewとrequired testはOfficeなしで成立させる。
+
+### 3.4 GUI起動とAI利用の分離
+
+- 取得済みの単一EXEだけで、Windows 11 x64の標準userがofflineでGUI、Excel読込、mapping、採点設計を利用できることを要求する。管理者昇格、setup script、terminalへのcommand入力、手動展開を要求しない。
+- GUI起動に.NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI（`gh`）、別Copilot CLI、Office、IDEの導入を要求しない。sidecar、repository、隣接DLL／manifest、既存のCLI cacheや認証情報も起動の前提にしない。
+- 起動時にloginやAI評価を自動開始しない。CLIのStart/Ping、認証状態確認、本人login、実AI評価は別々に検証し、GUI表示やCLI helpの成功をAI-readyへ読み替えない。
+- OS保護による警告・拒否と、network／account／認証の必要性は追加runtime不要の契約とは別であり、すべての端末での無警告・無条件起動を保証しない。
 
 ## 4. 入力workbook契約
 
@@ -518,7 +527,7 @@ run開始時、完成名に対応する次のfileを作る。
    - 固有項目とPrompt
    - formula／capacity preflight
 3. **実行**
-   - Copilot login、通常model、`auto` availability
+   - Copilot loginの明示開始・取消・既存buttonでの状態再確認、通常model、`auto` availability
    - output／partial path
    - 参照生成、通常評価、固有評価、類似度、finalizationの段階表示
    - completed rows / total rows、in-flight、error、cancel
@@ -552,6 +561,16 @@ run開始時、完成名に対応する次のfileを作る。
 - checkbox、同意、dismiss、role、期限を要求しない。
 - warning操作をrun、cancel、resume、formula、finalizationの条件にしない。
 
+### 11.3 同梱CLIによるlogin開始（D-06採用済み）
+
+1. 利用者が「GitHubにログイン」を押した場合だけloginを開始する。GUI起動、Prompt適用、認証状態確認から暗黙に開始しない。
+2. 既存のbundled resolverでmanifest、RID、SDK／CLI版、SHA-256を検証した絶対CLI pathだけを使い、固定CLI `1.0.79`の`login` subcommandを直接子processとして起動する。shell command文字列、PowerShell、`cmd /c`、任意command実行を介さない。optionは固定版で実在と動作を確認したものだけに限定する。
+3. 認証用console／ブラウザーとcredential保管はCLIに委譲する。アプリはtokenやdevice code等を解析・収集・保存せず、引数・標準入力・application logへ渡さない。独自OAuth、token入力UI、WebView、callback serverを追加しない。
+4. loginの二重開始と評価実行中のlogin開始を防ぐ。取消・失敗時もGUI、Excel読込、mapping、設計編集を利用可能に保ち、safeな理由と再試行操作を表示する。
+5. login子processを取消・強制終了するのは利用者のlogin取消またはアプリ終了時だけとし、アプリが開始・所有した当該login processだけを終了・解放する。process tree全体や名前一致で一括killせず、ブラウザー、他のCLI、credential storeに触れない。credentialの削除、logout、失効を行わない。
+6. 完了・取消・失敗後は利用者が既存の「Copilot 状態を確認」で認証を再確認する。process起動・終了codeだけを認証成功とせず、自動model選択変更やAI評価開始を追加しない。
+7. login前後で固定CLIのversion／hashを維持し、自己更新によるmanifest不一致を許容しない。必要な更新抑止optionも固定版の確認に基づく。CLI欠落・不一致時は配布物の再取得／展開状態の確認を案内し、PATH上の別CLI導入やhash検証緩和で回避しない。
+
 ## 12. Promptファイルからの起動
 
 ### 12.1 command line
@@ -560,11 +579,14 @@ run開始時、完成名に対応する次のfileを作る。
 
 `StudyReportEvaluator.App --input <xlsx-path> --prompt <txt-path> [--prompt <txt-path> ...]`
 
+単一EXEの配布名`StudyReportEvaluator-win-x64.exe`でも同じ引数契約を提供する。ZIP内の`StudyReportEvaluator.App.exe`による既存起動を維持し、新しい起動引数は追加しない。
+
 - `--input`は任意。指定時は入力pathを事前入力し、安全なread-only読込を開始する。
 - `--prompt`は複数指定可能。
 - Prompt fileはUTF-8 plain text `.txt`とする。
 - 1fileは32,767文字以下とする。
 - unknown option、重複`--input`、missing value、非txt Promptを明確な起動errorとする。
+- 相対pathは起動時のcwdを基準に解決し、EXE配置先やruntime抽出先へ変更しない。任意cwd、日本語・空白を含むpath、複数Promptの順序と同一pathの既存取扱いを維持する。
 
 ### 12.2 GUIへの反映
 
@@ -585,16 +607,19 @@ run開始時、完成名に対応する次のfileを作る。
 - GitHub Copilot SDKと互換なCLI runtimeをpackageへ同梱する。
 - source build用SDKを一般利用者端末へ導入しない。
 - GitHub loginは利用者本人の対話が必要であり、scriptがcredentialを収集しない。
-- end-user primary pathはWindows ZIPの取得、SHA-256確認、展開、apphost起動とする。.NET Runtime／SDK、別Copilot CLI、Officeの導入を要求しない。
+- end-user primary pathは正式配布元から取得済みのWindows単一EXEを開く操作からGUI表示までとする。ダブルクリックを1起動gestureと数え、download、任意のhash比較、OS警告への操作、本人loginは含めない。ZIPは手動展開を伴う代替経路として残す。
+- SHA-256 sidecarはEXE／ZIPの両方で公開し、CI・公開gateで最終bytesとのexact一致を必須とする。利用者の手動hash比較は任意の推奨であり、起動の必須操作ではない。sidecarをEXEのruntime依存にしない。同一配布元のhash一致は発行者の真正性やSmartScreen reputationを保証しない。
 - package作成、展開、起動は入力／出力／checkpoint workbookを変更または削除しない。
-- test certificate、unsigned package、cross-publishだけの成功は`PASS_MECHANISM`であり、正式公開証跡にしない。
+- test certificate、unsigned package作成、cross-publishだけの成功は`PASS_MECHANISM`であり、正式公開証跡にしない。単一EXEの公開には§13.6〜13.7のexact artifact検証とclean-host実測を別途要求する。
 
 ### 13.2 Windows
 
-- Windows 11 x64のpublic primary artifactは`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`とする。
-- GitHub Releasesからdirect配布し、ZIPとsidecarの一致を確認して新しいdirectoryへ展開し、`StudyReportEvaluator.App.exe`を起動する。
+- Windows 11 x64のpublic primary artifactは`StudyReportEvaluator-win-x64.exe`と`StudyReportEvaluator-win-x64.exe.sha256`とする。GitHub Releasesからdirect配布し、取得済みEXE1個から手動展開・追加installなしに入力画面を開く。
+- 代替artifactは`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`とする。ZIPを新しいdirectoryへ展開し、`StudyReportEvaluator.App.exe`を起動する既存経路を維持する。両経路の手動hash比較は§13.1の任意推奨とする。
+- EXE／ZIPはunsignedであり、SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行拒否があり得る。「誰でも1操作」「すべての端末で警告なし」とは表示しない。拒否を回避する保護無効化、MOTW除去、証明書の自動trust、execution policy変更、UAC回避を実装・案内しない。
 - Windows 11で証明書なしのcontainer互換性を先行試験する場合は、Publisherの最終fieldに固定marker`OID.2.25.311729368913984317654407730594956997722=1`を置き、明示的なunsigned test artifact名を使用する。実行codeを含むため、使い捨てVMまたは復元可能なsnapshot上で管理者PowerShellの`Add-AppxPackage -AllowUnsigned`による全ユーザーinstallとして実行し、結果を`PASS_MECHANISM`に限定する。この経路を一般利用者setup、signature trust、production配布の証拠にしない。
 - development MSIX required gateはpackage作成、unpack、manifest/version/RID、block map、public payload、bundled CLI hash、sidecar、policy negative、cleanupまでとする。install／launch／upgrade／repair／uninstallは実行した場合だけ追加の`PASS_MECHANISM` evidenceとし、初回公開をblockしない。
+- development MSIXの既存sourceと非公開regressionを維持するだけとし、新しいinstaller機能やrequired install試験へ拡張しない。
 - public ZIPはcleanな展開先でself-contained apphostとbundled CLI identityを検証する。installer、trusted package、SmartScreen reputation確立済みとは表示しない。
 - engineering用publish/package scriptはPowerShell 7以上だけを使用し、Windows PowerShell 5.1へfallbackしない。PowerShellをend-user setup要件にしない。
 
@@ -615,6 +640,52 @@ run開始時、完成名に対応する次のfileを作る。
 - macOS外部入力がない状態は現版のrequired release blockerにせず、macOS artifactと対応claimを公開しない。
 - Windowsのbuild、macOS cross-publish、Avalonia/.NETの一般的なcross-platform対応を、対象platformでの本製品install／launch／CLI／workbook証跡として代用しない。
 
+### 13.5 Windows単一EXEの標準publish・展開
+
+- production projectは既存のCoreとAppの2つだけを維持する。Windows single-file profileをAppだけへ適用し、solution全体やCoreへ適用しない。通常folder／ZIP publishの引数なし動作・出力とmacOS source/static contractは変更しない。
+- restoreとpublishに同じ`win-x64`、self-contained、`PublishSingleFile=true`、`IncludeNativeLibrariesForSelfExtract=true`、`IncludeAllContentForSelfExtract=true`の条件を渡し、folder出力から分離する。`PublishTrimmed=false`、`PublishReadyToRun=false`、圧縮無効、symbols非配布を維持する。固定versionはheaderのとおり変更せず、実在するsingle-file build-only依存だけをlockし、検証やanalyzerを無効化して通さない。
+- `IncludeAllContentForSelfExtract`はMicrosoftが**非推奨**とする.NET Core 3.1互換モードであり、将来削除される可能性がある。S01で固定.NET SDK `10.0.400`／runtime `10.0.11`と固定Avalonia／SDK／CLIへの適合を開発hostで確認したことを条件に採用する。これはclean-host成功や将来versionの互換性を保証せず、正式公開前には§13.7の実測を必須とする。
+- .NET/native依存、固定CLI、runtime manifest、既存ZIPで明示allowlistにあるREADME／利用者docs／画像／LICENSEをbundle前に含める。repository全体のglobを使わず、sample、利用者input／final／partial、work、tests、secretを含めない。最終配布名へ配置したEXEのbytesからsidecarを作り、検証後にEXEを書き換えない。
+- 全内容展開後の`AppContext.BaseDirectory`を基準とする既存manifest／CLI相対配置を保持する。RID、SDK／CLI版、CLI SHA-256の検証とPATH fallback禁止を維持し、独自launcherによる引数組み直しやresolverの検証緩和を行わない。
+- Windowsでは.NET標準hostが起動前に通常`%TEMP%/.net/<app>/<bundle-id>/`配下へ内容を展開する。1ファイル配布は「ディスク上でも1ファイル」「痕跡なし」を意味しない。`DOTNET_BUNDLE_EXTRACT_BASE_DIR`は試験の隔離に使えるが、利用者の設定や独自環境変数・API keyを要求しない。
+- 標準hostのcache再利用・欠落復元・並行起動処理を利用し、独自の展開／cache／locking engine、cache管理UI、自動掃除を追加しない。標準抽出を全cached fileの暗号学的検証とみなさず、CLI integrity検証を残し、別権限userから書換え可能な抽出先を対応済みとしない。
+- cacheはアプリ配置用であり、input／final／partialの保存先にしない。既定出力先は従来どおり入力隣接の`result`とし、配布・展開・起動のためにworkbookを移動・削除しない。checkpoint形式と同じ製品版・runtime identityのEXE／ZIP間の既存再開条件を維持する。§9〜10のatomic finalizationと完成成功後のpartial cleanupは変更しない。
+
+### 13.6 公開matrix v2とcandidate拘束
+
+新経路の公開はmachine-readable matrix v2を使い、次の3行だけのclosed setとする。v1は過去の契約として残し、unknown／duplicate／missing rowを受け入れない。
+
+| Required row | artifact／sidecar | publish | 必要な証跡 |
+|---|---|---|---|
+| Windows x64単一EXE | `StudyReportEvaluator-win-x64.exe` / `StudyReportEvaluator-win-x64.exe.sha256` | `true` | package required testsとexact EXEのCH-01〜06 |
+| Windows x64 ZIP | `StudyReportEvaluator-win-x64.zip` / `StudyReportEvaluator-win-x64.zip.sha256` | `true` | 既存ZIPのpackage／clean extract／起動／CLI／data保護のrequired tests |
+| Windows x64 development MSIX | candidateで実物検証したartifact／sidecarのdescriptor | `false` | 既存範囲の`PASS_MECHANISM`検証記録 |
+
+1. 順序は**候補生成 → exact EXEのclean-host試験 → protected publish時のv2最終matrix確定**とする。candidate生成時に未実施のclean-host結果や公開可能matrixを生成しない。candidateのpackage／mechanism required testsを満たした後に限り、EXE／ZIPと各sidecarの計4 assetをdraftへ添付する。publicのassetも同じ4個だけとする。
+2. EXE／ZIPは同じsource commit、製品版、SDK／CLI版から作る。candidate run ID／commit、artifact basename／bytes／SHA-256、sidecar、package evidence、clean-host evidenceを同じ成果物へ結び付ける。doc同梱や版変更等で最終EXEのbytesが変われば、以前のclean-host結果を流用せず再package・再検証する。
+3. development MSIXは同じcandidate runで実物検証した結果とartifact／sidecar descriptorを既存の内部control artifactに保存する。本体をGitHub ReleaseにもActions artifactにもuploadしない。公開時はcandidateに拘束された記録を照合し、MSIX本体を再取得・再作成・再検証したと扱わない。
+4. clean-host担当者は当該candidateのEXEで試験し、candidate run ID／commit、EXE basename／bytes／SHA-256／製品版を含むmetadata限定のclosed JSONを作る。OS edition／build／architecture、標準user、追加依存・保護状態、実build SDK／bundled runtime／Copilot SDK・CLIの版とCLI hash、試験ID別結果と操作数、実施記録の参照／hashを記録し、username、token、device code、学生本文、環境変数値一覧、生ログを含めない。公開前に製品repositoryへcommitしない。
+5. 既存protected publish workflowの`clean_host_evidence_json`入力でJSONを受け、環境変数経由で一時file化し、型・長さ・許可field・必須試験IDを検証する。workflow式をshell本文へ直接埋め込まない。新しいstorage／workflow／証跡基盤を作らず、人の試験記録であることを明記し、hash一致だけで実施事実が自動証明されたとしない。
+6. protected publishはcandidateが指定repositoryの`release.yml`による成功runであることとtag commitの一致を確認する。EXE／ZIPの4 assetを再downloadしてversion／bytes／hash／sidecarを照合し、MSIXは同runの検証記録とdescriptorを照合する。v2最終matrixと受領JSONは内部control artifactへ保存し、public assetへ含めない。
+7. 既存Core／App／packageのrequired testsと§13.7の必須試験がすべてPASSの場合だけ公開可能とする。必須試験の欠落・FAIL・NOT_RUN、別candidate／source／version／hashの証跡、sidecar不一致を拒否する。unsignedの`PASS_REQUIRED`は署名・installer等の`PASS_PRODUCTION`を意味しない。tag／push／draft／public Releaseの操作承認は実装承認から分離する。public化にはprotected environmentの公開承認を要求する。
+
+### 13.7 clean-host公開必須試験
+
+fresh Windows 11 x64実機またはVMの標準userでexact EXEを試験する。開発hostのPATH／.NET環境変数隔離やhosted CI成功をOS-only証跡にしない。guestに検証用SDKやPowerShellを導入してからOS-onlyと呼ばず、OS付属.NET Framework等と追加.NET Runtimeを区別する。EXE size、展開容量、初回／再起動の所要時間は実測を記録し、数値SLAは設けない。
+
+| ID | 内容 | 公開条件 |
+|---|---|---|
+| CH-01 | OS edition／build／x64、fresh標準user、.NET SDK／Runtime、PowerShell 6+、Node／npm、Git／gh、別Copilot CLI、Office、IDEの未導入を確認 | 必須PASS |
+| CH-02 | EXE1個だけからofflineで入力画面、Excel読込、設計を利用。sidecar／repository／隣接file／既存CLI cache・認証に依存しない | 必須PASS。保護機能による実行拒否を起動成功としない |
+| CH-03 | 同梱CLIのStart／Ping／auth状態確認を外部PowerShell／Node／Git／gh／CLIなしで実行 | 必須PASS。正常な未認証応答とruntime failureを区別 |
+| CH-04 | 移動、再起動、同時起動、任意cwd／起動引数、日本語・空白path、read-onlyなEXE配置先、cache欠落からの復元、data保護 | 必須PASS |
+| CH-05 | 標準ブラウザーで取得したMOTW付きEXEのSmartScreen／SAC／企業policy状態、警告・拒否、実際の操作数を記録し承認範囲と比較 | 必須PASS。無警告を一律要求せず、警告や追加操作を隠して1操作成功へ丸めない |
+| CH-06 | fresh userの本人login、既存buttonでの完了後・再起動後の再確認、取消／アプリ終了時の当該login processだけの終了と他process／data／credential保護 | D-06採用済みのため必須PASS。JSONで任意化・N/A化しない |
+| ADV-01 | 本人が明示承認したsynthetic入力による実AI評価 | 任意。NOT_RUN可。必須GUI／CLI／login試験の代替にしない |
+| ADV-02 | Office等の外部spreadsheetによる再計算 | 従来どおり任意。NOT_RUN可 |
+
+fake／help／process終了だけの成功はCH-06の本人認証に代用しない。必須試験未実施は公開を拒否するが、ADV-01／02のNOT_RUNを必須試験の失敗へ変換しない。
+
 ## 14. privacy・security・安全境界
 
 - AIへ送るworkbook由来の値は、現在行の選択済みprimary/supporting/special sourceだけとする。
@@ -625,6 +696,9 @@ run開始時、完成名に対応する次のfileを作る。
 - outputとpartial workbookは元本全体、Prompt、AI結果を保持するため、元本と同等以上に機密として扱う。
 - app-owned cloud backend、database、telemetry本文送信を追加しない。
 - checkpointは暗号化containerではない。保存先のaccess controlは利用者のOS権限に従う。
+- runtime抽出cacheと利用者workbook／CLI credential storeを分離する。配布・展開・起動のために利用者workbookを移動・削除しない。アプリはcacheの再帰削除、旧版の自動掃除、credential削除を行わない。
+- loginでは検証済みCLIとブラウザーに本人認証を委譲し、アプリはtoken／device code等を収集・解析・保存・log出力しない。取消／アプリ終了による終了対象は§11.3の所有login processだけとする。
+- Windowsの保護設定を変更せず、実行拒否を回避しない。公開用evidenceも§13.6のmetadataに限定し、利用者本文やcredentialをcontrol artifact／公開物へ混入させない。
 
 ## 15. performance・capacity
 
@@ -659,7 +733,7 @@ run開始時、完成名に対応する次のfileを作る。
 
 ## 17. Scope
 
-### 17.1 v4.4 required scope
+### 17.1 v4.5 required scope
 
 - Windows 11 x64
 - RID別.NET 10 self-contained app
@@ -671,9 +745,12 @@ run開始時、完成名に対応する次のfileを作る。
 - Excel-owned formulas
 - per-student-row `.partial.xlsx` checkpoint and process-restart resume
 - GUI prefill from input/Prompt text command-line options
-- Windows self-contained unsigned ZIPとSHA-256 sidecar
+- App限定の.NET標準single-file全内容展開によるWindows self-contained unsigned EXEとSHA-256 sidecarを主配布へ追加
+- Windows self-contained unsigned ZIPとSHA-256 sidecarを代替として維持
+- D-06採用による同梱CLIの明示login開始・取消・既存buttonでの認証再確認
 - non-public development MSIXのpackage/unpack/integrity `PASS_MECHANISM` evidence
 - clean extract、apphost起動、bundled CLI identityのWindows evidence
+- exact EXEのclean-host CH-01〜06と、EXE／ZIP／development MSIXのclosed 3-row matrix v2による公開判定
 - teacher, operator, engineer documentation and actual synthetic screenshots
 
 ### 17.2 out of scope
@@ -691,6 +768,10 @@ run開始時、完成名に対応する次のfileを作る。
 - automatic AI run from command-line arguments
 - production-signed/public MSIX、Developer ID/notarized DMG、Microsoft Store、Mac App Store
 - end-user primary pathとしてのPowerShell／shell setup script
+- 新しいproduction project／application、独自launcher／自己展開engine、汎用process runner／認証provider、将来用の拡張点
+- online bootstrap、auto-update／差分更新、独自cache／locking engine、cache管理UI、runtime cacheの自動cleanup
+- 新規installer、既存development MSIXの機能拡張、registry／PATH恒久変更、file association、保護機能の回避
+- token入力UI、独自OAuth／WebView／callback server、依頼に伴うSDK／CLI／Avalonia更新、Native AOT化、trimming全面適用
 
 ## 18. Acceptance criteria
 
@@ -716,16 +797,24 @@ run開始時、完成名に対応する次のfileを作る。
 | AC-018 | `--input`と複数`--prompt`でGUIを事前入力し、利用者操作なしにAI実行しない。 |
 | AC-019 | selected same-row dataだけをAIへ送り、本文／Prompt／reason／evidence／credentialをlogへ残さない。 |
 | AC-020 | 移行中もWindows 11 x64 self-contained unsigned ZIPがcleanな展開先で起動し、SHA-256 sidecarとbundled CLI identityを検証できる。 |
-| AC-021 | `PASS_PRODUCTION`がないplatform、architecture、installer、signing、notarizationを対応済みとして表示しない。 |
+| AC-021 | `PASS_PRODUCTION`がないplatform、architecture、installer、signing、notarizationを対応済みとして表示しない。ただし本版のunsigned Windows EXE／ZIPは§13.6〜13.7の`PASS_REQUIRED`を公開判定とし、署名・installer・notarization等のproduction trustを満たしたとは表示しない。 |
 | AC-022 | README、教師tutorial、Prompt例、install、privacy、troubleshooting、開発設計、実画面screenshotsを現行UIとcurrent delivery evidenceへ同期する。 |
 | AC-023 | Windows x64 development MSIXを作成・unpackし、manifest/version/RID、block map、payload、bundled CLI、SHA-256 sidecar、test-only identityを検証し、一般配布しない。 |
 | AC-024 | macOS publish/sign/notary source foundationのstatic contractを検証し、native production evidenceなしにartifactまたはsupport claimを公開しない。 |
 | AC-025 | macOS scriptがnested sign、shipped CLI hash、outer sign、notary log、app／DMG staple、strict verificationの順序を要求する。実行結果は現版のrequired acceptanceにしない。 |
-| AC-026 | Windows public ZIPの取得、SHA-256確認、展開、起動を文書化し、.NET Runtime／SDK、別Copilot CLI、Officeを要求しない。development MSIXを一般利用者手順へ含めない。 |
-| AC-027 | public ZIP/packageとdevelopment MSIXにsample、利用者入力、final、partialを含めず、package作成・展開・起動で利用者workbookを変更・削除しない。 |
-| AC-028 | release workflowはmachine-readable matrixで`publish=true`かつrequired statusを満たすartifactだけをdraftへ添付・公開し、development MSIX、secret、未実測claimを漏らさない。初回required rowはWindows ZIPとする。 |
+| AC-026 | Windows public EXEを主導線、ZIPの取得・展開・起動を代替として文書化する。sidecar公開とCIのexact hash検証は必須、利用者の手動比較は任意推奨、sidecarはEXE起動の前提にしない。.NET Runtime／SDK、PowerShell／Node／Git／gh、別Copilot CLI、Officeの導入やsetup scriptをGUI起動に要求せず、development MSIXを一般利用者手順へ含めない。 |
+| AC-027 | public EXE／ZIP/packageとdevelopment MSIXにsample、利用者入力、final、partialを含めず、package作成・展開・起動で利用者workbookを変更・削除しない。 |
+| AC-028 | release workflowはcandidateのpackage／mechanism required testsを満たしたEXE／ZIPと各sidecarの4 assetだけをdraftへ添付する。exact EXEの必須clean-host結果を照合したprotected publish時にEXE／ZIP／non-public development MSIXのclosed 3行でmatrix v2を確定し、`publish=true`かつrequired statusを満たすartifactだけを公開する。development MSIX本体・secret・未実測claimを漏らさない。 |
+| AC-029 | OSのみのfresh Windows 11 x64・標準userで、取得済みEXE1個を開く1起動gestureからofflineで入力画面を表示し、手動展開・追加導入・昇格を要求しない。OS警告・拒否・実操作数は別途記録し、無条件・無警告を保証しない。 |
+| AC-030 | 単一EXEに.NET/native依存・固定CLI・manifest・既存公開docs／画像／LICENSEを含め、外部PATH／SDKやsidecarに依存せず既存CLI integrity検証を維持する。App限定profileとCore／Appの2 production projectを維持する。 |
+| AC-031 | EXE／ZIPで任意cwd、日本語・空白path、相対`--input`、複数`--prompt`、既存invalid入力・明示適用の契約を維持する。起動によるAI送信は0件で、EXE配置先や抽出先へcwd基準を変えない。 |
+| AC-032 | 初回・再起動・同時起動・cache欠落・抽出中断・容量／権限不足でも利用者input／final／partialを変更・削除しない。cacheとdataを分離し、既定result位置と同版EXE／ZIP間の既存checkpoint再開条件を維持する。 |
+| AC-033 | 本人のbutton操作だけで検証済み同梱CLIのloginを直接開始し、shellを介さずcredential／device codeを収集しない。二重開始・評価中開始を防ぎ、取消・失敗後もGUIを継続する。取消／アプリ終了時だけ所有login processを終了し、ブラウザー・他CLI・credentialに触れず、既存buttonで再確認する。自動AI実行しない。 |
+| AC-034 | candidate run／source／version／bytes／hashに拘束されたexact EXEとCH-01〜06のPASSが一致した場合だけ新経路をprotected publishする。metadata限定JSON、candidate-bound MSIX検証記録、4 public assetsの再download照合を要求し、必須試験の欠落・FAIL・NOT_RUN・差替えを拒否する。未実測のOS-only／署名／installer claimを出さない。 |
 
 ## 19. Test requirements
+
+以下の番号は追跡ID `TR-01`〜`TR-33`に対応する。既存1〜29の番号・意味を維持し、30〜33を追加する。新経路の試験成功を本書の承認だけで付与しない。
 
 1. Microsoft Forms型、Google Forms型、question row 1/2の匿名化synthetic workbook test。各rowで主回答列変更後の設問textが同列の交差セル値へ一致すること、および質問文行変更後・metadata再読込前は旧行の値を反映せず`HEADER_METADATA_MISMATCH`で再読込を要求することを含む。
 2. sample identity、sheet、dimension、F〜K role suggestion、input不変test。
@@ -756,16 +845,26 @@ run開始時、完成名に対応する次のfileを作る。
 27. macOS scriptがhardened runtime、nested/outer signature、secure timestamp、notary log、staple、DMG integrity、quarantine launchをproduction evidenceとして要求することのcontract test。
 28. Windows ZIPのclean extract/apphost/bundled CLI/input不変と、development MSIX packageに利用者workbookを含めないことのE2E／package test。
 29. Windows ZIPをrequired publish row、development MSIXをnon-public mechanism rowとして扱うmatrix、secret isolation、public candidate re-download、未実測artifact非公開のrelease workflow test。
+30. App限定single-file profile／locked restore／publishと最終EXEのpackage test。固定version、restore／publish条件一致、通常ZIP／Core／macOSへの非適用、AMD64／版、実行必須file1個、symbols除外、native／CLI／manifest integrity、docs／画像／LICENSE allowlist、禁止物非混入、sidecarのfinal bytes一致とsidecarなし起動を検証する（AC-029／030）。
+31. 実EXEの初回／再起動／同時起動／cache欠落復元／抽出中断／容量・権限不足、移動・read-only配置、任意cwd・日本語／空白・相対path・複数Prompt・invalid引数・明示適用・no-auto-run test。synthetic input／既存final／partialのhash・size・時刻不変、default result位置、同版EXE／ZIPのcheckpoint互換を検証する。実施できないfaultをPASSにしない（AC-031／032）。
+32. login専用service／Execution UIのdeterministic test。検証済み絶対CLI／固定login引数だけの直接起動、shell非使用、token／device code非収集・非log、本人操作まで未開始、二重開始／評価中開始防止、失敗・取消後のGUI継続と再試行、取消／app close時の所有process限定終了、ブラウザー／他CLI／credential非干渉、既存buttonでの再確認、no-auto-run、login前後のCLI identity維持、keyboard／Automation ID／200% scaleを検証する。本人loginの実測はCH-06として分離する（AC-033）。
+33. exact candidate EXEのfresh OS試験CH-01〜06と公開境界test。matrix v2のclosed 3行／public 4 assets、candidate workflow／run／source／version／hash／sidecar拘束、metadata限定JSONの型・長さ・許可field、MSIXのcandidate検証記録のみ受渡し・本体非upload、再download照合後の最終matrix確定を検証する。unknown／duplicate／missing row、必須試験欠落・FAIL・NOT_RUN、CH-06の任意化、別EXE証跡、機微field、MSIX公開を拒否し、ADV-01／02のNOT_RUNは許容する。開発host／fake成功をclean-host／本人認証の代用にしない（AC-028／029／034）。
 
 ## 20. 外部仕様出典
 
 本要求の実装時は、固定するversionの一次資料を再確認する。
 
+2026-09-06のdelivery追補ではsingle-file互換モードの非推奨注意、Windows保護、CLI本人認証の境界を確認した。一般仕様は本製品のclean-host／login成功証拠ではない。GitHubの最新main資料の構成・API・optionを固定SDK `1.0.11`／CLI `1.0.79`へそのまま適用せず、固定版のhelpと実測で確認する。
+
 - GitHub Copilot SDK: [Getting started](https://github.com/github/copilot-sdk/blob/main/docs/getting-started.md)
 - GitHub Copilot SDK: [Bundled CLI](https://github.com/github/copilot-sdk/blob/main/docs/setup/bundled-cli.md)
+- GitHub Copilot CLI: [Authenticating GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli)
 - GitHub Copilot SDK: [Session persistence](https://github.com/github/copilot-sdk/blob/main/docs/features/session-persistence.md)
 - Avalonia: [File dialogs](https://github.com/AvaloniaUI/avalonia-docs/blob/main/docs/services/file-dialogs.md)
 - Microsoft: [.NET application publishing overview](https://learn.microsoft.com/dotnet/core/deploying/)
+- Microsoft: [Single-file deployment overview](https://learn.microsoft.com/dotnet/core/deploying/single-file/overview)
+- Microsoft: [dotnet publish](https://learn.microsoft.com/dotnet/core/tools/dotnet-publish)
+- Microsoft: [SmartScreen reputation](https://learn.microsoft.com/windows/apps/package-and-deploy/smartscreen-reputation)
 - Microsoft: [.NET RID catalog](https://learn.microsoft.com/dotnet/core/rid-catalog)
 - Microsoft: [Choose a Windows app distribution path](https://learn.microsoft.com/windows/apps/package-and-deploy/choose-distribution-path)
 - Microsoft: [Sign an MSIX package](https://learn.microsoft.com/windows/msix/package/signing-package-overview)
@@ -790,9 +889,12 @@ run開始時、完成名に対応する次のfileを作る。
 | Checkpoint/resume | App workflow + workbook adapter |
 | Prompt-file launch | App composition + Design UI |
 | Warning/progress/results | App UI |
-| Windows delivery | public ZIP publish/package tests + development MSIX mechanism tests |
+| Windows delivery | App限定single-file profile／EXE package（AC-030、TR-30）+ 既存public ZIP publish/package tests + development MSIX mechanism tests |
+| 標準抽出・起動引数・data保護 | .NET標準host + 既存App起動契約 + 実EXE package tests（AC-031／032、TR-31） |
+| Login開始・取消・終了 | bundled login専用service + Execution UI（AC-033、TR-32）。本人認証はCH-06 |
 | macOS source foundation | macOS publish/package/sign/notary static contract tests |
-| Platform release matrix | protected CI/release workflow + machine-readable evidence |
+| OS-only実測 | fresh Windows 11 x64標準userでのexact EXE CH-01〜06（AC-029／034、TR-33） |
+| Platform release matrix | 既存protected CI/release workflow + candidate-bound v2 matrix／metadata evidence（AC-028／034、TR-29／33） |
 | User/developer documentation | docs + dev/docs + screenshot tests |
 
 ## 22. Approval record
@@ -806,7 +908,10 @@ run開始時、完成名に対応する次のfileを作る。
 | Sample consolidation source | 2026-09-03の`sample/SampleReport.xlsx`を唯一のsampleとして扱う要求所有者指示 |
 | Setup simplification source | 2026-09-03の「WindowsとMac OSでのセットアップをシンプルに」「不明点はデフォルトのプラン」「全てのタスクを実行」指示 |
 | Question text synchronization source | 2026-09-05の「主回答列を選択したら、その列のExcelのシートの値を設問 textに表示」要求所有者指示 |
-| Delivery decision | [ADR-0015](../dev/docs/adr/0015-windows-macos-installer-delivery.md) |
-| Approved scope | 本書§1〜§21。既存機能、Windows unsigned ZIP公開、non-public development MSIX mechanism、Windows ZIP release matrixを含む。macOS production deliveryは現版scope外 |
+| One-action startup approval source | 2026-09-06の[1操作起動プラン](../work/20260906-0617-one-action-startup-plan.md)のデフォルト案・全タスク実行承認と[実行上書き](../work/20260906-one-action-startup-execution.md)。D-06のlogin buttonは採用済み。元プランの未承認表記ではなく、この後続承認・最新指示を優先する |
+| Delivery decision | [ADR-0015](../dev/docs/adr/0015-windows-macos-installer-delivery.md)の履歴を保持し、[ADR-0016](../dev/docs/adr/0016-windows-one-action-startup.md)で単一EXE主配布・ZIP代替・標準全内容展開・login導線・matrix v2を追加 |
+| Approved scope | 本書§1〜§21の要求。既存業務・入力・採点・数式・checkpoint・privacy、Windows unsigned EXE／ZIPと各sidecar、既存non-public development MSIX回帰、exact EXE clean-host公開gateを含む。macOS source/staticは変更せずproduction deliveryはscope外 |
 | Delivery scope revision | 2026-09-04の要求所有者指示「開発用のMSIXでOKです」「外部ブロッカーの情報はないです」 |
-| Meaning | repository要求baselineの承認記録。組織の法務・教育・security承認または電子署名を意味しない |
+| Latest version / changelog override | D-14／R03の予定MINOR更新を取り消す最新指示を優先し、実装・文書task完了後のR03でKeep a Changelog形式のUnreleasedへ概要・実装済み変更を追加して、製品版をPATCH `0.8.3` → `0.8.4`とした。R03後の最終artifact再検証を要求し、版変更だけを公開成功へ読み替えない。要求文書v4.5を製品版や公開版と混同しない |
+| Implementation / validation status | 要求承認済み・実装進行中。S01/G1は開発hostでの固定version機構適合のみ。clean-host／本人loginはNOT_RUNであり、新EXEの公開条件は未達 |
+| Meaning | repository要求baselineの承認記録。実装完了・試験成功・release存在・tag／push／draft／公開操作の承認、組織の法務・教育・security承認または電子署名を意味しない |

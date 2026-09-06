@@ -1,15 +1,15 @@
-# Requirement traceability — v4.4 input synchronization baseline
+# Requirement traceability — v4.5 one-action startup delta on v4.4 baseline
 
 | 項目 | 値 |
 |---|---|
-| Requirement | `docs/requirements-definition.md` v4.4 |
-| Decision | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence） |
+| Requirement | `docs/requirements-definition.md` v4.5（特にAC-029〜034、TR-30〜33、§13.6/§13.7） |
+| Decision | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence）/ ADR-0016（Windows単一EXE 1操作起動） |
 | Detailed design | `dev/docs/detailed-design.md` |
 | Plan | `work/20260904-publication-remediation-plan.md` |
 | Previous validation | delivery変更前 Release build warning/error 0、full 670/670 PASS（Core 190 / App 480）。現在の0.8.0 delivery evidenceへ流用しない |
 | Recorded focused validation | 2026-09-05: InputViewTests 21、WorkbookMetadataReaderTests 11、ColumnMappingSuggesterTests 14、計46/46 PASS。DocumentationContractTests 14/14 PASS |
 | Audited full required validation | 2026-09-05、source `20c8121`のbaseline: Core 190 + App deterministic 524 + sample構造 1 + Windows ZIP 3 = 718/718 PASS（App計528、failed 0、skipped 0）。opt-inの未実行経路を含む |
-| Current status | 監査済み`20c8121`のv4.4 baselineはPASS。現行`0.8.3` candidateはUNRELEASED、公開済みreleaseは`v0.8.1`。今回修正版の最終判定は以下のreview summaryと対象sourceの照合で行う |
+| Current status | 監査済み`20c8121`のv4.4／`0.8.3` baselineはPASS。現行`0.8.4` candidateはUNRELEASED、公開済みreleaseは`v0.8.1`（ZIP）。R03後の最終artifact再検証、clean-host／本人loginの新規公開判定は未完了。 |
 
 この表の`PLANNED`は未実装をPASSと称しない。task完了後にproduction symbol、direct test、gate identityへ更新する。旧v3 traceabilityはGit履歴とADR-0011に保持する。
 
@@ -48,6 +48,17 @@ AC-024／AC-025とTR-26／TR-27の`PASS_REQUIRED`は、現版でrequiredなmacOS
 
 AC-028／TR-29では、公開済み`v0.8.1`のdraft asset／matrix hash照合・公開後の認証なしre-downloadという履歴と、`20c8121`（`0.8.3`）のlocal matrix生成・semantic検証／workflow contract testのbaselineを区別する。後者は`0.8.3`の公開workflowや公開後re-downloadの完了を示さない。
 
+AC-029〜034／TR-30〜33は、deterministic test・開発host観測（P07）・fresh Windows clean-host本人実測（V02）・protected publish contract（C05/C06）を分離して判定する。既存PASS（ZIP経路、fake認証、開発host観測）をfresh OS/MOTW/本人loginの新経路PASSへ転記しない。
+
+## One-action startup owner split（D03）
+
+| Owner | Scope | Exact automated anchors |
+|---|---|---|
+| deterministic package/UI/fake tests | source contract、package layout、起動契約、UI/login serviceの非本人経路 | `StudyReportEvaluator.App.Tests.Packaging.WindowsSingleFileProfileTests.Windows_single_file_profile_scopes_all_declarations_to_the_app` / `Windows_single_file_profile_declares_standard_self_contained_settings_once` / `Windows_single_file_profile_registers_only_the_exact_safe_public_allowlist` / `StudyReportEvaluator.App.Tests.Packaging.WindowsSingleFilePublishTests.Single_file_publish_script_parses_and_preserves_the_default_folder_flow` / `Publish_mode_uses_the_full_app_profile_only_when_opted_in` / `Extracted_bundle_layout_reuses_integrity_checks_without_requiring_static_host_files` / `Single_file_probe_environment_owns_cache_home_and_trace_without_inherited_secrets` / `StudyReportEvaluator.App.Tests.Packaging.WindowsSingleFileArtifactTests.Copy_unit_preserves_exact_bytes_generates_exact_hash_and_repackages_without_touching_workbooks` / `StudyReportEvaluator.App.Tests.Packaging.WindowsSingleFilePackageTests.Single_file_cold_and_warm_start_validate_payload_and_show_input` / `Single_file_relative_input_and_two_prompts_are_observed_in_GUI_order` / `Single_file_two_instances_share_cache_and_close_independently` / `Single_file_missing_cached_CLI_is_recovered_by_the_standard_host` / `Single_file_deleted_cache_is_reextracted_after_moving_the_EXE` / `Single_file_file_valued_extraction_base_fails_without_changing_data` / `Single_file_truncated_bundle_reports_a_host_error_without_changing_data` / `StudyReportEvaluator.App.Tests.Copilot.BundledCopilotLoginServiceTests.Login_uses_only_the_explicit_path_fixed_arguments_and_unredirected_console` / `Cancellation_stops_only_owned_login_and_allows_retry_even_when_wait_ignores_token` / `StudyReportEvaluator.App.Tests.UI.CopilotLoginCommandTests.Login_invalidates_old_identity_and_exit_zero_requires_explicit_authentication_check` / `Cancel_command_stops_only_owned_login_once_and_retry_remains_explicit` / `Run_and_run_cancellation_exclude_login_and_login_preserves_completed_run_state` |
+| P07 development-host evidence | 開発host上の単一EXE実測を機構証跡として固定（clean-host代替不可） | `StudyReportEvaluator.App.Tests.Packaging.ReleaseMatrixBuilderTests.Candidate_generation_is_exact_and_passes_the_public_C02_candidate_CLI`（`PASS_CANDIDATE`拘束）/ 同fixtureの`CreateP07Evidence`由来7件（`WindowsSingleFilePackageTests`メソッド群） |
+| V02 human fresh Windows clean-host/login tests | fresh OS、MOTW/保護観測、本人login、任意live AIの実測 | automation未接続（human-run）。`CH-01..06` と `ADV-01/02` は `windows-singlefile-clean-host.evidence.json` の受領・検証対象であり、現時点では `NOT_RUN`/`NOT_RUN_EXTERNAL_PREREQUISITE` |
+| C05/C06 protected workflow contracts | candidate拘束、matrix v2閉集合、public 4 assets、CH必須、MSIX非公開、publish保護 | `StudyReportEvaluator.App.Tests.Packaging.ReleaseWorkflowContractTests.Candidate_workflow_is_manual_stable_tag_only_and_never_publishes` / `Candidate_workflow_uses_exact_control_and_public_artifact_sets_with_no_msix_binary` / `Publish_workflow_requires_protected_environment_permissions_and_clean_host_json_via_env_only` / `Publish_workflow_binds_candidate_run_to_repository_event_workflow_path_conclusion_and_sha` / `Publish_workflow_enforces_exact_control_and_draft_asset_sets_invokes_c03_final_and_uploads_before_publish` / `Publish_workflow_revalidates_current_draft_bytes_and_asset_identity_in_the_publish_step` / `StudyReportEvaluator.App.Tests.Packaging.ReleaseMatrixContractTests.V2_rejects_broken_schema_or_semantic_closure`（`ch06-not-run`/`ch06-fail`/`ch06-na`拒否、`ADV-01/02` NOT_RUN許容） |
+
 ## Acceptance criteria mapping
 
 | AC | Requirement surface | Production task | Required test owner | Status |
@@ -80,6 +91,12 @@ AC-028／TR-29では、公開済み`v0.8.1`のdraft asset／matrix hash照合・
 | AC-026 | Windows ZIP取得/hash/展開/起動docs | P-01/D-01..05 | ZIP journey + docs contract | PASS_REQUIRED |
 | AC-027 | public/development packageにuser workbookを含めない | P-01/P-02 | package layout + input identity | PASS_REQUIRED |
 | AC-028 | publish flag/status matrixとrelease boundary | P-04 | workflow contract + release evidence | PASS_REQUIRED |
+| AC-029 | fresh Windows 11 x64標準user、取得済みEXE1個からoffline入力画面（1起動gesture）。警告/拒否/操作数は別記し、無警告保証しない | V-02 | deterministic: `WindowsSingleFilePackageTests.Single_file_cold_and_warm_start_validate_payload_and_show_input`（開発host）/ protected boundary: `ReleaseMatrixContractTests.V2_rejects_broken_schema_or_semantic_closure`（`os-build`等）/ human required: CH-01, CH-02, CH-05 | NOT_RUN_EXTERNAL_PREREQUISITE |
+| AC-030 | App限定single-file profile、依存/CLI/manifest/docs allowlist同梱、PATH/SDK非依存、2 production project維持 | P-01/P-02 | `WindowsSingleFileProfileTests.*`（4件）+ `WindowsSingleFilePublishTests.Single_file_publish_script_parses_and_preserves_the_default_folder_flow` / `Publish_mode_uses_the_full_app_profile_only_when_opted_in` / `Extracted_bundle_layout_reuses_integrity_checks_without_requiring_static_host_files` + `WindowsSingleFileArtifactTests.Copy_unit_preserves_exact_bytes_generates_exact_hash_and_repackages_without_touching_workbooks` | PASS_REQUIRED |
+| AC-031 | EXE/ZIPでcwd・日本語/空白path・相対`--input`・複数`--prompt`・invalid入力・明示適用・no-auto-run維持 | P-06/L-01/U-02 | `WindowsSingleFilePackageTests.Single_file_relative_input_and_two_prompts_are_observed_in_GUI_order` + `WindowsSingleFilePackageTests.Single_file_two_instances_share_cache_and_close_independently`（cwd/同時起動）+ Launch options既存required regressions（TR-18） | PASS_REQUIRED |
+| AC-032 | 初回/再起動/同時起動/cache欠落/抽出障害でdata保護、result位置維持、同版EXE/ZIP再開条件維持 | P-06/W-02 | `WindowsSingleFilePackageTests.Single_file_missing_cached_CLI_is_recovered_by_the_standard_host` / `Single_file_deleted_cache_is_reextracted_after_moving_the_EXE` / `Single_file_file_valued_extraction_base_fails_without_changing_data` / `Single_file_truncated_bundle_reports_a_host_error_without_changing_data`（注: disk-full/ACL/抽出中断は未実施） | NOT_RUN_CURRENT_CANDIDATE |
+| AC-033 | button起点の同梱CLI login開始、shell非使用、token非収集、排他/取消/失敗後継続、所有process限定終了、既存button再確認、自動AI実行なし | A-01/A-02/A-03/V-02 | deterministic: `BundledCopilotLoginServiceTests.Login_uses_only_the_explicit_path_fixed_arguments_and_unredirected_console` / `Cancellation_stops_only_owned_login_and_allows_retry_even_when_wait_ignores_token` / `Dispose_stops_owned_process_synchronously_without_touching_another_service` + `CopilotLoginCommandTests.Login_invalidates_old_identity_and_exit_zero_requires_explicit_authentication_check` / `Cancel_command_stops_only_owned_login_once_and_retry_remains_explicit` / `Run_and_run_cancellation_exclude_login_and_login_preserves_completed_run_state`; human required: CH-06本人login | NOT_RUN_EXTERNAL_PREREQUISITE |
+| AC-034 | candidate/source/version/hash拘束、CH-01..06必須、metadata限定JSON、MSIX本体非公開、public 4 assets再download照合、欠落/FAIL/NOT_RUN拒否 | C-01/C-02/C-05/C-06/V-02 | `ReleaseMatrixBuilderTests.Final_generation_projects_exact_rows_and_passes_C02_without_the_MSIX_binary` + `Final_rejects_required_clean_host_non_pass_and_preserves_prior_candidate_output` + `ReleaseMatrixContractTests.V2_rejects_broken_schema_or_semantic_closure`（`ch06-*`拒否、`missing-clean-host`拒否）+ `ReleaseWorkflowContractTests.Publish_workflow_*`（protected publish contract） | NOT_RUN_EXTERNAL_PREREQUISITE |
 
 ## Test requirement mapping
 
@@ -114,6 +131,10 @@ AC-028／TR-29では、公開済み`v0.8.1`のdraft asset／matrix hash照合・
 | TR-27 | macOS future trust order static contract（source-only） | P-03 | PASS_REQUIRED |
 | TR-28 | Windows ZIP launch/input不変 + MSIX package exclusion | P-01/P-02 | PASS_REQUIRED |
 | TR-29 | publish matrix/secret/public re-download | P-04 | PASS_REQUIRED |
+| TR-30 | App限定single-file profile/lock/publishと最終EXE package integrity（AC-029/030） | deterministic package tests（`WindowsSingleFileProfileTests.*`、`WindowsSingleFilePublishTests.*`、`WindowsSingleFileArtifactTests.*`） | PASS_REQUIRED |
+| TR-31 | 実EXEの再起動/同時起動/cache欠落復元/移動/cwd/日本語path/data保護、未実施faultをPASS扱いしない（AC-031/032） | deterministic package tests（`WindowsSingleFilePackageTests` 7件）+ P07 limitations明示 | NOT_RUN_CURRENT_CANDIDATE |
+| TR-32 | login service/UI deterministic contract。本人login実測はCH-06で分離（AC-033） | deterministic UI/fake tests（`BundledCopilotLoginServiceTests.*`、`CopilotLoginCommandTests.*`） | NOT_RUN_EXTERNAL_PREREQUISITE |
+| TR-33 | exact candidate EXE × CH-01..06 × matrix v2/public境界（AC-028/029/034） | C05/C06 protected workflow contracts（`ReleaseWorkflowContractTests.*`、`ReleaseMatrixContractTests.*`、`ReleaseMatrixBuilderTests.*`）+ V02 human clean-host evidence | NOT_RUN_EXTERNAL_PREREQUISITE |
 
 ## Mandatory safety surfaces
 
@@ -152,8 +173,8 @@ AC-028／TR-29では、公開済み`v0.8.1`のdraft asset／matrix hash照合・
 
 ## Final gate prerequisites
 
-1. AC-001〜028が`PASS_REQUIRED`、`PASS_MECHANISM`、`PASS_PRODUCTION`または正確なblock statusへ更新済み。
-2. TR-01〜29がrequired evidenceまたは正確なexternal statusへ接続済み。
+1. AC-001〜034が`PASS_REQUIRED`、`PASS_MECHANISM`、`PASS_PRODUCTION`または正確なblock statusへ更新済み。
+2. TR-01〜33がrequired evidenceまたは正確なexternal statusへ接続済み。
 3. 全required test、Release build、package testがPASS。
 4. sample input identity不変。
 5. unresolved reproducible blocker/high finding 0。
@@ -162,3 +183,4 @@ AC-028／TR-29では、公開済み`v0.8.1`のdraft asset／matrix hash照合・
 8. macOS、Linux、Windows Arm64、production-signed MSIX、未実測artifactを対応済みと表示していない。
 9. optional live Copilot／spreadsheet recalculationをrequired evidenceへ算入しない。
 10. docsとscreenshotsがcurrent UI、Windows ZIP公開境界、実在assetへ同期。
+11. 公開済みpublic releaseは`v0.8.1` ZIPのままであり、新しい単一EXEはCH-01..06とprotected publish完了まで未公開を維持する。

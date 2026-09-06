@@ -6,8 +6,16 @@ StudyReport Evaluatorの利用者に影響する変更をこのファイルへ�
 
 ### Added
 
+- Windows 11 x64向けに、.NET 10 self-containedのunsigned単一EXEとSHA-256 sidecarを将来の主配布として追加。既存のZIP／sidecarは代替経路として維持。
+- Execution画面に、検証済み同梱Copilot CLIだけを直接起動する「GitHubにログイン」と取消操作を追加。認証成功は既存の状態確認で明示的に再確認。
+- EXE／ZIP／非公開development MSIXをclosed 3行で拘束するmatrix v2と、public 4 assets・clean-host証跡・protected publishのfail-closed contractを追加。
 - 定量化設計の上部に、Base・Special・類似度減点係数の現在値と短い採点計算式を常時表示。設問配点は各カード、詳しい式の説明は展開欄で確認可能。
 - 定量化設計の入力欄、選択欄、主要操作に、設定内容・値の範囲・計算への影響を説明するホバーヘルプを追加。
+
+### Changed
+
+- 利用者の手動SHA-256比較を任意の推奨とし、sidecar公開とCI／公開判定での最終bytes照合は必須のまま維持。
+- 単一EXE候補の公開前に、fresh Windows 11 x64標準userでCH-01〜CH-06を実測し、candidate run／source／version／bytes／hashへ拘束する手順へ変更。
 
 ### Fixed
 

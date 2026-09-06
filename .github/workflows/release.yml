@@ -48,25 +48,31 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          if ($PSVersionTable.PSEdition -cne 'Core' -or $PSVersionTable.PSVersion.Major -lt 7) {
-              throw 'PowerShell Core 7 or later is required.'
+          if ($PSVersionTable.PSEdition -cne 'Core' -or
+              $PSVersionTable.PSVersion -lt [System.Version]'7.5') {
+              throw 'PowerShell Core 7.5 or later is required.'
           }
           if ($env:RELEASE_TAG -cnotmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
               throw "Only stable release tags are supported: $env:RELEASE_TAG"
           }
 
-          $tagCommit = (git rev-list -n 1 $env:RELEASE_TAG).Trim()
-          $headCommit = (git rev-parse HEAD).Trim()
-          if ($LASTEXITCODE -ne 0 -or $tagCommit -cne $headCommit) {
+            $tagCommit = ((& git rev-list -n 1 $env:RELEASE_TAG) | Out-String).Trim()
+            $tagExitCode = $LASTEXITCODE
+            $headCommit = ((& git rev-parse HEAD) | Out-String).Trim()
+            $headExitCode = $LASTEXITCODE
+            if ($tagExitCode -ne 0 -or $headExitCode -ne 0 -or $tagCommit -cne $headCommit) {
               throw 'The requested tag must exist and point to the checked-out commit.'
           }
-          if ((git cat-file -t $env:RELEASE_TAG).Trim() -cne 'tag') {
+            $tagType = ((& git cat-file -t $env:RELEASE_TAG) | Out-String).Trim()
+            if ($LASTEXITCODE -ne 0 -or $tagType -cne 'tag') {
               throw 'The release tag must be annotated.'
           }
-          if (@(git status --porcelain=v1 --untracked-files=all).Count -ne 0) {
+            $sourceStatus = @(& git status --porcelain=v1 --untracked-files=all)
+            if ($LASTEXITCODE -ne 0 -or $sourceStatus.Count -ne 0) {
               throw 'The release checkout must be clean.'
           }
-          if (@(git ls-files -- sample).Count -ne 0) {
+            $trackedSamples = @(& git ls-files -- sample)
+            if ($LASTEXITCODE -ne 0 -or $trackedSamples.Count -ne 0) {
               throw 'The private local sample directory must remain untracked.'
           }
 
@@ -99,7 +105,7 @@ jobs:
           --configuration Release
           --no-build
           --no-restore
-          --filter "FullyQualifiedName!~StudyReportEvaluator.App.Tests.E2E.SampleWorkbookStructuralTests&FullyQualifiedName!~StudyReportEvaluator.App.Tests.Packaging.WindowsPublishPackageTests"
+          --filter "FullyQualifiedName!~StudyReportEvaluator.App.Tests.E2E.SampleWorkbookStructuralTests&FullyQualifiedName!~StudyReportEvaluator.App.Tests.Packaging.WindowsPublishPackageTests&FullyQualifiedName!~StudyReportEvaluator.App.Tests.Packaging.WindowsSingleFilePackageTests"
           --results-directory .\TestResults\release
           --logger "trx"
           --logger "console;verbosity=minimal"
@@ -109,6 +115,38 @@ jobs:
         run: >-
           .\scripts\test-windows-zip.ps1
           -ResultsDirectory .\TestResults\release\windows-zip
+
+      - name: Verify WindowsDesktop runtime for single-file UIA observer
+        shell: pwsh
+        run: |
+          $runtimeMatches = @(
+            dotnet --list-runtimes |
+              Where-Object { $_ -match '^Microsoft\.WindowsDesktop\.App 10\.0\.[0-9]+\s' })
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Failed to query installed .NET runtimes.'
+          }
+          if ($runtimeMatches.Count -eq 0) {
+            throw 'WindowsDesktop runtime 10.0.x is required for single-file UIA observer validation.'
+          }
+
+      - name: Build and validate Windows single-file candidate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & .\scripts\publish-windows.ps1 -SingleFile
+          if (-not $?) {
+            throw 'Single-file publish failed.'
+          }
+
+          & .\scripts\package-windows-singlefile.ps1
+          if (-not $?) {
+            throw 'Single-file packaging failed.'
+          }
+
+          & .\scripts\test-windows-singlefile.ps1 -ResultsDirectory .\TestResults\release\windows-singlefile
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Single-file required validation failed.'
+          }
 
       - name: Verify published binary version
         shell: pwsh
@@ -120,18 +158,28 @@ jobs:
         shell: pwsh
         run: .\scripts\test-windows-msix-unsigned.ps1
 
-      - name: Build and validate the platform release matrix
+      - name: Build and validate candidate release controls
         shell: pwsh
-        run: .\scripts\build-platform-release-matrix.ps1
+        run: >-
+          .\scripts\build-platform-release-matrix.ps1
+          -Mode Candidate
+          -ExpectedRepository $env:GITHUB_REPOSITORY
+          -CandidateRunId $env:GITHUB_RUN_ID
+          -SingleFileDirectory .\artifacts\package
+          -ZipDirectory .\artifacts\package
+          -MsixDirectory .\artifacts\package\mechanism
+          -OutputDirectory .\artifacts\package\matrix
 
       - name: Upload release control evidence
         uses: actions/upload-artifact@v7
         with:
           name: release-candidate-${{ inputs.tag }}-${{ github.run_id }}
           path: |
-            artifacts/package/matrix/platform-release-matrix.json
-            artifacts/package/StudyReportEvaluator-win-x64.evidence.json
-            artifacts/package/mechanism/StudyReportEvaluator-win-x64.unsigned.test.evidence.json
+            artifacts/package/matrix/release-candidate-record.json
+            artifacts/package/matrix/StudyReportEvaluator-win-x64.exe.evidence.json
+            artifacts/package/matrix/StudyReportEvaluator-win-x64.evidence.json
+            artifacts/package/matrix/StudyReportEvaluator-win-x64.unsigned.test.msix.sha256
+            artifacts/package/matrix/StudyReportEvaluator-win-x64.unsigned.test.evidence.json
           if-no-files-found: error
           retention-days: 30
 
@@ -140,8 +188,10 @@ jobs:
         with:
           name: release-assets-${{ inputs.tag }}-${{ github.run_id }}
           path: |
-            artifacts/package/StudyReportEvaluator-win-x64.zip
-            artifacts/package/StudyReportEvaluator-win-x64.zip.sha256
+            artifacts/package/matrix/StudyReportEvaluator-win-x64.exe
+            artifacts/package/matrix/StudyReportEvaluator-win-x64.exe.sha256
+            artifacts/package/matrix/StudyReportEvaluator-win-x64.zip
+            artifacts/package/matrix/StudyReportEvaluator-win-x64.zip.sha256
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
@@ -182,8 +232,10 @@ jobs:
 
           & gh @(
               'release', 'create', $env:RELEASE_TAG,
-              '.\artifacts\package\StudyReportEvaluator-win-x64.zip',
-              '.\artifacts\package\StudyReportEvaluator-win-x64.zip.sha256',
+              '.\artifacts\package\matrix\StudyReportEvaluator-win-x64.exe',
+              '.\artifacts\package\matrix\StudyReportEvaluator-win-x64.exe.sha256',
+              '.\artifacts\package\matrix\StudyReportEvaluator-win-x64.zip',
+              '.\artifacts\package\matrix\StudyReportEvaluator-win-x64.zip.sha256',
               '--repo', $env:GITHUB_REPOSITORY,
               '--draft',
               '--verify-tag',
@@ -197,12 +249,15 @@ jobs:
               ConvertFrom-Json
           $assetNames = @($draft.assets | ForEach-Object { [string]$_.name } | Sort-Object)
           $expectedAssets = @(
+              'StudyReportEvaluator-win-x64.exe',
+              'StudyReportEvaluator-win-x64.exe.sha256',
               'StudyReportEvaluator-win-x64.zip',
               'StudyReportEvaluator-win-x64.zip.sha256')
           if (-not $draft.isDraft -or
               $assetNames.Count -ne $expectedAssets.Count -or
               @($expectedAssets | Where-Object { $_ -cnotin $assetNames }).Count -ne 0) {
-              throw 'The candidate release must remain a draft that carries exactly the Windows ZIP and its sidecar.'
+              throw 'The candidate release must remain a draft that carries exactly EXE/ZIP public assets and sidecars.'
           }
 
-          Write-Output "Draft $env:RELEASE_TAG created. Publishing requires the protected publish workflow."
+          Write-Output "Draft $env:RELEASE_TAG created with exact EXE/ZIP assets."
+          Write-Output 'PASS_CANDIDATE is non-publishable. Clean-host verification and the protected publish workflow are still required before publication.'

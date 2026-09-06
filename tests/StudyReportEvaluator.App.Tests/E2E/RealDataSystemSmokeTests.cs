@@ -38,7 +38,7 @@ public sealed partial class RealDataSystemSmokeTests
         "STUDY_REPORT_EVALUATOR_SOURCE_COMMIT";
     private const string SourceStatusHashEnvironmentVariable =
         "STUDY_REPORT_EVALUATOR_SOURCE_STATUS_SHA256";
-    private const string RunId = "SYSTEM-TEST-REALDATA-V4-20260901-2205";
+    private const string RunId = "SYSTEM-TEST-REALDATA-V4_5-20260906-D14";
     private const string ExpectedSampleSha256 =
         "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA";
     private const string LocalModelId =
@@ -291,8 +291,8 @@ public sealed partial class RealDataSystemSmokeTests
                     commit = Environment.GetEnvironmentVariable(SourceCommitEnvironmentVariable) ?? "UNRECORDED",
                     worktree_status_sha256 = Environment.GetEnvironmentVariable(SourceStatusHashEnvironmentVariable) ?? "UNRECORDED",
                     test_driver = "tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs",
-                    requirements = "docs/requirements-definition.md v4.4",
-                    system_test_prompt = "SystemTest-prompt.md v4.4",
+                    requirements = "docs/requirements-definition.md v4.5",
+                    system_test_prompt = "SystemTest-prompt.md v4.5",
                 },
                 environment = new
                 {

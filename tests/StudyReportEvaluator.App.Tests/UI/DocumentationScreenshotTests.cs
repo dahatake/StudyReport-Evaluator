@@ -28,6 +28,8 @@ public sealed class DocumentationScreenshotTests
 {
     private const string GenerateEnvironmentVariable =
         "STUDY_REPORT_EVALUATOR_GENERATE_DOC_IMAGES";
+    private const string GenerateExecutionEnvironmentVariable =
+        "STUDY_REPORT_EVALUATOR_GENERATE_EXECUTION_DOC_IMAGE";
     private const string SafeInputPath = @"C:\Synthetic\StudyReport-100x2.xlsx";
     private const int ScreenshotWidth = 1440;
     private const int ScreenshotHeight = 1050;
@@ -110,7 +112,58 @@ public sealed class DocumentationScreenshotTests
         }
     }
 
-    private static async Task GenerateAsync(string imageDirectory)
+    [AvaloniaFact]
+    public async Task Execution_documentation_screenshot_renders_are_repeatable()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "StudyReportEvaluator-ExecutionCaptureRepeat-" + Guid.NewGuid().ToString("N"));
+        string first = Directory.CreateDirectory(Path.Combine(directory, "first")).FullName;
+        string second = Directory.CreateDirectory(Path.Combine(directory, "second")).FullName;
+        string fileName = ScreenshotFileNames[4];
+        try
+        {
+            await GenerateAsync(first, executionOnly: true);
+            await GenerateAsync(second, executionOnly: true);
+            foreach (string renderedDirectory in new[] { first, second })
+            {
+                string path = Assert.Single(Directory.GetFiles(renderedDirectory));
+                Assert.Equal(fileName, Path.GetFileName(path));
+                Assert.True(
+                    new FileInfo(path).Length > 10_000,
+                    $"Documentation screenshot is unexpectedly small: {fileName}");
+                using Bitmap bitmap = new(path);
+                Assert.Equal(new PixelSize(ScreenshotWidth, ScreenshotHeight), bitmap.PixelSize);
+            }
+
+            string before = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(first, fileName))));
+            string after = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(second, fileName))));
+            Assert.True(before == after, $"Synthetic screenshot is not repeatable: {fileName}");
+
+            // Retain only validated 05 renders for review; never publish to images here,
+            // even when the separate seven-image generation opt-in is also set.
+            if (string.Equals(
+                    Environment.GetEnvironmentVariable(GenerateExecutionEnvironmentVariable),
+                    "1",
+                    StringComparison.Ordinal))
+            {
+                string artifactDirectory = Path.Combine(
+                    FindRepositoryRoot(), "artifacts", "test", "documentation-execution-05");
+                foreach (string render in new[] { "first", "second" })
+                {
+                    string destination = Directory.CreateDirectory(Path.Combine(artifactDirectory, render)).FullName;
+                    File.Copy(
+                        Path.Combine(directory, render, fileName),
+                        Path.Combine(destination, fileName),
+                        overwrite: true);
+                }
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static async Task GenerateAsync(string imageDirectory, bool executionOnly = false)
     {
         using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
             "Original",
@@ -168,8 +221,9 @@ public sealed class DocumentationScreenshotTests
                 EvaluationProgressStatus.Completed));
             return Task.FromResult(summary);
         });
+        RecordingAuthenticationBoundary authentication = new(authenticationSnapshot);
         ExecutionViewModel execution = new(
-            new RecordingAuthenticationBoundary(authenticationSnapshot),
+            authentication,
             runBoundary);
         ResultsOutputViewModel results = new(new RecordingOutputBoundary());
         WorkflowNavigator navigator = new();
@@ -193,13 +247,19 @@ public sealed class DocumentationScreenshotTests
             Render();
             Assert.True(Required<Button>(Assert.Single(
                 window.GetVisualDescendants().OfType<InputView>()), "PickFileButton").IsVisible);
-            Capture(window, imageDirectory, ScreenshotFileNames[0]);
+            if (!executionOnly)
+            {
+                Capture(window, imageDirectory, ScreenshotFileNames[0]);
+            }
 
             InputView inputView = Assert.Single(
                 window.GetVisualDescendants().OfType<InputView>());
             Required<ListBox>(inputView, "InputQuestionList").BringIntoView();
             Render();
-            Capture(window, imageDirectory, ScreenshotFileNames[1]);
+            if (!executionOnly)
+            {
+                Capture(window, imageDirectory, ScreenshotFileNames[1]);
+            }
 
             viewModel.NextCommand.Execute(null);
             Render();
@@ -246,7 +306,10 @@ public sealed class DocumentationScreenshotTests
             {
                 AssertContainedInViewport(card, window);
             }
-            Capture(window, imageDirectory, ScreenshotFileNames[2]);
+            if (!executionOnly)
+            {
+                Capture(window, imageDirectory, ScreenshotFileNames[2]);
+            }
 
             QuestionDesignItemViewModel customQuestion = design.Questions[1];
             EvaluatorDesignItemViewModel customEvaluator = customQuestion.Evaluators[0];
@@ -267,13 +330,14 @@ public sealed class DocumentationScreenshotTests
             Assert.True(formulaGuide.IsEffectivelyVisible);
             AssertContainedInViewport(formulaGuide, window);
             AssertContainedInViewport(customPrompt, window);
-            Capture(window, imageDirectory, ScreenshotFileNames[3]);
+            if (!executionOnly)
+            {
+                Capture(window, imageDirectory, ScreenshotFileNames[3]);
+            }
 
             viewModel.NextCommand.Execute(null);
             Render();
-            await execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
             execution.MaxConcurrency = 2;
-            Assert.Equal("Auto", execution.SelectedModelId);
             Assert.Equal(402, execution.PlannedEvaluationCount);
             ExecutionView executionView = Assert.Single(
                 window.GetVisualDescendants().OfType<ExecutionView>());
@@ -282,7 +346,45 @@ public sealed class DocumentationScreenshotTests
             ResetScroll(Required<ScrollViewer>(window, "ShellScrollViewer"));
             ResetScroll(Required<ScrollViewer>(executionView, "ExecutionScrollViewer"));
             Render();
+
+            // This is the synthetic, not-yet-checked state, not evidence of live login.
+            Button checkAuthentication = Required<Button>(executionView, "CheckAuthenticationButton");
+            Button login = Required<Button>(executionView, "StartCopilotLogin");
+            Button cancelLogin = Required<Button>(executionView, "CancelCopilotLogin");
+            TextBlock loginStatus = Required<TextBlock>(executionView, "CopilotLoginStatus");
+            Assert.Equal(ExecutionAuthenticationState.NotChecked, execution.AuthenticationState);
+            Assert.False(execution.IsAuthenticationAvailable);
+            Assert.Empty(execution.AvailableModelIds);
+            Assert.Null(execution.SelectedModelId);
+            Assert.False(execution.IsLoggingIn);
+            Assert.Null(execution.LastLoginTask);
+            Assert.Equal(0, authentication.CallCount);
+            Assert.Equal(0, runBoundary.CallCount);
+            Assert.Same(execution.LoginCommand, login.Command);
+            Assert.Equal("GitHubにログイン", login.Content);
+            Assert.True(checkAuthentication.IsEffectivelyEnabled);
+            Assert.True(login.IsEffectivelyEnabled);
+            Assert.False(cancelLogin.IsEffectivelyEnabled);
+            Assert.False(Required<Button>(executionView, "StartRunButton").IsEffectivelyEnabled);
+            Assert.Equal("GitHub へのログインは開始していません。", execution.LoginStatusText);
+            Assert.Equal(execution.LoginStatusText, loginStatus.Text);
+            Assert.Equal(loginStatus.Text, AutomationProperties.GetName(loginStatus));
+            Assert.Empty(Required<StackPanel>(executionView, "CopilotLoginPanel")
+                .GetVisualDescendants().OfType<TextBox>());
+            foreach (Control control in new Control[] { checkAuthentication, login, cancelLogin, loginStatus })
+            {
+                Assert.True(control.IsEffectivelyVisible);
+                AssertContainedInViewport(control, window);
+            }
+
             Capture(window, imageDirectory, ScreenshotFileNames[4]);
+            if (executionOnly)
+            {
+                return;
+            }
+
+            await execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+            Assert.Equal("Auto", execution.SelectedModelId);
 
             WorkbookMetadata metadata = input.Metadata
                 ?? throw new InvalidOperationException("Synthetic workbook metadata is missing.");

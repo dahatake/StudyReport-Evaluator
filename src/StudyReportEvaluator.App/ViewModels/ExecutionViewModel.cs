@@ -303,11 +303,17 @@ public sealed class ExecutionRunCompletedEventArgs : EventArgs
 
 public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 {
+    private const string BundledCliUnavailableMessage =
+        "同梱 Copilot CLI を確認できません。配布物を再取得し、ZIP 版は再展開してください。";
+    private const string LoginExitUnconfirmedMessage =
+        "ログイン処理の終了を確認できませんでした。終了を待って再試行するか、アプリを終了して開き直してください。";
+
     private static readonly IReadOnlyList<int> ClosedConcurrencyOptions =
         Array.AsReadOnly([1, 2, 3]);
 
     private readonly IExecutionAuthenticationBoundary authenticationBoundary;
     private readonly IQuantificationRunBoundary runBoundary;
+    private readonly BundledCopilotLoginService loginService;
     private readonly QuantificationDefinitionValidator definitionValidator = new();
     private readonly ColumnMappingValidator mappingValidator = new();
     private readonly WorkbookExecutionPreflight workbookPreflight = new();
@@ -315,6 +321,8 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     private readonly Dictionary<string, CopilotModelAvailability> modelsById = new(StringComparer.Ordinal);
     private readonly ObservableCollection<ExecutionTechnicalError> technicalErrorItems = [];
     private readonly ViewModelCommand checkAuthenticationCommand;
+    private readonly ViewModelCommand loginCommand;
+    private readonly ViewModelCommand cancelLoginCommand;
     private readonly ViewModelCommand startCommand;
     private readonly ViewModelCommand cancelCommand;
     private QuantificationDefinition? definition;
@@ -327,6 +335,10 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     private ImmutableArray<ExecutionTechnicalError> runPreflightErrors = [];
     private int maxConcurrency = EvaluationSchedulerOptions.DefaultMaxConcurrency;
     private bool isCheckingAuthentication;
+    private bool isLoggingIn;
+    private bool loginExitUnconfirmed;
+    private bool loginServiceDisposed;
+    private string loginStatusText = "GitHub へのログインは開始していません。";
     private bool isRunning;
     private bool isCancelling;
     private int progressTotal;
@@ -345,6 +357,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     private bool isResumeMode;
     private ExecutionRunContext? lastRunContext;
     private CancellationTokenSource? authenticationCancellation;
+    private CancellationTokenSource? loginCancellation;
     private CancellationTokenSource? runCancellation;
     private long authenticationSequence;
     private bool disposed;
@@ -358,17 +371,26 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
     public ExecutionViewModel(
         IExecutionAuthenticationBoundary authenticationBoundary,
-        IQuantificationRunBoundary runBoundary)
+        IQuantificationRunBoundary runBoundary,
+        BundledCopilotLoginService? loginService = null)
     {
         this.authenticationBoundary = authenticationBoundary
             ?? throw new ArgumentNullException(nameof(authenticationBoundary));
         this.runBoundary = runBoundary
             ?? throw new ArgumentNullException(nameof(runBoundary));
+        // The view model owns the service, including an explicitly supplied instance.
+        this.loginService = loginService ?? new BundledCopilotLoginService();
         AvailableModelIds = new ReadOnlyObservableCollection<string>(modelItems);
         TechnicalErrors = new ReadOnlyObservableCollection<ExecutionTechnicalError>(technicalErrorItems);
         checkAuthenticationCommand = new ViewModelCommand(
             _ => _ = CheckAuthenticationAsync(),
             _ => CanCheckAuthentication);
+        loginCommand = new ViewModelCommand(
+            _ => _ = LoginAsync(),
+            _ => CanLogin);
+        cancelLoginCommand = new ViewModelCommand(
+            _ => CancelLogin(),
+            _ => CanCancelLogin);
         startCommand = new ViewModelCommand(
             _ => _ = StartAsync(),
             _ => CanStart);
@@ -413,7 +435,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         ExecutionAuthenticationState.Checking => "Copilot CLI と利用可能 model を確認しています…",
         ExecutionAuthenticationState.Available => "既存の Copilot CLI login を利用できます。",
         ExecutionAuthenticationState.AuthRequired => "Copilot CLI で login してから再確認してください。",
-        ExecutionAuthenticationState.CliUnavailable => "Copilot CLI を確認できません。PATH と導入状態を確認してください。",
+        ExecutionAuthenticationState.CliUnavailable => BundledCliUnavailableMessage,
         ExecutionAuthenticationState.RuntimeFailed => "Copilot runtime の確認に失敗しました。",
         ExecutionAuthenticationState.Cancelled => "Copilot 状態の確認を取り消しました。",
         _ => "Copilot runtime の状態を確認できません。",
@@ -558,12 +580,38 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             if (SetProperty(ref isCheckingAuthentication, value))
             {
                 OnPropertiesChanged(
+                    nameof(CanLogin),
                     nameof(CanCheckAuthentication),
                     nameof(CanStart));
                 RaiseCommandStates();
             }
         }
     }
+
+    public bool IsLoggingIn
+    {
+        get => isLoggingIn;
+        private set
+        {
+            if (SetProperty(ref isLoggingIn, value))
+            {
+                OnPropertiesChanged(
+                    nameof(CanLogin),
+                    nameof(CanCancelLogin),
+                    nameof(CanCheckAuthentication),
+                    nameof(CanStart));
+                RaiseCommandStates();
+            }
+        }
+    }
+
+    public string LoginStatusText
+    {
+        get => loginStatusText;
+        private set => SetProperty(ref loginStatusText, value);
+    }
+
+    public Task? LastLoginTask { get; private set; }
 
     public bool IsRunning
     {
@@ -573,6 +621,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             if (SetProperty(ref isRunning, value))
             {
                 OnPropertiesChanged(
+                    nameof(CanLogin),
                     nameof(CanCheckAuthentication),
                     nameof(CanStart),
                     nameof(CanCancel),
@@ -692,11 +741,27 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
     public bool CanCheckAuthentication => !disposed
         && !IsCheckingAuthentication
+        && !IsLoggingIn
+        && !loginExitUnconfirmed
+        && !loginServiceDisposed
         && !IsRunning;
+
+    public bool CanLogin => !disposed
+        && !loginServiceDisposed
+        && !IsLoggingIn
+        && !IsCheckingAuthentication
+        && !IsRunning;
+
+    public bool CanCancelLogin => !disposed
+        && IsLoggingIn
+        && loginCancellation is { IsCancellationRequested: false };
 
     public bool CanStart => !disposed
         && IsConfigured
         && !IsCheckingAuthentication
+        && !IsLoggingIn
+        && !loginExitUnconfirmed
+        && !loginServiceDisposed
         && !IsRunning
         && AuthenticationState == ExecutionAuthenticationState.Available
         && runtimeIdentity is not null
@@ -709,6 +774,10 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     public bool CanCancel => IsRunning && !IsCancelling;
 
     public ICommand CheckAuthenticationCommand => checkAuthenticationCommand;
+
+    public ICommand LoginCommand => loginCommand;
+
+    public ICommand CancelLoginCommand => cancelLoginCommand;
 
     public ICommand StartCommand => startCommand;
 
@@ -782,6 +851,120 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             nameof(PlanSummary),
             nameof(RunStatusText));
         Revalidate();
+    }
+
+    public Task LoginAsync(CancellationToken cancellationToken = default)
+    {
+        if (!CanLogin)
+        {
+            return Task.CompletedTask;
+        }
+
+        LastLoginTask = LoginCoreAsync(cancellationToken);
+        OnPropertyChanged(nameof(LastLoginTask));
+        return LastLoginTask;
+    }
+
+    private async Task LoginCoreAsync(CancellationToken cancellationToken)
+    {
+        using CancellationTokenSource operationCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        CancellationToken token = operationCancellation.Token;
+        loginCancellation = operationCancellation;
+        IsLoggingIn = true;
+
+        try
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            // Login may switch accounts. Only a later explicit check can restore availability.
+            Interlocked.Increment(ref authenticationSequence);
+            runtimeIdentity = null;
+            // Clear selection before the collection notifies bindings, preserving run errors.
+            selectedModelId = null;
+            modelItems.Clear();
+            modelsById.Clear();
+            AuthenticationState = ExecutionAuthenticationState.NotChecked;
+            LoginStatusText = "GitHub へのログイン中です。Copilot CLI とブラウザーの案内に従ってください。";
+            OnPropertiesChanged(
+                nameof(AvailableModelIds),
+                nameof(SelectedModelId),
+                nameof(RuntimeIdentityText));
+            Revalidate();
+
+            CopilotLoginResult result = await loginService.LoginAsync(token);
+            if (!disposed)
+            {
+                // A01 retains ownership when exit cannot be confirmed. A retry may
+                // observe that exit, but authentication/run must not race that process.
+                // A cancelled retry can return before A01 even inspects its retained process.
+                if (result.Status != CopilotLoginStatus.Cancelled)
+                {
+                    loginExitUnconfirmed = result.Status == CopilotLoginStatus.AlreadyRunning
+                        || result.ErrorCategory is CopilotLoginErrorCategory.ProcessWaitFailed
+                            or CopilotLoginErrorCategory.CleanupFailed;
+                }
+
+                loginServiceDisposed = result.Status == CopilotLoginStatus.Disposed;
+                LoginStatusText = loginExitUnconfirmed
+                    ? LoginExitUnconfirmedMessage
+                    : LoginResultMessage(result);
+            }
+        }
+        catch
+        {
+            if (!disposed)
+            {
+                loginExitUnconfirmed = true;
+                LoginStatusText = LoginExitUnconfirmedMessage;
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(loginCancellation, operationCancellation))
+            {
+                loginCancellation = null;
+                if (!disposed)
+                {
+                    IsLoggingIn = false;
+                    Revalidate();
+                }
+            }
+        }
+    }
+
+    public void CancelLogin()
+    {
+        if (!CanCancelLogin)
+        {
+            return;
+        }
+
+        LoginStatusText = "GitHub へのログインを取り消しています…";
+        try
+        {
+            loginCancellation?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The attempt finished or the application closed before cancellation.
+        }
+        catch
+        {
+            if (!disposed)
+            {
+                LoginStatusText = "ログインの取消処理で問題が発生しました。終了を確認できない場合はアプリを開き直してください。";
+            }
+        }
+
+        if (!disposed)
+        {
+            OnPropertyChanged(nameof(CanCancelLogin));
+            RaiseCommandStates();
+        }
     }
 
     public async Task CheckAuthenticationAsync(
@@ -970,15 +1153,53 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
         disposed = true;
         Interlocked.Increment(ref authenticationSequence);
+        CancellationTokenSource? cancellation = loginCancellation;
+        loginCancellation = null;
+        try
+        {
+            cancellation?.Cancel();
+        }
+        catch
+        {
+            // Cancellation callbacks cannot skip owned-process cleanup or expose content.
+        }
+        finally
+        {
+            // Do not wait on LastLoginTask: its continuation may need the closing UI.
+            // A01 performs synchronous owned-process cleanup without that continuation.
+            loginService.Dispose();
+            cancellation?.Dispose();
+        }
+
         authenticationCancellation?.Cancel();
         authenticationCancellation?.Dispose();
         runCancellation?.Cancel();
         runCancellation?.Dispose();
+        LoginStatusText = "アプリを終了したため、ログインは開始できません。";
+        IsLoggingIn = false;
+        OnPropertiesChanged(
+            nameof(CanLogin),
+            nameof(CanCancelLogin),
+            nameof(CanCheckAuthentication),
+            nameof(CanStart));
         RaiseCommandStates();
     }
 
     public override string ToString() =>
         $"{nameof(ExecutionViewModel)} {{ AuthenticationState = {AuthenticationState}, IsRunning = {IsRunning}, PlannedEvaluationCount = {PlannedEvaluationCount.ToString(CultureInfo.InvariantCulture)}, Content = <redacted> }}";
+
+    private static string LoginResultMessage(CopilotLoginResult result) => result.Status switch
+    {
+        CopilotLoginStatus.Completed => "ログイン処理が終了しました。認証状態は未確認です。「Copilot 状態を確認」を押してください。",
+        CopilotLoginStatus.CliUnavailable => BundledCliUnavailableMessage,
+        CopilotLoginStatus.RuntimeFailed when result.ErrorCategory is CopilotLoginErrorCategory.ProcessWaitFailed
+            or CopilotLoginErrorCategory.CleanupFailed => LoginExitUnconfirmedMessage,
+        CopilotLoginStatus.RuntimeFailed => "GitHub へのログインに失敗しました。再試行するか、「Copilot 状態を確認」を押してください。",
+        CopilotLoginStatus.Cancelled => "GitHub へのログインを取り消しました。再試行するか、「Copilot 状態を確認」を押してください。",
+        CopilotLoginStatus.AlreadyRunning => LoginExitUnconfirmedMessage,
+        CopilotLoginStatus.Disposed => "ログイン処理は終了しています。アプリを開き直してください。",
+        _ => LoginExitUnconfirmedMessage,
+    };
 
     private void ApplyAuthentication(ExecutionAuthenticationSnapshot result)
     {
@@ -1314,7 +1535,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 AddError(errors, new ExecutionTechnicalError(
                     "COPILOT_CLI_UNAVAILABLE",
                     "Copilot",
-                    "Copilot CLI の導入状態と PATH を確認してください。"));
+                    BundledCliUnavailableMessage));
                 break;
             case ExecutionAuthenticationState.RuntimeFailed:
                 AddError(errors, new ExecutionTechnicalError(
@@ -1382,6 +1603,8 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     private void RaiseCommandStates()
     {
         checkAuthenticationCommand.RaiseCanExecuteChanged();
+        loginCommand.RaiseCanExecuteChanged();
+        cancelLoginCommand.RaiseCanExecuteChanged();
         startCommand.RaiseCanExecuteChanged();
         cancelCommand.RaiseCanExecuteChanged();
     }

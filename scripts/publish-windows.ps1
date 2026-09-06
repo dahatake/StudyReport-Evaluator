@@ -2,7 +2,9 @@
 #Requires -PSEdition Core
 
 [CmdletBinding()]
-param()
+param(
+    [switch] $SingleFile
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -93,6 +95,66 @@ function Get-Sha256Hex {
     finally {
         $stream.Dispose()
     }
+}
+
+function Assert-OwnedDirectoryPath {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Root,
+
+        [Parameter(Mandatory)]
+        [string] $Path,
+
+        [switch] $IncludeChildren
+    )
+
+    $rootPath = [System.IO.Path]::TrimEndingDirectorySeparator([System.IO.Path]::GetFullPath($Root))
+    $currentPath = [System.IO.Path]::TrimEndingDirectorySeparator([System.IO.Path]::GetFullPath($Path))
+    Assert-PathWithinRoot -Root $rootPath -Path $currentPath
+    while ($true) {
+        $item = Get-Item -LiteralPath $currentPath -Force -ErrorAction SilentlyContinue
+        if ($null -ne $item) {
+            Assert-NotReparsePoint -Item $item
+            if (-not $item.PSIsContainer) {
+                throw "Expected an owned publish directory but found a file: $currentPath"
+            }
+        }
+
+        if ($currentPath.Equals($rootPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+
+        $currentPath = [System.IO.Path]::GetDirectoryName($currentPath)
+    }
+
+    if ($IncludeChildren -and (Test-Path -LiteralPath $Path -PathType Container)) {
+        # PowerShell does not follow directory links without -FollowSymlink.
+        foreach ($item in @(Get-ChildItem -LiteralPath $Path -Force -Recurse)) {
+            Assert-NotReparsePoint -Item $item
+            Assert-PathWithinRoot -Root $Path -Path $item.FullName
+        }
+    }
+}
+
+function Get-PublishModeArguments {
+    param(
+        [switch] $SingleFile,
+        [string] $PublishProfileFullPath
+    )
+
+    if ($SingleFile) {
+        if ([string]::IsNullOrWhiteSpace($PublishProfileFullPath) -or
+            -not [System.IO.Path]::IsPathFullyQualified($PublishProfileFullPath) -or
+            -not (Test-Path -LiteralPath $PublishProfileFullPath -PathType Leaf)) {
+            throw 'Single-file publish requires the full path to the App publish profile.'
+        }
+
+        Assert-NotReparsePoint -Item (Get-Item -LiteralPath $PublishProfileFullPath -Force)
+        # The profile is App-scoped. A global true would add ILLink to Core as well.
+        return "--property:PublishProfileFullPath=$PublishProfileFullPath"
+    }
+
+    return '--property:PublishSingleFile=false'
 }
 
 function Invoke-DotNet {
@@ -248,6 +310,92 @@ function Assert-RidLockMatchesCanonicalLock {
                 -not [object]::Equals($ridPackage[$field], $canonicalPackage[$field])) {
                 throw "RID restore changed $ProjectName package '$packageName' field '$field'."
             }
+        }
+    }
+}
+
+function Assert-SingleFileRidLockMatchesDedicatedLock {
+    param(
+        [Parameter(Mandatory)]
+        [string] $CanonicalLockPath,
+
+        [Parameter(Mandatory)]
+        [string] $DedicatedLockPath,
+
+        [Parameter(Mandatory)]
+        [string] $RidLockPath
+    )
+
+    if (-not (Test-Path -LiteralPath $DedicatedLockPath -PathType Leaf)) {
+        throw 'Dedicated App single-file package lock is missing.'
+    }
+
+    if (-not (Test-Path -LiteralPath $RidLockPath -PathType Leaf)) {
+        throw 'App single-file RID lock was not generated.'
+    }
+
+    foreach ($path in @($CanonicalLockPath, $DedicatedLockPath, $RidLockPath)) {
+        Assert-NotReparsePoint -Item (Get-Item -LiteralPath $path -Force)
+    }
+
+    $canonical = Get-Content -LiteralPath $CanonicalLockPath -Raw | ConvertFrom-Json -AsHashtable
+    $dedicated = Get-Content -LiteralPath $DedicatedLockPath -Raw | ConvertFrom-Json -AsHashtable
+    $ridLock = Get-Content -LiteralPath $RidLockPath -Raw | ConvertFrom-Json -AsHashtable
+
+    # Compare the entire documents, including field types and the exact RID package set.
+    Assert-JsonEquivalent -Expected $dedicated -Actual $ridLock -JsonPath "$ApplicationName.singleFileLock"
+    if ($canonical['version'] -ne 2 -or $dedicated.Count -ne 2 -or
+        $dedicated['dependencies'].Count -ne 2 -or
+        -not $dedicated['dependencies'].Contains($TargetFramework) -or
+        -not $dedicated['dependencies'].Contains("$TargetFramework/$RuntimeIdentifier")) {
+        throw 'App single-file lock must have version 2 and only the net10.0 and win-x64 targets.'
+    }
+
+    Assert-JsonEquivalent -Expected $canonical['version'] -Actual $dedicated['version'] -JsonPath 'singleFileLock.version'
+    $canonicalPackages = $canonical['dependencies'][$TargetFramework]
+    $expectedPackages = [ordered]@{}
+    foreach ($packageName in $canonicalPackages.Keys) {
+        $expectedPackages[$packageName] = $canonicalPackages[$packageName]
+    }
+
+    $buildOnlyPackage = 'Microsoft.NET.ILLink.Tasks'
+    if ($canonicalPackages.Contains($buildOnlyPackage)) {
+        throw 'The single-file build-only ILLink package must not enter the canonical App lock.'
+    }
+
+    $expectedPackages[$buildOnlyPackage] = [ordered]@{
+        type = 'Direct'
+        requested = '[10.0.11, )'
+        resolved = '10.0.11'
+        contentHash = 'IBf7lbovvjGWVWXZX5cJ/cO0WXbId0Zq4BuSeT94mGZuOAP66oMeH9PTBZ9Jpp3Jb6jtK0qm/NyUbPRo1gC/wQ=='
+    }
+    Assert-JsonEquivalent -Expected $expectedPackages -Actual $dedicated['dependencies'][$TargetFramework] `
+        -JsonPath "$ApplicationName.dependencies.$TargetFramework"
+
+    foreach ($package in $dedicated['dependencies']["$TargetFramework/$RuntimeIdentifier"].GetEnumerator()) {
+        if (-not $canonicalPackages.Contains($package.Key)) {
+            throw "Single-file RID restore introduced a package outside the canonical lock: $($package.Key)"
+        }
+
+        Assert-JsonEquivalent -Expected $canonicalPackages[$package.Key] -Actual $package.Value `
+            -JsonPath "$ApplicationName.dependencies.$RuntimeIdentifier.$($package.Key)"
+    }
+}
+
+function Assert-SingleFileLockHashes {
+    param(
+        [Parameter(Mandatory)]
+        [System.Collections.IDictionary] $Hashes
+    )
+
+    foreach ($path in $Hashes.Keys) {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "Single-file publish changed a protected package lock: $path"
+        }
+
+        Assert-NotReparsePoint -Item (Get-Item -LiteralPath $path -Force)
+        if ((Get-Sha256Hex -Path $path) -cne $Hashes[$path]) {
+            throw "Single-file publish changed a protected package lock: $path"
         }
     }
 }
@@ -477,10 +625,35 @@ function Assert-BundledCopilotRuntime {
     }
 }
 
+function Get-SingleFileDocumentationPaths {
+    # Same closed public allowlist as WindowsSingleFile.pubxml / package-windows.ps1.
+    return @(
+        'README.md',
+        'LICENSE',
+        'docs/README.md',
+        'docs/getting-started.md',
+        'docs/features.md',
+        'docs/custom-evaluator-guide.md',
+        'docs/prompt-launch.md',
+        'docs/privacy-and-data-handling.md',
+        'docs/troubleshooting.md',
+        'images/README.md',
+        'images/01-input-workbook.png',
+        'images/02-input-mapping.png',
+        'images/03-design-knowledge.png',
+        'images/04-design-custom-prompt.png',
+        'images/05-execution-auto.png',
+        'images/06-results-review.png',
+        'images/07-output-export.png'
+    )
+}
+
 function Assert-SafePublishLayout {
     param(
         [Parameter(Mandatory)]
-        [string] $PublishDirectory
+        [string] $PublishDirectory,
+
+        [switch] $ExtractedBundle
     )
 
     $rootItem = Get-Item -LiteralPath $PublishDirectory -Force
@@ -512,6 +685,15 @@ function Assert-SafePublishLayout {
         'StudyReportEvaluator.App.Tests',
         'StudyReportEvaluator.Core.Tests'
     )
+
+    $allowedExtractedContent = [System.Collections.Generic.HashSet[string]]::new(
+        [string[]](@(Get-SingleFileDocumentationPaths) + @(
+            "$ApplicationName.runtimeconfig.json",
+            "$ApplicationName.deps.json",
+            'copilot-runtime.json',
+            'runtimes/win-x64/native/copilot.exe'
+        )),
+        [System.StringComparer]::Ordinal)
 
     foreach ($item in $items) {
         Assert-NotReparsePoint -Item $item
@@ -553,6 +735,12 @@ function Assert-SafePublishLayout {
                     [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)) {
                 throw "Forbidden source, symbol, input, or secret file in publish output: $normalized"
             }
+
+            if ($ExtractedBundle -and
+                -not $allowedExtractedContent.Contains($normalized) -and
+                $item.Extension -ine '.dll') {
+                throw "Unexpected file in extracted single-file publish output: $normalized"
+            }
         }
     }
 
@@ -574,6 +762,14 @@ function Assert-SafePublishLayout {
         'hostpolicy.dll',
         'System.Private.CoreLib.dll'
     )
+    if ($ExtractedBundle) {
+        # The standard single-file host statically embeds these native host/runtime components.
+        # Their absence from extraction is not a missing self-contained dependency.
+        $requiredFiles = @($requiredFiles | Where-Object {
+            $_ -cnotin @("$ApplicationName.exe", 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll')
+        }) + @(Get-SingleFileDocumentationPaths)
+    }
+
     foreach ($requiredFile in $requiredFiles) {
         $requiredPath = Join-Path $PublishDirectory $requiredFile
         if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf) -or
@@ -612,6 +808,14 @@ function Assert-SafePublishLayout {
         throw 'Self-contained runtimeconfig.json must include Microsoft.NETCore.App 10.0.x.'
     }
 
+    if ($ExtractedBundle -and
+        ($null -ne $runtimeOptions.PSObject.Properties['frameworks'] -or
+            [string]$runtimeOptions.tfm -cne $TargetFramework -or
+            $includedFrameworks.Count -ne 1 -or
+            [string]$netCoreFramework[0].version -cne '10.0.11')) {
+        throw 'Single-file runtimeconfig.json must include only the pinned Microsoft.NETCore.App 10.0.11 runtime.'
+    }
+
     $depsPath = Join-Path $PublishDirectory "$ApplicationName.deps.json"
     $depsText = Get-Content -LiteralPath $depsPath -Raw
     foreach ($marker in $forbiddenMarkers) {
@@ -633,12 +837,29 @@ function Assert-SafePublishLayout {
         'GitHub.Copilot.SDK/',
         'Avalonia/',
         'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/')) {
-        if (-not ($libraryNames | Where-Object { $_.StartsWith($requiredPrefix, [System.StringComparison]::Ordinal) })) {
+        $matchingLibraries = @($libraryNames | Where-Object { $_.StartsWith($requiredPrefix, [System.StringComparison]::Ordinal) })
+        if ($matchingLibraries.Count -eq 0) {
             throw "deps.json is missing required library '$requiredPrefix'."
+        }
+
+        if ($ExtractedBundle -and $matchingLibraries.Count -ne 1) {
+            throw "Single-file deps.json has ambiguous library identities: $requiredPrefix"
         }
     }
 
-    Assert-Amd64PortableExecutable -ExecutablePath (Join-Path $PublishDirectory "$ApplicationName.exe")
+    if ($ExtractedBundle) {
+        $manifest = Get-Content -LiteralPath (Join-Path $PublishDirectory 'copilot-runtime.json') -Raw | ConvertFrom-Json
+        foreach ($library in @(
+            "GitHub.Copilot.SDK/$($manifest.sdkVersion)",
+            "runtimepack.Microsoft.NETCore.App.Runtime.win-x64/$($netCoreFramework[0].version)")) {
+            if ($library -cnotin $libraryNames) {
+                throw "Single-file deps.json identity does not match extracted runtime metadata: $library"
+            }
+        }
+    }
+    else {
+        Assert-Amd64PortableExecutable -ExecutablePath (Join-Path $PublishDirectory "$ApplicationName.exe")
+    }
 }
 
 function Remove-PublishSymbols {
@@ -657,10 +878,189 @@ function Remove-PublishSymbols {
     }
 }
 
-function Assert-ApplicationLaunch {
+function Assert-SingleFilePublishLayout {
     param(
         [Parameter(Mandatory)]
         [string] $PublishDirectory
+    )
+
+    $rootItem = Get-Item -LiteralPath $PublishDirectory -Force
+    Assert-NotReparsePoint -Item $rootItem
+    if (-not $rootItem.PSIsContainer) {
+        throw 'Single-file publish output must be a directory.'
+    }
+
+    $entries = @(Get-ChildItem -LiteralPath $PublishDirectory -Force)
+    foreach ($entry in $entries) {
+        Assert-NotReparsePoint -Item $entry
+    }
+
+    if ($entries.Count -ne 1 -or $entries[0].PSIsContainer -or
+        $entries[0].Name -cne "$ApplicationName.exe") {
+        throw 'Single-file publish output must contain only the application EXE, with no sidecars or directories.'
+    }
+
+    if ($entries[0].Length -le 0) {
+        throw 'Single-file application EXE must not be empty.'
+    }
+
+    Assert-Amd64PortableExecutable -ExecutablePath $entries[0].FullName
+}
+
+function Get-PublishProductVersion {
+    param(
+        [Parameter(Mandatory)]
+        [string] $RepositoryRoot
+    )
+
+    $props = [xml](Get-Content -LiteralPath (Join-Path $RepositoryRoot 'Directory.Build.props') -Raw)
+    $prefixes = @($props.SelectNodes('/Project/PropertyGroup/VersionPrefix'))
+    $suffixes = @($props.SelectNodes('/Project/PropertyGroup/VersionSuffix'))
+    if ($prefixes.Count -ne 1 -or $suffixes.Count -ne 1 -or
+        $prefixes[0].InnerText -notmatch '^\d+\.\d+\.\d+$' -or
+        $suffixes[0].InnerText -notmatch '^[0-9A-Za-z.-]*$') {
+        throw 'Unable to resolve the canonical product version for single-file validation.'
+    }
+
+    $version = $prefixes[0].InnerText
+    if (-not [string]::IsNullOrEmpty($suffixes[0].InnerText)) {
+        $version += '-' + $suffixes[0].InnerText
+    }
+
+    return $version
+}
+
+function Assert-PublishBinaryVersion {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path,
+
+        [Parameter(Mandatory)]
+        [string] $ExpectedVersion,
+
+        [switch] $Managed
+    )
+
+    $fileVersion = $ExpectedVersion.Split('-', 2)[0] + '.0'
+    $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
+    if (([string]$versionInfo.ProductVersion).Split('+', 2)[0] -cne $ExpectedVersion -or
+        [string]$versionInfo.FileVersion -cne $fileVersion) {
+        throw "Single-file binary does not match the canonical product version: $([System.IO.Path]::GetFileName($Path))"
+    }
+
+    if ($Managed) {
+        # Metadata inspection only; do not load or execute the published assembly.
+        $assemblyName = [System.Reflection.AssemblyName]::GetAssemblyName($Path)
+        if ($assemblyName.Name -cne [System.IO.Path]::GetFileNameWithoutExtension($Path) -or
+            $assemblyName.Version.ToString() -cne $fileVersion) {
+            throw 'Extracted managed assembly identity does not match the canonical product version.'
+        }
+    }
+}
+
+function Set-SingleFileProbeEnvironment {
+    param(
+        [Parameter(Mandatory)]
+        [System.Diagnostics.ProcessStartInfo] $StartInfo,
+
+        [Parameter(Mandatory)]
+        [string] $ProbeDirectory
+    )
+
+    # Never inherit credentials, startup hooks, profiler settings, or user CLI configuration.
+    $StartInfo.Environment.Clear()
+    foreach ($name in @('SystemRoot', 'WINDIR', 'SystemDrive', 'ComSpec')) {
+        $value = [System.Environment]::GetEnvironmentVariable($name)
+        if ($null -ne $value) {
+            $StartInfo.Environment[$name] = $value
+        }
+    }
+
+    foreach ($name in @('TEMP', 'TMP', 'USERPROFILE', 'HOME', 'LOCALAPPDATA', 'APPDATA', 'COPILOT_HOME')) {
+        $ownedPath = Join-Path $ProbeDirectory $name
+        Assert-OwnedDirectoryPath -Root $ProbeDirectory -Path $ownedPath
+        [void][System.IO.Directory]::CreateDirectory($ownedPath)
+        $StartInfo.Environment[$name] = $ownedPath
+    }
+
+    $StartInfo.WorkingDirectory = Join-Path $ProbeDirectory 'cwd'
+    Assert-OwnedDirectoryPath -Root $ProbeDirectory -Path $StartInfo.WorkingDirectory
+    [void][System.IO.Directory]::CreateDirectory($StartInfo.WorkingDirectory)
+    $StartInfo.Environment['PATH'] = Join-Path $env:SystemRoot 'System32'
+    $StartInfo.Environment['DOTNET_ROOT'] = Join-Path $ProbeDirectory '__no-installed-dotnet__'
+    $StartInfo.Environment['DOTNET_ROOT_X64'] = Join-Path $ProbeDirectory '__no-installed-dotnet-x64__'
+    $StartInfo.Environment['DOTNET_MULTILEVEL_LOOKUP'] = '0'
+    $StartInfo.Environment['DOTNET_DISABLE_GUI_ERRORS'] = '1'
+    $StartInfo.Environment['DOTNET_BUNDLE_EXTRACT_BASE_DIR'] = Join-Path $ProbeDirectory 'TEMP\.net'
+    $StartInfo.Environment['DOTNET_HOST_TRACE'] = '1'
+    $StartInfo.Environment['DOTNET_HOST_TRACE_VERBOSITY'] = '4'
+    $StartInfo.Environment['DOTNET_HOST_TRACEFILE'] = Join-Path $ProbeDirectory 'host-trace.log'
+}
+
+function Get-SingleFileExtractionDirectory {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ProbeDirectory
+    )
+
+    $cacheRoot = Join-Path $ProbeDirectory 'TEMP\.net'
+    Assert-OwnedDirectoryPath -Root $ProbeDirectory -Path $cacheRoot -IncludeChildren
+    $tracePath = Join-Path $ProbeDirectory 'host-trace.log'
+    if (-not (Test-Path -LiteralPath $tracePath -PathType Leaf)) {
+        throw 'Single-file host trace is missing.'
+    }
+
+    Assert-NotReparsePoint -Item (Get-Item -LiteralPath $tracePath -Force)
+    $prefix = 'Property APP_CONTEXT_BASE_DIRECTORY = '
+    $basePaths = @(foreach ($line in [System.IO.File]::ReadAllLines($tracePath)) {
+        if ($line.StartsWith($prefix, [System.StringComparison]::Ordinal)) {
+            $line.Substring($prefix.Length).Trim()
+        }
+    })
+    if ($basePaths.Count -ne 1 -or -not [System.IO.Path]::IsPathFullyQualified($basePaths[0])) {
+        throw 'Single-file host trace must contain exactly one absolute APP_CONTEXT_BASE_DIRECTORY.'
+    }
+
+    $appBase = [System.IO.Path]::TrimEndingDirectorySeparator([System.IO.Path]::GetFullPath($basePaths[0]))
+    Assert-OwnedDirectoryPath -Root $cacheRoot -Path $appBase
+    $segments = [System.IO.Path]::GetRelativePath($cacheRoot, $appBase).Replace('\', '/').Split('/')
+    if ($segments.Count -ne 2 -or $segments[0] -cne $ApplicationName) {
+        throw 'Single-file application base is not the owned standard-host bundle directory.'
+    }
+
+    $applications = @(Get-ChildItem -LiteralPath $cacheRoot -Force)
+    $bundles = @(Get-ChildItem -LiteralPath (Join-Path $cacheRoot $ApplicationName) -Force)
+    if ($applications.Count -ne 1 -or -not $applications[0].PSIsContainer -or
+        $applications[0].Name -cne $ApplicationName -or
+        $bundles.Count -ne 1 -or -not $bundles[0].PSIsContainer -or
+        -not $bundles[0].FullName.Equals($appBase, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Single-file extraction must contain exactly one application and one bundle directory.'
+    }
+
+    return $appBase
+}
+
+function Assert-NoStartupChildProcesses {
+    param(
+        [Parameter(Mandatory)]
+        [int] $ProcessId
+    )
+
+    # A bounded snapshot, not an event audit: short-lived children remain a P06 concern.
+    # Unlike Win32_ProcessStartTrace subscription, this does not require elevation.
+    $children = @(Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = $ProcessId" `
+        -Property ProcessId -OperationTimeoutSec 5 -ErrorAction Stop)
+    if ($children.Count -ne 0) {
+        throw 'Single-file startup unexpectedly has child processes; CLI, login and AI must not start automatically.'
+    }
+}
+
+function Assert-ApplicationLaunch {
+    param(
+        [Parameter(Mandatory)]
+        [string] $PublishDirectory,
+
+        [string] $SingleFileProbeDirectory
     )
 
     $executablePath = Join-Path $PublishDirectory "$ApplicationName.exe"
@@ -673,6 +1073,10 @@ function Assert-ApplicationLaunch {
     $startInfo.Environment['DOTNET_ROOT_X64'] = Join-Path $PublishDirectory '__no-installed-dotnet-x64__'
     $startInfo.Environment['DOTNET_MULTILEVEL_LOOKUP'] = '0'
 
+    if (-not [string]::IsNullOrWhiteSpace($SingleFileProbeDirectory)) {
+        Set-SingleFileProbeEnvironment -StartInfo $startInfo -ProbeDirectory $SingleFileProbeDirectory
+    }
+
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = $startInfo
     $started = $false
@@ -683,7 +1087,8 @@ function Assert-ApplicationLaunch {
         }
 
         try {
-            [void]$process.WaitForInputIdle(5000)
+            $idleTimeout = if ([string]::IsNullOrWhiteSpace($SingleFileProbeDirectory)) { 5000 } else { 20000 }
+            [void]$process.WaitForInputIdle($idleTimeout)
         }
         catch [System.InvalidOperationException] {
             # A startup liveness probe below remains authoritative.
@@ -691,6 +1096,12 @@ function Assert-ApplicationLaunch {
 
         if ($process.WaitForExit(1500)) {
             throw "The self-contained application exited during startup with code $($process.ExitCode)."
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($SingleFileProbeDirectory)) {
+            Assert-NoStartupChildProcesses -ProcessId $process.Id
+            # No nonzero window handle requirement on headless CI; this proves liveness, not UI readiness.
+            Write-Verbose 'Single-file startup liveness checked with an isolated environment; not GUI or clean-host evidence.'
         }
 
         $closedGracefully = $process.CloseMainWindow() -and $process.WaitForExit(5000)
@@ -724,6 +1135,87 @@ function Assert-ApplicationLaunch {
     }
 }
 
+function Assert-SingleFileApplicationLaunch {
+    param(
+        [Parameter(Mandatory)]
+        [string] $RepositoryRoot,
+
+        [Parameter(Mandatory)]
+        [string] $PublishDirectory,
+
+        [Parameter(Mandatory)]
+        [string] $ProbeDirectory
+    )
+
+    Assert-OwnedDirectoryPath -Root $RepositoryRoot -Path $PublishDirectory -IncludeChildren
+    Assert-OwnedDirectoryPath -Root $RepositoryRoot -Path $ProbeDirectory
+    if (Test-Path -LiteralPath $ProbeDirectory) {
+        throw 'Single-file launch verification requires a fresh owned probe directory.'
+    }
+
+    # Only the freshly published EXE is launched. Contents are inspected AFTER standard-host
+    # extraction, not authenticated by a proprietary bundle parser before execution.
+    Assert-SingleFilePublishLayout -PublishDirectory $PublishDirectory
+    $executablePath = Join-Path $PublishDirectory "$ApplicationName.exe"
+    $expectedVersion = Get-PublishProductVersion -RepositoryRoot $RepositoryRoot
+    Assert-PublishBinaryVersion -Path $executablePath -ExpectedVersion $expectedVersion
+    $exeHash = Get-Sha256Hex -Path $executablePath
+    [void][System.IO.Directory]::CreateDirectory($ProbeDirectory)
+    try {
+        $isolatedDirectory = Join-Path $ProbeDirectory 'application'
+        [void][System.IO.Directory]::CreateDirectory($isolatedDirectory)
+        $isolatedExe = Join-Path $isolatedDirectory "$ApplicationName.exe"
+        [System.IO.File]::Copy($executablePath, $isolatedExe, $false)
+        if ((Get-Sha256Hex -Path $isolatedExe) -cne $exeHash) {
+            throw 'Isolated single-file EXE copy differs from the publish output.'
+        }
+
+        Assert-ApplicationLaunch -PublishDirectory $isolatedDirectory -SingleFileProbeDirectory $ProbeDirectory
+        $appBase = Get-SingleFileExtractionDirectory -ProbeDirectory $ProbeDirectory
+        Assert-SafePublishLayout -PublishDirectory $appBase -ExtractedBundle
+        foreach ($assembly in @("$ApplicationName.dll", 'StudyReportEvaluator.Core.dll')) {
+            Assert-PublishBinaryVersion -Path (Join-Path $appBase $assembly) -ExpectedVersion $expectedVersion -Managed
+        }
+
+        $deps = Get-Content -LiteralPath (Join-Path $appBase "$ApplicationName.deps.json") -Raw | ConvertFrom-Json
+        $canonical = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'src\StudyReportEvaluator.App\packages.lock.json') -Raw |
+            ConvertFrom-Json -AsHashtable
+        $sdkVersion = $canonical['dependencies'][$TargetFramework]['GitHub.Copilot.SDK']['resolved']
+        foreach ($library in @("$ApplicationName/$expectedVersion", "StudyReportEvaluator.Core/$expectedVersion", "GitHub.Copilot.SDK/$sdkVersion")) {
+            if ($library -cnotin @($deps.libraries.PSObject.Properties.Name)) {
+                throw "Extracted deps.json does not match the canonical product/SDK version: $library"
+            }
+        }
+
+        foreach ($document in @(Get-SingleFileDocumentationPaths)) {
+            if ((Get-Sha256Hex -Path (Join-Path $appBase $document)) -cne
+                (Get-Sha256Hex -Path (Join-Path $RepositoryRoot $document))) {
+                throw "Single-file documentation differs from its allowed repository source: $document"
+            }
+        }
+
+        Assert-SingleFilePublishLayout -PublishDirectory $PublishDirectory
+        Assert-SingleFilePublishLayout -PublishDirectory $isolatedDirectory
+        if ((Get-Sha256Hex -Path $executablePath) -cne $exeHash -or
+            (Get-Sha256Hex -Path $isolatedExe) -cne $exeHash) {
+            throw 'The single-file EXE changed during launch verification.'
+        }
+    }
+    finally {
+        # Includes host trace (paths only, no inherited secrets), .net cache and isolated home.
+        # Never clean the real user cache or retain/upload the trace as release evidence.
+        Assert-OwnedDirectoryPath -Root $RepositoryRoot -Path $ProbeDirectory
+        $tracePath = Join-Path $ProbeDirectory 'host-trace.log'
+        if (Test-Path -LiteralPath $tracePath -PathType Leaf) {
+            # A nonrecursive removal also removes a file link itself, never its target.
+            Remove-Item -LiteralPath $tracePath -Force
+        }
+
+        Assert-OwnedDirectoryPath -Root $RepositoryRoot -Path $ProbeDirectory -IncludeChildren
+        Remove-Item -LiteralPath $ProbeDirectory -Recurse -Force
+    }
+}
+
 Assert-SupportedHost
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -732,19 +1224,43 @@ $globalJsonPath = Join-Path $repositoryRoot 'global.json'
 $appProjectPath = Join-Path $repositoryRoot 'src\StudyReportEvaluator.App\StudyReportEvaluator.App.csproj'
 $coreProjectDirectory = Join-Path $repositoryRoot 'src\StudyReportEvaluator.Core'
 $appProjectDirectory = Join-Path $repositoryRoot 'src\StudyReportEvaluator.App'
+$singleFileProfilePath = [System.IO.Path]::GetFullPath((Join-Path $appProjectDirectory 'Properties\PublishProfiles\WindowsSingleFile.pubxml'))
+$dedicatedLockPath = Join-Path $appProjectDirectory 'packages.win-x64-singlefile.lock.json'
 $packageDirectory = Join-Path $repositoryRoot 'artifacts\package'
 $publishParent = Join-Path $repositoryRoot 'artifacts\package\publish'
-$finalPublishDirectory = Join-Path $publishParent $RuntimeIdentifier
+$publishVariant = if ($SingleFile) { "$RuntimeIdentifier-singlefile" } else { $RuntimeIdentifier }
+$lockScope = if ($SingleFile) { 'P02' } else { 'P01' }
+$finalPublishDirectory = Join-Path $publishParent $publishVariant
 $runId = [System.Guid]::NewGuid().ToString('N')
-$temporaryPublishDirectory = Join-Path $publishParent ('.' + $RuntimeIdentifier + '-' + $runId)
-$temporaryLockRelativePath = "obj\P01\$runId\packages.$RuntimeIdentifier.lock.json"
+$temporaryPublishDirectory = Join-Path $publishParent ('.' + $publishVariant + '-' + $runId)
+$temporaryLockRelativePath = "obj\$lockScope\$runId\packages.$RuntimeIdentifier.lock.json"
 $temporaryCopilotDirectory = Join-Path $packageDirectory ('.copilot-cli-' + $runId)
+$temporaryProbeDirectory = Join-Path $publishParent ('.win-x64-singlefile-probe-' + $runId)
 
 foreach ($requiredPath in @($solutionPath, $globalJsonPath, $appProjectPath)) {
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
         throw "Required repository file is missing: $requiredPath"
     }
 }
+
+if ($SingleFile) {
+    if (-not (Test-Path -LiteralPath $dedicatedLockPath -PathType Leaf)) {
+        throw 'Dedicated App single-file package lock is missing.'
+    }
+
+    foreach ($ownedPath in @($publishParent, $finalPublishDirectory, $temporaryPublishDirectory,
+            $temporaryCopilotDirectory, $temporaryProbeDirectory, (Split-Path $singleFileProfilePath -Parent))) {
+        Assert-OwnedDirectoryPath -Root $repositoryRoot -Path $ownedPath
+    }
+
+    foreach ($freshPath in @($temporaryPublishDirectory, $temporaryCopilotDirectory, $temporaryProbeDirectory)) {
+        if (Test-Path -LiteralPath $freshPath) {
+            throw "Single-file temporary output is already present and is not owned by this run: $freshPath"
+        }
+    }
+}
+
+$publishModeArguments = @(Get-PublishModeArguments -SingleFile:$SingleFile -PublishProfileFullPath $singleFileProfilePath)
 
 Assert-PathWithinRoot -Root $repositoryRoot -Path $publishParent
 Assert-PathWithinRoot -Root $repositoryRoot -Path $finalPublishDirectory
@@ -772,13 +1288,33 @@ foreach ($lockPath in $canonicalLockPaths) {
         throw "Canonical package lock is missing: $lockPath"
     }
 
+    if ($SingleFile) {
+        Assert-OwnedDirectoryPath -Root $repositoryRoot -Path (Split-Path $lockPath -Parent)
+        Assert-NotReparsePoint -Item (Get-Item -LiteralPath $lockPath -Force)
+    }
+
     $canonicalLockHashes[$lockPath] = Get-Sha256Hex -Path $lockPath
 }
 
+$singleFileLockHashes = $canonicalLockHashes.Clone()
+if ($SingleFile) {
+    Assert-NotReparsePoint -Item (Get-Item -LiteralPath $dedicatedLockPath -Force)
+    $singleFileLockHashes[$dedicatedLockPath] = Get-Sha256Hex -Path $dedicatedLockPath
+}
+
 $temporaryLockDirectories = @(
-    (Join-Path $coreProjectDirectory "obj\P01\$runId"),
-    (Join-Path $appProjectDirectory "obj\P01\$runId")
+    (Join-Path $coreProjectDirectory "obj\$lockScope\$runId"),
+    (Join-Path $appProjectDirectory "obj\$lockScope\$runId")
 )
+if ($SingleFile) {
+    foreach ($temporaryLockDirectory in $temporaryLockDirectories) {
+        Assert-OwnedDirectoryPath -Root $repositoryRoot -Path $temporaryLockDirectory
+        if (Test-Path -LiteralPath $temporaryLockDirectory) {
+            throw 'Single-file temporary RID lock directory is not owned by this run.'
+        }
+    }
+}
+
 $published = $false
 
 try {
@@ -801,7 +1337,7 @@ try {
             'minimal'
         )
 
-        Invoke-DotNet -DotNetPath $dotNetPath -Arguments @(
+        $ridRestoreArguments = @(
             'restore',
             $appProjectPath,
             '--runtime',
@@ -811,21 +1347,31 @@ try {
             $temporaryLockRelativePath,
             '--property:CopilotSkipCliDownload=true',
             '--property:SelfContained=true',
-            '--property:PublishSingleFile=false',
             '--property:PublishTrimmed=false',
             '--property:PublishReadyToRun=false',
             '--verbosity',
             'minimal'
         )
+        $ridRestoreArguments += $publishModeArguments
+        Invoke-DotNet -DotNetPath $dotNetPath -Arguments $ridRestoreArguments
 
         Assert-RidLockMatchesCanonicalLock `
             -CanonicalLockPath (Join-Path $coreProjectDirectory 'packages.lock.json') `
             -RidLockPath (Join-Path $coreProjectDirectory $temporaryLockRelativePath) `
             -ProjectName 'StudyReportEvaluator.Core'
-        Assert-RidLockMatchesCanonicalLock `
-            -CanonicalLockPath (Join-Path $appProjectDirectory 'packages.lock.json') `
-            -RidLockPath (Join-Path $appProjectDirectory $temporaryLockRelativePath) `
-            -ProjectName 'StudyReportEvaluator.App'
+        if ($SingleFile) {
+            Assert-SingleFileRidLockMatchesDedicatedLock `
+                -CanonicalLockPath (Join-Path $appProjectDirectory 'packages.lock.json') `
+                -DedicatedLockPath $dedicatedLockPath `
+                -RidLockPath (Join-Path $appProjectDirectory $temporaryLockRelativePath)
+            Assert-SingleFileLockHashes -Hashes $singleFileLockHashes
+        }
+        else {
+            Assert-RidLockMatchesCanonicalLock `
+                -CanonicalLockPath (Join-Path $appProjectDirectory 'packages.lock.json') `
+                -RidLockPath (Join-Path $appProjectDirectory $temporaryLockRelativePath) `
+                -ProjectName 'StudyReportEvaluator.App'
+        }
 
         foreach ($lockPath in $canonicalLockPaths) {
             if ((Get-Sha256Hex -Path $lockPath) -cne $canonicalLockHashes[$lockPath]) {
@@ -854,7 +1400,6 @@ try {
             '--output',
             $temporaryPublishDirectory,
             '--property:CopilotSkipCliDownload=false',
-            '--property:PublishSingleFile=false',
             '--property:PublishTrimmed=false',
             '--property:PublishReadyToRun=false',
             '--property:UseAppHost=true',
@@ -863,6 +1408,7 @@ try {
             '--verbosity',
             'minimal'
         )
+        $publishArguments += $publishModeArguments
         if ($null -ne $copilotCliPath) {
             $publishArguments += "--property:CopilotCliBinaryPath=$copilotCliPath"
         }
@@ -873,9 +1419,22 @@ try {
         Pop-Location
     }
 
+    if ($SingleFile) {
+        Assert-SingleFileLockHashes -Hashes $singleFileLockHashes
+        Assert-OwnedDirectoryPath -Root $repositoryRoot -Path $temporaryPublishDirectory -IncludeChildren
+    }
+
     Remove-PublishSymbols -PublishDirectory $temporaryPublishDirectory
-    Assert-SafePublishLayout -PublishDirectory $temporaryPublishDirectory
-    Assert-ApplicationLaunch -PublishDirectory $temporaryPublishDirectory
+    if ($SingleFile) {
+        Assert-SingleFileApplicationLaunch -RepositoryRoot $repositoryRoot `
+            -PublishDirectory $temporaryPublishDirectory -ProbeDirectory $temporaryProbeDirectory
+        Assert-SingleFileLockHashes -Hashes $singleFileLockHashes
+        Assert-OwnedDirectoryPath -Root $repositoryRoot -Path $finalPublishDirectory -IncludeChildren
+    }
+    else {
+        Assert-SafePublishLayout -PublishDirectory $temporaryPublishDirectory
+        Assert-ApplicationLaunch -PublishDirectory $temporaryPublishDirectory
+    }
 
     if (Test-Path -LiteralPath $finalPublishDirectory) {
         Remove-Item -LiteralPath $finalPublishDirectory -Recurse -Force
@@ -883,27 +1442,51 @@ try {
 
     [System.IO.Directory]::Move($temporaryPublishDirectory, $finalPublishDirectory)
     $published = $true
-    Write-Output "Published self-contained unsigned folder: $finalPublishDirectory"
+    if ($SingleFile) {
+        Write-Output "Published self-contained unsigned single file: $(Join-Path $finalPublishDirectory "$ApplicationName.exe")"
+    }
+    else {
+        Write-Output "Published self-contained unsigned folder: $finalPublishDirectory"
+    }
 }
 finally {
-    foreach ($temporaryLockDirectory in $temporaryLockDirectories) {
-        if (Test-Path -LiteralPath $temporaryLockDirectory) {
-            Remove-Item -LiteralPath $temporaryLockDirectory -Recurse -Force
+    try {
+        foreach ($temporaryLockDirectory in $temporaryLockDirectories) {
+            if (Test-Path -LiteralPath $temporaryLockDirectory) {
+                if ($SingleFile) {
+                    Assert-OwnedDirectoryPath -Root $repositoryRoot -Path $temporaryLockDirectory -IncludeChildren
+                }
+
+                Remove-Item -LiteralPath $temporaryLockDirectory -Recurse -Force
+            }
+        }
+
+        if (-not $published -and (Test-Path -LiteralPath $temporaryPublishDirectory)) {
+            if ($SingleFile) {
+                Assert-OwnedDirectoryPath -Root $repositoryRoot -Path $temporaryPublishDirectory -IncludeChildren
+            }
+
+            Remove-Item -LiteralPath $temporaryPublishDirectory -Recurse -Force
+        }
+
+        if (Test-Path -LiteralPath $temporaryCopilotDirectory) {
+            if ($SingleFile) {
+                Assert-OwnedDirectoryPath -Root $repositoryRoot -Path $temporaryCopilotDirectory -IncludeChildren
+            }
+
+            Remove-Item -LiteralPath $temporaryCopilotDirectory -Recurse -Force
         }
     }
+    finally {
+        if ($SingleFile) {
+            Assert-SingleFileLockHashes -Hashes $singleFileLockHashes
+        }
 
-    if (-not $published -and (Test-Path -LiteralPath $temporaryPublishDirectory)) {
-        Remove-Item -LiteralPath $temporaryPublishDirectory -Recurse -Force
-    }
-
-    if (Test-Path -LiteralPath $temporaryCopilotDirectory) {
-        Remove-Item -LiteralPath $temporaryCopilotDirectory -Recurse -Force
-    }
-
-    foreach ($lockPath in $canonicalLockPaths) {
-        if (-not (Test-Path -LiteralPath $lockPath -PathType Leaf) -or
-            (Get-Sha256Hex -Path $lockPath) -cne $canonicalLockHashes[$lockPath]) {
-            throw "Canonical package lock changed during publish: $lockPath"
+        foreach ($lockPath in $canonicalLockPaths) {
+            if (-not (Test-Path -LiteralPath $lockPath -PathType Leaf) -or
+                (Get-Sha256Hex -Path $lockPath) -cne $canonicalLockHashes[$lockPath]) {
+                throw "Canonical package lock changed during publish: $lockPath"
+            }
         }
     }
 }

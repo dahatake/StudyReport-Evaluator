@@ -93,20 +93,58 @@
 
       <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
         <Border Grid.Column="0" Classes="card">
-          <StackPanel Spacing="11">
+          <StackPanel x:Name="CopilotLoginPanel" Spacing="11">
             <TextBlock Text="COPILOT RUNTIME" Classes="kicker" />
             <TextBlock Text="login と identity" Classes="heading" />
             <TextBlock Text="{Binding AuthenticationStatusText}" TextWrapping="Wrap" FontWeight="SemiBold" />
             <TextBlock Text="{Binding RuntimeIdentityText}" Classes="muted" TextWrapping="Wrap" FontSize="12" />
-            <Button
-                x:Name="CheckAuthenticationButton"
-                Content="Copilot 状態を確認"
-                Command="{Binding CheckAuthenticationCommand}"
-                HorizontalAlignment="Left"
-                TabIndex="0"
-                AutomationProperties.AutomationId="CheckCopilotAuthentication"
-                AutomationProperties.Name="既存 Copilot CLI login と model を確認" />
+            <TextBlock
+                x:Name="CopilotLoginInstructions"
+                Text="「GitHubにログイン」で同梱 CLI を起動し、別のブラウザーで認証します。このアプリはパスワードやトークンを取得・保存しません。完了後は「Copilot 状態を確認」を押してください。ログインや定量化は自動で開始しません。"
+                Classes="muted"
+                FontSize="12"
+                TextWrapping="Wrap" />
+            <WrapPanel x:Name="CopilotLoginActions" ItemSpacing="10" LineSpacing="8">
+              <Button
+                  x:Name="CheckAuthenticationButton"
+                  Content="Copilot 状態を確認"
+                  Command="{Binding CheckAuthenticationCommand}"
+                  HorizontalAlignment="Left"
+                  TabIndex="0"
+                  AutomationProperties.AutomationId="CheckCopilotAuthentication"
+                  AutomationProperties.Name="既存 Copilot CLI login と model を確認" />
+              <Button
+                  x:Name="StartCopilotLogin"
+                  Content="GitHubにログイン"
+                  Command="{Binding LoginCommand}"
+                  TabIndex="1"
+                  AutomationProperties.AutomationId="StartCopilotLogin"
+                  AutomationProperties.Name="GitHubにログイン"
+                  AutomationProperties.HelpText="同梱 Copilot CLI を起動し、別のブラウザーで認証します。このアプリはトークンを取得・保存しません。" />
+              <Button
+                  x:Name="CancelCopilotLogin"
+                  Content="ログインを取り消す"
+                  Command="{Binding CancelLoginCommand}"
+                  TabIndex="2"
+                  AutomationProperties.AutomationId="CancelCopilotLogin"
+                  AutomationProperties.Name="ログインを取り消す"
+                  AutomationProperties.HelpText="このアプリで開始したログイン処理だけを取り消します。ブラウザーは閉じません。" />
+            </WrapPanel>
             <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsCheckingAuthentication}" Height="5" />
+            <Border
+                Background="{DynamicResource AppSurfaceMutedBrush}"
+                BorderBrush="{DynamicResource AppBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="9"
+                Padding="12">
+              <TextBlock
+                  x:Name="CopilotLoginStatus"
+                  Text="{Binding LoginStatusText}"
+                  TextWrapping="Wrap"
+                  AutomationProperties.AutomationId="CopilotLoginStatus"
+                  AutomationProperties.Name="{Binding LoginStatusText}"
+                  AutomationProperties.HelpText="ログイン処理の状態だけを表示します。認証状態は「Copilot 状態を確認」で再確認してください。" />
+            </Border>
           </StackPanel>
         </Border>
 
@@ -119,7 +157,7 @@
                 x:Name="ModelComboBox"
                 ItemsSource="{Binding AvailableModelIds}"
                 SelectedItem="{Binding SelectedModelId, Mode=TwoWay}"
-                TabIndex="1"
+                TabIndex="3"
                 AutomationProperties.AutomationId="ExecutionModel"
                 AutomationProperties.Name="評価に使用する Copilot model" />
             <TextBlock Text="Concurrency" Classes="label" />
@@ -127,7 +165,7 @@
                 x:Name="ConcurrencyComboBox"
                 ItemsSource="{Binding ConcurrencyOptions}"
                 SelectedItem="{Binding MaxConcurrency, Mode=TwoWay}"
-                TabIndex="2"
+                TabIndex="4"
                 AutomationProperties.AutomationId="ExecutionConcurrency"
                 AutomationProperties.Name="評価の最大並列度 1 から 3" />
             <TextBlock Text="{Binding ConcurrencyText}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
@@ -143,7 +181,7 @@
               x:Name="ResumeModeCheckBox"
               IsChecked="{Binding IsResumeMode, Mode=TwoWay}"
               Content="既存checkpointから再開"
-              TabIndex="3"
+              TabIndex="5"
               AutomationProperties.AutomationId="ExecutionResumeMode"
               AutomationProperties.Name="新規runとcheckpoint再開を切り替え" />
           <TextBlock Text="{Binding OutputModeText}" Classes="muted" TextWrapping="Wrap" />
@@ -153,7 +191,7 @@
                 x:Name="OutputDirectoryTextBox"
                 Text="{Binding OutputDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                 TextWrapping="Wrap"
-                TabIndex="4"
+                TabIndex="6"
                 AutomationProperties.AutomationId="ExecutionOutputDirectory"
                 AutomationProperties.Name="finalとpartialを作成するdirectory" />
           </StackPanel>
@@ -163,7 +201,7 @@
                 x:Name="ResumePartialPathTextBox"
                 Text="{Binding ResumePartialPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                 TextWrapping="Wrap"
-                TabIndex="4"
+                TabIndex="6"
                 AutomationProperties.AutomationId="ExecutionResumePartialPath"
                 AutomationProperties.Name="再開する既存 partial xlsx path" />
           </StackPanel>
@@ -185,7 +223,7 @@
                 Classes="primary"
                 Content="定量化を開始"
                 Command="{Binding StartCommand}"
-                TabIndex="5"
+                TabIndex="7"
                 AutomationProperties.AutomationId="StartQuantification"
                 AutomationProperties.Name="現在の設計 snapshot で定量化を開始" />
             <Button
@@ -193,7 +231,7 @@
                 Classes="cancel"
                 Content="cancel"
                 Command="{Binding CancelCommand}"
-                TabIndex="6"
+                TabIndex="8"
                 AutomationProperties.AutomationId="CancelQuantification"
                 AutomationProperties.Name="新規 evaluator の送信を停止して部分結果を保持" />
           </WrapPanel>

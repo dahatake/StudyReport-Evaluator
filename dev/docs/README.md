@@ -12,16 +12,18 @@
 | [詳細設計書](detailed-design.md) | 開発、アーキテクト、QA | v4 domain、AI operation、formula、checkpoint、UI、Windows/macOS delivery設計 |
 | [Excel / formula契約](excel-contract.md) | 開発、Excel監査、QA | sheet、formula、blank、preflight、atomic commit |
 | [Traceability](traceability.md) | QA、リリース | AC / TR / implementation / test / gate対応 |
-| [要求定義書](../../docs/requirements-definition.md) | 要求所有者、QA | v4.4規範baseline |
+| [要求定義書](../../docs/requirements-definition.md) | 要求所有者、QA | v4.5規範baseline |
 | [ADR-0012](adr/0012-point-allocation-similarity-resume-portability.md) | アーキテクト | 配点、AI operation、formula、checkpoint、Prompt起動 |
 | [ADR-0013](adr/0013-windows-only-public-release.md) | アーキテクト、リリース | 現行platform/release scope decision |
 | [ADR-0014](adr/0014-product-versioning.md) | アーキテクト、リリース | 製品SemVer、単一正本、tag/release identity |
 | [ADR-0015](adr/0015-windows-macos-installer-delivery.md) | アーキテクト、リリース、QA | Windows ZIP public、development MSIX、macOS source foundation |
-| [Screenshot manifest](../../images/README.md) | UI開発、QA、利用者支援 | 7枚のUNRELEASED `0.8.3`候補view renderと合成fixture provenance |
+| [ADR-0016](adr/0016-windows-one-action-startup.md) | アーキテクト、リリース、QA | App限定Windows単一EXE、login導線、matrix v2、clean-host公開境界 |
+| [Windows単一EXEの方式適合](preflight/windows-singlefile-feasibility.md) | 開発、QA、リリース | 固定.NET／SDK／CLIでの開発host適合結果と未実施clean-host境界 |
+| [Screenshot manifest](../../images/README.md) | UI開発、QA、利用者支援 | 7枚のUNRELEASED `0.8.4`候補view renderと合成fixture provenance |
 
 ## 履歴文書
 
-ADR-0012はADR-0011のv3評価契約をsupersedeし、入力不変、closed AI result、Excel formula ownership、2-project構成等をcarry forwardします。ADR-0013はcurrent public evidenceをWindows 11 x64初版へ限定した記録です。ADR-0014は製品SemVerとrelease identityを定義します。ADR-0015はv4.3でWindows ZIPをpublic artifact、development MSIXをnon-public mechanism、macOSをsource foundationとするdelivery境界を定義します。
+ADR-0012はADR-0011のv3評価契約をsupersedeし、入力不変、closed AI result、Excel formula ownership、2-project構成等をcarry forwardします。ADR-0013はcurrent public evidenceをWindows 11 x64初版へ限定した記録です。ADR-0014は製品SemVerとrelease identityを定義します。ADR-0015はv4.3でWindows ZIPをpublic artifact、development MSIXをnon-public mechanism、macOSをsource foundationとするdelivery境界を定義します。ADR-0016はv4.5でApp限定single-file EXEを将来の主配布、ZIPを代替とし、fresh clean-host CH-01〜06とprotected publishを公開条件に追加します。
 
 ```mermaid
 flowchart LR
@@ -32,7 +34,8 @@ flowchart LR
     V41 --> V42[requirements v4.2\nADR-0015 delivery expansion]
     V42 --> V43[requirements v4.3\nWindows ZIP + development MSIX]
     V43 --> V44[requirements v4.4\nprimary column to question text]
-    V44 --> IMPL[current source + deterministic tests]
+    V44 --> V45[requirements v4.5\nWindows single-file + login + matrix v2]
+    V45 --> IMPL[current source + deterministic tests]
     V3 --> GATE[historical v3 gate evidence]
     GATE --> AUDIT[post-gate conformance audit\n2 gaps found]
     AUDIT --> CLOSE[commit 69e4b99\n2 gaps closed]
@@ -61,13 +64,26 @@ flowchart LR
 
 1. current production source
 2. current deterministic tests
-3. current requirements v4.4 / ADR-0012 / ADR-0013 / ADR-0014 / ADR-0015 / detailed design / version-management
+3. current requirements v4.5 / ADR-0012 / ADR-0013 / ADR-0014 / ADR-0015 / ADR-0016 / detailed design / version-management
 4. generated ignored gate・performance・package evidence
 5. historical ADR・preflight
 
 `artifacts/`は再実行で変化し、Gitへcommitされないため、永続するrelease noteの代わりにはなりません。根拠: [`traceability.md`](traceability.md#evidence-integrity-and-storage)。
 
 監査済み`0.8.3`候補のbaselineはsource `20c8121c2474a13f409c0d7f0fde9d4c41f74698`（集約記録: `artifacts/test/final-recovery-20c8121/phases.json`）です。公開`v0.8.1`の証跡と区別し、今回reviewの編集・その後の変更は再検証完了までこのPASSに含めません。
+
+## Windows単一EXEの開発入口
+
+| Surface | Source / test |
+|---|---|
+| App限定profile | [`WindowsSingleFile.pubxml`](../../src/StudyReportEvaluator.App/Properties/PublishProfiles/WindowsSingleFile.pubxml)、[`WindowsSingleFileProfileTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsSingleFileProfileTests.cs) |
+| locked publish | [`publish-windows.ps1`](../../scripts/publish-windows.ps1)の`-SingleFile`、[`packages.win-x64-singlefile.lock.json`](../../src/StudyReportEvaluator.App/packages.win-x64-singlefile.lock.json)、[`WindowsSingleFilePublishTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsSingleFilePublishTests.cs) |
+| EXE／sidecar package | [`package-windows-singlefile.ps1`](../../scripts/package-windows-singlefile.ps1)、[`WindowsSingleFileArtifactTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsSingleFileArtifactTests.cs) |
+| 実EXEの開発host検証 | [`test-windows-singlefile.ps1`](../../scripts/test-windows-singlefile.ps1)、[`WindowsSingleFilePackageTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsSingleFilePackageTests.cs) |
+| login導線 | [`BundledCopilotLoginService.cs`](../../src/StudyReportEvaluator.App/Copilot/BundledCopilotLoginService.cs)、[`BundledCopilotLoginServiceTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Copilot/BundledCopilotLoginServiceTests.cs)、[`CopilotLoginCommandTests.cs`](../../tests/StudyReportEvaluator.App.Tests/UI/CopilotLoginCommandTests.cs) |
+| matrix v2／公開制御 | [`platform-release-matrix-v2.schema.json`](../../eng/schemas/platform-release-matrix-v2.schema.json)、[`ReleaseMatrixBuilderTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseMatrixBuilderTests.cs)、[`ReleaseWorkflowContractTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseWorkflowContractTests.cs) |
+
+`test-windows-singlefile.ps1`の成功statusは`PASS_DEVELOPMENT`です。fresh Windows 11 x64、MOTW／Windows保護、本人loginのCH-01〜06を代替せず、新EXEの公開資格を単独では与えません。正確な状態は[実装状態](implementation-status.md)と[Traceability](traceability.md)を参照してください。
 
 今回の[敵対的レビューと修正記録](../../work/20260905-adversarial-review.md)の最終検証は、`artifacts/test/adversarial-review/final/summary.json`で対象commit、全体status、TRX件数・SHA-256、前後のsource不変を照合してください。記録がない／`RUNNING`／`FAILED`の場合は完了扱いにしません。
 
@@ -85,7 +101,7 @@ historical fileへ追加した先頭bannerはpost-gate navigation metadataです
 
 | Item | Pinned value | Source |
 |---|---:|---|
-| Product version | `0.8.3` candidate（UNRELEASED） | [`Directory.Build.props`](../../Directory.Build.props)、[版管理手順](version-management.md) |
+| Product version | `0.8.4` candidate（UNRELEASED） | [`Directory.Build.props`](../../Directory.Build.props)、[版管理手順](version-management.md) |
 | .NET SDK | 10.0.400、latestPatch | [`global.json`](../../global.json) |
 | Target framework | `net10.0` | [`Directory.Build.props`](../../Directory.Build.props) |
 | Avalonia | 12.1.1 | [`Directory.Packages.props`](../../Directory.Packages.props) |

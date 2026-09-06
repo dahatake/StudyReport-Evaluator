@@ -2,11 +2,11 @@
 
 | 項目 | 内容 |
 |---|---|
-| 対象要求 | `docs/requirements-definition.md` v4.4 |
-| 設計決定 | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence boundary） |
+| 対象要求 | `docs/requirements-definition.md` v4.5 |
+| 設計決定 | ADR-0012（機能）/ ADR-0016（Windows単一EXE主配布・ZIP代替・明示login・candidate拘束公開gate） |
 | 作成日 | 2026-09-02 |
-| 更新日 | 2026-09-05 |
-| 状態 | Windows ZIP初回公開・development MSIX検証baseline |
+| 更新日 | 2026-09-06 |
+| 状態 | `0.8.4`未公開candidate（EXE主配布候補 + ZIP代替 + development MSIX非公開記録）。公開済みは`v0.8.1` ZIP |
 | Production topology | Core + App の2 projectを維持 |
 
 ## 1. 設計目標
@@ -19,7 +19,9 @@
 - `.partial.xlsx` checkpointとprocess restart後のresume
 - native file picker
 - Prompt text fileによるGUI prefill
-- Windows 11 x64 self-contained ZIP公開とnon-public development MSIX検証
+- Windows 11 x64 App限定self-contained単一EXE（主配布候補）とZIP（代替）の併存
+- 同梱CLIの明示login開始/取消/所有process cleanupと、login後の利用者明示再確認
+- candidate → 人手clean-host証跡受領 → protected publish Final v2の公開制御
 
 追加のdatabase、server、plugin framework、汎用AI operation framework、production projectは作らない。
 
@@ -688,6 +690,7 @@ finalizationはrunの一部として自動実行する。Resultsでは既存fina
 - package manifestへSDK version、CLI file relative path、CLI SHA-256を保存する。
 - appはmanifestを読んでpackage-relative absolute pathを使用する。
 - manifest／file/hash mismatchではAI unavailableとし、PATH fallbackしない。
+- `BundledCopilotCliPathResolver`は`AppContext.BaseDirectory`配下の`copilot-runtime.json`をstrictに検証し、`runtimes/win-x64/native/copilot.exe`を絶対path化して返す。manifestのschema/runtime/SDK version/CLI version/SHA-256不一致は失敗として扱う。
 
 ### 12.2 identity
 
@@ -699,23 +702,45 @@ checkpointとRun sheetへ次を保存する。
 - normal model ID
 - reference/similarity model ID `auto`
 
+### 12.3 runtime配置cacheとcredential storeの分離
+
+- 単一EXEは.NET標準hostのbundle抽出cache（通常`%TEMP%/.net/<app>/<bundle-id>/`）を使う。
+- このcacheはアプリ配置専用であり、input/final/partial workbookの保存先にしない。
+- CLI credential storeはCLI/OS管理の境界とし、Appはcredentialを収集/保存/削除しない。
+- runtime cacheとCLI credential storeを混同せず、失敗時メッセージも境界を分ける。
+
+### 12.4 login lifecycle（明示開始・取消・所有）
+
+- login開始はExecution画面の`GitHubにログイン`ボタン操作だけで行う。GUI起動/Prompt適用/状態確認で自動開始しない。
+- `BundledCopilotLoginService`は検証済み絶対CLI pathを直接起動し、固定引数`--no-auto-update --log-level none login --web-flow`を使用する。
+- shell/PowerShell/`cmd /c`/任意command文字列経由でloginを起動しない。標準入出力のcredential処理を行わない。
+- login取消またはアプリ終了時のみ、serviceが所有する当該login processだけを停止対象にする。process tree全体や名前一致killを行わない。
+- login完了は認証成功の証明ではない。完了/取消/失敗後、利用者が`Copilot 状態を確認`を押して認証状態とモデルを明示再確認する。
+- login完了による自動model選択変更・自動評価開始を行わない。
+
 ## 13. Packaging
 
 ### 13.1 共通payload
 
-- public `win-x64`をRelease/self-contained/non-trimmed/non-single-fileでpublishする。`osx-arm64`／`osx-x64`はsource foundationのcontract検証に限定する。
-- apphost、.NET runtime、Avalonia native assets、Open XML、GitHub Copilot SDK、RID別bundled CLI、runtime manifest、README/docs/images/licenseを含める。
+- App限定single-file publish profile（`WindowsSingleFile.pubxml`）を使用し、`win-x64`/self-contained/`PublishSingleFile=true`/`IncludeNativeLibrariesForSelfExtract=true`/`IncludeAllContentForSelfExtract=true`を固定する。
+- `IncludeAllContentForSelfExtract`は非推奨互換モードであることを明示し、固定構成での適合確認に限定して採用する。
+- 公開payloadは、.NET runtime/Avalonia/Open XML/Copilot SDK/固定CLI/runtime manifestに加え、明示allowlist 17ファイル（README・LICENSE・docs 7件・images README + 7画像）だけを同梱する。
 - source、test、sample、symbol、secret、0-byte、root外linkをpackageへ含めない。
 - package-installed appが外部.NET、Office、別Copilot CLIへfallbackしないことを検証する。
 
 ### 13.2 Windows
 
-- public primary artifactは`StudyReportEvaluator-win-x64.zip`とSHA-256 sidecar。
+- candidate/publicで扱う公開assetは常に4件固定：
+    - `StudyReportEvaluator-win-x64.exe`
+    - `StudyReportEvaluator-win-x64.exe.sha256`
+    - `StudyReportEvaluator-win-x64.zip`
+    - `StudyReportEvaluator-win-x64.zip.sha256`
+- 単一EXEは主配布候補、ZIPは代替経路として併存する。
 - development MSIXのIdentity Versionはstable SemVer `Major.Minor.Patch`から`Major.Minor.Patch.0`へ写像し、test-only Publisherを使用する。
 - test certificateはmanifest/layout/install mechanismだけを検証し、statusを`PASS_MECHANISM`に限定する。
 - 証明書なしのWindows 11開発試験は`StudyReportEvaluator-win-x64.unsigned.test.msix`へ分離する。Publisherは`CN=<test name>, OID.2.25.311729368913984317654407730594956997722=1`とし、fixed unsigned markerを最終fieldに置く。署名entryなし、signed packageと別identityを必須とし、使い捨てVMまたは復元可能なsnapshot上で管理者PowerShellの`Add-AppxPackage -AllowUnsigned`による全ユーザーinstallだけを行う。標準App Installer UI、非管理者setup、production trustの証拠にしない。
-- development MSIXはpackage、unpack、block map、manifest、bundled CLI、sidecar、policy negative、cleanupを検証し、public assetへ含めない。install lifecycleは現版のrequired gateにしない。
-- public ZIPはbundled `runtimes/win-x64/native/copilot.exe`のidentity、safe layout、clean extract/launchを検証する。
+- development MSIXは同candidateで実物検証したsidecar/evidence descriptorを内部controlとして保持するが、MSIX本体をRelease asset/Actions artifactへ公開しない。
+- EXE/ZIPは同一source commit・製品版・SDK/CLI版で作成し、各sidecarのexact hash一致を必須にする。
 - PowerShell 7はengineering scriptだけの前提で、end-user setup要件にしない。
 
 ### 13.3 macOS source foundation（現版公開対象外）
@@ -732,7 +757,8 @@ checkpointとRun sheetへ次を保存する。
 
 ### 13.4 Setup lifecycle
 
-- Windows public: ZIP/sidecar取得→SHA-256確認→展開→apphost起動。
+- Windows EXE主導線: 取得済み`StudyReportEvaluator-win-x64.exe`を開いてGUI起動（download・任意hash比較・本人loginは別操作）。
+- Windows ZIP代替: ZIP/sidecar取得→任意のSHA-256確認→展開→`StudyReportEvaluator.App.exe`起動。
 - Windows development MSIX: package mechanismだけをrequiredとし、一般利用者へ案内しない。
 - package作成、展開、起動は利用者のinput、final、partialを変更・削除しない。
 - wrong RID、tamper、hash mismatchを単一原因で試験し、成功表示しない。
@@ -741,21 +767,22 @@ checkpointとRun sheetへ次を保存する。
 
 - [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)はsecretなしでlocked restore、Release build、決定的test、Windows legacy package、MSIX mechanismを検査する。macOS jobsはlocked restore／Release build後に`MacOsPublishPackageTests`のstatic source contractと`CopilotClientFactoryTests`のresolver contractを実行するだけで、macOS RID publish／bundle生成／署名／公証／実app起動は実施しない。
 - `sample/SampleReport.xlsx`はprivate local inputとしてGit追跡・package同梱を禁止する。platform package acceptanceはsynthetic fixtureで行い、canonical sampleのlocal technical E2Eと分離する。
-- [`.github/workflows/release.yml`](../../.github/workflows/release.yml)はWindows ZIPとsidecarをdraftへ添付する。development MSIXを添付せず、PR/forkへwrite権限を渡さない。
-- release matrixで`publish=true`のWindows ZIP行が`PASS_REQUIRED`でなければ公開しない。development MSIXは`publish=false`かつ`PASS_MECHANISM`として分離する。
+- [`.github/workflows/release.yml`](../../.github/workflows/release.yml)はcandidateとしてEXE/ZIPと各sidecarの4 assetだけをdraftへ添付し、development MSIX本体を添付しない。
+- [`.github/workflows/publish-release.yml`](../../.github/workflows/publish-release.yml)は受領したhuman clean-host JSONを検証し、candidate runと再downloadした4 assetのidentity一致を確認してからpublishする。
+- 受領clean-host証跡は人手実施記録であり、hash一致だけでは実行事実そのものを自動証明しない。
 - Live Copilot、canonical sample technical E2E、external spreadsheet recalculationは各scopeを分離し、未実行を成功扱いにしない。
 
-#### 13.5.1 Initial Windows release matrix v1
+#### 13.5.1 Platform release matrix v2（candidate拘束）
 
-- closed schema正本は[`eng/schemas/platform-release-matrix-v1.schema.json`](../../eng/schemas/platform-release-matrix-v1.schema.json)とする。root、row、nested descriptorは全て`additionalProperties:false`である。
-- semantic validator正本は[`scripts/validate-platform-release-matrix.ps1`](../../scripts/validate-platform-release-matrix.ps1)、direct regressionは[`ReleaseMatrixContractTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseMatrixContractTests.cs)とする。
-- rowはexactly 2件とする。
-    1. `windows-zip`: `publish=true`、`PASS_REQUIRED`、public assetは`StudyReportEvaluator-win-x64.zip`とsidecarだけ。
-    2. `windows-development-msix`: `publish=false`、`PASS_MECHANISM`。MSIX、sidecar、evidenceをmatrixへbindするがRelease assetへ含めない。
-- 各rowはWindows version/build、OS/process architecture、artifact／sidecar／evidenceのbasename、bytes、SHA-256を持つ。rootのstable product versionとlowercase 40桁source commitはvalidator invocationのexpected identityへ一致させる。
+- schema正本は[`eng/schemas/platform-release-matrix-v2.schema.json`](../../eng/schemas/platform-release-matrix-v2.schema.json)、validator正本は[`scripts/validate-platform-release-matrix.ps1`](../../scripts/validate-platform-release-matrix.ps1)とする。
+- candidate modeは`release-candidate-record.json`を生成し、固定3種（single-file EXE / ZIP / development MSIX）のdescriptorを同一runへ拘束する。
+- final modeはcandidate record + 受領clean-host JSONで`platform-release-matrix.json`（schemaVersion 2）を確定する。
+- rowはclosed 3件固定：
+    1. `windows-singlefile-exe`: `publish=true`、`PASS_REQUIRED`、公開asset対象
+    2. `windows-zip`: `publish=true`、`PASS_REQUIRED`、公開asset対象
+    3. `windows-development-msix`: `publish=false`、`PASS_MECHANISM`、non-public記録対象
 - validatorはstrict UTF-8、duplicate JSON property、row重複、unsafe basename、reparse point、size/hash drift、sidecar exact bytes、artifact-kind別evidence contract、publishable asset集合をfail-closedで検査する。
-- matrix validatorの`PASS`はmatrix、local file、evidence identityの一致だけを意味する。ZIP clean launch、MSIX unpack等のpackage behaviorはupstream package testが生成した同一hashのevidenceを使い、candidate／publish workflowがsource commitとartifact hashを再bindする。M2 validator単体をpackage execution、production trust、custom cryptographic attestationの代替にしない。
-- 現版scope外のmacOS row、自由form status、任意metadata bag、未実測artifactをv1 matrixへ追加しない。
+- matrix validatorの`PASS`はcandidate/run/source/version/bytes/hash/sidecar/evidenceの整合を示す。clean-host実行そのものの証明には人手記録と運用承認を別途要する。
 
 ### 13.6 製品版
 
@@ -787,6 +814,15 @@ checkpointとRun sheetへ次を保存する。
 `REFERENCE_OUTPUT_INVALID`, `REFERENCE_TIMEOUT`, `REFERENCE_NETWORK_FAILED`, `SPECIAL_OUTPUT_INVALID`, `SIMILARITY_OUTPUT_INVALID`, `AUTO_MODEL_REQUIRED`
 
 既存`AUTH_REQUIRED`, `AI_TIMEOUT`, `NETWORK_FAILED`, `CLEANUP_FAILED`, `AI_RUNTIME_FAILED`をoperation contextとともに再利用できる。
+
+### Authentication / login preflight distinction
+
+- 認証状態未確認: `AUTH_CHECK_REQUIRED`
+- 認証必要: `AUTH_REQUIRED`
+- 同梱CLI欠落/不一致: `COPILOT_CLI_UNAVAILABLE`
+- runtime確認失敗: `COPILOT_RUNTIME_FAILED`
+- model未選択/未列挙: `MODEL_SELECTION_REQUIRED` / `MODEL_REQUIRED`
+- login終了未確認やcleanup失敗は、login status文言で再確認要求を出し、自動run開始を抑止する。
 
 ### Checkpoint / output
 
@@ -848,10 +884,11 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 ### 16.5 Delivery
 
 - Windows legacy ZIP layout/hash/clean launch regression
+- Windows single-file publish/package/layout/identity/allowlist 17ファイル検証
 - development MSIX manifest/version/layout、unpack、block map、bundled CLI、sidecar、policy negative、cleanup
 - macOS RID別bundle/sign/notary source foundationのstatic contractと未実測artifact非公開
-- public ZIPのbundled CLI、input不変、clean extract/launch regression
-- platform matrix、secret isolation、未実測artifact非公開、public candidate再download
+- public EXE + ZIPの4 asset再download照合、candidate拘束matrix v2、secret isolation
+- clean-host CH-01〜06と本人login実測は別証跡（現時点`NOT_RUN`）
 
 ## 17. File-level implementation map
 
@@ -886,11 +923,15 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 
 ## 18. Definition of done
 
-- 要求v4.4のAC-001〜028がdirect deterministicまたはmechanism evidenceへ適切に接続される。
+- 要求v4.5のAC-001〜034がdirect deterministicまたは適切なmechanism/candidate-bound evidenceへ接続される。
 - 各implementation taskでtarget tests、Release build、diff checkが成功する。
 - 各taskの敵対的reviewで再現したfindingを修正し、同じ観点のfollow-upで0件を確認する。
 - full required testsが成功する。
-- Windows ZIP regressionとdevelopment MSIX package/unpack/integrityが成功する。
+- candidate段階でEXE/ZIP 4 assetと対応evidenceが整合し、development MSIXはnon-public recordのみで扱う。
+- protected publishでcandidate run・受領clean-host記録・再download 4 asset照合・v2 final matrix確定が成功する。
+- 受領human証跡は実行事実の自動証明ではないことを維持する。
+- `0.8.4` single-file EXE candidateは未公開で、公開済み`v0.8.1` ZIPとの境界を崩さない。
+- clean-host CH-01〜06と本人login実測が`NOT_RUN`の間は、新EXE公開完了を主張しない。
 - macOS source foundationのstatic contractが成功し、production artifactを公開しない。
 - Linux、Windows Arm64、macOS 13以前、未実測installer／signing／notarizationを対応済みと記録しない。
 - 実在学生本文、Prompt、reference、AI reason/evidenceをlog、test artifact、review recordへ追加しない。

@@ -1,15 +1,17 @@
-# StudyReport Evaluator v4.4 システムテスト Prompt集
+# StudyReport Evaluator v4.5 システムテスト Prompt集
 
 | 項目 | 内容 |
 |---|---|
 | 文書用途 | ソフトウェアエンジニアまたはテスト支援AIが、ユースケース単位でコピーして実行するPrompt集 |
-| 対象 | StudyReport Evaluator v4.4 |
-| 基準日 | 2026-09-05 |
-| 要求正本 | `docs/requirements-definition.md` v4.4 |
-| 設計正本 | `dev/docs/detailed-design.md`、ADR-0012、ADR-0013、ADR-0015 |
-| 対象環境 | Windows 11 x64。public artifactはunsigned ZIP、development MSIXはnon-public mechanism、macOSはsource foundationのみ |
+| 対象 | StudyReport Evaluator v4.5 |
+| 基準日 | 2026-09-06 |
+| 要求正本 | `docs/requirements-definition.md` v4.5 |
+| 設計正本 | `dev/docs/detailed-design.md`、ADR-0012、ADR-0013、ADR-0015、ADR-0016 |
+| 対象環境 | Windows 11 x64。public artifactはunsigned single-file EXE（主導線）とunsigned ZIP（代替）+ sidecar。development MSIXはnon-public mechanism、macOSはsource foundationのみ |
 | 必須決定的fixture | `tests/fixtures/system-test/SystemTest-10Students.xlsx` |
 | 注意 | 本書はテスト結果ではない。未実施、過去結果、文書上の期待値を今回のPASSとして扱わない |
+
+> **V02境界の明記:** P06/P07の開発host観測は`PASS_DEVELOPMENT`またはpackage機構確認であり、fresh標準user clean-host（CH-01〜CH-06）の公開判定試験（V02）を充足しない。未実施項目は`NOT_RUN`のまま保持し、`PASS_REQUIRED`/`PASS_PRODUCTION`へ読み替えない。
 
 > **捏造禁止:** 期待結果は要求、実装、固定fixture、独立oracleから導出し、実測結果は今回の実行証跡だけから記録する。過去のtest件数、性能値、package hash、Live AI結果、未対応platformの結果を今回値として流用しない。
 
@@ -19,7 +21,7 @@
 
 - repositoryに実在する要求正本は`docs/requirements-definition.md`である。
 - `/hve-dev/requirement-definition.md`は本repositoryに存在しないため参照しない。
-- 要求定義§19のTR-01〜TR-29を欠番なく網羅する。
+- 要求定義§19のTR-01〜TR-33を欠番なく網羅する。
 - 10人fixture E2Eは、Promptを小規模かつ決定的に反復できるよう追加した補助scenarioであり、要求定義を改変しない。
 - 531行synthetic E2E、10人synthetic E2E、canonical SampleReport technical E2Eを相互代用しない。
 - optional Live Copilotとexternal recalculationをrequired deterministic testへ代用しない。
@@ -124,7 +126,7 @@ Kは、設問(4)(5)に関連してPrompt作成時に工夫した点、観点、�
 
 ## 4. 使い方
 
-1. 実行したい`ST-UC-01`〜`ST-UC-25`を1件選ぶ。
+1. 実行したい`ST-UC-01`〜`ST-UC-26`を1件選ぶ。
 2. 直下の`text`コードブロック全体を1個だけコピーする。
 3. コマンド実行可能なAI agentまたはテスト担当者へ渡す。
 4. 各Promptはrepository root、fixture path、evidence directoryを実行時に解決する。原則として置換は不要。
@@ -214,6 +216,7 @@ Kは、設問(4)(5)に関連してPrompt作成時に工夫した点、観点、�
 | ST-UC-23 | macOS source foundation static contract | TR-26 / AC-024 |
 | ST-UC-24 | macOS future trust order static contract | TR-27 / AC-025 |
 | ST-UC-25 | Windows ZIP E2E、release matrix、secret boundary | TR-28、TR-29 / AC-026〜AC-028 |
+| ST-UC-26 | clean-host単一EXE起動・同梱CLI状態確認・本人login・公開境界 | TR-30〜TR-33 / AC-029〜AC-034 |
 
 ## 9. Scenario Prompt
 
@@ -222,7 +225,7 @@ Kは、設問(4)(5)に関連してPrompt作成時に工夫した点、観点、�
 ### ST-UC-01: Forms／Google question row 1/2と10人fixture mapping
 
 ```text
-あなたはStudyReport Evaluator v4.4のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のシステムテスト担当者です。
 Test ID: ST-UC-01
 Requirement: TR-01 / AC-001 / AC-002
 
@@ -276,7 +279,7 @@ UIで未観測の内部候補はmetadata/mapping testの結果として報告し
 ### ST-UC-02: Canonical SampleReport identityとF〜K role候補
 
 ```text
-あなたはStudyReport Evaluator v4.4のcanonical repository sampleシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のcanonical repository sampleシステムテスト担当者です。
 Test ID: ST-UC-02
 Requirement: TR-02 / AC-003 / docs/requirements-definition.md §4.4
 
@@ -322,7 +325,7 @@ Requirement: TR-02 / AC-003 / docs/requirements-definition.md §4.4
 ### ST-UC-03: Native picker、direct path、unsupported input
 
 ```text
-あなたはStudyReport Evaluator v4.4のinput workflowシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のinput workflowシステムテスト担当者です。
 Test ID: ST-UC-03
 Requirement: TR-03 / AC-001 / AC-002
 
@@ -358,7 +361,7 @@ Requirement: TR-03 / AC-001 / AC-002
 ### ST-UC-04: 絶対配点、均等化、range、run前validation
 
 ```text
-あなたはStudyReport Evaluator v4.4の採点設計システムテスト担当者です。
+あなたはStudyReport Evaluator v4.5の採点設計システムテスト担当者です。
 Test ID: ST-UC-04
 Requirement: TR-04 / TR-05 / AC-004 / AC-005 / AC-006 / AC-008
 
@@ -406,7 +409,7 @@ validation matrix:
 ### ST-UC-05: Knowledge／Custom／Special Promptとclosed tool schema
 
 ```text
-あなたはStudyReport Evaluator v4.4のPrompt・structured resultシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のPrompt・structured resultシステムテスト担当者です。
 Test ID: ST-UC-05
 Requirement: TR-06 / AC-007 / AC-008
 
@@ -440,7 +443,7 @@ Requirement: TR-06 / AC-007 / AC-008
 ### ST-UC-06: Reference-firstとnormal／special／similarity境界
 
 ```text
-あなたはStudyReport Evaluator v4.4の4 AI operationシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5の4 AI operationシステムテスト担当者です。
 Test ID: ST-UC-06
 Requirement: TR-07 / TR-08 / AC-009 / AC-010 / AC-012
 
@@ -487,7 +490,7 @@ attempt/session/call countとcheckpoint順はtest double/store記録から取得
 ### ST-UC-07: Score hand oracleとConfig参照formula
 
 ```text
-あなたはStudyReport Evaluator v4.4のscore・Excel formulaシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のscore・Excel formulaシステムテスト担当者です。
 Test ID: ST-UC-07
 Requirement: TR-09 / TR-10 / AC-006 / AC-011 / AC-012
 
@@ -541,7 +544,7 @@ formula surface:
 ### ST-UC-08: Final workbook、output path、no-overwrite atomic commit
 
 ```text
-あなたはStudyReport Evaluator v4.4のfinal workbook・output commitシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のfinal workbook・output commitシステムテスト担当者です。
 Test ID: ST-UC-08
 Requirement: TR-11 / TR-12 / AC-013
 
@@ -590,7 +593,7 @@ atomic final oracle:
 ### ST-UC-09: Checkpoint、atomic fault、resume mismatch
 
 ```text
-あなたはStudyReport Evaluator v4.4のdurable checkpoint・resumeシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のdurable checkpoint・resumeシステムテスト担当者です。
 Test ID: ST-UC-09
 Requirement: TR-13 / TR-14 / AC-014 / AC-015
 
@@ -648,7 +651,7 @@ resume期待:
 ### ST-UC-10: Auth／timeout／network／schema／cleanup／cancel
 
 ```text
-あなたはStudyReport Evaluator v4.4のAI failure・cancelシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のAI failure・cancelシステムテスト担当者です。
 Test ID: ST-UC-10
 Requirement: TR-15 / AC-012 / AC-016
 
@@ -683,7 +686,7 @@ normal、reference、special、similarityの各operationで単一原因ごとに
 ### ST-UC-11: Selected same-row privacy、literal text、no-content log
 
 ```text
-あなたはStudyReport Evaluator v4.4のprivacy・formula injectionシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のprivacy・formula injectionシステムテスト担当者です。
 Test ID: ST-UC-11
 Requirement: TR-16 / AC-019
 
@@ -723,7 +726,7 @@ logging oracle:
 ### ST-UC-12: 4-step UI、warning、progress、keyboard、200% scale
 
 ```text
-あなたはStudyReport Evaluator v4.4のuser-visible UI・accessibilityシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のuser-visible UI・accessibilityシステムテスト担当者です。
 Test ID: ST-UC-12
 Requirement: TR-17 / AC-002 / AC-016 / AC-017
 
@@ -775,7 +778,7 @@ apphost起動時に`Copilot 状態を確認`や`定量化を開始`を押す必�
 ### ST-UC-13: `--input`／`--prompt`、explicit apply、no-auto-run
 
 ```text
-あなたはStudyReport Evaluator v4.4のcommand-line Prompt launchシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のcommand-line Prompt launchシステムテスト担当者です。
 Test ID: ST-UC-13
 Requirement: TR-18 / AC-018
 
@@ -819,7 +822,7 @@ explicit apply oracle:
 ### ST-UC-14: Windows x64 publish、bundled CLI、clean launch
 
 ```text
-あなたはStudyReport Evaluator v4.4のWindows public ZIP deliveryシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のWindows ZIP代替経路システムテスト担当者です。
 Test ID: ST-UC-14
 Requirement: TR-19 / AC-020
 
@@ -863,7 +866,7 @@ clean launch:
 ### ST-UC-15: Unsigned ZIP integrity、sidecar、再現性、tamper
 
 ```text
-あなたはStudyReport Evaluator v4.4のWindows public ZIP package integrityシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のWindows ZIP package integrityシステムテスト担当者です。
 Test ID: ST-UC-15
 Requirement: TR-20 / AC-020
 
@@ -903,7 +906,7 @@ negative case:
 ### ST-UC-16: Windows-only claim、documentation、screenshots
 
 ```text
-あなたはStudyReport Evaluator v4.4の公開scope・documentation整合システムテスト担当者です。
+あなたはStudyReport Evaluator v4.5の公開scope・documentation整合システムテスト担当者です。
 Test ID: ST-UC-16
 Requirement: TR-21 / TR-22 / AC-021 / AC-022
 
@@ -915,9 +918,10 @@ Requirement: TR-21 / TR-22 / AC-021 / AC-022
 3. repository外にevidence directoryを作り、locked restore後、`DocumentationContractTests`、`DocumentationScreenshotTests`、`WindowsPublishPackageTests`をReleaseで実行します。
 
 Delivery transition oracle:
-- 要求v4.4はADR-0015のv4.3 delivery決定をcarry forwardし、Windows unsigned ZIPをpublic artifact、development MSIXをnon-public mechanism、macOSをsource foundationとする。
-- current READMEと利用者文書はWindows 11 x64 unsigned ZIPだけを対応範囲とする。
-- scripts/package testsは`win-x64` ZIPをpublic regression、development MSIXを`PASS_MECHANISM`として分離する。
+- 要求v4.5はv4.4の業務契約とADR-0015のZIP／development MSIX境界をcarry forwardし、ADR-0016のApp限定unsigned single-file EXE、login導線、matrix v2を追加する。
+- current READMEと利用者文書は公開`v0.8.1`のZIPと、UNRELEASED `0.8.4`候補の将来EXE主導線／ZIP代替を明確に分離する。
+- single-file／ZIP package testsはそれぞれの実成果物とsidecarを検証し、development MSIXは`PASS_MECHANISM`として非公開に分離する。
+- 開発hostのP06／P07、fake login、CLI helpをfresh OSのCH-01〜06や本人login成功へ読み替えず、新EXEを公開済みと記載しない。
 - development MSIX、macOS、installer、code signing、notarization、SmartScreen／Gatekeeper結果を対応済みまたはpublic assetと記載しない。
 - packageにsample、user workbook、未生成macOS runtime、署名済みmarkerを現在のpublic成果物として要求しない。
 - framework support、cross-publish、test certificateを現在のproduction PASSへ算入しない。
@@ -946,7 +950,7 @@ read-onlyでdocument inventory、local link、claim文字列、script/package en
 ### ST-UC-17: 10人fixture new→interrupt→resume E2E
 
 ```text
-あなたはStudyReport Evaluator v4.4の10人synthetic durable E2Eシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5の10人synthetic durable E2Eシステムテスト担当者です。
 Test ID: ST-UC-17
 Requirement: supplemental deterministic scenario / AC-009〜AC-016 / AC-019
 
@@ -999,7 +1003,7 @@ Requirement: supplemental deterministic scenario / AC-009〜AC-016 / AC-019
 ### ST-UC-18: Fixed-seed 531-row synthetic new/resume E2E
 
 ```text
-あなたはStudyReport Evaluator v4.4の531-row fixed-seed synthetic E2Eシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5の531-row fixed-seed synthetic E2Eシステムテスト担当者です。
 Test ID: ST-UC-18
 Requirement: TR-23 / AC-009〜AC-016 / AC-019
 
@@ -1048,7 +1052,7 @@ fixture／definition:
 ### ST-UC-19: Canonical SampleReport no-network technical durable E2E
 
 ```text
-あなたはStudyReport Evaluator v4.4のcanonical SampleReport technical durable E2Eシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.5のcanonical SampleReport technical durable E2Eシステムテスト担当者です。
 Test ID: ST-UC-19
 Requirement: real-data technical E2E / AC-009〜AC-016 / AC-019
 
@@ -1066,8 +1070,8 @@ Requirement: real-data technical E2E / AC-009〜AC-016 / AC-019
 8. evidenceはrepository外の一意なdirectoryへ保存します。
 
 正本:
-- `docs/requirements-definition.md` v4.4
-- `SystemTest-prompt.md` v4.4
+- `docs/requirements-definition.md` v4.5
+- `SystemTest-prompt.md` v4.5
 - `docs/getting-started.md`
 - `docs/privacy-and-data-handling.md`
 - `tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs`
@@ -1149,7 +1153,7 @@ technical oracle:
 19. external recalculation statusはadvisoryとしてrequired pathから分離する。
 
 evidence整合性:
-- JSONのsource requirements=`docs/requirements-definition.md v4.4`、system_test_prompt=`SystemTest-prompt.md v4.4`。
+- JSONのsource requirements=`docs/requirements-definition.md v4.5`、system_test_prompt=`SystemTest-prompt.md v4.5`。
 - driver固定run IDを今回のunique external run IDと誤認せず、`NON_UNIQUE_DRIVER_RUN_ID`として記録する。
 - runtime CLI identityがtest value／zero hashであるため、bundled production CLI検証済みと報告しない。
 - JSON privacy flagだけを信用せず、input absolute path、user profile path、16文字以上のworkbook文字列が完全一致で混入していないことを値非表示で再確認する。
@@ -1190,7 +1194,7 @@ Required technical E2Eは全technical oracleを今回確認した場合だけPAS
 ### ST-UC-20: Optional authenticated synthetic Copilot smoke
 
 ```text
-あなたはStudyReport Evaluator v4.4のoptional authenticated synthetic Copilot smoke担当者です。
+あなたはStudyReport Evaluator v4.5のoptional authenticated synthetic Copilot smoke担当者です。
 Test ID: ST-UC-20
 Requirement: TR-24A advisory
 
@@ -1223,7 +1227,7 @@ PASSはsession/tool/schema/cleanupの1件のtechnical smoke成功だけを意味
 ### ST-UC-21: Optional external spreadsheet recalculation
 
 ```text
-あなたはStudyReport Evaluator v4.4のoptional external spreadsheet recalculation smoke担当者です。
+あなたはStudyReport Evaluator v4.5のoptional external spreadsheet recalculation smoke担当者です。
 Test ID: ST-UC-21
 Requirement: TR-24B advisory
 
@@ -1258,7 +1262,7 @@ PASSは登録済みspreadsheet 1環境でsynthetic formulaが再計算された�
 ### ST-UC-22: Windows development MSIX mechanismと非公開境界
 
 ```text
-あなたはStudyReport Evaluator v4.4のWindows development MSIX mechanismテスト担当者です。
+あなたはStudyReport Evaluator v4.5のWindows development MSIX mechanismテスト担当者です。
 Test ID: ST-UC-22
 Requirement: TR-25 / AC-023 / AC-027
 
@@ -1281,7 +1285,7 @@ install／launch／upgrade／repair／uninstallは現版のrequired scopeでは�
 ### ST-UC-23: macOS source foundation static contract
 
 ```text
-あなたはStudyReport Evaluator v4.4のmacOS source foundationテスト担当者です。
+あなたはStudyReport Evaluator v4.5のmacOS source foundationテスト担当者です。
 Test ID: ST-UC-23
 Requirement: TR-26 / AC-024
 
@@ -1300,7 +1304,7 @@ Requirement: TR-26 / AC-024
 ### ST-UC-24: macOS future trust order static contract
 
 ```text
-あなたはStudyReport Evaluator v4.4のmacOS future trust order contractテスト担当者です。
+あなたはStudyReport Evaluator v4.5のmacOS future trust order contractテスト担当者です。
 Test ID: ST-UC-24
 Requirement: TR-27 / AC-025
 
@@ -1320,21 +1324,74 @@ Requirement: TR-27 / AC-025
 ### ST-UC-25: Windows ZIP E2Eとrelease matrix
 
 ```text
-あなたはStudyReport Evaluator v4.4のplatform release gate担当者です。
+あなたはStudyReport Evaluator v4.5のdeterministic platform release gate担当者です。
 Test ID: ST-UC-25
 Requirement: TR-28 / TR-29 / AC-026 / AC-027 / AC-028
 
 捏造禁止。実在する今回artifactとevidenceだけを使用し、development MSIXまたはmacOS source foundationをpublic artifactへ昇格しません。private sample、student content、Prompt、response、reason、credential、private pathを共有evidenceへ含めません。
 
-1. Windows ZIPを今回build/packageし、sidecar、safe layout、version、bundled CLI、clean extract/launch、sample/user workbook不在を確認します。
-2. machine-readable matrixをclosed schemaで検証します。Windows ZIPは`publish=true`かつ`PASS_REQUIRED`、development MSIXは`publish=false`かつ`PASS_MECHANISM`であることを要求します。
-3. `publish=false` rowとmacOS未実測artifactがRelease asset一覧にないことを確認します。
-4. release workflowがPR/forkでwrite権限やsecretを使用せず、verified annotated tagのdraftへZIPとsidecarだけを添付することを確認します。
-5. publish workflowがdraft、tag、CHANGELOG、asset hash、matrixを再検証し、protected approval後だけ公開することを確認します。
-6. candidateが存在する段階ではfresh downloadしたZIP/sidecarを再検証します。存在しないURL、hash、run IDを作りません。
-7. documentationがWindows ZIPの取得、SHA-256確認、展開、起動を案内し、development MSIX/macOSを一般利用者へ案内しないことを確認します。
+1. Windows単一EXEとZIPを同じsource／versionから今回build/packageし、各sidecar、safe layout、bundled CLI、sample/user workbook不在を確認します。ZIPのclean extract/launch回帰を維持します。
+2. matrix v2をclosed schemaで検証します。single-file EXEとZIPは`publish=true`、development MSIXは`publish=false`かつ`PASS_MECHANISM`のcandidate-bound descriptorであることを要求します。
+3. draft／public assetのexact setがEXE／ZIPと各sidecarの4件で、development MSIX本体、control JSON、macOS未実測artifactが含まれないことを確認します。
+4. candidate workflowがPR/forkでwrite権限やsecretを使用せず、verified annotated tagのdraftへ4 assetだけを添付し、clean-host待ちのcandidate recordを内部control artifactへ保存することを確認します。
+5. publish workflowが成功candidate run／tag commit、metadata限定clean-host JSON、4 assetの再download、C03 final matrix、C02再検証を要求し、protected approval後の最後のwrite操作だけで公開することを確認します。
+6. live candidateが存在する場合だけ、そのrun ID／commitとfresh downloadした4 assetを再検証します。存在しないURL、hash、run ID、CH結果を作りません。
+7. documentationが未公開EXE主候補と公開`v0.8.1` ZIP代替を分離し、development MSIX/macOSを一般利用者へ案内せず、CH-01〜06未実施を開示することを確認します。
 
-全required oracleが一致した場合だけ`PASS_REQUIRED`。GitHub draft/public candidateがまだ存在しない段階ではfresh-download scopeを`NOT_RUN_NO_CANDIDATE`とし、公開完了とは報告しません。
+全deterministic oracleが一致した場合だけlocal contract scopeを`PASS_REQUIRED`とします。GitHub draft/public candidateがまだ存在しない段階ではfresh-download scopeを`NOT_RUN_NO_CANDIDATE`、CH-01〜06を`NOT_RUN`とし、公開完了とは報告しません。
 
 報告順: Test ID / UTC / source / ZIP identity・launch / matrix rows / excluded assets / workflow boundary / docs / fresh-download status / evidence / Status / 非保証事項。
+```
+
+### ST-UC-26: clean-host単一EXE・同梱CLI状態確認・本人login・公開境界
+
+```text
+あなたはStudyReport Evaluator v4.5のclean-host公開判定システムテスト担当者です。
+Test ID: ST-UC-26
+Requirement: TR-30 / TR-31 / TR-32 / TR-33 / AC-029 / AC-030 / AC-031 / AC-032 / AC-033 / AC-034
+
+このscenarioは、P06/P07（開発host観測）と独立したV02公開判定用です。捏造禁止。P06/P07のPASS_DEVELOPMENTや過去reportをclean-host PASSへ転記しません。未実施はNOT_RUNのまま保持します。
+
+絶対規則:
+1. 候補EXE identity（candidate run/commit/productVersion/bytes/SHA-256）に**完全一致**する実物だけを対象にする。別EXE・再build・類似版を代用しない。
+2. fresh Windows 11 x64標準userで実施する。事前に.NET SDK/Runtime、PowerShell 6+、Node/npm、Git/gh、外部Copilot CLI、Office、IDEを追加導入しない。
+3. 取得済みEXE 1個からofflineでGUI起動、Input/Design利用を確認する。手動展開、昇格、setup script、terminal入力を要求しない。
+4. 標準ブラウザー取得のMOTW、SmartScreen/SAC/企業policy状態、警告/拒否、**実際の操作数**をそのまま記録する。無警告へ丸めない。
+5. 同梱CLIのStart/Ping/auth状態確認を分離し、正常な未認証応答とruntime failureを区別する。CLI help成功をauth済みやAI-readyへ読み替えない。
+6. EXEの移動、再起動、同時起動、任意cwd、相対`--input`、複数`--prompt`、日本語/空白path、read-only配置先、cache欠落復元で契約が維持されることを確認する。
+7. input/final/partial/workbook data不変を検証する。cacheと利用者dataの領域を混同しない。
+8. 本人loginは「GitHubにログイン」の明示操作だけで開始する。cancelとアプリ終了時は、当該login processだけを終了し、ブラウザー/他CLI/credentialへ干渉しない。
+9. secret、token、device code、学生data、Prompt本文、生ログ、環境変数一覧を証跡へ含めない。metadata限定JSONのみを作成する。
+10. optional authenticated live AI（ADV-01）はsynthetic入力だけで別scenarioとして扱う。CH-01〜CH-06の必須判定へ代用しない。
+
+準備:
+1. `StudyReportEvaluator.slnx`を上位探索してrepository rootへ移動し、HEADとworktree status hashを記録する。
+2. candidate control artifact（release-candidate-record、EXE/ZIP evidence、MSIX descriptor）と受領したclean-host JSONの整合を検証する。
+3. EXEのbasename/bytes/SHA-256、sidecar、source commit、candidate run IDが一致しない場合は`FAIL_CANDIDATE_IDENTITY_MISMATCH`で停止する。
+4. 試験中にsource、package、evidenceを改変しない。再packageや再publishが必要ならこのscenarioを中断して別runとして扱う。
+
+実行（必須CH）:
+- CH-01: fresh OS/architecture/標準user/追加依存未導入を確認。
+- CH-02: EXE1個からoffline GUI起動、Input/Design利用、no-auto-run、追加導入不要。
+- CH-03: bundled CLIのStart/Ping/auth状態確認（未認証とfailureの区別）。
+- CH-04: 移動/再起動/同時起動/args/cwd/path/cacherecovery/data不変。
+- CH-05: MOTW・保護状態・警告/拒否・実操作数を記録し承認範囲と比較。
+- CH-06: 本人login、完了後/再起動後の既存buttonで再確認、cancel/close時の所有process限定終了。
+
+任意ADV:
+- ADV-01（optional authenticated live AI）は、本人が明示承認したsynthetic入力のみ。`NOT_RUN`可。
+- ADV-02（optional external recalculation）は従来どおり任意。`NOT_RUN`可。
+
+判定:
+- CH-01〜CH-06が全て今回PASSし、candidate拘束（run/commit/version/hash/sidecar）とpublic 4 assets再照合が一致した場合のみ`PASS_REQUIRED`。
+- CHの欠落、`FAIL`、`NOT_RUN`、別candidate証跡、機微field混入、MSIX本体の公開混入、public asset差替えはFAIL。
+- ADV-01/ADV-02の`NOT_RUN`は許容し、必須CHの失敗へ変換しない。
+
+証跡契約（metadata only）:
+- 含める: run ID、timestamp、candidate/source/productVersion、artifact basename/bytes/SHA-256、host依存有無フラグ、CH/ADV status、operation count、記録参照hash。
+- 含めない: username、secret、token、device code、学生本文、Prompt本文、response本文、生ログ、private absolute path。
+
+報告順: Test ID / candidate identity binding / host前提(CH-01) / offline GUI(CH-02) / bundled CLI state(CH-03) / lifecycle invariants(CH-04) / MOTW-protection-operations(CH-05) / personal login-cancel-close(CH-06) / optional ADV status / metadata-only evidence / public 4 assets再照合 / Status / 差異 / 非保証事項。
+
+最後に、P06/P07はdevelopment-host試験でありV02 clean-host判定を代替しないこと、CH未実施はNOT_RUNのままであることを明記します。
 ```

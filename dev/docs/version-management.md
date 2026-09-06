@@ -9,13 +9,15 @@
 | tool self-test | [`dev/version.tests.ps1`](../version.tests.ps1) |
 | 変更履歴 | [`CHANGELOG.md`](../../CHANGELOG.md) |
 | Decision | [ADR-0014](adr/0014-product-versioning.md) |
-| 最終更新 | 2026-09-05 |
+| 最終更新 | 2026-09-06 |
 
 ## 1. 目的と境界
 
 この手順は、同じ製品版がsource、App/Core project、公開binary、Git tag、変更履歴で一貫するように管理するための正本です。製品版を変更しただけで、test済み、公開済み、署名済み、またはGitHub Release作成済みとは扱いません。
 
 現在の公開版は`0.8.1`、2026-09-04に初回公開しました。公開前の候補を`0.8.0`へ再baselineし、公開task完了時にPATCHを1つ進めています。過去の`1.0.0`、`1.0.1`、`1.1.0`は公開済み版ではなく、経緯は[調査証拠](../../work/20260902-version-management-investigation-evidence.json)、[release recovery記録](../../work/20260903-v1.0.1-release-recovery-plan.md)、[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に保持します。
+
+現在の開発候補版は`0.8.4`です。2026-09-06承認のv4.5実装では、R03（最終版処理）を実装・文書task完了後まで延期し、`0.8.3`からPATCHを1つ進めて`CHANGELOG.md`のUnreleasedへ実装済み変更を追加しました。R03後のEXE／ZIP共存の最終配布物はこれから再publish・再package・再検証します（版だけ進めて公開検証を省略しません）。
 
 2026-09-02の公開API調査では公開GitHub Releaseとremote tagはいずれも0件でした。この観測はprivate draftの不存在を証明しません。[調査レポート §2.2](../../work/20260902-version-management-investigation-report.md#22-実測した主なcommand)
 
@@ -74,8 +76,8 @@
 
 | Version | 現在値 | 更新条件 | Source |
 |---|---:|---|---|
-| 製品版 | `0.8.3` candidate | 本手順の公開契約差分 | [`Directory.Build.props`](../../Directory.Build.props) |
-| 要求文書版 | `4.4` | 要求baseline変更 | [`requirements-definition.md`](../../docs/requirements-definition.md) |
+| 製品版 | `0.8.4` candidate | 本手順の公開契約差分 | [`Directory.Build.props`](../../Directory.Build.props) |
+| 要求文書版 | `4.5` | 要求baseline変更 | [`requirements-definition.md`](../../docs/requirements-definition.md) |
 | QuantificationDefinition schema | `4.0` | canonical definition format変更 | [`CanonicalDefinitionSerializer.cs`](../../src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs) |
 | checkpoint schema | `1` | checkpoint payload format変更 | [`CheckpointEnvelope.cs`](../../src/StudyReportEvaluator.App/Workbooks/Checkpoint/CheckpointEnvelope.cs) |
 | Copilot runtime manifest schema | `1` | `copilot-runtime.json` format変更 | [`StudyReportEvaluator.App.csproj`](../../src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj) |
@@ -163,6 +165,13 @@ App/Core DLLについて、次を検証します。
 - `FileVersion == MAJOR.MINOR.PATCH.0`
 - `ProductVersion`の`+sourceRevision`より前が製品版と一致
 
+v4.5の単一EXE経路では、`scripts/publish-windows.ps1 -SingleFile`（P02）が次を実検証します。
+
+- 最終EXE (`StudyReportEvaluator.App.exe`) の`FileVersion`と`ProductVersion`が`Directory.Build.props`の製品版と一致する。
+- 標準hostの展開後payloadにある管理DLL（`StudyReportEvaluator.App.dll`、`StudyReportEvaluator.Core.dll`）の`AssemblyVersion`/`FileVersion`/`ProductVersion`が同じ製品版に一致する。
+
+この検証はP02/P07のpackage evidenceに拘束され、C02/C03でartifact hashとcandidate identityへ再結合されます。公開workflowはここで記録された検証を再利用し、publish段階で別バイナリへすり替えません。
+
 ### 5.6 release tagを検証
 
 公開用commitとtagを作成した後に実行します。
@@ -222,11 +231,15 @@ pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify -Tag v0.8.0 -RequireC
 
 1. [`scripts/publish-windows.ps1`](../../scripts/publish-windows.ps1)で`win-x64`をpublishします。
 2. [`scripts/package-windows.ps1`](../../scripts/package-windows.ps1)でpublic ZIPとsidecarを作ります。
-3. `version.ps1 verify -PublishedDirectory ...`でApp/Core DLLを検証します。
-4. package testでZIPのsafe layout、sidecar、bundled CLI、clean extract/launch、再現性を検証します。
-5. development MSIXはmanifest/version/RID、unpack、block map、bundled CLI、sidecar、policy negative、cleanupを検証し、`PASS_MECHANISM`とします。install/launchはrequiredではなく、GitHub Release assetへ含めません。
-6. macOS publish/sign/notary scriptはstatic contractだけをrequiredとし、DMGまたはsupport claimを公開しません。
-7. public asset名は`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`です。製品版はGitHub Release tag、release notes、binary/package metadata、SHA-256の組で識別します。
+3. v4.5の共存経路では、同じsource commit・同じ製品版で`-SingleFile` publish（EXE）とZIP publishを作成し、EXE/ZIPの版分岐を禁止します。
+4. `version.ps1 verify -PublishedDirectory ...`でApp/Core DLLを検証します。
+5. package testでZIPのsafe layout、sidecar、bundled CLI、clean extract/launch、再現性を検証します。
+6. `scripts/package-windows-singlefile.ps1`で最終公開名`StudyReportEvaluator-win-x64.exe`と`StudyReportEvaluator-win-x64.exe.sha256`を作成し、P06/P07で実EXEの起動・標準抽出・同梱CLI・input不変・version拘束を検証します。
+7. development MSIXはmanifest/version/RID、unpack、block map、bundled CLI、sidecar、policy negative、cleanupを検証し、`PASS_MECHANISM`とします。install/launchはrequiredではなく、GitHub Release assetへ含めません。
+8. macOS publish/sign/notary scriptはstatic contractだけをrequiredとし、DMGまたはsupport claimを公開しません。
+9. public asset名は**4件固定**です: `StudyReportEvaluator-win-x64.exe`、`StudyReportEvaluator-win-x64.exe.sha256`、`StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`。製品版はGitHub Release tag、release notes、binary/package metadata、SHA-256の組で識別します。
+
+> 公開済み`v0.8.1`は履歴上ZIP+sidecarの2件です。これは過去公開の事実であり、v4.5で定義した4件固定の将来公開手順と混同しません。
 
 ### 6.6 release commitとtag
 
@@ -242,7 +255,7 @@ pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify -Tag v0.8.0 -RequireC
 GitHub Releaseは既存annotated tagを対象に[release workflow](../../.github/workflows/release.yml)のmanual dispatchで作成できます。workflowを利用できない場合も、以下と同じfail-closed手順で手動作成します。
 
 1. verified tagを選び、draft Releaseを作ります。
-2. ZIPと対応する`.sha256`をdraftへ添付します。
+2. v4.5ではEXE+sidecar、ZIP+sidecarの**4 assetだけ**をdraftへ添付します。
 3. asset名、size、SHA-256、tag、release notesを確認します。
 4. 現行production workflowはstable版だけを受理します。prerelease packageを作る場合は別workflow decisionを先に行います。
 5. assetが揃うまで公開しません。
@@ -250,6 +263,18 @@ GitHub Releaseは既存annotated tagを対象に[release workflow](../../.github
 7. 公開後、実在するdownload URLを確認してから利用者文書へ記載します。
 
 GitHubはdraftへ全assetを添付してから公開する手順を推奨しています。[GitHub Docs: Managing releases](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository)
+
+#### v4.5のcandidate→final（C03/C02）順序
+
+旧手順（ZIP中心）の履歴を保持したまま、v4.5の公開制御は次を追加します。
+
+1. `release.yml`（candidate）は、同一tag/commitからEXE・ZIP・development MSIX検証記録を作成し、`release-candidate-record.json`（candidate identity）を含むcontrol artifactを保存します。ここでのstatusは`PASS_CANDIDATE`であり、公開完了ではありません。
+2. development MSIXは**non-public record**として扱い、公開assetへMSIX本体を添付しません。拘束対象は`.msix.sha256`とevidence JSONです。
+3. clean-host証跡は人が実行した記録を`clean_host_evidence_json`として受領し、`publish-release.yml`がUTF-8・長さ・許可fieldを検証して一時file化します（受領記録の拘束であり、workflow内でV02実行を代替しません）。
+4. `build-platform-release-matrix.ps1 -Mode Final`（C03）が、candidate record + 受領clean-host recordから`platform-release-matrix.json`（v2 final）を生成します。
+5. `publish-release.yml`はprotected environment承認の後、draftの4 assetを再downloadし、`validate-platform-release-matrix.ps1`（C02）でsource/version/hash/sidecar/candidate run拘束を再検証してから、最後のwrite操作として`--draft=false`を実行します。
+
+この文書は手順契約を定義するものであり、live workflow実行済みやV02実行済みを主張しません。実行有無は別途execution recordで管理します。
 
 ## 7. prereleaseとcheckpoint
 
@@ -309,10 +334,12 @@ self-testは実repositoryの`show/verify`と、一時copyに対するset、bump�
 - [ ] App/CoreのMSBuild版が一致する。
 - [ ] required build/test/package/clean launchが成功する。
 - [ ] publish DLLのAssembly/File/Product versionが一致する。
+- [ ] v4.5では最終EXEのFileVersion/ProductVersion、および標準抽出後の管理DLL versionが同一製品版へ一致する。
 - [ ] annotated tagが製品版と一致し、release commitを指す。
 - [ ] working treeがcleanである。
-- [ ] ZIPとsidecarが一致する。
-- [ ] GitHub Releaseのtag、prerelease状態、asset、notesが一致する。
+- [ ] EXE/ZIPそれぞれと対応sidecarが一致する。
+- [ ] GitHub Releaseのtag、prerelease状態、asset（EXE+sidecar、ZIP+sidecar）、notesが一致する。
+- [ ] candidate run identity、受領clean-host record、C03 final matrix、C02再検証、protected publish順序が一致する。
 - [ ] 公開済み版を差し替えていない。
 - [ ] schema/component versionを理由なく連動更新していない。
 
@@ -325,8 +352,20 @@ self-testは実repositoryの`show/verify`と、一時copyに対するset、bump�
 - [`global.json`](../../global.json)
 - [`scripts/publish-windows.ps1`](../../scripts/publish-windows.ps1)
 - [`scripts/package-windows.ps1`](../../scripts/package-windows.ps1)
+- [`scripts/package-windows-singlefile.ps1`](../../scripts/package-windows-singlefile.ps1)
+- [`scripts/test-windows-singlefile.ps1`](../../scripts/test-windows-singlefile.ps1)
+- [`scripts/build-platform-release-matrix.ps1`](../../scripts/build-platform-release-matrix.ps1)
+- [`scripts/validate-platform-release-matrix.ps1`](../../scripts/validate-platform-release-matrix.ps1)
+- [`.github/workflows/release.yml`](../../.github/workflows/release.yml)
+- [`.github/workflows/publish-release.yml`](../../.github/workflows/publish-release.yml)
 - [`WindowsPublishPackageTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs)
+- [`ReleaseWorkflowContractTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseWorkflowContractTests.cs)
+- [`ReleaseMatrixContractTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseMatrixContractTests.cs)
+- [`ReleaseMatrixBuilderTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseMatrixBuilderTests.cs)
 - [`PackageLockTests.cs`](../../tests/StudyReportEvaluator.App.Tests/SupplyChain/PackageLockTests.cs)
+- [要求定義書 v4.5](../../docs/requirements-definition.md)
+- [1操作起動プラン](../../work/20260906-0617-one-action-startup-plan.md)
+- [1操作起動実行記録](../../work/20260906-one-action-startup-execution.md)
 - [版管理の事前調査](../../work/20260902-version-management-investigation-report.md)
 
 ### External specifications

@@ -26,7 +26,7 @@ env:
 
 jobs:
   validate:
-    name: Windows deterministic and legacy package validation
+    name: Windows development-host deterministic and package validation
     runs-on: windows-latest
     timeout-minutes: 60
 
@@ -41,7 +41,9 @@ jobs:
         with:
           dotnet-version: 10.0.400
           cache: true
-          cache-dependency-path: "**/packages.lock.json"
+          cache-dependency-path: |
+            **/packages.lock.json
+            src/StudyReportEvaluator.App/packages.win-x64-singlefile.lock.json
 
       - name: Verify PowerShell and privacy boundary
         shell: pwsh
@@ -79,7 +81,7 @@ jobs:
           --configuration Release
           --no-build
           --no-restore
-          --filter "FullyQualifiedName!~StudyReportEvaluator.App.Tests.E2E.SampleWorkbookStructuralTests&FullyQualifiedName!~StudyReportEvaluator.App.Tests.Packaging.WindowsPublishPackageTests"
+          --filter "FullyQualifiedName!~StudyReportEvaluator.App.Tests.E2E.SampleWorkbookStructuralTests&FullyQualifiedName!~StudyReportEvaluator.App.Tests.Packaging.WindowsPublishPackageTests&FullyQualifiedName!~StudyReportEvaluator.App.Tests.Packaging.WindowsSingleFilePackageTests"
           --results-directory .\TestResults\ci
           --logger "trx"
           --logger "console;verbosity=minimal"
@@ -90,6 +92,30 @@ jobs:
         run: >-
           .\scripts\test-windows-zip.ps1
           -ResultsDirectory .\TestResults\ci\windows-zip
+
+      - name: Build and validate Windows development-host single-file package
+        id: windows-singlefile
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # The .NET SDK on Windows supplies WindowsDesktop for the P06 UIA observer, not the EXE.
+          $runtimes = @(dotnet --list-runtimes)
+          if ($LASTEXITCODE -ne 0) {
+              throw 'Unable to inspect installed .NET runtimes for the UIA observer.'
+          }
+          if (@($runtimes -cmatch '^Microsoft\.WindowsDesktop\.App 10\.0\.[0-9]+ \[').Count -eq 0) {
+              throw 'The P06 UIA observer requires Microsoft.WindowsDesktop.App 10.0.x from the Windows .NET SDK.'
+          }
+
+          # Hosted CI is not clean-OS evidence and does not guarantee an interactive desktop.
+          # Unavailable UIA must fail P06, not silently skip it.
+          # P02/P05 throw on failure; P07 explicitly sets its exit code.
+          & .\scripts\publish-windows.ps1 -SingleFile
+          & .\scripts\package-windows-singlefile.ps1
+          & .\scripts\test-windows-singlefile.ps1 -ResultsDirectory .\TestResults\ci\windows-singlefile
+          if ($LASTEXITCODE -ne 0) {
+              throw 'P07 Windows single-file required validation failed.'
+          }
 
       - name: Build and validate unsigned MSIX mechanism
         id: unsigned-msix
@@ -118,7 +144,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ github.run_id }}
-          path: TestResults/ci/**/*.trx
+          # Keep P07 raw TRX local; only its closed evidence is uploaded below.
+          path: |
+            TestResults/ci/**/*.trx
+            !TestResults/ci/windows-singlefile/**
           if-no-files-found: warn
           retention-days: 14
 
@@ -131,6 +160,19 @@ jobs:
             artifacts/package/StudyReportEvaluator-win-x64.zip
             artifacts/package/StudyReportEvaluator-win-x64.zip.sha256
             artifacts/package/StudyReportEvaluator-win-x64.evidence.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Upload Windows development-host single-file evidence
+        if: ${{ steps.windows-singlefile.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-singlefile-development-host-${{ github.run_id }}
+          path: |
+            artifacts/package/StudyReportEvaluator-win-x64.exe
+            artifacts/package/StudyReportEvaluator-win-x64.exe.sha256
+            artifacts/package/StudyReportEvaluator-win-x64.exe.evidence.json
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
