@@ -9,7 +9,7 @@
 | tool self-test | [`dev/version.tests.ps1`](../version.tests.ps1) |
 | 変更履歴 | [`CHANGELOG.md`](../../CHANGELOG.md) |
 | Decision | [ADR-0014](adr/0014-product-versioning.md) |
-| 最終更新 | 2026-09-06 |
+| 最終更新 | 2026-09-07 |
 
 ## 1. 目的と境界
 
@@ -17,7 +17,13 @@
 
 現在の公開版は`0.8.1`、2026-09-04に初回公開しました。公開前の候補を`0.8.0`へ再baselineし、公開task完了時にPATCHを1つ進めています。過去の`1.0.0`、`1.0.1`、`1.1.0`は公開済み版ではなく、経緯は[調査証拠](../../work/20260902-version-management-investigation-evidence.json)、[release recovery記録](../../work/20260903-v1.0.1-release-recovery-plan.md)、[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に保持します。
 
-現在の開発候補版は`0.8.4`です。2026-09-06承認のv4.5実装では、R03（最終版処理）を実装・文書task完了後まで延期し、`0.8.3`からPATCHを1つ進めて`CHANGELOG.md`のUnreleasedへ実装済み変更を追加しました。R03後のEXE／ZIP共存の最終配布物はこれから再publish・再package・再検証します（版だけ進めて公開検証を省略しません）。
+現在の開発候補版は**`0.8.5`（UNRELEASED・未公開）**です。親担当がF02で`Directory.Build.props`を`0.8.4`から一度だけPATCHし、F01のKeep a Changelog形式のUnreleased追記はREVIEWEDです。要求版v4.6、設定schema整数1、公開版0.8.1とは独立して管理します。このPATCHは要求所有者の明示指示に基づく今回の処理で、§2の一般的なSemVer原則を変更しません。
+
+T01〜T38はREVIEWED、T39は追加native 3試行のFAILと本人／Narrator／隔離利用者native保存の外部前提によりBLOCKEDです。利用者不在時の自律続行指示を受け、T39を完了扱いにせずF01／F02を進めます。本同期時点の最終0.8.5 build／test／package再検証は親担当で未完了であり、以後の結果は[実行記録](../../work/20260907-ui-settings-execution-record.md)の最新F02欄を正本とします。G4・全タスクDONE・公開PASSは付与しません。
+
+**0.8.4の履歴:** 2026-09-06承認のv4.5実装では、R03（最終版処理）を実装・文書task完了後まで延期し、`0.8.3`から`0.8.4`へPATCHしてUnreleasedへ実装済み変更を追加しました。R03後のEXE／ZIP再生成・再検証はV01の履歴として[実装状態](implementation-status.md)に保持します。さらに0.8.4のUI変更後はT36が21/21、T37が実ZIP＋MSIX静的契約9/9、T38がcontract 114/114とP06 7/7・P07 PASS_DEVELOPMENT、T39が自動回帰1892/1892（Core 190＋App 1702、skip 0）とMSIX PASS_MECHANISM（256 entries、0.8.4.0）です。これらの件数・日付・artifact identityを0.8.5へ付け替えません。
+
+F02後の最終EXE／ZIPは同じsource・0.8.5で再生成・再検証し、MSIXのmechanismも同版の記録へ拘束する必要があります。以前の同梱文書・版・bytes／hashを新しい成果物の成功証拠へ流用しません。CH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITE、本人login・実AI・実学生data・公開操作は未実施で、新EXEの公開gateはBLOCKED_EXTERNALです。版正本の変更は公開検証・操作承認を省略する理由にはなりません。
 
 2026-09-02の公開API調査では公開GitHub Releaseとremote tagはいずれも0件でした。この観測はprivate draftの不存在を証明しません。[調査レポート §2.2](../../work/20260902-version-management-investigation-report.md#22-実測した主なcommand)
 
@@ -76,10 +82,11 @@
 
 | Version | 現在値 | 更新条件 | Source |
 |---|---:|---|---|
-| 製品版 | `0.8.4` candidate | 本手順の公開契約差分 | [`Directory.Build.props`](../../Directory.Build.props) |
-| 要求文書版 | `4.5` | 要求baseline変更 | [`requirements-definition.md`](../../docs/requirements-definition.md) |
+| 製品版 | `0.8.5` candidate（UNRELEASED） | 本手順と要求所有者の明示指示 | [`Directory.Build.props`](../../Directory.Build.props) |
+| 要求文書版 | `4.6` | 要求baseline変更 | [`requirements-definition.md`](../../docs/requirements-definition.md) |
 | QuantificationDefinition schema | `4.0` | canonical definition format変更 | [`CanonicalDefinitionSerializer.cs`](../../src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs) |
 | checkpoint schema | `1` | checkpoint payload format変更 | [`CheckpointEnvelope.cs`](../../src/StudyReportEvaluator.App/Workbooks/Checkpoint/CheckpointEnvelope.cs) |
+| 設定file schema | `1` | setting.txt format変更。製品PATCHと連動させない | [`ApplicationSettings.cs`](../../src/StudyReportEvaluator.App/Settings/ApplicationSettings.cs) |
 | Copilot runtime manifest schema | `1` | `copilot-runtime.json` format変更 | [`StudyReportEvaluator.App.csproj`](../../src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj) |
 | Knowledge template | `knowledge-v1` | built-in Prompt semantics変更 | [`BuiltInPromptTemplates.cs`](../../src/StudyReportEvaluator.Core/Prompting/BuiltInPromptTemplates.cs) |
 | .NET SDK | `10.0.400`, `latestPatch` | toolchain update | [`global.json`](../../global.json) |
@@ -326,7 +333,7 @@ self-testは実repositoryの`show/verify`と、一時copyに対するset、bump�
 
 ## 10. 完了条件
 
-版上げは次を全て満たした場合だけ完了です。
+以下は版の正式公開までの完了条件で、F02の候補版同期と公開承認は別です。チェックリストは手順契約であり、現在すべてを達成した状態表ではありません。最終版の検証結果は実行記録の最新F02欄で確認し、T39のBLOCKEDとCH-01〜06未実施を版変更だけで解除しません。
 
 - [ ] bump根拠がMAJOR/MINOR/PATCH規則へ追跡できる。
 - [ ] `Directory.Build.props`が合意した版を示す。
@@ -363,9 +370,10 @@ self-testは実repositoryの`show/verify`と、一時copyに対するset、bump�
 - [`ReleaseMatrixContractTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseMatrixContractTests.cs)
 - [`ReleaseMatrixBuilderTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseMatrixBuilderTests.cs)
 - [`PackageLockTests.cs`](../../tests/StudyReportEvaluator.App.Tests/SupplyChain/PackageLockTests.cs)
-- [要求定義書 v4.5](../../docs/requirements-definition.md)
+- [要求定義書 v4.6](../../docs/requirements-definition.md)
 - [1操作起動プラン](../../work/20260906-0617-one-action-startup-plan.md)
 - [1操作起動実行記録](../../work/20260906-one-action-startup-execution.md)
+- [UI・設定保存の実行記録](../../work/20260907-ui-settings-execution-record.md)
 - [版管理の事前調査](../../work/20260902-version-management-investigation-report.md)
 
 ### External specifications

@@ -2,7 +2,9 @@
 
 このガイドは、StudyReport Evaluatorが扱う情報と保存先を説明します。法的助言、組織承認、教育的妥当性の証明ではありません。
 
-> **対象版と確認範囲:** 単一EXEと「GitHubにログイン」buttonの説明は、現在のソースの`0.8.4`候補（**UNRELEASED・未公開**）向けです。公開`v0.8.1`はZIP配布で、単一EXEもlogin buttonもありません。**clean-host試験と本人loginは`NOT_RUN`**であり、OS-only環境での動作、実認証、新EXEの公開完了を示すものではありません。配布状況と起動・login手順は[README](../README.md)を確認してください。
+> **対象版と確認範囲:** 単一EXE、「GitHubにログイン」button、`setting.txt`への設定保存・適用の説明は、現在のソースの`0.8.5`候補（**UNRELEASED・未公開**）向けです。公開`v0.8.1`はZIP配布で、単一EXE、login button、本頁の設定保存・適用機能はありません。**clean-host試験と本人loginは`NOT_RUN`**であり、OS-only環境での動作、実認証、新EXEの公開完了を示すものではありません。配布状況と起動・login手順は[README](../README.md)を確認してください。
+>
+> 設定の説明は現行productionコードに基づきます。一時保存先の実設定fileとfake AI境界を使うdeterministic E2Eの成功は、native WindowsのUI／DPI／Narrator確認・本人walkthroughやrelease完了の証拠ではありません。版更新前の実EXE確認には実測がありますが、追加native確認は**NOT COMPLETE（FAIL）**です。Space／Narrator、本人walkthrough、隔離利用者環境のnative保存は`NOT_RUN`です。[確認範囲](getting-started.md#未公開候補の検証範囲)を参照し、部分的な観測を全native確認や公開の成功へ読み替えないでください。
 
 ## 全体像
 
@@ -62,7 +64,61 @@ application loggerはclosedな項目だけを扱います。
 
 cacheはアプリ終了後も残り、再利用され得ます。1ファイル配布は「ディスク上も1ファイル」「痕跡なし」を意味しません。アプリは独自cache管理、自動掃除、cacheの再帰削除、旧版の自動削除を行いません。
 
-入力は元の場所でread-onlyのまま扱い、final／partialの初期出力先は従来どおり入力fileに隣接する`result`です。EXE配置先や抽出cacheへ変更せず、配布・展開・起動のために利用者workbookを移動・変更・削除しません。出力先はrun開始前に利用者が変更できます。完成成功後のpartial cleanupは、このruntime cacheの扱いとは別です。
+入力は元の場所でread-onlyのまま扱います。final／partialの新規runの出力先は、利用者の明示指定がない場合だけ入力fileに隣接する`result`です。明示した絶対pathは設定へ保存でき、再起動・別入力の読込後も保持します。空欄へ戻すと未指定（`null`）になり、その時点の入力から`result`を算出します。この自動算出pathは設定へ保存せず、入力未選択なら「入力後に決定」です。指定先が利用不可でも別pathへfallbackせず、設定の読込だけでは出力directoryを作成しません。
+
+EXE配置先や抽出cacheを既定の出力先にせず、配布・展開・起動のために利用者workbookを移動・変更・削除しません。出力先はrun開始前に変更できます。実行中の変更は次回用であり、現在runのimmutable snapshot・予約済みfinal／partial pathや既存checkpointの再開条件は変更しません。完成成功後のpartial cleanupは、このruntime cacheの扱いとは別です。
+
+## setting.txtの保存と機密性（未公開候補）
+
+### 保存場所と形式
+
+設定は現在のOS利用者のLocalApplicationData配下、Windowsでは通常`%LOCALAPPDATA%\StudyReportEvaluator\setting.txt`に保存します。productionの`SettingsFileStore`が扱う**UTF-8 JSONの平文file**で、拡張子は`.txt`、設定schemaは整数`1`です。読込はUTF-8のBOMあり／なしを受け付けます。設定schema、採点定義のrevision／canonical schema、要求文書版、製品版は別です。
+
+保存先はEXE配置先、入力／結果workbook、runtime抽出cache、CLI credential storeとは別です。実際の場所は**設定 → 共通 → 保存定義**で確認できます。場所を解決できない場合は保存を利用できず、EXE横やcwdへ代わりに書き込みません。新しい環境変数・API key・`.env`の作成は不要です。
+
+### 保存する項目・しない項目
+
+設定fileの項目は次の5つです。
+
+| JSON項目 | 保存する値 |
+|---|---|
+| `schemaVersion` | 設定形式の整数`1` |
+| `preferredModelId` | 通常評価modelの希望ID、または未指定の`null`。認証済み・利用可能という保証ではない |
+| `maxConcurrency` | 最大並列度1〜3、既定1 |
+| `outputDirectoryOverride` | 利用者が明示した絶対出力path、または未指定の`null`。自動算出した`result`は保存しない |
+| `definition` | 任意の採点定義1件、または`null`。複数profileや結果の保管庫ではない |
+
+採点定義はID・name・revision、sheet／質問文行／回答行範囲、base／special配点・類似度係数・丸め、設問のID・名前・質問文・主列／補助列・配点・enabled、通常evaluatorの種別・組込template版・Custom Prompt・criterion・range・weight、固有評価のID・source・Prompt等を含みます。共通画面の「採点定義名」「定義revision」「丸めの桁数」も、この定義の値です。
+
+次は専用の保存項目ではなく、設定保存のために自動収集しません。
+
+- 入力xlsxのpath・bytes、回答行本文
+- AI結果・reason・evidence・参照回答、run／checkpoint状態・partial指定
+- 認証情報としてのcredential・login状態、CLI hash等のruntime診断
+- Imported Promptの取込file一覧・未適用の本文・順序（定義へ明示適用したtemplateは定義の一部として保存）
+- 画面の選択対象・表示ページ・カテゴリ・操作履歴、Control／Command、warningの承認状態（定義内のIDは保存）
+
+**定義を明示保存すると、主回答列の選択で見出しセルから取り込んだ質問文も平文で保存されます。** 読込や主列変更だけでdiskへ自動保存する意味ではありません。設問text、Prompt、評価基準等へ利用者が貼り付けた学生回答・氏名・その他の機密情報や秘密情報も、定義に入れば保存され得ます。**「回答行を自動収集しない」は「機密な本文が設定に絶対に含まれない」という保証ではありません。** sheet名や明示出力path自体にも機密情報が含まれ得ます。
+
+`setting.txt`は暗号化containerではありません。OSの利用者別保存先のaccess controlに従います。設定fileや内容をrepository、配布物、画像、log、issue、chat、共有証跡へ含めず、保存・共有・廃棄は所属組織の規則に従ってください。設定fileの自動削除・backup・履歴・cloud同期はありません。
+
+### 画面への反映とdisk保存は別
+
+- 起動時は設定を読み込みますが、fileなしなら既定値で続行し、最初の**設定を保存**までfileを作成しません。設定読込・主列変更・Prompt適用・画面遷移・**設定から戻る**・終了で自動保存しません。「戻る」は変更破棄でもありません。再起動後も使いたい変更は、終了前に明示保存してください。
+- **設定を保存**は共通設定とInput／Designの最新draftを対象にします。入力未読込なら、既に読み込んだ保存定義を保持したまま共通設定を保存します。定義やPrompt・配点・共通値が不正な場合は旧fileと編集内容を保持し、保存しません。
+- 保存開始時点の値を固定し、同じdirectoryの一意tempへ書込・flush・close後に旧fileを置き換えます。先に旧fileを削除・切り詰めません。保存開始を成功とは扱わず、開始後の再編集は成功後も未保存として残り得ます。失敗・置換前の取消では旧fileとdraftを保持します。
+- tempの後始末はその保存で作ったfileだけへのbest effortです。失敗時に残る一時fileにも設定本文が含まれ得るため、同じ機密情報として扱います。別processとのmerge・監視はなく、最後に成功した保存が優先します。電源断や任意network filesystemまでの耐久性は保証しません。
+- 認証状態・runtime情報は表示だけで保存しません。希望model IDと現在使えるmodelの選択も別です。明示的な**Copilot 状態を確認**で希望IDが候補に存在する場合だけ実効選択へ反映し、不在なら未選択・no fallbackです。確認失敗だけでは希望IDを消しません。希望ID未指定の初回確認で表示する従来の初期選択も、暗黙の希望IDとしては保存しません。参照回答／類似度の固定`auto`は別に利用可否を確認します。
+
+### 保存定義の適用は別の明示操作
+
+起動時の読込は保存定義を保持するだけです。Excelを読み込み、**設定 → 共通 → 保存定義**で概要を確認して**現在の入力に適用**を選ぶと、現在の編集を保存定義へ置き換えるための検証を行います。保存定義の質問文行でExcelをread-only再読込し、入力identity、sheet、列、行範囲、定義全体を検証して、成功時だけInput／Designへ反映します。以前の質問行のmetadataを流用しません。
+
+失敗・取消では現在のmetadata・draft・Designと保存fileを変更しません。成功時は保存したID・順序・質問文・Prompt・配点を保持し、候補の作り直しや新しいheader値への暗黙置換をしません。その後に利用者が主回答列を変更すると、既存どおり交差セルの値へ質問文を更新します。Imported Prompt一覧・本文・順序は適用で変更・消去しません。
+
+run中の一括適用はできません。別Excelのsheet・列が存在しても授業内容の一致やcheckpoint再開可能性は保証せず、利用者の確認と既存の再開検証が必要です。設定の読込・保存・適用から、認証確認・login・AI評価を自動開始しません。
+
+障害時は[設定のトラブルシューティング](troubleshooting.md#設定を保存読み込めない未公開候補)を確認してください。詳細な操作は[設定ガイド](settings.md)を参照してください。
 
 ## input
 
@@ -98,6 +154,7 @@ finalも入力を匿名化・縮小したfileではありません。入力の�
 ## 運用上の注意
 
 - input、partial、finalへ同等以上のaccess controlを適用する
+- `setting.txt`と保存失敗時に残った設定の一時fileも、含有する本文に応じて同等以上に保護する
 - 共有前に元sheetとapp-owned sheetsの含有情報を確認する
 - repository、issue、chat、通常test artifactへ実在学生本文を貼らない
 - retention期限と削除手順は所属組織の規則に従う
@@ -105,13 +162,13 @@ finalも入力を匿名化・縮小したfileではありません。入力の�
 
 ## credential
 
-アプリはpassword、PAT、client secret、token、device code、独自OAuth credentialを入力・収集・解析・保存・application log出力しません。これらをアプリへ渡さないでください。本人認証のOAuth対話、認証用console／ブラウザー、credential保管は同梱CLI／ブラウザーへ委譲します。アプリ独自のOAuth、token入力UI、WebView、callback serverは追加していません。
+アプリの認証処理はpassword、PAT、client secret、token、device code、独自OAuth credentialを入力・収集・解析・保存・application log出力しません。これらを設問textやPrompt等へ貼り付けないでください。貼付内容が定義に入った場合の平文保存は、上記の設定fileの説明に従います。本人認証のOAuth対話、認証用console／ブラウザー、credential保管は同梱CLI／ブラウザーへ委譲します。アプリ独自のOAuth、token入力UI、WebView、callback serverは追加していません。
 
-**アプリがcredentialを収集・保存しないことと、CLI自身が認証情報を保存することは別です。** 同梱CLI `1.0.79`の`login --help`は、system credential storeが見つからない、または利用に問題がある場合、tokenを`~/.copilot/`配下の**平文config file**へ保存するfallbackを案内しています。CLI側の保管が常に安全・暗号化済みであるとは保証しません。CLI／OSの保管仕様と利用環境、所属組織の規則を確認してください。
+**アプリの認証処理がcredentialを収集・保存しないことと、CLI自身が認証情報を保存することは別です。** 同梱CLI `1.0.79`の`login --help`は、system credential storeが見つからない、または利用に問題がある場合、tokenを`~/.copilot/`配下の**平文config file**へ保存するfallbackを案内しています。CLI側の保管が常に安全・暗号化済みであるとは保証しません。CLI／OSの保管仕様と利用環境、所属組織の規則を確認してください。
 
 ### loginの開始と再確認
 
-1. **未公開`0.8.4`候補のみ**、利用者が**GitHubにログイン**を選んだ場合に開始します。manifest、RID、SDK／CLI版、SHA-256を検証した同梱native CLIの絶対pathだけを使い、PATH上の別CLIへfallbackしません。
+1. **未公開`0.8.5`候補のみ**、利用者が**GitHubにログイン**を選んだ場合に開始します。manifest、RID、SDK／CLI版、SHA-256を検証した同梱native CLIの絶対pathだけを使い、PATH上の別CLIへfallbackしません。
 2. shell、PowerShell、`cmd /c`を介さず、固定引数`--no-auto-update`、`--log-level none`、`login --web-flow`で直接子processを起動します。token等を引数・標準入力へ渡さず、標準入力／標準出力／標準errorをredirectせず、CLIの出力もcapture・解析しません。本人の対話はCLI／ブラウザー上で完了します。
 3. 完了・取消・失敗後や再起動後は、既存の**Copilot 状態を確認**を利用者が選びます。processの開始・終了codeだけを認証成功とせず、login完了だけでmodelを自動選択したりAI評価を開始したりしません。
 

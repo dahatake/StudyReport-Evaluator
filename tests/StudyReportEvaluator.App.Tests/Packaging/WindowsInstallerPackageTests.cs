@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Xunit;
 
@@ -5,6 +6,31 @@ namespace StudyReportEvaluator.App.Tests.Packaging;
 
 public sealed class WindowsInstallerPackageTests
 {
+    // Keep this contract independent of the scripts and the ZIP test's required list.
+    private static readonly string[] ExpectedPublicPayloadPaths =
+    [
+        "README.md",
+        "LICENSE",
+        "docs/README.md",
+        "docs/getting-started.md",
+        "docs/features.md",
+        "docs/custom-evaluator-guide.md",
+        "docs/prompt-launch.md",
+        "docs/privacy-and-data-handling.md",
+        "docs/troubleshooting.md",
+        "docs/settings.md",
+        "docs/third-party-notices.md",
+        "images/README.md",
+        "images/01-input-workbook.png",
+        "images/02-input-mapping.png",
+        "images/03-design-knowledge.png",
+        "images/04-design-custom-prompt.png",
+        "images/05-execution-auto.png",
+        "images/06-results-review.png",
+        "images/07-output-export.png",
+        "images/08-settings.png",
+    ];
+
     [Fact]
     public void Msix_manifest_template_declares_the_x64_packaged_classic_full_trust_contract()
     {
@@ -78,9 +104,11 @@ public sealed class WindowsInstallerPackageTests
         Assert.Contains("Assert-PathWithinRoot -Root $repositoryRoot -Path $PublishedDirectory", source, StringComparison.Ordinal);
         Assert.Contains("Assert-NotReparsePoint", source, StringComparison.Ordinal);
         Assert.Contains("Assert-SafePublishPayload", source, StringComparison.Ordinal);
-        Assert.Contains("$PublicPayloadRelativePaths", source, StringComparison.Ordinal);
-        Assert.Contains("'docs\\getting-started.md'", source, StringComparison.Ordinal);
-        Assert.Contains("'images\\07-output-export.png'", source, StringComparison.Ordinal);
+        AssertPublicPayloadList(source, "PublicPayloadRelativePaths");
+        Assert.Contains("$item.Name -ieq 'setting.txt'", source, StringComparison.Ordinal);
+        string zipSource = File.ReadAllText(Path.Combine(repositoryRoot, "scripts", "package-windows.ps1"));
+        AssertPublicPayloadList(zipSource, "documentationRelativePaths");
+        Assert.Contains("$item.Name -ieq 'setting.txt'", zipSource, StringComparison.Ordinal);
         Assert.Contains("$hasCodeSigningEku", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Import-Certificate", source, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("TrustedPeople", source, StringComparison.OrdinalIgnoreCase);
@@ -136,8 +164,8 @@ public sealed class WindowsInstallerPackageTests
         Assert.Contains("SIGNED_PUBLISHER_UNSIGNED_MARKER_REJECTED_WITH_OUTPUT_UNCHANGED", source, StringComparison.Ordinal);
         Assert.Contains("-UnsignedDevelopment", source, StringComparison.Ordinal);
         Assert.Contains("AppxSignature.p7x", source, StringComparison.Ordinal);
-        Assert.Contains("docs/getting-started.md", source, StringComparison.Ordinal);
-        Assert.Contains("images/07-output-export.png", source, StringComparison.Ordinal);
+        AssertPublicPayloadList(source, "RequiredPublicEntries");
+        Assert.Contains("[System.IO.Path]::GetFileName($normalized) -ieq 'setting.txt'", source, StringComparison.Ordinal);
         Assert.Contains("PASS_MECHANISM", source, StringComparison.Ordinal);
         Assert.Contains("BLOCKED_EXTERNAL", source, StringComparison.Ordinal);
         Assert.Contains("NOT_RUN_REQUIRES_ELEVATED_DISPOSABLE_WINDOWS_11_HOST", source, StringComparison.Ordinal);
@@ -238,6 +266,34 @@ public sealed class WindowsInstallerPackageTests
         Assert.Contains("Assert-NoReparsePointsBelowRoot -Root $repositoryRoot -Path $PublishedDirectory", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Import-Certificate", source, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("TrustedPeople", source, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void AssertPublicPayloadList(string source, string variableName)
+    {
+        Match array = Assert.Single(
+            Regex.Matches(
+                source,
+                @"(?m)^[ \t]*\$" + Regex.Escape(variableName) +
+                @"[ \t]*=[ \t]*@\(\s*(?:'(?<path>[^'\r\n]+)'\s*,?\s*)+\)[ \t]*\r?$",
+                RegexOptions.CultureInvariant)
+                .Cast<Match>());
+        string[] actualPaths = array.Groups["path"].Captures
+            .Cast<Capture>()
+            .Select(capture => capture.Value.Replace('\\', '/'))
+            .ToArray();
+
+        Assert.Equal(20, ExpectedPublicPayloadPaths.Length);
+        Assert.Equal(20, actualPaths.Length);
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string path in actualPaths)
+        {
+            Assert.True(seen.Add(path), $"Duplicate or case-colliding public payload path: {path}");
+        }
+
+        Assert.Equal(
+            ExpectedPublicPayloadPaths.OrderBy(path => path, StringComparer.Ordinal).ToArray(),
+            actualPaths.OrderBy(path => path, StringComparer.Ordinal).ToArray(),
+            StringComparer.Ordinal);
     }
 
     private static string FindRepositoryRoot()

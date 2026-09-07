@@ -4,12 +4,14 @@ using System.Globalization;
 using System.Reflection;
 using System.Windows.Input;
 using StudyReportEvaluator.App.Copilot;
+using StudyReportEvaluator.App.Settings;
 using StudyReportEvaluator.App.Workflow;
 using StudyReportEvaluator.App.Workbooks.Mapping;
 using StudyReportEvaluator.App.Workbooks.Checkpoint;
 using StudyReportEvaluator.App.Workbooks.Reading;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
+using StudyReportEvaluator.Core.Serialization;
 using StudyReportEvaluator.Core.Validation;
 
 namespace StudyReportEvaluator.App.ViewModels;
@@ -233,7 +235,12 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
 
 public sealed class ExecutionTechnicalError
 {
-    public ExecutionTechnicalError(string code, string field, string message)
+    public ExecutionTechnicalError(
+        string code,
+        string field,
+        string message,
+        string? nodeId = null,
+        string? path = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
         ArgumentException.ThrowIfNullOrWhiteSpace(field);
@@ -241,6 +248,8 @@ public sealed class ExecutionTechnicalError
         Code = code;
         Field = field;
         Message = message;
+        NodeId = string.IsNullOrWhiteSpace(nodeId) ? null : nodeId;
+        Path = string.IsNullOrWhiteSpace(path) ? null : path;
     }
 
     public string Code { get; }
@@ -249,7 +258,17 @@ public sealed class ExecutionTechnicalError
 
     public string Message { get; }
 
-    public string AccessibleText => $"{Field}。{Message}";
+    public string? NodeId { get; }
+
+    /// <summary>A validator-owned definition location, not a workbook or output path.</summary>
+    public string? Path { get; }
+
+    public string TargetText => string.Join(" · ", new[] { NodeId, Path, Field }
+        .Where(value => value is not null));
+
+    internal (string Code, string? NodeId, string? Path, string Field) Key => (Code, NodeId, Path, Field);
+
+    public string AccessibleText => $"{TargetText}。{Message}";
 
     public override string ToString() =>
         $"{nameof(ExecutionTechnicalError)} {{ Code = {Code}, Field = {Field}, Content = <redacted> }}";
@@ -315,6 +334,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     private readonly IQuantificationRunBoundary runBoundary;
     private readonly BundledCopilotLoginService loginService;
     private readonly QuantificationDefinitionValidator definitionValidator = new();
+    private readonly CanonicalDefinitionSerializer definitionSerializer = new();
     private readonly ColumnMappingValidator mappingValidator = new();
     private readonly WorkbookExecutionPreflight workbookPreflight = new();
     private readonly ObservableCollection<string> modelItems = [];
@@ -328,7 +348,12 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     private QuantificationDefinition? definition;
     private WorkbookMetadata? workbookMetadata;
     private string inputPath = string.Empty;
+    private (string InputPath, long EvaluationCount)? nextDraftSummary;
     private string? selectedModelId;
+    private string? preferredModelId;
+    private string? initialModelId;
+    private bool initialModelSelectionApplied;
+    private bool updatingModelSelection;
     private CopilotRuntimeIdentity? runtimeIdentity;
     private ExecutionAuthenticationState authenticationState = ExecutionAuthenticationState.NotChecked;
     private string? runtimeErrorCode;
@@ -352,10 +377,12 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     private int rowTotal;
     private string reservedFinalPath = string.Empty;
     private string partialPath = string.Empty;
-    private string outputDirectory = string.Empty;
+    private string? outputDirectoryOverride;
     private string resumePartialPath = string.Empty;
     private bool isResumeMode;
+    private string resumeResetReason = string.Empty;
     private ExecutionRunContext? lastRunContext;
+    private QuantificationRunRequest? currentRunRequest;
     private CancellationTokenSource? authenticationCancellation;
     private CancellationTokenSource? loginCancellation;
     private CancellationTokenSource? runCancellation;
@@ -421,13 +448,19 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             {
                 OnPropertiesChanged(
                     nameof(AuthenticationStatusText),
-                    nameof(IsAuthenticationAvailable));
+                    nameof(IsAuthenticationAvailable),
+                    nameof(IsAutoModelAvailable),
+                    nameof(ValidationSummary));
             }
         }
     }
 
     public bool IsAuthenticationAvailable =>
         AuthenticationState == ExecutionAuthenticationState.Available;
+
+    public bool IsAutoModelAvailable =>
+        AuthenticationState == ExecutionAuthenticationState.Available
+        && modelsById.ContainsKey("auto");
 
     public string AuthenticationStatusText => AuthenticationState switch
     {
@@ -445,18 +478,23 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         ? "runtime identity はまだありません。"
         : $"CLI {runtimeIdentity.CliVersion} · SHA-256 {runtimeIdentity.CliSha256[..12]}… · SDK {runtimeIdentity.SdkInformationalVersion}";
 
+    /// <summary>The saved or explicitly edited preference, independent of authentication state.</summary>
+    public string? PreferredModelId => preferredModelId;
+
     public string? SelectedModelId
     {
         get => selectedModelId;
         set
         {
-            string? next = value;
-            if (SetProperty(ref selectedModelId, next))
+            string? next = string.IsNullOrWhiteSpace(value) ? null : value;
+            // Collection resets and two-way binding feedback are not explicit preference edits.
+            if (updatingModelSelection
+                || (next is null && (selectedModelId is null || IsCheckingAuthentication || IsLoggingIn)))
             {
-                runtimeErrorCode = null;
-                runPreflightErrors = [];
-                Revalidate();
+                return;
             }
+
+            SetModelPreference(next);
         }
     }
 
@@ -478,18 +516,31 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     public string ConcurrencyText =>
         $"最大 {MaxConcurrency.ToString(CultureInfo.InvariantCulture)} 件を並列実行（許可範囲 1～3）";
 
-    public string OutputDirectory
+    /// <summary>An explicit next-run directory, or null to derive it from the current input.</summary>
+    public string? OutputDirectoryOverride
     {
-        get => outputDirectory;
+        get => outputDirectoryOverride;
         set
         {
-            if (SetProperty(ref outputDirectory, value ?? string.Empty))
+            string? next = string.IsNullOrWhiteSpace(value) ? null : value;
+            if (SetProperty(ref outputDirectoryOverride, next))
             {
                 runtimeErrorCode = null;
+                OnPropertyChanged(nameof(OutputDirectory));
                 Revalidate();
             }
         }
     }
+
+    public string OutputDirectory
+    {
+        get => OutputDirectoryOverride ?? (string.IsNullOrWhiteSpace(NextDraftInputPath)
+            ? string.Empty
+            : Path.Combine(Path.GetDirectoryName(NextDraftInputPath) ?? string.Empty, "result"));
+        set => OutputDirectoryOverride = value;
+    }
+
+    private string NextDraftInputPath => nextDraftSummary?.InputPath ?? inputPath;
 
     public string ResumePartialPath
     {
@@ -499,6 +550,8 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             if (SetProperty(ref resumePartialPath, value ?? string.Empty))
             {
                 runtimeErrorCode = null;
+                resumeResetReason = string.Empty;
+                OnPropertiesChanged(nameof(ResumeResetReason), nameof(OutputModeText));
                 Revalidate();
             }
         }
@@ -512,48 +565,24 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             if (SetProperty(ref isResumeMode, value))
             {
                 runtimeErrorCode = null;
-                OnPropertiesChanged(nameof(OutputModeText), nameof(CanStart));
+                resumeResetReason = string.Empty;
+                OnPropertiesChanged(nameof(ResumeResetReason), nameof(OutputModeText), nameof(CanStart));
                 Revalidate();
             }
         }
     }
 
+    public string ResumeResetReason => resumeResetReason;
+
     public string OutputModeText => IsResumeMode
         ? "既存の .partial.xlsx をread-only検証して再開します。"
-        : "新規runとしてfinal/partial名を同時予約します。";
+        : "新規runとしてfinal/partial名を同時予約します。"
+            + (string.IsNullOrEmpty(ResumeResetReason) ? string.Empty : " " + ResumeResetReason);
 
-    public long PlannedEvaluationCount
-    {
-        get
-        {
-            if (definition is null)
-            {
-                return 0;
-            }
+    public long PlannedEvaluationCount => nextDraftSummary?.EvaluationCount
+        ?? CountPlannedEvaluations(definition);
 
-            long selectedRows = Math.Max(
-                0L,
-                ((long)definition.LastDataRow - definition.FirstDataRow) + 1L);
-            long referenceOperations = definition.Questions.Count(question => question.Enabled);
-            long normalOperations = definition.Questions
-                .Where(question => question.Enabled)
-                .Sum(question => (long)question.Evaluators.Count(evaluator => evaluator.Enabled));
-            long specialOperations = definition.Questions
-                .Where(question => question.Enabled)
-                .Sum(question => (long)question.SpecialEvaluations.Count(special => special.Enabled));
-            try
-            {
-                return checked(referenceOperations
-                    + selectedRows * (normalOperations + specialOperations + referenceOperations));
-            }
-            catch (OverflowException)
-            {
-                return long.MaxValue;
-            }
-        }
-    }
-
-    public string PlanSummary => IsConfigured
+    public string PlanSummary => !string.IsNullOrWhiteSpace(NextDraftInputPath)
         ? $"{PlannedEvaluationCount.ToString("N0", CultureInfo.InvariantCulture)} evaluation units · retry込み最大 {WorstCaseAttemptCount.ToString("N0", CultureInfo.InvariantCulture)} attempts · snapshot は実行開始時に固定"
         : "入力と定量化設計を完了してください。";
 
@@ -582,7 +611,8 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 OnPropertiesChanged(
                     nameof(CanLogin),
                     nameof(CanCheckAuthentication),
-                    nameof(CanStart));
+                    nameof(CanStart),
+                    nameof(ValidationSummary));
                 RaiseCommandStates();
             }
         }
@@ -599,7 +629,8 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                     nameof(CanLogin),
                     nameof(CanCancelLogin),
                     nameof(CanCheckAuthentication),
-                    nameof(CanStart));
+                    nameof(CanStart),
+                    nameof(ValidationSummary));
                 RaiseCommandStates();
             }
         }
@@ -625,7 +656,9 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                     nameof(CanCheckAuthentication),
                     nameof(CanStart),
                     nameof(CanCancel),
-                    nameof(RunStatusText));
+                    nameof(RunStatusText),
+                    nameof(ValidationSummary),
+                    nameof(CurrentRunOutputSummary));
                 RaiseCommandStates();
             }
         }
@@ -638,7 +671,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         {
             if (SetProperty(ref isCancelling, value))
             {
-                OnPropertiesChanged(nameof(CanCancel), nameof(RunStatusText));
+                OnPropertiesChanged(nameof(CanCancel), nameof(RunStatusText), nameof(ValidationSummary));
                 RaiseCommandStates();
             }
         }
@@ -731,13 +764,90 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         private set => SetProperty(ref lastRunContext, value);
     }
 
+    /// <summary>UI-only metadata from the latest dispatched request, not the next-run draft.</summary>
+    public bool HasCurrentRun => currentRunRequest is not null;
+
+    public string? CurrentRunModelId => currentRunRequest?.ModelId;
+
+    public int? CurrentRunMaxConcurrency => currentRunRequest?.MaxConcurrency;
+
+    public string CurrentRunOutputSummary
+    {
+        get
+        {
+            if (currentRunRequest is not { } request)
+            {
+                return string.Empty;
+            }
+
+            string label = IsRunning ? "今回run" : "前回run";
+            return request.ResumePartialPath is { } resumePath
+                ? $"{label} 再開: {resumePath}"
+                : $"{label} 新規出力先: {request.OutputDirectory}";
+        }
+    }
+
     public bool HasTechnicalErrors => technicalErrorItems.Count > 0;
 
     public bool IsTechnicallyValid => !HasTechnicalErrors;
 
-    public string ValidationSummary => IsTechnicallyValid
-        ? "技術検証を通過しました。run を開始できます。"
-        : $"実行前に解消する技術的な問題が {technicalErrorItems.Count.ToString(CultureInfo.InvariantCulture)} 件あります。";
+    public string ValidationSummary
+    {
+        get
+        {
+            // Error presence stays independent of this presentation and CanStart.
+            if (CanStart)
+            {
+                return "技術検証を通過しました。run を開始できます。";
+            }
+
+            if (disposed || loginServiceDisposed)
+            {
+                return "アプリを開き直すまで run は開始できません。";
+            }
+
+            if (IsRunning)
+            {
+                return IsCancelling
+                    ? "取消処理中です。次回の run はまだ開始できません。"
+                    : "実行中です。次回の run はまだ開始できません。";
+            }
+
+            if (IsLoggingIn)
+            {
+                return "GitHub にログイン中です。run はまだ開始できません。";
+            }
+
+            if (IsCheckingAuthentication || AuthenticationState == ExecutionAuthenticationState.Checking)
+            {
+                return "Copilot 状態を確認中です。run はまだ開始できません。";
+            }
+
+            if (loginExitUnconfirmed)
+            {
+                return "ログイン処理の終了が未確認です。run は開始できません。";
+            }
+
+            if (!IsConfigured)
+            {
+                return "入力と定量化設計を完了してください。run はまだ開始できません。";
+            }
+
+            if (nextDraftSummary is not null)
+            {
+                return "次回の入力と定量化設計を実行画面で確認してください。run はまだ開始できません。";
+            }
+
+            if (HasTechnicalErrors)
+            {
+                return $"実行前に解消する技術的な問題が {technicalErrorItems.Count.ToString(CultureInfo.InvariantCulture)} 件あります。";
+            }
+
+            return IsAuthenticationAvailable
+                ? "実行条件を確認してください。run はまだ開始できません。"
+                : AuthenticationStatusText;
+        }
+    }
 
     public bool CanCheckAuthentication => !disposed
         && !IsCheckingAuthentication
@@ -758,6 +868,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
     public bool CanStart => !disposed
         && IsConfigured
+        && nextDraftSummary is null
         && !IsCheckingAuthentication
         && !IsLoggingIn
         && !loginExitUnconfirmed
@@ -783,6 +894,67 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
     public ICommand CancelCommand => cancelCommand;
 
+    public void ApplySettings(ApplicationSettings settings)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        ArgumentNullException.ThrowIfNull(settings);
+
+        string? preference = string.IsNullOrWhiteSpace(settings.PreferredModelId)
+            ? null
+            : settings.PreferredModelId;
+        if (!string.Equals(preferredModelId, preference, StringComparison.Ordinal))
+        {
+            SetModelPreference(preference);
+        }
+
+        MaxConcurrency = settings.MaxConcurrency;
+        OutputDirectoryOverride = settings.OutputDirectoryOverride;
+        // Definitions require the separate explicit Input/Design application boundary.
+        // Restoring preferences never checks authentication, logs in, or starts a run.
+    }
+
+    /// <summary>
+    /// Refresh only next-run presentation on any screen. No draft clone, preflight,
+    /// progress reset or request replacement; Configure is still required before the next start.
+    /// </summary>
+    internal void UpdateNextDraftSummary(
+        QuantificationDefinition? draftDefinition,
+        string? configuredInputPath)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        string nextInputPath = draftDefinition is null || string.IsNullOrWhiteSpace(configuredInputPath)
+            ? string.Empty
+            : Path.GetFullPath(configuredInputPath);
+        (string InputPath, long EvaluationCount) next = (
+            nextInputPath,
+            nextInputPath.Length == 0 ? 0 : CountPlannedEvaluations(draftDefinition));
+        var previous = nextDraftSummary ?? (inputPath, CountPlannedEvaluations(definition));
+        // Opening unchanged settings must not invalidate a ready configuration.
+        // During a run, retain the existing pending-draft gate even when only non-summary fields changed.
+        if (nextDraftSummary == next || (!IsRunning && previous == next))
+        {
+            return;
+        }
+
+        bool becamePending = nextDraftSummary is null;
+        nextDraftSummary = next;
+        if (previous != next)
+        {
+            OnPropertiesChanged(
+                nameof(OutputDirectory),
+                nameof(PlannedEvaluationCount),
+                nameof(WorstCaseAttemptCount),
+                nameof(PlanSummary));
+        }
+
+        if (becamePending && !IsRunning)
+        {
+            // Readiness presentation only: leave configured fields and validation errors intact.
+            OnPropertiesChanged(nameof(CanStart), nameof(ValidationSummary));
+            startCommand.RaiseCanExecuteChanged();
+        }
+    }
+
     public void Configure(
         QuantificationDefinition draftDefinition,
         WorkbookMetadata metadata,
@@ -797,12 +969,30 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             throw new InvalidOperationException("An active run cannot be reconfigured.");
         }
 
+        string nextInputPath = Path.GetFullPath(configuredInputPath);
+        bool hadNextDraftSummary = nextDraftSummary is not null;
+        nextDraftSummary = null;
+        if (IsSameConfiguration(draftDefinition, metadata, nextInputPath))
+        {
+            if (hadNextDraftSummary)
+            {
+                OnPropertiesChanged(
+                    nameof(OutputDirectory),
+                    nameof(PlannedEvaluationCount),
+                    nameof(WorstCaseAttemptCount),
+                    nameof(PlanSummary));
+            }
+
+            Revalidate();
+            return;
+        }
+
         definition = InputViewModel.CloneDefinition(draftDefinition);
         workbookMetadata = metadata;
-        inputPath = configuredInputPath;
-        outputDirectory = Path.Combine(
-            Path.GetDirectoryName(Path.GetFullPath(configuredInputPath)) ?? string.Empty,
-            "result");
+        inputPath = nextInputPath;
+        resumeResetReason = isResumeMode || !string.IsNullOrWhiteSpace(resumePartialPath)
+            ? "入力または採点定義が変更されたため、再開指定を解除しました。再開する場合はcheckpointを指定し直してください。"
+            : string.Empty;
         resumePartialPath = string.Empty;
         isResumeMode = false;
         runtimeErrorCode = null;
@@ -814,6 +1004,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             nameof(OutputDirectory),
             nameof(ResumePartialPath),
             nameof(IsResumeMode),
+            nameof(ResumeResetReason),
             nameof(OutputModeText),
             nameof(PlannedEvaluationCount),
             nameof(WorstCaseAttemptCount),
@@ -833,7 +1024,10 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         definition = null;
         workbookMetadata = null;
         inputPath = string.Empty;
-        outputDirectory = string.Empty;
+        nextDraftSummary = null;
+        resumeResetReason = isResumeMode || !string.IsNullOrWhiteSpace(resumePartialPath)
+            ? "入力が未選択になったため、再開指定を解除しました。入力を読み込み、checkpointを指定し直してください。"
+            : string.Empty;
         resumePartialPath = string.Empty;
         isResumeMode = false;
         runtimeErrorCode = null;
@@ -845,6 +1039,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             nameof(OutputDirectory),
             nameof(ResumePartialPath),
             nameof(IsResumeMode),
+            nameof(ResumeResetReason),
             nameof(OutputModeText),
             nameof(PlannedEvaluationCount),
             nameof(WorstCaseAttemptCount),
@@ -882,17 +1077,9 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
             // Login may switch accounts. Only a later explicit check can restore availability.
             Interlocked.Increment(ref authenticationSequence);
-            runtimeIdentity = null;
-            // Clear selection before the collection notifies bindings, preserving run errors.
-            selectedModelId = null;
-            modelItems.Clear();
-            modelsById.Clear();
+            ClearAuthenticationModels();
             AuthenticationState = ExecutionAuthenticationState.NotChecked;
             LoginStatusText = "GitHub へのログイン中です。Copilot CLI とブラウザーの案内に従ってください。";
-            OnPropertiesChanged(
-                nameof(AvailableModelIds),
-                nameof(SelectedModelId),
-                nameof(RuntimeIdentityText));
             Revalidate();
 
             CopilotLoginResult result = await loginService.LoginAsync(token);
@@ -983,15 +1170,9 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         CancellationToken token = authenticationCancellation.Token;
         IsCheckingAuthentication = true;
         AuthenticationState = ExecutionAuthenticationState.Checking;
-        runtimeIdentity = null;
-        modelItems.Clear();
-        selectedModelId = null;
+        ClearAuthenticationModels();
         runtimeErrorCode = null;
         runPreflightErrors = [];
-        OnPropertiesChanged(
-            nameof(AvailableModelIds),
-            nameof(SelectedModelId),
-            nameof(RuntimeIdentityText));
         Revalidate();
 
         try
@@ -1070,10 +1251,18 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         SynchronizationContext? observerContext = SynchronizationContext.Current;
         runtimeErrorCode = null;
         runPreflightErrors = [];
-        LastRunContext = null;
-        ResetProgress();
+        // Freeze before start-state observers can edit settings. The same immutable
+        // request goes to the boundary; no draft-derived snapshot or path is invented.
+        currentRunRequest = request;
         IsCancelling = false;
         IsRunning = true;
+        LastRunContext = null;
+        ResetProgress();
+        OnPropertiesChanged(
+            nameof(HasCurrentRun),
+            nameof(CurrentRunModelId),
+            nameof(CurrentRunMaxConcurrency),
+            nameof(CurrentRunOutputSummary));
         Revalidate();
 
         try
@@ -1181,7 +1370,8 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             nameof(CanLogin),
             nameof(CanCancelLogin),
             nameof(CanCheckAuthentication),
-            nameof(CanStart));
+            nameof(CanStart),
+            nameof(ValidationSummary));
         RaiseCommandStates();
     }
 
@@ -1201,25 +1391,164 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         _ => LoginExitUnconfirmedMessage,
     };
 
-    private void ApplyAuthentication(ExecutionAuthenticationSnapshot result)
+    private static long CountPlannedEvaluations(QuantificationDefinition? definition)
     {
-        AuthenticationState = result.State;
-        runtimeIdentity = result.RuntimeIdentity;
-        modelItems.Clear();
-        modelsById.Clear();
-        foreach (CopilotModelAvailability model in result.Models)
+        if (definition is null)
         {
-            modelItems.Add(model.Id);
-            modelsById.Add(model.Id, model);
+            return 0;
         }
 
-        selectedModelId = result.State == ExecutionAuthenticationState.Available
-            ? modelItems.FirstOrDefault()
+        long selectedRows = Math.Max(
+            0L,
+            ((long)definition.LastDataRow - definition.FirstDataRow) + 1L);
+        long referenceOperations = definition.Questions.Count(question => question.Enabled);
+        long normalOperations = definition.Questions
+            .Where(question => question.Enabled)
+            .Sum(question => (long)question.Evaluators.Count(evaluator => evaluator.Enabled));
+        long specialOperations = definition.Questions
+            .Where(question => question.Enabled)
+            .Sum(question => (long)question.SpecialEvaluations.Count(special => special.Enabled));
+        try
+        {
+            return checked(referenceOperations
+                + selectedRows * (normalOperations + specialOperations + referenceOperations));
+        }
+        catch (OverflowException)
+        {
+            return long.MaxValue;
+        }
+    }
+
+    private bool IsSameConfiguration(
+        QuantificationDefinition incomingDefinition,
+        WorkbookMetadata metadata,
+        string normalizedInputPath)
+    {
+        // A freshly read metadata instance represents a new input observation, even at the same path.
+        if (definition is null
+            || !ReferenceEquals(workbookMetadata, metadata)
+            || !string.Equals(inputPath, normalizedInputPath,
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        try
+        {
+            return string.Equals(
+                definitionSerializer.Serialize(definition),
+                definitionSerializer.Serialize(incomingDefinition),
+                StringComparison.Ordinal);
+        }
+        catch (ArgumentException)
+        {
+            // Unsupported draft values must still reach the existing definition validation.
+            return false;
+        }
+    }
+
+    private string? ResolveSelectedModelId()
+    {
+        string? requested = preferredModelId ?? initialModelId;
+        return AuthenticationState == ExecutionAuthenticationState.Available
+            && requested is not null
+            && modelsById.ContainsKey(requested)
+            ? requested
             : null;
-        OnPropertiesChanged(
-            nameof(AvailableModelIds),
-            nameof(SelectedModelId),
-            nameof(RuntimeIdentityText));
+    }
+
+    private void SetModelPreference(string? preference)
+    {
+        bool preferenceChanged = !string.Equals(preferredModelId, preference, StringComparison.Ordinal);
+        preferredModelId = preference;
+        initialModelId = null;
+        initialModelSelectionApplied = true;
+        string? effective = ResolveSelectedModelId();
+        bool selectionChanged = !string.Equals(selectedModelId, effective, StringComparison.Ordinal);
+        selectedModelId = effective;
+        if (!preferenceChanged && !selectionChanged)
+        {
+            return;
+        }
+
+        runtimeErrorCode = null;
+        runPreflightErrors = [];
+        updatingModelSelection = true;
+        try
+        {
+            if (preferenceChanged)
+            {
+                OnPropertyChanged(nameof(PreferredModelId));
+            }
+
+            if (selectionChanged)
+            {
+                OnPropertyChanged(nameof(SelectedModelId));
+            }
+        }
+        finally
+        {
+            updatingModelSelection = false;
+        }
+
+        Revalidate();
+    }
+
+    private void ClearAuthenticationModels()
+    {
+        updatingModelSelection = true;
+        try
+        {
+            runtimeIdentity = null;
+            selectedModelId = null;
+            modelItems.Clear();
+            modelsById.Clear();
+            OnPropertiesChanged(
+                nameof(AvailableModelIds),
+                nameof(IsAutoModelAvailable),
+                nameof(SelectedModelId),
+                nameof(RuntimeIdentityText));
+        }
+        finally
+        {
+            updatingModelSelection = false;
+        }
+    }
+
+    private void ApplyAuthentication(ExecutionAuthenticationSnapshot result)
+    {
+        updatingModelSelection = true;
+        try
+        {
+            AuthenticationState = result.State;
+            runtimeIdentity = result.RuntimeIdentity;
+            selectedModelId = null;
+            modelItems.Clear();
+            modelsById.Clear();
+            foreach (CopilotModelAvailability model in result.Models)
+            {
+                modelItems.Add(model.Id);
+                modelsById.Add(model.Id, model);
+            }
+
+            if (result.State == ExecutionAuthenticationState.Available && !initialModelSelectionApplied)
+            {
+                // Preserve the legacy first selection once, without persisting an implicit preference.
+                initialModelId = preferredModelId is null ? modelItems.FirstOrDefault() : null;
+                initialModelSelectionApplied = true;
+            }
+
+            selectedModelId = ResolveSelectedModelId();
+            OnPropertiesChanged(
+                nameof(AvailableModelIds),
+                nameof(IsAutoModelAvailable),
+                nameof(SelectedModelId),
+                nameof(RuntimeIdentityText));
+        }
+        finally
+        {
+            updatingModelSelection = false;
+        }
     }
 
     private void RaiseRunCompleted(ExecutionRunContext context)
@@ -1359,7 +1688,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
     private void Revalidate()
     {
-        Dictionary<string, ExecutionTechnicalError> errors = new(StringComparer.Ordinal);
+        Dictionary<(string Code, string? NodeId, string? Path, string Field), ExecutionTechnicalError> errors = [];
         if (definition is null || workbookMetadata is null || string.IsNullOrWhiteSpace(inputPath))
         {
             AddError(errors, new ExecutionTechnicalError(
@@ -1389,7 +1718,9 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 AddError(errors, new ExecutionTechnicalError(
                     error.Code,
                     error.Field,
-                    "定量化設計の技術的な設定を修正してください。"));
+                    "定量化設計の技術的な設定を修正してください。",
+                    nodeId: error.NodeId,
+                    path: error.Path));
             }
 
             ColumnMappingValidationResult mappingResult = mappingValidator.Validate(
@@ -1400,7 +1731,9 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 AddError(errors, new ExecutionTechnicalError(
                     error.Code,
                     error.Field,
-                    "入力 workbook と列 mapping を一致させてください。"));
+                    "入力 workbook と列 mapping を一致させてください。",
+                    nodeId: error.QuestionId,
+                    path: error.Path));
             }
 
             if (definitionResult.IsValid && mappingResult.IsValid)
@@ -1464,6 +1797,14 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                     "Resume",
                     "既存の .partial.xlsx checkpointを指定してください。"));
             }
+        }
+        else if (OutputDirectoryOverride is { } explicitDirectory
+            && !Path.IsPathFullyQualified(explicitDirectory))
+        {
+            AddError(errors, new ExecutionTechnicalError(
+                "OUTPUT_DIRECTORY_INVALID",
+                "Output directory",
+                "明示する出力先は絶対パスで指定してください。空欄の場合は入力隣接の result を使用します。"));
         }
         else
         {
@@ -1545,6 +1886,14 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 break;
         }
 
+        if (AuthenticationState == ExecutionAuthenticationState.Available && !IsAutoModelAvailable)
+        {
+            AddError(errors, new ExecutionTechnicalError(
+                "AUTO_MODEL_UNAVAILABLE",
+                "Model",
+                "参照回答生成と類似度評価に必要な model ID auto を利用できないため、run を開始できません。Copilot 状態を再確認してください。"));
+        }
+
         if (runtimeErrorCode is not null)
         {
             AddError(errors, new ExecutionTechnicalError(
@@ -1573,16 +1922,17 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     }
 
     private static void AddError(
-        IDictionary<string, ExecutionTechnicalError> errors,
+        IDictionary<(string Code, string? NodeId, string? Path, string Field), ExecutionTechnicalError> errors,
         ExecutionTechnicalError error) =>
-        errors.TryAdd($"{error.Code}|{error.Field}", error);
+        errors.TryAdd(error.Key, error);
 
     private static ExecutionTechnicalError CapacityTechnicalError(
         ExecutionCapacityError error) =>
         new(
             error.Code,
             error.Field,
-            $"実測値 {error.ActualDimension} は上限 {error.Limit} を満たしません。定量化設計を縮小してください。");
+            $"実測値 {error.ActualDimension} は上限 {error.Limit} を満たしません。定量化設計を縮小してください。",
+            nodeId: error.NodeId);
 
     private static string RunFailureMessage(string code) => code switch
     {

@@ -1,8 +1,10 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Launch;
 using StudyReportEvaluator.App.Resources;
+using StudyReportEvaluator.App.Settings;
 using StudyReportEvaluator.App.Workbooks.Checkpoint;
 using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.App.Workbooks.Writing;
@@ -17,11 +19,13 @@ public sealed class DocumentationContractTests
         "README.md",
         "docs/README.md",
         "docs/getting-started.md",
+        "docs/settings.md",
         "docs/features.md",
         "docs/custom-evaluator-guide.md",
         "docs/prompt-launch.md",
         "docs/privacy-and-data-handling.md",
         "docs/troubleshooting.md",
+        "docs/third-party-notices.md",
         "images/README.md",
     ];
 
@@ -70,6 +74,59 @@ public sealed class DocumentationContractTests
     }
 
     [Fact]
+    public void Public_document_inventory_and_settings_notice_links_are_explicit()
+    {
+        Assert.Equal(11, PublicDocumentPaths.Length);
+        Assert.Equal(11, PublicDocumentPaths.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(new[]
+        {
+            "README.md", "docs/README.md", "docs/getting-started.md", "docs/settings.md",
+            "docs/features.md", "docs/custom-evaluator-guide.md", "docs/prompt-launch.md",
+            "docs/privacy-and-data-handling.md", "docs/troubleshooting.md",
+            "docs/third-party-notices.md", "images/README.md",
+        }, PublicDocumentPaths);
+
+        // Fixed entry points, not expectations collected from the links under test.
+        // Both new documents also participate in the shared file and anchor checks.
+        // The docs index reaches the notice through the product README, not a direct link.
+        foreach ((string document, string target) in new[]
+                 {
+                     ("README.md", "docs/settings.md"),
+                     ("README.md", "docs/third-party-notices.md"),
+                     ("docs/README.md", "../README.md"),
+                     ("docs/README.md", "settings.md"),
+                     ("docs/getting-started.md", "settings.md"),
+                     ("docs/settings.md", "../images/08-settings.png"),
+                 })
+        {
+            string[] targets = Regex.Matches(
+                    Read(document),
+                    @"!?\[[^\]]*\]\((?<target>[^)]+)\)",
+                    RegexOptions.CultureInvariant)
+                .Select(match => match.Groups["target"].Value)
+                .ToArray();
+            Assert.Contains(target, targets);
+        }
+
+        string notice = Read("docs/third-party-notices.md");
+        AssertContainsAll(
+            notice,
+            "Fluent System Icons 6点だけを対象",
+            "WorkflowIcons.axaml",
+            "5bae3fb7771054c252a54b1d9210e9c03439fa1b",
+            "Copyright (c) 2020 Microsoft Corporation",
+            "[LICENSE原本](",
+            "[NOTICE原本](",
+            "同梱CLIが本書のMIT Licenseで許諾されるという意味ではありません",
+            "現在の公開版への収録や配布物の更新を示すものではありません");
+        Assert.Equal(
+            new[] { "WorkflowInputIcon", "WorkflowDesignIcon", "WorkflowExecutionIcon",
+                "WorkflowResultsIcon", "WorkflowSettingsIcon", "WorkflowSaveIcon" },
+            Regex.Matches(notice, @"^\| `(?<key>[^`]+)` \|", RegexOptions.Multiline | RegexOptions.CultureInvariant)
+                .Select(match => match.Groups["key"].Value));
+    }
+
+    [Fact]
     public void Developer_documents_and_product_version_management_are_current()
     {
         string root = FindRepositoryRoot();
@@ -85,6 +142,7 @@ public sealed class DocumentationContractTests
             "dev/version.tests.ps1",
             "dev/docs/README.md",
             "dev/docs/version-management.md",
+            "dev/docs/ui-layout-contract.md",
             "dev/docs/adr/0014-product-versioning.md",
             "dev/docs/adr/0016-windows-one-action-startup.md",
             "dev/docs/preflight/windows-singlefile-feasibility.md",
@@ -303,7 +361,7 @@ public sealed class DocumentationContractTests
             "StudyReportEvaluator-win-x64.exe.sha256",
             "現在の公開版は`0.8.1`です",
             "https://github.com/dahatake/StudyReport-Evaluator/releases",
-            "clean-host試験と本人loginは`NOT_RUN`",
+            "追加ソフト未導入のOS-only環境でのclean-host試験と本人loginは未実施",
             "macOS、Linux、Windows Arm64は初版対応対象外",
             "installer、code signing、notarizationを提供しません");
 
@@ -402,8 +460,10 @@ public sealed class DocumentationContractTests
             "SimilarityPenalty_q=QuestionPoints_q\\times Similarity_q\\times SimilarityPenaltyWeight",
             "eval-yyyyMMdd-HHmm[-NN].xlsx",
             "eval-yyyyMMdd-HHmm[-NN].partial.xlsx",
-            "空の主回答: AI callなし",
-            "技術的AI失敗: 対象値はblank");
+            "主回答が空と確定した完了行: Normal／SimilarityのAI callなし、Question earnedとSimilarityは0相当",
+            "非空回答の技術的AI失敗: 対象値はblank",
+            "取消・未処理／未確定: 未確定値はblankで、0点とはしない",
+            "必要な値がblank: Final raw / Final scoreもblank");
         AssertContainsAll(
             features,
             "各Reference完了後",
@@ -419,8 +479,8 @@ public sealed class DocumentationContractTests
         string guide = Read("docs/prompt-launch.md");
         AssertContainsAll(
             readme,
-            "StudyReportEvaluator.App.exe --input <xlsx-path> --prompt <txt-path> [--prompt <txt-path> ...]",
-            "StudyReportEvaluator-win-x64.exe --input <xlsx-path> --prompt <txt-path> [--prompt <txt-path> ...]",
+            "未公開候補の`StudyReportEvaluator-win-x64.exe`と、公開`v0.8.1` ZIPの`StudyReportEvaluator.App.exe`",
+            "[Promptファイルから起動](docs/prompt-launch.md)",
             "`--input`は0または1回",
             "`--prompt`は0回以上",
             "strict UTF-8",
@@ -428,10 +488,12 @@ public sealed class DocumentationContractTests
             "AI処理はExecution画面の明示操作まで開始しません");
         AssertContainsAll(
             guide,
+            "StudyReportEvaluator.App.exe --input \"<xlsx-path>\" --prompt \"<txt-path>\" [--prompt \"<txt-path>\" ...]",
+            "StudyReportEvaluator-win-x64.exe --input \"<xlsx-path>\" --prompt \"<txt-path>\" [--prompt \"<txt-path>\" ...]",
             "BOMあり／なしを受理",
             "1〜32,767 UTF-16 code units",
             "`--run`や`--resume`はありません",
-            "filenameによる自動割当は行いません");
+            "filenameによる自動割当や、選択だけでの適用は行いません");
         Assert.Equal(32_767, PromptFileLoader.MaximumCharacters);
         Assert.NotNull(LaunchOptions.Parse([]));
     }
@@ -458,53 +520,253 @@ public sealed class DocumentationContractTests
     }
 
     [Fact]
+    public void test_settings_contract_plaintext_schema_single_definition_and_explicit_apply()
+    {
+        string guide = Read("docs/settings.md");
+        ApplicationSettings defaults = new();
+        Assert.Equal(1, ApplicationSettings.CurrentSchemaVersion);
+        Assert.Equal(1, defaults.SchemaVersion);
+        Assert.Equal(1, defaults.MaxConcurrency);
+        Assert.Null(defaults.PreferredModelId);
+        Assert.Null(defaults.OutputDirectoryOverride);
+        Assert.Null(defaults.Definition);
+
+        // Independently fixed schema and meanings, as exercised by SettingsFileStoreTests.
+        // Do not infer the allowed fields from ApplicationSettings or from the guide itself.
+        (string Field, string Meaning)[] expectedFields =
+        [
+            ("schemaVersion", "必須の整数`1`"),
+            ("preferredModelId", "通常modelの希望ID、または`null`。利用可能と確認した実行状態ではない"),
+            ("maxConcurrency", "1〜3、既定1"),
+            ("outputDirectoryOverride", "明示した完全修飾の絶対出力path、または`null`。自動算出`result`は保存しない"),
+            ("definition", "任意の採点定義**1件**、または`null`"),
+        ];
+        Match formatSection = Regex.Match(
+            guide,
+            @"^## 保存場所と形式\r?\n(?<body>[\s\S]*?)(?=^## |\z)",
+            RegexOptions.Multiline | RegexOptions.CultureInvariant);
+        Assert.True(formatSection.Success);
+        Match[] fields = Regex.Matches(
+                formatSection.Groups["body"].Value,
+                @"^\| `(?<field>[^`]+)` \| (?<meaning>[^\r\n]+) \|\r?$",
+                RegexOptions.Multiline | RegexOptions.CultureInvariant)
+            .Cast<Match>()
+            .ToArray();
+        Assert.Equal(expectedFields.Select(field => field.Field), fields.Select(field => field.Groups["field"].Value));
+        for (int index = 0; index < expectedFields.Length; index++)
+        {
+            Assert.Equal(expectedFields[index].Meaning, fields[index].Groups["meaning"].Value);
+        }
+
+        // SettingsViewModelTests covers missing files, explicit save/reload, dirty edits,
+        // and failed/cancelled apply. No store or real user settings are opened here.
+        AssertContainsAll(
+            guide,
+            @"%LOCALAPPDATA%\StudyReportEvaluator\setting.txt",
+            "UTF-8 JSON、設定schemaは整数`1`",
+            "BOMあり／なしを受け付けます",
+            "保存定義は保持するだけで自動適用しません。認証確認・login・AI評価も開始しません",
+            "最初の明示保存までfileを作りません",
+            "設定読込の完了前は、未読の保存定義を消さないため保存できません",
+            "Excel未読込なら、読込済みの保存定義を消さずに共通値を保存します",
+            "戻る・画面遷移・終了では自動保存しない",
+            "保存中に再編集した現在draftは未保存のまま残り得る",
+            "失敗や置換前の取消では**旧bytesを保持**",
+            "tempの後始末は自分が作ったfileだけへのbest effort",
+            "読込前からある未保存の共通編集が保存値へ戻り得る",
+            "**設定 → 共通 → 保存定義**",
+            "**現在の入力に適用**",
+            "Excel未読込・保存定義なし・読込／保存／適用中・run中は利用できません",
+            "保存定義の質問文行でExcel metadataをread-only再読込",
+            "古いheader metadataを流用しません",
+            "成功時だけInput metadata・選択値・draftとDesignを更新し、失敗・取消では現在のInput／Designを置き換えず、設定fileも変更しません",
+            "保存したID・順序・設問text・Prompt・配点を保持",
+            "Imported Promptの一覧・本文・順序は変更・消去せず、未適用Promptを定義へ取り込みません",
+            "見出しセルから取り込まれた設問textは、定義を明示保存すると平文で含まれます",
+            "貼り付けた学生回答・氏名・秘密情報も、定義に入れば保存され得ます",
+            "`setting.txt`は暗号化containerではなく",
+            "入力xlsxのpath・bytes、学生の回答行本文",
+            "AI結果、reason、evidence、参照回答、結果override",
+            "run／checkpoint状態、新規／再開mode、partial指定",
+            "認証情報としてのcredential・login状態、CLI hash等のruntime診断",
+            "Imported Promptの取込file一覧・未適用本文・順序",
+            "同schemaの未知項目・重複項目等を拒否",
+            "その後に有効な設定を明示保存すると元fileを置き換えます",
+            "複数profileの管理・切替と保存済みfinal workbookの再importは未対応");
+        AssertContainsAll(
+            Read("README.md"),
+            "任意の採点定義1件",
+            "UTF-8 JSON・`schemaVersion`は整数`1`",
+            "画面移動・編集・終了では自動保存せず",
+            "採点定義は保持するだけで自動適用しません",
+            "**設定 → 共通 → 保存定義 → 現在の入力に適用**",
+            "**`setting.txt`は暗号化されていない平文です。**",
+            "定義の明示保存時に含まれ得ます",
+            "**設定を保存**では結果・overrideを保存しません");
+    }
+
+    [Fact]
+    public void test_settings_contract_model_output_reset_and_run_isolation()
+    {
+        string guide = Read("docs/settings.md");
+        // ExecutionSettingsTests separates desired/effective values, explicit null reset,
+        // and immutable current requests. These assertions keep that distinction public.
+        AssertContainsAll(
+            guide,
+            "保存するのは**希望ID**で、認証済み・利用可能という判定ではありません",
+            "候補に存在するときだけ実効選択へ反映",
+            "不在なら未選択のまま",
+            "別modelへfallbackしません",
+            "確認失敗だけでは希望IDを消しません",
+            "それだけで暗黙の希望IDを保存しません",
+            "通常modelが使えても`auto`不在なら開始できません",
+            "再起動後や別Excelへ変更した後もその絶対pathを保持",
+            "指定出力先を空欄にする操作は未指定（`null`）への明示変更",
+            "以前の保存指定へ勝手に戻りません",
+            "`null`の場合だけ、現在の入力fileに隣接する`result`を都度算出",
+            "入力Aから入力Bへ変えればBの隣接先",
+            "入力未選択なら**入力後に決定**",
+            "自動算出したpathは指定値として保存しません",
+            "指定先が利用不可でも別pathへfallbackしません",
+            "設定の復元だけでは出力directoryを作りません",
+            "checkpoint再開では保存済みの予約pathを使い、この新規run用指定で置き換えません",
+            "実行中に編集・保存する設定は**次回用draft**",
+            "現在runは開始時のrequest／immutable snapshot、model・並列度・出力条件、予約済みpathを保持",
+            "保存定義の一括適用だけはrun中に行えません",
+            "Settings表示中に完了しても結果へ強制移動しません",
+            "前回結果とoverrideは次回設定から分離",
+            "**設定を保存**ではありません");
+        AssertContainsAll(
+            Read("README.md"),
+            "実行画面の**モデル・並列度・実効出力先は読取専用**",
+            "**変更 → 設定の共通**",
+            "保存希望modelが利用不可なら未選択のままで、別modelへfallbackしません",
+            "希望IDの復元は認証済み・利用可能という判定ではありません",
+            "空欄（`outputDirectoryOverride: null`）",
+            "保存した明示指定は再起動・入力変更後も保持",
+            "`null`の場合だけ現在の入力に隣接する`result`を算出し、算出path自体は保存しません",
+            "利用できない指定先から別pathへfallbackしません",
+            "開始済みrunの入力・採点定義・モデル・並列度・出力条件と予約済みpathは固定",
+            "設定表示中に完了しても強制移動せず",
+            "前回結果は次回設定から分離され、次回用の編集で自動再評価されません");
+    }
+
+    [Fact]
     public void Screenshot_captions_and_manifest_disclose_synthetic_and_fake_state()
     {
         string readme = Read("README.md");
         string manifest = Read("images/README.md");
         AssertContainsAll(
             readme,
-            "synthetic dataを使用",
-            "fake scoreを使用");
+            "画像は合成データ・fake結果による説明用",
+            "fake runの100行とfake score",
+            "実認証・実保存・clean-host動作の証拠ではありません");
         AssertContainsAll(
             manifest,
             "fake authentication boundary",
-            "fake row/AI/checkpoint/output boundaries",
-            "実fileを作成した証跡ではない",
-            "personal/student data: なし");
+            "fake row/AI/input-snapshot/checkpoint/path-planner/finalizer/output boundaries",
+            "実file作成の証跡ではない",
+            "personal/student data・secret: なし",
+            "生成日: 2026-09-07（親T28での実際のPNG生成日",
+            "renderer: Avalonia 12.1.1 Headless + Skia",
+            "generator source: `tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs`",
+            "1440 × 1050 pixels、8枚",
+            "`NotChecked`（認証未確認）・ログイン未開始",
+            "Final score 91.2",
+            "Final score 93.2",
+            "**未保存候補**で、exportは未実行",
+            "`settingsStore: null`を明示し、保存・読込再試行は無効",
+            "`setting.txt`の読込・保存は行わない",
+            "本番アプリはユーザー用の保存先を解決する",
+            "**非opt-inではrepository画像を検査・更新しません**",
+            "2回生成の一致や最小サイズtestの成功を、repository画像と現行UIの自動的一致確認へ拡張しません");
 
-        foreach (string fileName in new[]
+        string[] expectedFiles =
+        [
+            "01-input-workbook.png",
+            "02-input-mapping.png",
+            "03-design-knowledge.png",
+            "04-design-custom-prompt.png",
+            "05-execution-auto.png",
+            "06-results-review.png",
+            "07-output-export.png",
+            "08-settings.png",
+        ];
+        string imageDirectory = Resolve(FindRepositoryRoot(), "images");
+        Assert.Equal(expectedFiles, Directory.EnumerateFiles(imageDirectory, "*.png")
+            .Select(Path.GetFileName).Order(StringComparer.Ordinal));
+        Assert.Equal(expectedFiles, Regex.Matches(
+                manifest,
+                @"^\| \[`[^`]+`\]\((?<file>[^)]+)\) \|",
+                RegexOptions.Multiline | RegexOptions.CultureInvariant)
+            .Select(match => match.Groups["file"].Value));
+
+        // Check saved-file presence/IHDR, not current UI pixels or native rendering.
+        // Rendering/repeatability stays with DocumentationScreenshotTests; no generation here.
+        foreach (string fileName in expectedFiles)
+        {
+            string path = Path.Combine(imageDirectory, fileName);
+            Assert.True(File.Exists(path), $"Missing documentation screenshot: {fileName}");
+            byte[] png = File.ReadAllBytes(path);
+            Assert.True(png.Length > 10_000, $"Documentation screenshot is unexpectedly small: {fileName}");
+            Assert.Equal(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, png[..8]);
+            Assert.Equal(new byte[] { 0, 0, 0, 13, 73, 72, 68, 82 }, png[8..16]); // Length 13, IHDR.
+            int width = (png[16] << 24) | (png[17] << 16) | (png[18] << 8) | png[19];
+            int height = (png[20] << 24) | (png[21] << 16) | (png[22] << 8) | png[23];
+            Assert.Equal(1440, width);
+            Assert.Equal(1050, height);
+            Assert.Contains(fileName, manifest, StringComparison.Ordinal);
+        }
+
+        string generator = Read("tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs");
+        Match generatorFiles = Regex.Match(
+            generator,
+            @"private static readonly string\[\] ScreenshotFileNames\s*=\s*\[(?<files>[\s\S]*?)\];",
+            RegexOptions.CultureInvariant);
+        Assert.True(generatorFiles.Success);
+        Assert.Equal(expectedFiles, Regex.Matches(generatorFiles.Groups["files"].Value, "\"(?<file>[^\"]+\\.png)\"")
+            .Select(match => match.Groups["file"].Value));
+        AssertContainsAll(generator, "private const int ScreenshotWidth = 1440;", "private const int ScreenshotHeight = 1050;");
+        foreach (string testName in new[]
                  {
-                     "01-input-workbook.png",
-                     "02-input-mapping.png",
-                     "03-design-knowledge.png",
-                     "04-design-custom-prompt.png",
-                     "05-execution-auto.png",
-                     "06-results-review.png",
-                     "07-output-export.png",
+                     "Documentation_screenshots_use_only_synthetic_state_and_have_expected_dimensions",
+                     "Synthetic_screenshot_renders_are_repeatable",
+                     "Minimum_client_screenshots_verify_all_eight_actual_pixel_frames_without_publishing",
+                     "Execution_documentation_screenshot_renders_are_repeatable",
                  })
         {
-            Assert.True(File.Exists(Resolve(FindRepositoryRoot(), "images/" + fileName)));
-            Assert.Contains(fileName, manifest, StringComparison.Ordinal);
+            Assert.Contains($"public async Task {testName}()", generator, StringComparison.Ordinal);
+            Assert.Contains($"`{testName}`", manifest, StringComparison.Ordinal);
         }
     }
 
     [Fact]
     public void Unreleased_ui_and_screenshots_are_explicitly_distinguished_from_the_public_release()
     {
-        foreach (string path in new[]
+        // Literal current candidate expectations are deliberate: synchronized in F02,
+        // not by reading a version back from the documents being checked. Public 0.8.1 is separate.
+        Assert.Contains("<VersionPrefix>0.8.5</VersionPrefix>", Read("Directory.Build.props"), StringComparison.Ordinal);
+        foreach ((string path, string candidate, string published) in new[]
                  {
-                     "README.md",
-                     "docs/README.md",
-                     "docs/getting-started.md",
-                     "docs/features.md",
-                     "images/README.md",
+                     ("README.md", "製品候補は`0.8.5`（UNRELEASED・未公開）", "現在の公開版は`0.8.1`です"),
+                     ("docs/README.md", "UNRELEASED（未リリース）の`0.8.5`候補", "現在の公開版は`0.8.1`です"),
+                     ("docs/getting-started.md", "現在のソース候補`0.8.5`（UNRELEASED・未公開）", "現在の公開版は`v0.8.1`です"),
+                     ("docs/settings.md", "現在のソース候補`0.8.5`", "公開`v0.8.1`はZIP配布で、本頁の設定保存・適用機能はありません"),
+                     ("docs/features.md", "UNRELEASED（未リリース）の`0.8.5`候補", "現在の公開版`v0.8.1`（ZIP）"),
+                     ("docs/custom-evaluator-guide.md", "UNRELEASED（未リリース）の`0.8.5`候補", "現在の公開版`v0.8.1`（ZIP）"),
+                     ("docs/prompt-launch.md", "未公開候補`0.8.5`（UNRELEASED・単一EXE）", "現在の公開版`v0.8.1`（ZIP）"),
+                     ("docs/privacy-and-data-handling.md", "現在のソースの`0.8.5`候補", "公開`v0.8.1`はZIP配布"),
+                     ("docs/troubleshooting.md", "UNRELEASED（未公開）の`0.8.5`候補", "公開`v0.8.1`はZIP配布"),
+                     ("images/README.md", "UNRELEASED（未リリース）の`0.8.5`候補", "公開`0.8.1`の画面を示すものではありません"),
                  })
         {
-            AssertContainsAll(Read(path), "UNRELEASED", "`0.8.4`候補", "`0.8.1`");
+            AssertContainsAll(Read(path), "UNRELEASED", candidate, published);
         }
 
-        AssertContainsAll(Read("images/README.md"), "一時directoryへ描画", "2回生成の一致", "finally");
+        AssertContainsAll(Read("images/README.md"), "一時directoryへ描画", "2回生成の一致", "finally",
+            "生成時の製品版: `0.8.4`", "PNGを再生成していません");
+        AssertContainsAll(Read("CHANGELOG.md"), "## [Unreleased]", "ソース候補`0.8.5`", "**未公開**");
+        Assert.DoesNotContain("## [0.8.5]", Read("CHANGELOG.md"), StringComparison.Ordinal);
         AssertContainsAll(
             Read("docs/getting-started.md"),
             "確認のためだけにPowerShell等を導入する必要はありません",
@@ -520,6 +782,10 @@ public sealed class DocumentationContractTests
             readme,
             "AI品質、教育的妥当性、公平性、法的適合性、組織policy適合性、不正行為を保証・判定しません",
             "未実測の処理時間、token数、費用を保証しません",
+            "すべての端末で無警告・無条件に1操作で起動できるとは表示しません",
+            "1ファイル配布は「ディスク上も1ファイル」「痕跡なし」ではありません",
+            "保存済みfinal workbookのアプリへの再importと、複数definition profileの管理・切替は提供しません",
+            "候補版の採点定義1件の明示保存・適用とは別です",
             "[MIT License](LICENSE)");
         AssertDoesNotContainAny(
             readme,
@@ -527,7 +793,10 @@ public sealed class DocumentationContractTests
             "不正検知",
             "公平性を保証",
             "signed installer",
-            "macOS対応");
+            "macOS対応",
+            "設定の永続化は未対応",
+            "採点定義の保存は未対応",
+            "設定・definitionの一般的な永続化・再import");
         Assert.StartsWith("MIT License", Read("LICENSE"), StringComparison.Ordinal);
     }
 
@@ -550,8 +819,8 @@ public sealed class DocumentationContractTests
 
         AssertContainsAll(
             requirements,
-            "| 文書版 | 4.5 |",
-            "| 基準日 | 2026-09-06 |",
+            "| 文書版 | 4.6 |",
+            "| 基準日 | 2026-09-07 |",
             "ADR-0013",
             "ADR-0016",
             "| 対応環境 | Windows 11 x64。macOS、Linux、Windows Arm64は現版の正式公開対象外 |",
@@ -587,13 +856,13 @@ public sealed class DocumentationContractTests
             "469,995",
             "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D",
             "A1:J531");
-        AssertSequentialTableIds(requirements, "AC-", 34);
-        AssertSequentialTableIds(ledger, "C-", 44);
+        AssertSequentialTableIds(requirements, "AC-", 37);
+        AssertSequentialTableIds(ledger, "C-", 47);
         AssertContainsAll(ledger, "VERIFIED", "BLOCKED", "EXCLUDED");
         AssertContainsAll(
             ledger,
-            "`docs/requirements-definition.md` v4.5",
-            "`SystemTest-prompt.md` v4.5、ST-UC-01〜26、TR-01〜33",
+            "`docs/requirements-definition.md` v4.6",
+            "`SystemTest-prompt.md` v4.6、ST-UC-01〜29、TR-01〜36",
             "`PASS_DEVELOPMENT`",
             "fresh user本人login／再起動後確認のCH-06は`NOT_RUN`");
 
@@ -603,7 +872,7 @@ public sealed class DocumentationContractTests
                 RegexOptions.Multiline | RegexOptions.CultureInvariant)
             .Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))
             .ToArray();
-        Assert.Equal(Enumerable.Range(1, 26), scenarioHeadingIds);
+        Assert.Equal(Enumerable.Range(1, 29), scenarioHeadingIds);
 
         Match[] standalonePrompts = Regex.Matches(
                 prompts,
@@ -612,7 +881,7 @@ public sealed class DocumentationContractTests
             .Cast<Match>()
             .ToArray();
         Assert.Equal(
-            Enumerable.Range(1, 26),
+            Enumerable.Range(1, 29),
             standalonePrompts.Select(match => int.Parse(
                 match.Groups[1].Value,
                 System.Globalization.CultureInfo.InvariantCulture)));
@@ -645,6 +914,9 @@ public sealed class DocumentationContractTests
             "TR-27 / AC-025",
             "TR-28 / TR-29 / AC-026 / AC-027 / AC-028",
             "TR-30 / TR-31 / TR-32 / TR-33 / AC-029 / AC-030 / AC-031 / AC-032 / AC-033 / AC-034",
+            "TR-34 / AC-035",
+            "TR-35 / AC-036",
+            "TR-36 / AC-016 / AC-017 / AC-018 / AC-019 / AC-035 / AC-036 / AC-037",
         ];
         Assert.Equal(
             expectedRequirementMappings,
@@ -660,13 +932,14 @@ public sealed class DocumentationContractTests
             .Distinct()
             .Order()
             .ToArray();
-        Assert.Equal(Enumerable.Range(1, 33), coveredRequirementIds);
+        Assert.Equal(Enumerable.Range(1, 36), coveredRequirementIds);
         AssertContainsAll(
             prompts,
-            "| 対象 | StudyReport Evaluator v4.5 |",
-            "| 基準日 | 2026-09-06 |",
-            "| 要求正本 | `docs/requirements-definition.md` v4.5 |",
+            "| 対象 | StudyReport Evaluator v4.6 |",
+            "| 基準日 | 2026-09-07 |",
+            "| 要求正本 | `docs/requirements-definition.md` v4.6 |",
             "ST-UC-26",
+            "ST-UC-29",
             "CH-01〜CH-06",
             "`sample/SampleReport.xlsx`",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
@@ -676,12 +949,12 @@ public sealed class DocumentationContractTests
         Assert.DoesNotContain("sample/realdata.xlsx", prompts, StringComparison.OrdinalIgnoreCase);
         AssertContainsAll(
             realDataSmoke,
-            "requirements = \"docs/requirements-definition.md v4.5\"",
-            "system_test_prompt = \"SystemTest-prompt.md v4.5\"");
+            "requirements = \"docs/requirements-definition.md v4.6\"",
+            "system_test_prompt = \"SystemTest-prompt.md v4.6\"");
         AssertContainsAll(
             Read("docs/getting-started.md"),
             "主回答列を選択すると",
-            "設問text**へ即座に表示",
+            "**設問文（必須）**へ即座に反映",
             "**見出し行を再読込**");
         AssertContainsAll(
             Read("docs/features.md"),
@@ -691,41 +964,322 @@ public sealed class DocumentationContractTests
     }
 
     [Fact]
-    public void Package_script_includes_every_public_document_image_and_license()
+    public void Ui_settings_baseline_preserves_explicit_boundaries_and_pending_evidence()
     {
-        string packageScript = Read("scripts/package-windows.ps1");
-        AssertContainsAll(
-            packageScript,
-            "$documentationRelativePaths = @(",
-            "'README.md'",
-            "'LICENSE'",
-            "'docs\\getting-started.md'",
-            "'images\\07-output-export.png'",
-            "Documentation package input must be LICENSE, Markdown, or PNG and nonempty");
+        string requirements = Read("docs/requirements-definition.md");
+        string contract = Read("dev/docs/ui-layout-contract.md");
+        string traceability = Read("dev/docs/traceability.md");
+        string ledger = Read("dev/docs/readme-claim-ledger.md");
+        string prompts = Read("SystemTest-prompt.md");
 
-        string packageTest = Read("tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs");
-        foreach (string required in new[]
+        AssertContainsAll(
+            requirements,
+            "全タスク完了後だけUnreleased追記",
+            "T01では製品版・CHANGELOGを変更しない",
+            "明示指定はabsolute pathとして再起動・入力Excel変更後も保持する",
+            "空欄への明示編集は`null`への変更として扱い",
+            "明示指定が`null`の場合だけ",
+            "自動算出したresult pathを明示指定として保存しない",
+            "指定先が利用不可でも別pathへfallbackせず",
+            "設定復元だけではdirectoryを作成しない",
+            "UTF-8 JSON、設定schema整数1",
+            "任意の採点定義1件だけを保存する",
+            "diskへの書込は利用者の明示保存だけ",
+            "見出しセルから取り込まれた設問textもsetting.txtに平文で含まれる",
+            "失敗・取消では現在の状態と保存fileを変更しない",
+            "確認失敗だけで保存希望IDを消さない",
+            "実行中も戻る・次回用編集を許可するが現在runを再構成しない",
+            "既存checkpointの予約済みfinal／partial pathと再開条件は変更しない",
+            "T01時点の未実装・試験NOT_RUNは履歴",
+            "T01〜T35はREVIEWED",
+            "T35の対象文書試験は4/4成功・敵対的レビュー済み",
+            "製品`0.8.5`は未公開候補",
+            "公開済みは`v0.8.1` ZIPのまま");
+        // T35's four historical results are not T36's expanded document/image gate.
+        // Check the evidence boundary without requiring T36 to remain pending forever.
+        foreach (string content in new[] { requirements, traceability, ledger, prompts })
+        {
+            AssertContainsAll(content, "T35の対象文書試験は4/4成功", "t35-reviewed.trx", "敵対的レビュー済み", "T36", "別scope");
+            AssertDoesNotContainAny(content,
+                "T35の文書変更後試験はNOT_RUN",
+                "T35の文書変更後試験・独立レビューはNOT_RUN",
+                "T35変更後文書試験・native",
+                "T35自体の試験・独立レビュー成功を付与しない");
+        }
+        // Check only CURRENT status rows. T01 dates and unimplemented history must remain historical.
+        foreach ((string content, string label) in new[]
                  {
-                     "LICENSE",
-                     "README.md",
-                     "docs/getting-started.md",
-                     "docs/features.md",
-                     "docs/custom-evaluator-guide.md",
-                     "docs/prompt-launch.md",
-                     "docs/privacy-and-data-handling.md",
-                     "docs/troubleshooting.md",
-                     "images/README.md",
-                     "images/01-input-workbook.png",
-                     "images/02-input-mapping.png",
-                     "images/03-design-knowledge.png",
-                     "images/04-design-custom-prompt.png",
-                     "images/05-execution-auto.png",
-                     "images/06-results-review.png",
-                     "images/07-output-export.png",
+                     (requirements, "状態"),
+                     (traceability, "Current status"),
                  })
         {
-            Assert.Contains($"\"{required}\"", packageTest, StringComparison.Ordinal);
+            Match currentStatus = Regex.Match(
+                content,
+                $@"^\| {Regex.Escape(label)} \|[^\r\n]+\r?$",
+                RegexOptions.Multiline | RegexOptions.CultureInvariant);
+            Assert.True(currentStatus.Success, $"Missing current status row: {label}");
+            Assert.Contains("VERIFIED_SCOPED", currentStatus.Value, StringComparison.Ordinal);
+            AssertDoesNotContainAny(currentStatus.Value, "未実装", "NOT_IMPLEMENTED");
         }
+
+        AssertContainsAll(
+            contract,
+            "v4.6 / 2026-09-07",
+            "MinWidth=\"1024\"",
+            "MinHeight=\"720\"",
+            "Width=\"1180\"",
+            "Height=\"800\"",
+            "第5ステップ、modal、drawerではない",
+            "「共通」「入力詳細」「通常評価」「固有評価」「読込Prompt」の5つ",
+            "Extent <= Viewport",
+            "760×600 standalone／200%表示",
+            "主操作target最小44 DIP",
+            "未実測は`NOT_RUN`",
+            "headlessやHTMLモックで代替しない");
+        AssertContainsAll(
+            traceability,
+            "`docs/requirements-definition.md` v4.6 / 2026-09-07",
+            "T01時点の予定ownerを実在確認済みの試験ownerへ更新",
+            "T35の対象文書試験は4/4成功・敵対的レビュー済み",
+            "SettingsFileStore.LoadAsync",
+            "SettingsFileStore.SaveAsync",
+            "MainWindowSettingsTests",
+            "WorkflowStateTests",
+            "ResponsiveLayoutTests",
+            "CompactWorkflowLayoutTests",
+            "SettingsWorkflowSystemTests",
+            "540/540",
+            "275/275",
+            "67/67",
+            "74/74",
+            "216/216",
+            "27と7を74へ再加算しない",
+            "合算してfull gateを作らない",
+            "Closed resume identity",
+            "ST-UC-27",
+            "ST-UC-28",
+            "ST-UC-29");
+        AssertContainsAll(
+            prompts,
+            "VERIFIED_SCOPED",
+            "4合成回答行、6メソッド・7ケース",
+            "MainWindowTests.Failed_saved_definition_apply_preserves_divergent_drafts_and_latest_preview",
+            "MainWindowTests.Input_replacement_during_reload_publishes_only_coherent_execution_state",
+            "SettingsFileStoreTests.Exclusive_handle_refuses_read_and_replace_keeps_old_bytes_and_cleans_only_own_temp",
+            "SettingsWorkflowSystemTests",
+            "Real_atomic_final_validation_rejects_a_corrupted_cached_score_and_does_not_publish_it",
+            "Manual user-visible UI at 200%",
+            "overall PASSには両scopeの実測PASSが必要",
+            "CHの欠落、`FAIL`、`NOT_RUN`",
+            "ADV-01/ADV-02の`NOT_RUN`は許容");
+
+        AssertSequentialTableIds(traceability, "AC-", 37);
+        Assert.Equal(
+            Enumerable.Range(1, 36),
+            Regex.Matches(
+                    traceability,
+                    @"^\| TR-(\d{2}) \|",
+                    RegexOptions.Multiline | RegexOptions.CultureInvariant)
+                .Select(match => int.Parse(
+                    match.Groups[1].Value,
+                    System.Globalization.CultureInfo.InvariantCulture)));
+
+        // Independent owner/status expectations, not generated from the documents under test.
+        // T36 documents and T38 P06 may cite their measured, scoped results, not full
+        // native, fault or publish acceptance. A source check cannot certify its own execution.
+        (string Id, string[] Statuses, string Owner)[] expectedCurrentRows =
+        [
+            ("AC-013", ["VERIFIED_SCOPED"], "ExecutionSettingsTests"),
+            ("AC-016", ["VERIFIED_SCOPED"], "ResponsiveLayoutTests"),
+            ("AC-017", ["VERIFIED_SCOPED"], "EthicsWarningTests"),
+            ("AC-018", ["VERIFIED_SCOPED"], "ImportedPromptSettingsViewTests"),
+            ("AC-022", ["NOT_RUN_CURRENT_CANDIDATE", "VERIFIED_SCOPED", "PASS_REQUIRED"], "DocumentationContractTests"),
+            ("AC-029", ["NOT_RUN_EXTERNAL_PREREQUISITE"], "CH-01"),
+            ("AC-032", ["VERIFIED_SCOPED"], "WindowsSingleFilePackageTests"),
+            ("AC-033", ["NOT_RUN_EXTERNAL_PREREQUISITE"], "CH-06"),
+            ("AC-034", ["NOT_RUN_EXTERNAL_PREREQUISITE"], "ReleaseMatrixContractTests"),
+            ("AC-035", ["VERIFIED_SCOPED"], "SettingsFileStoreTests"),
+            ("AC-036", ["VERIFIED_SCOPED"], "SavedDefinitionApplicationTests"),
+            ("AC-037", ["VERIFIED_SCOPED"], "WorkflowStateTests"),
+            ("TR-17", ["VERIFIED_SCOPED"], "CompactWorkflowLayoutTests"),
+            ("TR-18", ["VERIFIED_SCOPED"], "ImportedPromptSettingsViewTests"),
+            ("TR-22", ["NOT_RUN_CURRENT_CANDIDATE", "VERIFIED_SCOPED", "PASS_REQUIRED"], "DocumentationContractTests"),
+            ("TR-31", ["VERIFIED_SCOPED"], "WindowsSingleFilePackageTests"),
+            ("TR-32", ["NOT_RUN_EXTERNAL_PREREQUISITE"], "BundledCopilotLoginServiceTests"),
+            ("TR-33", ["NOT_RUN_EXTERNAL_PREREQUISITE"], "ReleaseWorkflowContractTests"),
+            ("TR-34", ["VERIFIED_SCOPED"], "SettingsFileStoreTests"),
+            ("TR-35", ["VERIFIED_SCOPED"], "SavedDefinitionApplicationTests"),
+            ("TR-36", ["VERIFIED_SCOPED"], "SettingsWorkflowSystemTests"),
+        ];
+        Dictionary<string, string> documentStatuses = new(StringComparer.Ordinal);
+        foreach ((string id, string[] statuses, string owner) in expectedCurrentRows)
+        {
+            Match row = Regex.Match(
+                traceability,
+                $@"^\| {Regex.Escape(id)} \|[^\r\n]*\| (?<status>[A-Z_]+) \|\r?$",
+                RegexOptions.Multiline | RegexOptions.CultureInvariant);
+            Assert.True(row.Success, $"Missing current traceability row: {id}.");
+            Assert.Contains(row.Groups["status"].Value, statuses);
+            Assert.Contains(owner, row.Value, StringComparison.Ordinal);
+            if (id is "AC-032" or "TR-31")
+            {
+                AssertContainsAll(row.Value, "0.8.4", "artifacts/test/ui-settings/t38/native/",
+                    "disk-full／directory ACL／抽出中断／EXE・ZIP間checkpoint再開は未実施",
+                    "全faultのPASS_REQUIREDではない");
+            }
+            if (id is "AC-022" or "TR-22")
+            {
+                AssertContainsAll(row.Value, "T36", "ST-UC-16");
+                documentStatuses.Add(id, row.Groups["status"].Value);
+            }
+        }
+
+        Assert.Equal(2, documentStatuses.Count);
+        string documentStatus = documentStatuses["AC-022"];
+        Assert.Equal(documentStatus, documentStatuses["TR-22"]);
+        if (documentStatus != "NOT_RUN_CURRENT_CANDIDATE")
+        {
+            // A later measured T36 gate must name its own evidence, not reuse T35's TRX.
+            // This validates the reference, not the execution or contents of a local artifact.
+            Assert.Matches(@"`[^`\r\n]*t36[^`\r\n]*\.trx`", traceability);
+        }
+
+        string[] allowedClaimStatuses = documentStatus == "NOT_RUN_CURRENT_CANDIDATE"
+            ? ["BLOCKED"]
+            : ["BLOCKED", "VERIFIED"];
+        (string Id, string Owner, string Requirement, string Scenario)[] expectedScopedClaims =
+        [
+            ("C-045", "SettingsFileStore", "AC-035", "TR-34／ST-UC-27"),
+            ("C-046", "InputViewModel.ApplySavedDefinitionAsync", "AC-036", "TR-35／ST-UC-28"),
+            ("C-047", "MainWindowSettingsTests", "AC-016／017／037", "ST-UC-12／29"),
+        ];
+        foreach ((string id, string owner, string requirement, string scenario) in expectedScopedClaims)
+        {
+            Match row = Regex.Match(
+                ledger,
+                $@"^\| {Regex.Escape(id)} \|[^\r\n]*\| (?<status>BLOCKED|VERIFIED) \|[^\r\n]*\r?$",
+                RegexOptions.Multiline | RegexOptions.CultureInvariant);
+            Assert.True(row.Success, $"Missing scoped public claim: {id}.");
+            Assert.Contains(row.Groups["status"].Value, allowedClaimStatuses);
+            AssertContainsAll(row.Value, "実装済み", "VERIFIED_SCOPED", owner, requirement, scenario, "T36");
+            AssertDoesNotContainAny(row.Value, "未実装", "未検証", "予定`", "PASS_PRODUCTION");
+        }
+    }
+
+    [Fact]
+    public void Package_script_includes_every_public_document_image_and_license()
+    {
+        // Independent closed expectation: never derive it from another producer's allowlist.
+        // These are source contracts only; no PowerShell, MSBuild or package execution here.
+        string[] expected =
+        [
+            "README.md",
+            "LICENSE",
+            "docs/README.md",
+            "docs/getting-started.md",
+            "docs/features.md",
+            "docs/custom-evaluator-guide.md",
+            "docs/prompt-launch.md",
+            "docs/privacy-and-data-handling.md",
+            "docs/troubleshooting.md",
+            "docs/settings.md",
+            "docs/third-party-notices.md",
+            "images/README.md",
+            "images/01-input-workbook.png",
+            "images/02-input-mapping.png",
+            "images/03-design-knowledge.png",
+            "images/04-design-custom-prompt.png",
+            "images/05-execution-auto.png",
+            "images/06-results-review.png",
+            "images/07-output-export.png",
+            "images/08-settings.png",
+        ];
+        Assert.Equal(20, expected.Length);
+        Assert.Equal(20, expected.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Equal(11, PublicDocumentPaths.Length);
+        Assert.Equal(
+            PublicDocumentPaths.Order(StringComparer.Ordinal),
+            expected.Where(path => path.EndsWith(".md", StringComparison.Ordinal)).Order(StringComparer.Ordinal));
+        Assert.Equal(8, expected.Count(path => path.StartsWith("images/", StringComparison.Ordinal)
+            && path.EndsWith(".png", StringComparison.Ordinal)));
+
+        const RegexOptions options = RegexOptions.Multiline | RegexOptions.CultureInvariant;
+        foreach ((string path, string declaration) in new[]
+                 {
+                     ("scripts/package-windows.ps1", "$documentationRelativePaths = @("),
+                     ("scripts/package-windows-msix.ps1", "$PublicPayloadRelativePaths = @("),
+                     ("scripts/test-windows-msix-unsigned.ps1", "$RequiredPublicEntries = @("),
+                 })
+        {
+            Match list = Assert.Single(Regex.Matches(
+                Read(path),
+                @"^" + Regex.Escape(declaration) + @"[ \t]*\r?\n(?<paths>[\s\S]*?)^\)[ \t]*\r?$",
+                options).Cast<Match>());
+            AssertPublicPaths(ParsePublicDocumentationLiterals(list.Groups["paths"].Value));
+        }
+
+        // Match the entire helper body, including its return, rather than collecting
+        // matching-looking filenames from comments or from an unrelated array.
+        Match publishHelper = Assert.Single(Regex.Matches(
+            Read("scripts/publish-windows.ps1"),
+            @"^function Get-SingleFileDocumentationPaths[ \t]*\{\r?\n"
+            + @"(?:[ \t]*#[^\r\n]*\r?\n)*[ \t]*return[ \t]+@\(\r?\n"
+            + @"(?<paths>[\s\S]*?)^[ \t]*\)[ \t]*\r?\n\}[ \t]*\r?$",
+            options).Cast<Match>());
+        AssertPublicPaths(ParsePublicDocumentationLiterals(publishHelper.Groups["paths"].Value));
+
+        XElement itemGroup = Assert.Single(XDocument.Parse(Read(
+            "src/StudyReportEvaluator.App/Properties/PublishProfiles/WindowsSingleFile.pubxml"))
+            .Descendants("ItemGroup"));
+        AssertPublicPaths(itemGroup.Elements().Select(item =>
+        {
+            Assert.Equal("Content", item.Name.ToString()); // Do not filter away unknown item types.
+            string link = Assert.IsType<string>((string?)item.Attribute("Link"));
+            Assert.Equal("$(MSBuildProjectDirectory)\\..\\..\\" + link, (string?)item.Attribute("Include"));
+            return link;
+        }));
+        Assert.Contains(
+            "Documentation package input must be LICENSE, Markdown, or PNG and nonempty",
+            Read("scripts/package-windows.ps1"), StringComparison.Ordinal);
+
+        // Same-size substitutions must fail too: unknowns, duplicates, case drift,
+        // user settings and input/final/partial workbooks cannot hide behind a count.
+        foreach (string replacement in new[]
+                 {
+                     "docs/unlisted.md", "docs/features.md", "DOCS/settings.md",
+                     "setting.txt", "input.xlsx", "result/keep.final.xlsx", "result/keep.partial.xlsx",
+                 })
+        {
+            Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => AssertPublicPaths(
+                expected.Select(path => path == "docs/settings.md" ? replacement : path)));
+        }
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            ParsePublicDocumentationLiterals("'README.md', $unexpected"));
+
+        void AssertPublicPaths(IEnumerable<string> paths)
+        {
+            string[] actual = paths.Select(path => path.Replace('\\', '/')).ToArray();
+            Assert.Equal(20, actual.Length);
+            Assert.Equal(20, actual.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.DoesNotContain(actual, path => string.Equals(
+                Path.GetFileName(path), "setting.txt", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(actual, path => path.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(
+                expected.Order(StringComparer.Ordinal).ToArray(),
+                actual.Order(StringComparer.Ordinal).ToArray(),
+                StringComparer.Ordinal);
+        }
+    }
+
+    private static string[] ParsePublicDocumentationLiterals(string body)
+    {
+        // Consume the WHOLE literal array; unknown expressions must not be silently skipped.
+        Match literals = Regex.Match(
+            body,
+            @"\A\s*'(?<path>[^'\r\n]+)'(?:\s*,\s*'(?<path>[^'\r\n]+)')*\s*\z",
+            RegexOptions.CultureInvariant);
+        Assert.True(literals.Success, "Public documentation arrays must contain only comma-separated path literals.");
+        return literals.Groups["path"].Captures.Select(capture => capture.Value).ToArray();
     }
 
     private static void AssertSequentialTableIds(string content, string prefix, int expectedCount)

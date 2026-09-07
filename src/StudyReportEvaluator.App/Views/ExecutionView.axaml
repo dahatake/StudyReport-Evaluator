@@ -6,41 +6,31 @@
     xmlns:viewModels="using:StudyReportEvaluator.App.ViewModels"
     Background="{DynamicResource AppCanvasBrush}"
     Foreground="{DynamicResource AppTextBrush}"
-    AutomationProperties.AutomationId="ExecutionView">
+    FontSize="14"
+    AutomationProperties.AutomationId="ExecutionView"
+    AutomationProperties.Name="定量化の実行">
   <UserControl.Styles>
-    <Style Selector="Border.card">
-      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="14" />
-      <Setter Property="Padding" Value="18" />
+    <Style Selector="Button, TextBox, CheckBox, ListBoxItem">
+      <Setter Property="MinWidth" Value="44" />
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="ToolTip.ShowOnDisabled" Value="True" />
     </Style>
-    <Style Selector="Border.ok">
-      <Setter Property="Background" Value="{DynamicResource AppCompletedSoftBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource AppCompletedBrush}" />
-      <Setter Property="BorderThickness" Value="3,0,0,0" />
-      <Setter Property="CornerRadius" Value="9" />
-      <Setter Property="Padding" Value="14" />
+    <Style Selector="Button, TextBox, ListBoxItem">
+      <Setter Property="Padding" Value="8,4" />
     </Style>
-    <Style Selector="Border.invalid">
-      <Setter Property="Background" Value="{DynamicResource TechnicalBackgroundBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource TechnicalBorderBrush}" />
-      <Setter Property="BorderThickness" Value="3,0,0,0" />
-      <Setter Property="CornerRadius" Value="9" />
-      <Setter Property="Padding" Value="14" />
+    <Style Selector="TextBlock">
+      <Setter Property="FontSize" Value="14" />
     </Style>
-    <Style Selector="TextBlock.kicker">
-      <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="LetterSpacing" Value="1" />
-    </Style>
-    <Style Selector="TextBlock.heading">
-      <Setter Property="FontSize" Value="18" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="TextWrapping" Value="Wrap" />
+    <Style Selector="TextBox.single-line">
+      <Setter Property="Height" Value="44" />
+      <Setter Property="TextWrapping" Value="NoWrap" />
+      <Setter Property="AcceptsReturn" Value="False" />
+      <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+      <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
     </Style>
     <Style Selector="TextBlock.label">
+      <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
@@ -59,231 +49,205 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
-    <Style Selector="ComboBox:focus-visible">
+    <Style Selector="Button:focus-visible, TextBox:focus-visible, CheckBox:focus-visible, ListBoxItem:focus-visible">
       <Setter Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
       <Setter Property="BorderThickness" Value="3" />
     </Style>
   </UserControl.Styles>
 
-  <ScrollViewer
-      x:Name="ExecutionScrollViewer"
-      HorizontalScrollBarVisibility="Disabled"
-      VerticalScrollBarVisibility="Auto"
-      AutomationProperties.AutomationId="ExecutionScrollViewer">
-    <StackPanel
-        HorizontalAlignment="Stretch"
-        Margin="24"
-        Spacing="16"
+  <!-- The normal 950 x 450 slot has a 346-DIP body. Only long content scrolls
+       locally; the effective settings and Start/Cancel never join that scroll. -->
+  <Grid x:Name="ExecutionLayout" RowDefinitions="44,*,44" RowSpacing="8"
         KeyboardNavigation.TabNavigation="Continue">
-      <Border Background="{DynamicResource AppHeroBrush}" CornerRadius="18" Padding="22">
-        <Grid ColumnDefinitions="2*,*" ColumnSpacing="16">
-          <StackPanel Spacing="6">
-            <TextBlock Text="STEP 03 · EXECUTION" Foreground="#9FABFF" FontWeight="SemiBold" LetterSpacing="1.1" TextWrapping="Wrap" />
-            <TextBlock Text="snapshot-bound quantification" Foreground="White" FontSize="27" FontWeight="Bold" TextWrapping="Wrap" />
-            <TextBlock
-                Text="既存の Copilot CLI login を確認し、選択した model で行 × 質問 × evaluator を実行します。"
-                Foreground="{DynamicResource AppHeroMutedBrush}"
-                TextWrapping="Wrap" />
-          </StackPanel>
-          <Border Grid.Column="1" Padding="12,8" CornerRadius="10" Background="#20AAB6FF" HorizontalAlignment="Right" VerticalAlignment="Top">
-            <TextBlock Text="NO SECRET INPUT · EPHEMERAL SESSIONS" Foreground="White" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap" />
-          </Border>
-        </Grid>
-      </Border>
+    <Grid x:Name="ExecutionSettingsSummary" ColumnDefinitions="84,*,108,84,72" ColumnSpacing="8">
+      <TextBlock Text="実行条件&#10;今回／次回" Classes="label" />
+      <TextBox x:Name="EffectiveModelTextBox" Grid.Column="1" Classes="single-line"
+               IsReadOnly="True" TabIndex="10"
+               AutomationProperties.AutomationId="ExecutionEffectiveModel"
+               AutomationProperties.Name="実行中または前回と次回のモデル・並列度・読取専用"
+               ToolTip.Tip="実行中／前回runは開始時の固定値、次回は現在の設定の実効値です。希望IDが使えなくても別モデルへ自動変更しません。全文を選択・コピーできます。" />
+      <TextBlock x:Name="FixedAutoModelStatus" Grid.Column="2" Classes="label"
+                 AutomationProperties.AutomationId="ExecutionFixedAutoModel"
+                 AutomationProperties.Name="参照回答と類似度評価で固定使用するautoの利用可否" />
+      <TextBlock x:Name="ConcurrencySummary" Grid.Column="3" Classes="label"
+                 Text="{Binding MaxConcurrency, StringFormat='次回並列&#10;{0} 件'}"
+                 ToolTip.Tip="{Binding ConcurrencyText}"
+                 AutomationProperties.AutomationId="ExecutionConcurrencySummary" />
+      <Button x:Name="ChangeExecutionSettingsButton" Grid.Column="4" Content="変更"
+              Click="HandleOpenSettings" TabIndex="3"
+              AutomationProperties.AutomationId="ExecutionChangeSettings"
+              AutomationProperties.Name="モデル・並列度・出力先の共通設定を開く"
+              ToolTip.Tip="共通設定で次回のモデル・並列度・出力先を変更できます。runtime診断も共通設定にあります。実行中のsnapshotは変わりません。" />
+    </Grid>
 
-      <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
-        <Border Grid.Column="0" Classes="card">
-          <StackPanel x:Name="CopilotLoginPanel" Spacing="11">
-            <TextBlock Text="COPILOT RUNTIME" Classes="kicker" />
-            <TextBlock Text="login と identity" Classes="heading" />
-            <TextBlock Text="{Binding AuthenticationStatusText}" TextWrapping="Wrap" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding RuntimeIdentityText}" Classes="muted" TextWrapping="Wrap" FontSize="12" />
-            <TextBlock
-                x:Name="CopilotLoginInstructions"
-                Text="「GitHubにログイン」で同梱 CLI を起動し、別のブラウザーで認証します。このアプリはパスワードやトークンを取得・保存しません。完了後は「Copilot 状態を確認」を押してください。ログインや定量化は自動で開始しません。"
-                Classes="muted"
-                FontSize="12"
-                TextWrapping="Wrap" />
-            <WrapPanel x:Name="CopilotLoginActions" ItemSpacing="10" LineSpacing="8">
-              <Button
-                  x:Name="CheckAuthenticationButton"
-                  Content="Copilot 状態を確認"
-                  Command="{Binding CheckAuthenticationCommand}"
-                  HorizontalAlignment="Left"
-                  TabIndex="0"
-                  AutomationProperties.AutomationId="CheckCopilotAuthentication"
-                  AutomationProperties.Name="既存 Copilot CLI login と model を確認" />
-              <Button
-                  x:Name="StartCopilotLogin"
-                  Content="GitHubにログイン"
-                  Command="{Binding LoginCommand}"
-                  TabIndex="1"
-                  AutomationProperties.AutomationId="StartCopilotLogin"
-                  AutomationProperties.Name="GitHubにログイン"
-                  AutomationProperties.HelpText="同梱 Copilot CLI を起動し、別のブラウザーで認証します。このアプリはトークンを取得・保存しません。" />
-              <Button
-                  x:Name="CancelCopilotLogin"
-                  Content="ログインを取り消す"
-                  Command="{Binding CancelLoginCommand}"
-                  TabIndex="2"
-                  AutomationProperties.AutomationId="CancelCopilotLogin"
-                  AutomationProperties.Name="ログインを取り消す"
-                  AutomationProperties.HelpText="このアプリで開始したログイン処理だけを取り消します。ブラウザーは閉じません。" />
+    <Grid x:Name="ExecutionBody" Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="12">
+      <Grid RowDefinitions="*,44,Auto,Auto" RowSpacing="4">
+        <ScrollViewer x:Name="ExecutionAuthenticationScroll"
+                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel x:Name="CopilotLoginPanel" Spacing="4">
+            <TextBlock x:Name="CopilotAuthenticationStatus" Text="{Binding AuthenticationStatusText}"
+                       TextWrapping="Wrap" FontWeight="SemiBold"
+                       AutomationProperties.AutomationId="CopilotAuthenticationStatus" />
+            <WrapPanel x:Name="CopilotLoginActions" ItemSpacing="4" LineSpacing="4">
+              <Button x:Name="CheckAuthenticationButton" Content="Copilot 状態を確認"
+                      Command="{Binding CheckAuthenticationCommand}" TabIndex="0"
+                      AutomationProperties.AutomationId="CheckCopilotAuthentication"
+                      AutomationProperties.Name="既存 Copilot CLI login と model を確認"
+                      ToolTip.Tip="本人の操作で既存loginと利用可能モデルを確認します。ログインや定量化は開始しません。" />
+              <Button x:Name="StartCopilotLogin" Content="GitHubにログイン"
+                      Command="{Binding LoginCommand}" TabIndex="1"
+                      AutomationProperties.AutomationId="StartCopilotLogin"
+                      AutomationProperties.Name="GitHubにログイン"
+                      AutomationProperties.HelpText="同梱 Copilot CLI を起動し、別のブラウザーで認証します。このアプリはトークンを取得・保存しません。"
+                      ToolTip.Tip="同梱 CLI を直接起動し、別のブラウザーで認証します。このアプリはパスワードやトークンを取得・保存しません。完了後は「Copilot 状態を確認」を押してください。" />
+              <Button x:Name="CancelCopilotLogin" Content="ログインを取り消す"
+                      Command="{Binding CancelLoginCommand}" TabIndex="2"
+                      AutomationProperties.AutomationId="CancelCopilotLogin"
+                      AutomationProperties.Name="ログインを取り消す"
+                      AutomationProperties.HelpText="このアプリで開始したログイン処理だけを取り消します。ブラウザーは閉じません。"
+                      ToolTip.Tip="このアプリが所有するログイン処理だけを取り消します。外部のCLIやブラウザーは終了しません。" />
             </WrapPanel>
-            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsCheckingAuthentication}" Height="5" />
-            <Border
-                Background="{DynamicResource AppSurfaceMutedBrush}"
-                BorderBrush="{DynamicResource AppBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="9"
-                Padding="12">
-              <TextBlock
-                  x:Name="CopilotLoginStatus"
-                  Text="{Binding LoginStatusText}"
-                  TextWrapping="Wrap"
-                  AutomationProperties.AutomationId="CopilotLoginStatus"
-                  AutomationProperties.Name="{Binding LoginStatusText}"
-                  AutomationProperties.HelpText="ログイン処理の状態だけを表示します。認証状態は「Copilot 状態を確認」で再確認してください。" />
-            </Border>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsCheckingAuthentication}" Height="4" />
+            <TextBlock x:Name="CopilotLoginStatus" Text="{Binding LoginStatusText}" TextWrapping="Wrap"
+                       AutomationProperties.AutomationId="CopilotLoginStatus"
+                       AutomationProperties.Name="{Binding LoginStatusText}"
+                       AutomationProperties.HelpText="ログイン処理の状態だけを表示します。認証状態は「Copilot 状態を確認」で再確認してください。" />
+            <TextBlock x:Name="CopilotLoginInstructions" Classes="muted" TextWrapping="Wrap"
+                       Text="別のブラウザーで認証し、完了後は「Copilot 状態を確認」。ログイン・定量化は自動で開始しません。" />
           </StackPanel>
-        </Border>
+        </ScrollViewer>
 
-        <Border Grid.Column="1" Classes="card">
-          <StackPanel Spacing="11">
-            <TextBlock Text="RUN OPTIONS" Classes="kicker" />
-            <TextBlock Text="model と並列度" Classes="heading" />
-            <TextBlock Text="Model" Classes="label" />
-            <ComboBox
-                x:Name="ModelComboBox"
-                ItemsSource="{Binding AvailableModelIds}"
-                SelectedItem="{Binding SelectedModelId, Mode=TwoWay}"
-                TabIndex="3"
-                AutomationProperties.AutomationId="ExecutionModel"
-                AutomationProperties.Name="評価に使用する Copilot model" />
-            <TextBlock Text="Concurrency" Classes="label" />
-            <ComboBox
-                x:Name="ConcurrencyComboBox"
-                ItemsSource="{Binding ConcurrencyOptions}"
-                SelectedItem="{Binding MaxConcurrency, Mode=TwoWay}"
-                TabIndex="4"
-                AutomationProperties.AutomationId="ExecutionConcurrency"
-                AutomationProperties.Name="評価の最大並列度 1 から 3" />
-            <TextBlock Text="{Binding ConcurrencyText}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
-          </StackPanel>
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*" ColumnSpacing="8">
+          <CheckBox x:Name="ResumeModeCheckBox" Content="checkpoint から再開"
+                    IsChecked="{Binding IsResumeMode, Mode=TwoWay}" TabIndex="4"
+                    AutomationProperties.AutomationId="ExecutionResumeMode"
+                    AutomationProperties.Name="新規runとcheckpoint再開を切り替え"
+                    ToolTip.Tip="オフなら新規run、オンなら既存のpartial checkpointから再開します。切替だけでは実行しません。" />
+          <TextBox x:Name="ResumePartialPathTextBox" Grid.Column="1" Classes="single-line"
+                   IsVisible="{Binding IsResumeMode}" PlaceholderText="既存の .partial.xlsx"
+                   Text="{Binding ResumePartialPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                   TabIndex="5" AutomationProperties.AutomationId="ExecutionResumePartialPath"
+                   AutomationProperties.Name="再開する既存 partial xlsx path"
+                   ToolTip.Tip="再開する既存.partial.xlsxのパスです。全文を編集・選択・コピーできます。入力や設計の変更時は再指定が必要です。" />
+          <TextBlock Grid.Column="1" Text="新規 run（チェックなし）" Classes="label"
+                     IsVisible="{Binding !IsResumeMode}" />
+        </Grid>
+        <ScrollViewer Grid.Row="2" MaxHeight="44"
+                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <TextBlock x:Name="OutputModeSummary" Text="{Binding OutputModeText}"
+                     Classes="muted" TextWrapping="Wrap" />
+        </ScrollViewer>
+
+        <Border x:Name="ExecutionValidationSummary" Grid.Row="3" Height="108" Padding="6"
+              IsVisible="{Binding HasTechnicalErrors, FallbackValue=False}" Background="{DynamicResource TechnicalBackgroundBrush}"
+                BorderBrush="{DynamicResource TechnicalBorderBrush}" BorderThickness="1" CornerRadius="8"
+                AutomationProperties.AutomationId="ExecutionValidationSummary">
+            <Grid RowDefinitions="Auto,*" RowSpacing="4">
+            <TextBlock Text="技術的な問題（選択して詳細を確認）" FontWeight="SemiBold" />
+            <Grid Grid.Row="1" ColumnDefinitions="2*,3*" ColumnSpacing="6">
+              <ListBox x:Name="TechnicalErrorsList" ItemsSource="{Binding TechnicalErrors}"
+                       SelectionChanged="HandleTechnicalErrorSelectionChanged" TabIndex="8"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                       AutomationProperties.AutomationId="ExecutionTechnicalErrors"
+                       AutomationProperties.Name="実行を止めている技術検証エラー"
+                       ToolTip.Tip="問題を選択すると右にコード・対象・説明を表示します。矢印キーでも選べます。">
+                <ListBox.ItemsPanel>
+                  <ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="viewModels:ExecutionTechnicalError">
+                    <StackPanel ToolTip.Tip="{Binding AccessibleText}">
+                      <TextBlock Text="{Binding Code}" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding TargetText}" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <TextBox x:Name="SelectedTechnicalErrorDetail" Grid.Column="1" IsReadOnly="True"
+                       AcceptsReturn="True" TextWrapping="Wrap" VerticalAlignment="Stretch" TabIndex="9"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                       AutomationProperties.AutomationId="ExecutionTechnicalErrorDetail"
+                       AutomationProperties.Name="選択した技術検証エラーの全文・読取専用"
+                       ToolTip.Tip="選択した問題のコード・対象・説明です。スクロールと全文の選択・コピーができます。確認ダイアログや同意操作はありません。" />
+            </Grid>
+          </Grid>
         </Border>
       </Grid>
 
-      <Border Classes="card">
-        <StackPanel Spacing="10">
-          <TextBlock Text="OUTPUT / RESUME" Classes="kicker" />
-          <TextBlock Text="新規runまたはcheckpoint再開" Classes="heading" />
-          <CheckBox
-              x:Name="ResumeModeCheckBox"
-              IsChecked="{Binding IsResumeMode, Mode=TwoWay}"
-              Content="既存checkpointから再開"
-              TabIndex="5"
-              AutomationProperties.AutomationId="ExecutionResumeMode"
-              AutomationProperties.Name="新規runとcheckpoint再開を切り替え" />
-          <TextBlock Text="{Binding OutputModeText}" Classes="muted" TextWrapping="Wrap" />
-          <StackPanel IsVisible="{Binding !IsResumeMode}" Spacing="5">
-            <TextBlock Text="出力directory" Classes="label" />
-            <TextBox
-                x:Name="OutputDirectoryTextBox"
-                Text="{Binding OutputDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                TextWrapping="Wrap"
-                TabIndex="6"
-                AutomationProperties.AutomationId="ExecutionOutputDirectory"
-                AutomationProperties.Name="finalとpartialを作成するdirectory" />
+      <Grid Grid.Column="1" RowDefinitions="44,*,Auto,44,44" RowSpacing="4">
+        <Grid ColumnDefinitions="110,*" ColumnSpacing="8">
+          <TextBlock x:Name="OutputDirectorySource" Classes="label" />
+          <TextBox x:Name="EffectiveOutputDirectoryTextBox" Grid.Column="1" Classes="single-line"
+                   Text="{Binding OutputDirectory, Mode=OneWay}" IsReadOnly="True" PlaceholderText="入力後に決定"
+                   TabIndex="11" AutomationProperties.AutomationId="ExecutionEffectiveOutputDirectory"
+                   AutomationProperties.Name="次回新規runの実効出力先・読取専用"
+                   ToolTip.Tip="次回新規runの実効出力先です。今回／前回runの出力条件とは別です。再開には左のpartialパスを使用します。長い値は欄内を横スクロールし、全文を選択・コピーできます。" />
+        </Grid>
+        <ScrollViewer x:Name="ExecutionProgressScroll" Grid.Row="1"
+                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="4">
+            <TextBox x:Name="CurrentRunOutputTextBox" Classes="single-line"
+                     Text="{Binding CurrentRunOutputSummary, Mode=OneWay}" IsReadOnly="True"
+                     IsVisible="{Binding HasCurrentRun, FallbackValue=False}" TabIndex="14"
+                     AutomationProperties.AutomationId="ExecutionCurrentRunOutput"
+                     AutomationProperties.Name="今回または前回runの固定した出力条件・読取専用"
+                     ToolTip.Tip="実際のrequestに固定した新規出力先または再開元です。取消・完了後も保持します。予約パスやファイル作成完了を示す値ではありません。全文を選択・コピーできます。" />
+            <TextBlock x:Name="PlanSummaryLabel" Text="次回の実行予定（送信済み件数ではありません）" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock x:Name="PlanSummaryText" Text="{Binding PlanSummary}" TextWrapping="Wrap"
+                       AutomationProperties.AutomationId="ExecutionPlanSummary"
+                       ToolTip.Tip="設計から求める予定単位数とretry込み上限です。実測の送信回数ではありません。実行開始後のdraft編集は次回だけに反映されます。" />
+            <TextBlock x:Name="RunStatusSummary" Text="{Binding RunStatusText}" TextWrapping="Wrap"
+                       AutomationProperties.AutomationId="ExecutionRunStatus" />
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+              <TextBlock x:Name="ExecutionStage" Text="{Binding StageText}" Classes="label"
+                         AutomationProperties.AutomationId="ExecutionStage" />
+              <ProgressBar x:Name="RunProgressBar" Grid.Column="1" Minimum="0"
+                           Maximum="{Binding ProgressTotal}" Value="{Binding ProgressCompleted}"
+                           Height="10" VerticalAlignment="Center"
+                           AutomationProperties.AutomationId="ExecutionProgress"
+                           AutomationProperties.Name="処理単位の完了進捗・送信回数とは別" />
+            </Grid>
+            <TextBlock x:Name="OperationProgressSummary" Text="{Binding ProgressText, StringFormat='処理単位: {0}'}" TextWrapping="Wrap"
+                       AutomationProperties.AutomationId="ExecutionOperationProgress"
+                       ToolTip.Tip="報告された処理単位の完了・実行中の件数です。学生行数やAIへの送信回数ではありません。" />
+            <TextBlock x:Name="DurableProgressSummary" Text="{Binding DurableProgressText, StringFormat='実測: {0}'}" TextWrapping="Wrap"
+                       AutomationProperties.AutomationId="ExecutionDurableProgress"
+                       ToolTip.Tip="実行中に報告された参照回答と学生行の進捗です。予定単位数や送信回数とは別です。" />
           </StackPanel>
-          <StackPanel IsVisible="{Binding IsResumeMode}" Spacing="5">
-            <TextBlock Text="再開するpartial checkpoint" Classes="label" />
-            <TextBox
-                x:Name="ResumePartialPathTextBox"
-                Text="{Binding ResumePartialPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                TextWrapping="Wrap"
-                TabIndex="6"
-                AutomationProperties.AutomationId="ExecutionResumePartialPath"
-                AutomationProperties.Name="再開する既存 partial xlsx path" />
-          </StackPanel>
-        </StackPanel>
-      </Border>
+        </ScrollViewer>
+        <TextBlock x:Name="ReservedPathsLabel" Grid.Row="2" Text="予約名（ファイル作成済みとは限りません）" Classes="muted" />
+        <Grid Grid.Row="3" ColumnDefinitions="110,*" ColumnSpacing="8">
+          <TextBlock Text="final（予約名）" Classes="label" />
+          <TextBox x:Name="ReservedFinalPathTextBox" Grid.Column="1" Classes="single-line"
+                   Text="{Binding ReservedFinalPath, Mode=OneWay}" IsReadOnly="True" PlaceholderText="run開始時に予約"
+                   TabIndex="12" AutomationProperties.AutomationId="ExecutionReservedFinalPath"
+                   AutomationProperties.Name="finalの予約パス・作成完了とは別・読取専用"
+                   ToolTip.Tip="finalの予約名です。作成・検証の成否は実行状態で確認してください。長いパスも全文を選択・コピーできます。" />
+        </Grid>
+        <Grid Grid.Row="4" ColumnDefinitions="110,*" ColumnSpacing="8">
+          <TextBlock Text="partial（予約名）" Classes="label" />
+          <TextBox x:Name="PartialPathTextBox" Grid.Column="1" Classes="single-line"
+                   Text="{Binding PartialPath, Mode=OneWay}" IsReadOnly="True" PlaceholderText="run開始時に予約"
+                   TabIndex="13" AutomationProperties.AutomationId="ExecutionPartialPath"
+                   AutomationProperties.Name="partial checkpointの予約パス・保存完了とは別・読取専用"
+                   ToolTip.Tip="partial checkpointの予約名です。保存の成否は実行状態で確認してください。長いパスも全文を選択・コピーできます。" />
+        </Grid>
+      </Grid>
+    </Grid>
 
-      <Border Classes="card">
-        <StackPanel Spacing="12">
-          <TextBlock Text="EVALUATION PLAN" Classes="kicker" />
-          <TextBlock Text="実行単位と snapshot" Classes="heading" />
-          <TextBlock Text="{Binding PlanSummary}" FontWeight="SemiBold" TextWrapping="Wrap" />
-          <TextBlock
-              Text="run 開始後の draft 編集は次回だけへ反映され、現在の Prompt・schema・range・weight・formula layout は変わりません。"
-              Classes="muted"
-              TextWrapping="Wrap" />
-          <WrapPanel ItemSpacing="10" LineSpacing="8">
-            <Button
-                x:Name="StartRunButton"
-                Classes="primary"
-                Content="定量化を開始"
-                Command="{Binding StartCommand}"
-                TabIndex="7"
-                AutomationProperties.AutomationId="StartQuantification"
-                AutomationProperties.Name="現在の設計 snapshot で定量化を開始" />
-            <Button
-                x:Name="CancelRunButton"
-                Classes="cancel"
-                Content="cancel"
-                Command="{Binding CancelCommand}"
-                TabIndex="8"
-                AutomationProperties.AutomationId="CancelQuantification"
-                AutomationProperties.Name="新規 evaluator の送信を停止して部分結果を保持" />
-          </WrapPanel>
-        </StackPanel>
-      </Border>
-
-      <Border Classes="card">
-        <StackPanel Spacing="10">
-          <TextBlock Text="PROGRESS" Classes="kicker" />
-          <TextBlock Text="{Binding RunStatusText}" Classes="heading" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding StageText}" FontWeight="SemiBold" TextWrapping="Wrap" />
-          <ProgressBar
-              x:Name="RunProgressBar"
-              Minimum="0"
-              Maximum="{Binding ProgressTotal}"
-              Value="{Binding ProgressCompleted}"
-              Height="14"
-              AutomationProperties.AutomationId="ExecutionProgress"
-              AutomationProperties.Name="定量化の完了進捗" />
-          <TextBlock Text="{Binding ProgressText}" TextWrapping="Wrap" />
-            <TextBlock Text="{Binding DurableProgressText}" TextWrapping="Wrap" />
-            <TextBlock
-              Text="{Binding OutputIdentityText}"
-              Classes="muted"
-              FontSize="12"
-              TextWrapping="Wrap"
-              AutomationProperties.AutomationId="ExecutionOutputIdentity" />
-        </StackPanel>
-      </Border>
-
-      <Border
-          x:Name="ExecutionValidationSummary"
-          Classes.ok="{Binding IsTechnicallyValid}"
-          Classes.invalid="{Binding HasTechnicalErrors}"
-          AutomationProperties.AutomationId="ExecutionValidationSummary">
-        <StackPanel Spacing="7">
-          <TextBlock Text="技術検証" FontWeight="Bold" />
-          <TextBlock Text="{Binding ValidationSummary}" TextWrapping="Wrap" />
-          <ListBox
-              ItemsSource="{Binding TechnicalErrors}"
-              MaxHeight="190"
-              IsVisible="{Binding HasTechnicalErrors}"
-              AutomationProperties.AutomationId="ExecutionTechnicalErrors"
-              AutomationProperties.Name="実行を止めている技術検証エラー">
-            <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="viewModels:ExecutionTechnicalError">
-                <TextBlock Text="{Binding AccessibleText}" TextWrapping="Wrap" Margin="0,3" />
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
-        </StackPanel>
-      </Border>
-    </StackPanel>
-  </ScrollViewer>
+    <Grid x:Name="ExecutionActions" Grid.Row="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+      <TextBlock x:Name="ExecutionValidationStatus" Text="{Binding ValidationSummary}" Classes="label"
+                 AutomationProperties.AutomationId="ExecutionValidationStatus" />
+      <Button x:Name="StartRunButton" Grid.Column="1" Classes="primary" Content="定量化を開始"
+              Command="{Binding StartCommand}" MinWidth="144" TabIndex="6"
+              AutomationProperties.AutomationId="StartQuantification"
+              AutomationProperties.Name="現在の設計 snapshot で定量化を開始"
+              ToolTip.Tip="現在の入力・設計・実効モデル・並列度・出力条件を固定して明示実行します。技術的な問題は左の一覧で確認してください。" />
+      <Button x:Name="CancelRunButton" Grid.Column="2" Classes="cancel" Content="cancel"
+              Command="{Binding CancelCommand}" MinWidth="88" TabIndex="7"
+              AutomationProperties.AutomationId="CancelQuantification"
+              AutomationProperties.Name="新規 evaluator の送信を停止して部分結果を保持"
+              ToolTip.Tip="新規送信を停止し、実行中処理の安全な終了と部分結果の保持を待ちます。ログインの取消とは別の操作です。" />
+    </Grid>
+  </Grid>
 </UserControl>

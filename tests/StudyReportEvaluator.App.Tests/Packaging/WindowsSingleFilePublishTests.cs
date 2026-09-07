@@ -291,6 +291,7 @@ public sealed class WindowsSingleFilePublishTests
     public async Task Extracted_bundle_layout_reuses_integrity_checks_without_requiring_static_host_files()
     {
         await AssertFunctionsSucceedAsync(ExtractedLayoutSetup + "\n" + """
+            if (@(Get-SingleFileDocumentationPaths).Count -ne 20) { throw 'The extracted fixture must contain all 20 public documentation files.' }
             Assert-SafePublishLayout -PublishDirectory $publish -ExtractedBundle
             if (-not $script:cliLayoutChecked) { throw 'Bundled CLI validation was bypassed.' }
             foreach ($absent in @("$ApplicationName.exe", 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll')) {
@@ -311,12 +312,25 @@ public sealed class WindowsSingleFilePublishTests
     [InlineData("StudyReportEvaluator.Core.dll")]
     [InlineData("System.Private.CoreLib.dll")]
     [InlineData("docs/features.md")]
+    [InlineData("docs/settings.md")]
+    [InlineData("docs/third-party-notices.md")]
+    [InlineData("images/08-settings.png")]
     public async Task Extracted_bundle_layout_rejects_missing_required_content(string relativePath)
     {
-        await AssertFunctionsFailAsync(ExtractedLayoutSetup +
-            $"\n[IO.File]::Delete((Join-Path $publish {Quote(relativePath)}))\n" +
-            "Assert-SafePublishLayout -PublishDirectory $publish -ExtractedBundle",
-            "Required self-contained publish file is missing", LayoutFunctions);
+        await AssertFunctionsSucceedAsync(ExtractedLayoutSetup +
+            $"\n$missing = {Quote(relativePath)}\n" + """
+            # A fixture/setup failure must not count as rejection of the missing entry.
+            Assert-SafePublishLayout -PublishDirectory $publish -ExtractedBundle
+            $missingPath = Join-Path $publish $missing
+            if (-not (Test-Path -LiteralPath $missingPath -PathType Leaf)) { throw 'The missing-content fixture was not created.' }
+            [IO.File]::Delete($missingPath)
+            $rejected = $false
+            try { Assert-SafePublishLayout -PublishDirectory $publish -ExtractedBundle }
+            catch {
+                $rejected = $_.Exception.Message.Replace('\', '/') -ceq "Required self-contained publish file is missing or empty: $missing"
+            }
+            if (-not $rejected) { throw "Missing required content was not rejected for the expected path: $missing" }
+            """, LayoutFunctions);
     }
 
     [Theory]
@@ -328,11 +342,24 @@ public sealed class WindowsSingleFilePublishTests
     [InlineData("input.xlsx", "Forbidden source")]
     [InlineData("unexpected.pdb", "Forbidden source")]
     [InlineData(".env", "Forbidden source")]
+    [InlineData("setting.txt", "Forbidden source")]
+    [InlineData("SETTING.TXT", "Forbidden source")]
+    [InlineData("docs/setting.txt", "Forbidden source")]
     public async Task Extracted_bundle_layout_rejects_unexpected_scripts_sources_and_content(string name, string message)
     {
-        await AssertFunctionsFailAsync(ExtractedLayoutSetup +
-            $"\n[IO.File]::WriteAllText((Join-Path $publish {Quote(name)}), 'synthetic')\n" +
-            "Assert-SafePublishLayout -PublishDirectory $publish -ExtractedBundle", message, LayoutFunctions);
+        await AssertFunctionsSucceedAsync(ExtractedLayoutSetup +
+            $"\n$unexpected = {Quote(name)}\n$expectedPrefix = {Quote(message)}\n" + """
+            Assert-SafePublishLayout -PublishDirectory $publish -ExtractedBundle
+            [IO.File]::WriteAllText((Join-Path $publish $unexpected), 'synthetic')
+            $rejected = $false
+            try { Assert-SafePublishLayout -PublishDirectory $publish -ExtractedBundle }
+            catch {
+                $actualMessage = $_.Exception.Message.Replace('\', '/')
+                $rejected = $actualMessage.StartsWith($expectedPrefix, [System.StringComparison]::Ordinal) -and
+                    $actualMessage.EndsWith(": $unexpected", [System.StringComparison]::Ordinal)
+            }
+            if (-not $rejected) { throw "Unexpected content was not rejected for the expected reason and path: $unexpected" }
+            """, LayoutFunctions);
     }
 
     [Theory]
@@ -371,15 +398,45 @@ public sealed class WindowsSingleFilePublishTests
     [Fact]
     public async Task Single_file_documentation_allowlist_matches_the_app_profile()
     {
+        // Independent contract: neither the profile nor the script supplies the expected paths.
+        string[] expected =
+        [
+            "README.md",
+            "LICENSE",
+            "docs/README.md",
+            "docs/getting-started.md",
+            "docs/features.md",
+            "docs/custom-evaluator-guide.md",
+            "docs/prompt-launch.md",
+            "docs/privacy-and-data-handling.md",
+            "docs/troubleshooting.md",
+            "docs/settings.md",
+            "docs/third-party-notices.md",
+            "images/README.md",
+            "images/01-input-workbook.png",
+            "images/02-input-mapping.png",
+            "images/03-design-knowledge.png",
+            "images/04-design-custom-prompt.png",
+            "images/05-execution-auto.png",
+            "images/06-results-review.png",
+            "images/07-output-export.png",
+            "images/08-settings.png",
+        ];
+        Assert.Equal(20, expected.Length);
+        expected = expected.Order(StringComparer.Ordinal).ToArray();
         string profilePath = Path.Combine(FindRepositoryRoot(), "src", "StudyReportEvaluator.App", "Properties", "PublishProfiles", "WindowsSingleFile.pubxml");
-        string[] expected = XDocument.Load(profilePath).Descendants("Content")
+        string[] profilePaths = XDocument.Load(profilePath).Descendants("Content")
             .Select(item => ((string)item.Attribute("Link")!).Replace('\\', '/'))
             .Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(expected, profilePaths);
+
         ProcessResult result = await RunFunctionsAsync(
             "Get-SingleFileDocumentationPaths", "Get-SingleFileDocumentationPaths");
         AssertSucceeded(result);
-        Assert.Equal(expected, result.StandardOutput.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-            .Order(StringComparer.Ordinal).ToArray());
+        string[] actual = result.StandardOutput.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(20, actual.Length);
+        Assert.Equal(expected, actual);
     }
 
     [Theory]

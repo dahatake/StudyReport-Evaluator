@@ -20,6 +20,8 @@ public sealed class WindowsSingleFileProfileTests
         "docs/prompt-launch.md",
         "docs/privacy-and-data-handling.md",
         "docs/troubleshooting.md",
+        "docs/settings.md",
+        "docs/third-party-notices.md",
         "images/README.md",
         "images/01-input-workbook.png",
         "images/02-input-mapping.png",
@@ -28,6 +30,7 @@ public sealed class WindowsSingleFileProfileTests
         "images/05-execution-auto.png",
         "images/06-results-review.png",
         "images/07-output-export.png",
+        "images/08-settings.png",
     ];
 
     [Fact]
@@ -93,7 +96,8 @@ public sealed class WindowsSingleFileProfileTests
         XElement itemGroup = Assert.Single(LoadProfile().Elements("ItemGroup"));
         XElement[] contentItems = itemGroup.Elements().ToArray();
 
-        Assert.Equal(RequiredDocumentationFiles.Length, contentItems.Length);
+        Assert.Equal(20, RequiredDocumentationFiles.Length);
+        Assert.Equal(20, contentItems.Length);
         Assert.All(contentItems, item => Assert.Equal("Content", item.Name.ToString()));
 
         foreach (string requiredFile in RequiredDocumentationFiles)
@@ -145,6 +149,7 @@ public sealed class WindowsSingleFileProfileTests
             .Select(entry => entry.TrimEnd(',').Trim('\'').Replace('\\', '/'))
             .ToArray();
 
+        Assert.Equal(20, paths.Length);
         Assert.Equal(
             RequiredDocumentationFiles.OrderBy(path => path, StringComparer.Ordinal).ToArray(),
             paths.OrderBy(path => path, StringComparer.Ordinal).ToArray());

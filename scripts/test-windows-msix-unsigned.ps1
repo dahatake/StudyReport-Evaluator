@@ -30,6 +30,8 @@ $RequiredPublicEntries = @(
     'docs/prompt-launch.md',
     'docs/privacy-and-data-handling.md',
     'docs/troubleshooting.md',
+    'docs/settings.md',
+    'docs/third-party-notices.md',
     'images/README.md',
     'images/01-input-workbook.png',
     'images/02-input-mapping.png',
@@ -37,7 +39,8 @@ $RequiredPublicEntries = @(
     'images/04-design-custom-prompt.png',
     'images/05-execution-auto.png',
     'images/06-results-review.png',
-    'images/07-output-export.png'
+    'images/07-output-export.png',
+    'images/08-settings.png'
 )
 $ExpectedNegativePolicyChecks = @(
     'INVALID_UNSIGNED_MARKER_REJECTED_WITH_OUTPUT_UNCHANGED',
@@ -365,6 +368,10 @@ function Get-UnsignedMsixInspection {
                     @($normalized.Split('/') | Where-Object { $_ -eq '.' -or $_ -eq '..' }).Count -ne 0 -or
                     -not $seen.Add($normalized)) {
                     throw "MSIX contains an unsafe, duplicate, or case-colliding entry: $normalized"
+                }
+
+                if ([System.IO.Path]::GetFileName($normalized) -ieq 'setting.txt') {
+                    throw "User settings are not allowed in the MSIX package: $normalized"
                 }
 
                 if (-not $normalized.EndsWith('/', [System.StringComparison]::Ordinal) -and

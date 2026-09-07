@@ -2,12 +2,22 @@ using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using System.Reflection;
 using System.Windows.Input;
+using Avalonia.Automation;
+using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.LogicalTree;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Navigation;
 using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.App.Tests.Workflow;
 using StudyReportEvaluator.App.ViewModels;
+using StudyReportEvaluator.App.Views;
 using StudyReportEvaluator.App.Workflow;
+using StudyReportEvaluator.App.Workbooks.Mapping;
 using StudyReportEvaluator.App.Workbooks.Reading;
 using StudyReportEvaluator.Core.Domain;
 using Xunit;
@@ -77,6 +87,17 @@ public sealed class CopilotLoginCommandTests
         Assert.Equal(WorkflowStep.Execution, shell.CurrentStep);
         shell.PreviousCommand.Execute(null);
         shell.NextCommand.Execute(null);
+        foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
+        {
+            shell.OpenSettings(category);
+            Assert.Same(shell.Settings, shell.CurrentEditorViewModel);
+            Assert.Same(viewModel, shell.Settings.Execution);
+            Assert.Equal(category, shell.Settings.SelectedCategory);
+            Assert.Equal(WorkflowStep.Execution, shell.CurrentStep);
+            shell.Settings.RequestCloseCommand.Execute(null);
+            Assert.False(shell.IsSettingsOpen);
+            Assert.Same(viewModel, shell.CurrentEditorViewModel);
+        }
 
         Assert.Null(viewModel.LastLoginTask);
         Assert.False(viewModel.IsLoggingIn);
@@ -86,6 +107,138 @@ public sealed class CopilotLoginCommandTests
         Assert.Equal(0, harness.Process.StartCount);
         Assert.Equal(0, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
+        Assert.Null(shell.Settings.LastLoadTask);
+        Assert.Null(shell.Settings.LastSaveTask);
+        Assert.Null(shell.Settings.LastApplySavedDefinitionTask);
+    }
+
+    [AvaloniaFact]
+    public async Task Execution_login_stays_explicit_and_completion_in_settings_never_navigates_checks_auth_or_starts_AI()
+    {
+        using LoginHarness harness = new();
+        QuantificationDefinition definition = U04TestSupport.Definition(2, 2);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        InputViewModel input = new(new LoginInputLoader(new InputWorkbookLoadResult(
+            U01TestSupport.InputSnapshot(), metadata, new ColumnMappingSuggester().Suggest(metadata))));
+        await input.SetFilePathAsync(InputPath(), TestContext.Current.CancellationToken);
+        Assert.True(await input.ApplySavedDefinitionAsync(definition, TestContext.Current.CancellationToken));
+        using MainWindowViewModel shell = new(new WorkflowNavigator(), input,
+            new QuantificationDesignViewModel(input.DefinitionDraft, input.AvailableColumnNames),
+            harness.ViewModel, new ResultsOutputViewModel(new RecordingOutputBoundary()));
+        MainWindow window = new(shell);
+        try
+        {
+            window.Show();
+            RenderUi();
+            Activate(window, Required<Button>(window, "NextStepButton"));
+            Activate(window, Required<Button>(window, "NextStepButton"));
+            ExecutionView execution = Assert.IsType<ExecutionView>(CurrentView(window));
+            Assert.Equal(WorkflowStep.Execution, shell.CurrentStep);
+            Assert.Same(harness.ViewModel, execution.ViewModel);
+            Button loginButton = Required<Button>(execution, "StartCopilotLogin");
+            Button cancelLogin = Required<Button>(execution, "CancelCopilotLogin");
+            Button check = Required<Button>(execution, "CheckAuthenticationButton");
+            Button change = Required<Button>(execution, "ChangeExecutionSettingsButton");
+            Assert.Equal("StartCopilotLogin", AutomationProperties.GetAutomationId(loginButton));
+            Assert.Equal("CancelCopilotLogin", AutomationProperties.GetAutomationId(cancelLogin));
+            Assert.Equal("CheckCopilotAuthentication", AutomationProperties.GetAutomationId(check));
+            Assert.Same(harness.ViewModel.LoginCommand, loginButton.Command);
+            Assert.Same(harness.ViewModel.CancelLoginCommand, cancelLogin.Command);
+            Assert.Same(harness.ViewModel.CheckAuthenticationCommand, check.Command);
+            Assert.False(loginButton.IsDefault);
+            Assert.False(cancelLogin.IsCancel);
+            Assert.True(loginButton.IsEffectivelyEnabled);
+            Assert.False(cancelLogin.IsEffectivelyEnabled);
+            Assert.True(loginButton.MinHeight >= 44d);
+            Assert.True(loginButton.Bounds.Height >= 44d);
+            Assert.True(loginButton.Bounds.Width >= 44d);
+            Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(loginButton)));
+            Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetHelpText(loginButton)));
+            Assert.Null(harness.ViewModel.LastLoginTask);
+
+            Activate(window, change);
+            SettingsView settings = Assert.IsType<SettingsView>(CurrentView(window));
+            foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
+            {
+                Activate(window, ById<Button>(settings, "SettingsCategory" + category));
+                Assert.Equal(category, shell.Settings.SelectedCategory);
+                Assert.Equal(WorkflowStep.Execution, shell.CurrentStep);
+                Assert.Same(settings, CurrentView(window));
+                Assert.DoesNotContain(AllControls(settings), control => AutomationProperties.GetAutomationId(control)
+                    is "StartCopilotLogin" or "CancelCopilotLogin" or "CheckCopilotAuthentication");
+                Assert.DoesNotContain(AllControls(window), control => control is ExecutionView);
+                Assert.Equal(0, harness.Resolver.CallCount);
+                Assert.Equal(0, harness.FactoryCallCount);
+                Assert.Equal(0, harness.Process.StartCount);
+                Assert.Equal(0, harness.Authentication.CallCount);
+                Assert.Equal(0, harness.Runner.CallCount);
+                Assert.Null(harness.ViewModel.LastLoginTask);
+            }
+
+            Activate(window, Required<Button>(settings, "SettingsRequestClose"));
+            Assert.Same(execution, CurrentView(window));
+            Assert.Same(change, window.FocusManager?.GetFocusedElement());
+            Press(window, Key.Tab);
+            Assert.Same(Required<CheckBox>(execution, "ResumeModeCheckBox"), window.FocusManager?.GetFocusedElement());
+            Press(window, Key.Tab, RawInputModifiers.Shift);
+            Assert.Same(change, window.FocusManager?.GetFocusedElement());
+
+            Assert.True(check.Focus(NavigationMethod.Tab));
+            Press(window, Key.Tab);
+            Assert.Same(loginButton, window.FocusManager?.GetFocusedElement());
+            Press(window, Key.Enter);
+            Task login = LoginTask(harness.ViewModel);
+            await harness.Process.Waiting.Task.WaitAsync(TestWait, TestContext.Current.CancellationToken);
+            RenderUi();
+            Assert.True(harness.ViewModel.IsLoggingIn);
+            Assert.False(loginButton.IsEffectivelyEnabled);
+            Assert.True(cancelLogin.IsEffectivelyEnabled);
+            Assert.False(check.IsEffectivelyEnabled);
+
+            Activate(window, change);
+            Assert.Same(settings, CurrentView(window));
+            Assert.Equal(SettingsCategory.Common, shell.Settings.SelectedCategory);
+            harness.Process.Complete(0);
+            await login.WaitAsync(TestWait, TestContext.Current.CancellationToken);
+            RenderUi();
+            Assert.True(shell.IsSettingsOpen);
+            Assert.Equal(WorkflowStep.Execution, shell.CurrentStep);
+            Assert.Same(settings, CurrentView(window));
+            Assert.False(harness.ViewModel.IsLoggingIn);
+            Assert.Equal(ExecutionAuthenticationState.NotChecked, harness.ViewModel.AuthenticationState);
+            Assert.False(harness.ViewModel.CanStart);
+            Assert.Equal(1, harness.Resolver.CallCount);
+            Assert.Equal(1, harness.FactoryCallCount);
+            Assert.Equal(1, harness.Process.StartCount);
+            Assert.Empty(harness.Process.KillTreeArguments); // Detaching the view did not cancel its owned login.
+            Assert.Equal(0, harness.Authentication.CallCount);
+            Assert.Equal(0, harness.Runner.CallCount);
+
+            Activate(window, Required<Button>(settings, "SettingsRequestClose"));
+            Assert.Same(execution, CurrentView(window));
+            Assert.Same(change, window.FocusManager?.GetFocusedElement());
+            Assert.Same(loginButton, Required<Button>(execution, "StartCopilotLogin"));
+            Assert.True(check.IsEffectivelyEnabled);
+            Assert.Contains("認証状態は未確認", Required<TextBlock>(execution, "CopilotLoginStatus").Text, StringComparison.Ordinal);
+            Activate(window, check); // Only this explicit action may use the authentication boundary.
+            Assert.Equal(1, harness.Authentication.CallCount);
+            Assert.True(harness.ViewModel.IsAuthenticationAvailable);
+            Assert.True(harness.ViewModel.CanStart);
+            Assert.True(Required<Button>(execution, "StartRunButton").IsEffectivelyEnabled);
+            Assert.Equal(0, harness.Runner.CallCount);
+            Assert.False(harness.ViewModel.IsRunning);
+            Assert.Null(harness.ViewModel.LastRunContext);
+            Assert.Equal(WorkflowStep.Execution, shell.CurrentStep);
+            Assert.False(shell.IsSettingsOpen);
+            Assert.Same(login, harness.ViewModel.LastLoginTask);
+            Assert.Null(shell.Settings.LastLoadTask);
+            Assert.Null(shell.Settings.LastSaveTask);
+            Assert.Null(shell.Settings.LastApplySavedDefinitionTask);
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 
     [Fact]
@@ -93,11 +246,15 @@ public sealed class CopilotLoginCommandTests
     {
         using LoginHarness harness = new();
         ExecutionViewModel viewModel = harness.ViewModel;
+        harness.Authentication.Snapshot = AvailableSnapshot("model-a");
+        viewModel.SelectedModelId = "model-a";
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
         Assert.True(viewModel.CanStart);
-        Assert.Equal("model-before-login", viewModel.SelectedModelId);
+        Assert.Equal("model-a", viewModel.SelectedModelId);
+        Assert.Equal("model-a", viewModel.PreferredModelId);
+        Assert.True(viewModel.IsAutoModelAvailable);
         string previousIdentity = viewModel.RuntimeIdentityText;
-        harness.Authentication.Snapshot = AvailableSnapshot("model-after-login");
+        harness.Authentication.Snapshot = AvailableSnapshot("model-b");
 
         viewModel.LoginCommand.Execute(null);
         Task login = LoginTask(viewModel);
@@ -110,8 +267,10 @@ public sealed class CopilotLoginCommandTests
         Assert.False(viewModel.CanStart);
         Assert.Equal(ExecutionAuthenticationState.NotChecked, viewModel.AuthenticationState);
         Assert.False(viewModel.IsAuthenticationAvailable);
+        Assert.False(viewModel.IsAutoModelAvailable);
         Assert.Empty(viewModel.AvailableModelIds);
         Assert.Null(viewModel.SelectedModelId);
+        Assert.Equal("model-a", viewModel.PreferredModelId);
         Assert.NotEqual(previousIdentity, viewModel.RuntimeIdentityText);
         Assert.Contains(viewModel.TechnicalErrors, error => error.Code == "AUTH_CHECK_REQUIRED");
 
@@ -131,20 +290,39 @@ public sealed class CopilotLoginCommandTests
         Assert.False(viewModel.CanCancelLogin);
         Assert.False(viewModel.CanStart);
         Assert.False(viewModel.IsAuthenticationAvailable);
+        Assert.False(viewModel.IsAutoModelAvailable);
         Assert.Empty(viewModel.AvailableModelIds);
         Assert.Null(viewModel.SelectedModelId);
+        Assert.Equal("model-a", viewModel.PreferredModelId);
         Assert.Contains("認証状態は未確認", viewModel.LoginStatusText, StringComparison.Ordinal);
         Assert.Contains("Copilot 状態を確認", viewModel.LoginStatusText, StringComparison.Ordinal);
         Assert.Equal(1, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
         Assert.Null(viewModel.LastRunContext);
 
-        // This boundary completes synchronously: only this explicit command restores availability.
+        // This explicit command restores authentication, not an unavailable model preference.
         viewModel.CheckAuthenticationCommand.Execute(null);
 
         Assert.Equal(2, harness.Authentication.CallCount);
-        Assert.Equal("model-after-login", viewModel.SelectedModelId);
+        Assert.True(viewModel.IsAuthenticationAvailable);
+        Assert.True(viewModel.IsAutoModelAvailable);
+        Assert.Equal(["model-b", "auto"], viewModel.AvailableModelIds);
+        Assert.Equal("model-a", viewModel.PreferredModelId);
+        Assert.Null(viewModel.SelectedModelId);
+        Assert.False(viewModel.CanStart);
+        Assert.False(viewModel.StartCommand.CanExecute(null));
+        Assert.Contains(viewModel.TechnicalErrors, error => error.Code == "MODEL_SELECTION_REQUIRED");
+        viewModel.StartCommand.Execute(null);
+        await viewModel.StartAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, harness.Runner.CallCount);
+
+        viewModel.SelectedModelId = "model-b";
+
+        Assert.Equal("model-b", viewModel.PreferredModelId);
+        Assert.Equal("model-b", viewModel.SelectedModelId);
         Assert.True(viewModel.CanStart);
+        Assert.True(viewModel.StartCommand.CanExecute(null));
+        Assert.Equal(2, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
         Assert.Equal(1, harness.FactoryCallCount);
         Assert.Same(login, viewModel.LastLoginTask);
@@ -784,6 +962,7 @@ public sealed class CopilotLoginCommandTests
             nameof(ExecutionViewModel.LastLoginTask), nameof(ExecutionViewModel.CanLogin),
             nameof(ExecutionViewModel.CanCancelLogin), nameof(ExecutionViewModel.CanCheckAuthentication),
             nameof(ExecutionViewModel.CanStart), nameof(ExecutionViewModel.AvailableModelIds),
+            nameof(ExecutionViewModel.IsAutoModelAvailable),
             nameof(ExecutionViewModel.SelectedModelId), nameof(ExecutionViewModel.RuntimeIdentityText),
         })
         {
@@ -818,6 +997,46 @@ public sealed class CopilotLoginCommandTests
         Assert.Equal(0, harness.FactoryCallCount);
     }
 
+    private static Control CurrentView(MainWindow window) =>
+        Assert.IsAssignableFrom<Control>(Required<ContentControl>(window, "CurrentStepContent").Content);
+
+    private static T Required<T>(Control root, string name) where T : Control =>
+        Assert.IsType<T>(root.FindControl<T>(name));
+
+    private static T ById<T>(Control root, string id) where T : Control =>
+        Assert.Single(root.GetVisualDescendants().OfType<T>(), control => AutomationProperties.GetAutomationId(control) == id);
+
+    private static IEnumerable<Control> AllControls(Control root) => root.GetVisualDescendants().OfType<Control>()
+        .Concat(root.GetLogicalDescendants().OfType<Control>()).Prepend(root).Distinct();
+
+    private static void Activate(Window window, Button button)
+    {
+        Assert.True(button.IsEffectivelyVisible);
+        Assert.True(button.IsEffectivelyEnabled);
+        Assert.True(button.Focus(NavigationMethod.Tab));
+        Press(window, Key.Enter);
+    }
+
+    private static void Press(Window window, Key key, RawInputModifiers modifiers = RawInputModifiers.None)
+    {
+        PhysicalKey physical = key switch
+        {
+            Key.Tab => PhysicalKey.Tab,
+            Key.Enter => PhysicalKey.Enter,
+            _ => throw new ArgumentOutOfRangeException(nameof(key)),
+        };
+        window.KeyPress(key, modifiers, physical, null);
+        window.KeyRelease(key, modifiers, physical, null);
+        RenderUi();
+    }
+
+    private static void RenderUi()
+    {
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Dispatcher.UIThread.RunJobs();
+    }
+
     private static Task LoginTask(ExecutionViewModel viewModel) =>
         Assert.IsAssignableFrom<Task>(viewModel.LastLoginTask);
 
@@ -826,7 +1045,7 @@ public sealed class CopilotLoginCommandTests
     private static string InputPath() => Path.Combine(Path.GetTempPath(), "a02-synthetic-input.xlsx");
 
     private static ExecutionAuthenticationSnapshot AvailableSnapshot(string modelId = "model-before-login") =>
-        new(ExecutionAuthenticationState.Available, [U04TestSupport.Model(modelId)], U04TestSupport.RuntimeIdentity());
+        new(ExecutionAuthenticationState.Available, [U04TestSupport.Model(modelId), U04TestSupport.Model("auto")], U04TestSupport.RuntimeIdentity());
 
     private static void AssertSafe(ExecutionViewModel viewModel)
     {
@@ -842,6 +1061,15 @@ public sealed class CopilotLoginCommandTests
     }
 
     public enum FailurePoint { None, MissingCli, Resolver, Factory, StartFalse, Start, NonzeroExit, Wait, PrematureWait, UnconfirmedExit }
+
+    private sealed class LoginInputLoader(InputWorkbookLoadResult result) : IInputWorkbookLoader
+    {
+        public Task<InputWorkbookLoadResult> LoadAsync(string filePath, uint headerRow, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(result);
+        }
+    }
 
     private sealed class LoginHarness : IDisposable
     {

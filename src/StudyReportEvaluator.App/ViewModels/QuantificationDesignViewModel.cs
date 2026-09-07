@@ -253,7 +253,7 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
 
     private void SynchronizeEvaluators()
     {
-        string? selectedEvaluatorId = selectedEvaluator?.Id;
+        EvaluatorDesignItemViewModel? previousSelection = selectedEvaluator;
         Dictionary<string, EvaluatorDesignItemViewModel> existing = Evaluators
             .ToDictionary(item => item.Id, StringComparer.Ordinal);
         List<EvaluatorDesignItemViewModel> ordered = [];
@@ -271,18 +271,12 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
             ordered.Add(item);
         }
 
-        SynchronizeCollection(Evaluators, ordered);
-        SelectedEvaluator = selectedEvaluatorId is null
-            ? Evaluators.FirstOrDefault()
-            : Evaluators.FirstOrDefault(item => string.Equals(
-                item.Id,
-                selectedEvaluatorId,
-                StringComparison.Ordinal)) ?? Evaluators.FirstOrDefault();
+        SelectedEvaluator = SynchronizeCollection(Evaluators, ordered, previousSelection);
     }
 
     private void SynchronizeSpecialEvaluations()
     {
-        string? selectedId = selectedSpecialEvaluation?.Id;
+        SpecialEvaluationDesignItemViewModel? previousSelection = selectedSpecialEvaluation;
         Dictionary<string, SpecialEvaluationDesignItemViewModel> existing = SpecialEvaluations
             .ToDictionary(item => item.Id, StringComparer.Ordinal);
         List<SpecialEvaluationDesignItemViewModel> ordered = [];
@@ -300,13 +294,33 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
             ordered.Add(item);
         }
 
-        SynchronizeCollection(SpecialEvaluations, ordered);
-        SelectedSpecialEvaluation = selectedId is null
-            ? SpecialEvaluations.FirstOrDefault()
-            : SpecialEvaluations.FirstOrDefault(item => string.Equals(
-                item.Id,
-                selectedId,
-                StringComparison.Ordinal)) ?? SpecialEvaluations.FirstOrDefault();
+        SelectedSpecialEvaluation = SynchronizeCollection(SpecialEvaluations, ordered, previousSelection);
+    }
+
+    internal static T? SynchronizeCollection<T>(
+        ObservableCollection<T> target,
+        IReadOnlyList<T> ordered,
+        T? selected)
+        where T : class
+    {
+        // The callers reuse each VM by stable ID. Resolve the selection before
+        // collection notifications can clear a bound SelectedItem during a move.
+        T? nextSelection = selected;
+        if (target.Count == 0)
+        {
+            nextSelection = ordered.FirstOrDefault();
+        }
+        else if (selected is not null && !ordered.Contains(selected))
+        {
+            int previousIndex = target.IndexOf(selected);
+            nextSelection = target.Skip(previousIndex + 1)
+                .FirstOrDefault(item => ordered.Contains(item))
+                ?? target.Take(previousIndex).LastOrDefault(item => ordered.Contains(item))
+                ?? ordered.FirstOrDefault();
+        }
+
+        SynchronizeCollection(target, ordered);
+        return nextSelection;
     }
 
     internal static void SynchronizeCollection<T>(
@@ -389,6 +403,8 @@ public sealed class SpecialEvaluationDesignItemViewModel : UiObservableObject
     private readonly QuantificationDesignViewModel owner;
     private readonly string questionId;
     private SpecialEvaluationDefinition definition;
+    private string primarySourceColumn;
+    private bool isRefreshingPrimarySourceColumn;
     private readonly ViewModelCommand duplicateCommand;
     private readonly ViewModelCommand moveUpCommand;
     private readonly ViewModelCommand moveDownCommand;
@@ -402,6 +418,7 @@ public sealed class SpecialEvaluationDesignItemViewModel : UiObservableObject
         this.owner = owner;
         this.questionId = questionId;
         this.definition = definition;
+        primarySourceColumn = definition.PrimarySourceColumn;
         SupportingColumns = [];
         duplicateCommand = new ViewModelCommand(_ => owner.DuplicateSpecialEvaluation(questionId, Id));
         moveUpCommand = new ViewModelCommand(
@@ -427,9 +444,16 @@ public sealed class SpecialEvaluationDesignItemViewModel : UiObservableObject
 
     public string PrimarySourceColumn
     {
-        get => definition.PrimarySourceColumn;
+        get => primarySourceColumn;
         set
         {
+            // Candidate replacement can write back null or the previous selection.
+            // Neither is a user edit while incoming state is being published.
+            if (owner.IsSynchronizingFromInput || isRefreshingPrimarySourceColumn)
+            {
+                return;
+            }
+
             string next = value ?? string.Empty;
             owner.UpdateSpecialEvaluation(questionId, Id, special => special with
             {
@@ -508,11 +532,10 @@ public sealed class SpecialEvaluationDesignItemViewModel : UiObservableObject
 
     internal void RefreshAll()
     {
+        RefreshPrimarySourceColumn();
         OnPropertiesChanged(
             nameof(Id),
             nameof(DisplayName),
-            nameof(PrimarySourceColumn),
-            nameof(AvailableColumnNames),
             nameof(PromptTemplate),
             nameof(Enabled),
             nameof(HasErrors),
@@ -526,6 +549,25 @@ public sealed class SpecialEvaluationDesignItemViewModel : UiObservableObject
 
     public override string ToString() =>
         $"{nameof(SpecialEvaluationDesignItemViewModel)} {{ Id = {Id}, Content = <redacted> }}";
+
+    private void RefreshPrimarySourceColumn()
+    {
+        bool wasRefreshingPrimarySourceColumn = isRefreshingPrimarySourceColumn;
+        isRefreshingPrimarySourceColumn = true;
+        try
+        {
+            // TwoWay binding rereads the getter after a rejected writeback. Keep
+            // the previously published value until the new candidates are applied.
+            OnPropertyChanged(nameof(AvailableColumnNames));
+            primarySourceColumn = definition.PrimarySourceColumn;
+            OnPropertyChanged(nameof(PrimarySourceColumn));
+        }
+        finally
+        {
+            primarySourceColumn = definition.PrimarySourceColumn;
+            isRefreshingPrimarySourceColumn = wasRefreshingPrimarySourceColumn;
+        }
+    }
 
     private void SynchronizeSupportingColumns()
     {
@@ -777,7 +819,7 @@ public sealed class EvaluatorDesignItemViewModel : UiObservableObject
 
     private void SynchronizeCriteria()
     {
-        string? selectedCriterionId = selectedCriterion?.Id;
+        CriterionDesignItemViewModel? previousSelection = selectedCriterion;
         Dictionary<string, CriterionDesignItemViewModel> existing = Criteria
             .ToDictionary(item => item.Id, StringComparer.Ordinal);
         List<CriterionDesignItemViewModel> ordered = [];
@@ -795,13 +837,7 @@ public sealed class EvaluatorDesignItemViewModel : UiObservableObject
             ordered.Add(item);
         }
 
-        QuestionDesignItemViewModel.SynchronizeCollection(Criteria, ordered);
-        SelectedCriterion = selectedCriterionId is null
-            ? Criteria.FirstOrDefault()
-            : Criteria.FirstOrDefault(item => string.Equals(
-                item.Id,
-                selectedCriterionId,
-                StringComparison.Ordinal)) ?? Criteria.FirstOrDefault();
+        SelectedCriterion = QuestionDesignItemViewModel.SynchronizeCollection(Criteria, ordered, previousSelection);
     }
 
     public override string ToString() =>
@@ -978,17 +1014,23 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
     private readonly QuantificationDefinitionValidator definitionValidator = new();
     private readonly ScoringAllocationCalculator allocationCalculator = new();
     private readonly PromptTemplateRenderer promptRenderer = new();
-    private readonly IReadOnlyList<string> availableColumnNames;
+    private IReadOnlyList<string> availableColumnNames;
     private readonly ImmutableArray<ImportedPrompt> importedPromptSources;
     private readonly ObservableCollection<QuestionDesignItemViewModel> questionItems = [];
+    private readonly ObservableCollection<QuestionDesignItemViewModel> visibleQuestionItems = [];
     private readonly ObservableCollection<ImportedPromptViewModel> importedPromptItems = [];
     private readonly ObservableCollection<DesignValidationError> validationErrorItems = [];
     private readonly ViewModelCommand addQuestionCommand;
     private readonly ViewModelCommand equalizeQuestionPointsCommand;
     private readonly ViewModelCommand applyImportedPromptCommand;
     private readonly ViewModelCommand validateCommand;
+    private readonly ViewModelCommand previousPageCommand;
+    private readonly ViewModelCommand nextPageCommand;
     private QuantificationDefinition draft;
     private QuestionDesignItemViewModel? selectedQuestion;
+    private int pageSize = 4;
+    private int pageIndex;
+    private bool updatingPresentation;
     private ImportedPromptViewModel? selectedImportedPrompt;
     private ImportedPromptTarget selectedPromptTarget = ImportedPromptTarget.CustomEvaluator;
 
@@ -1016,6 +1058,7 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         }
 
         Questions = new ReadOnlyObservableCollection<QuestionDesignItemViewModel>(questionItems);
+        VisibleQuestions = new ReadOnlyObservableCollection<QuestionDesignItemViewModel>(visibleQuestionItems);
         ImportedPrompts = new ReadOnlyObservableCollection<ImportedPromptViewModel>(importedPromptItems);
         ValidationErrors = new ReadOnlyObservableCollection<DesignValidationError>(validationErrorItems);
         draft = CloneDefinition(seed);
@@ -1028,6 +1071,8 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             _ => ApplyImportedPrompt(),
             _ => CanApplyImportedPrompt);
         validateCommand = new ViewModelCommand(_ => Revalidate());
+        previousPageCommand = new ViewModelCommand(_ => PageIndex--, _ => pageIndex > 0);
+        nextPageCommand = new ViewModelCommand(_ => PageIndex++, _ => pageIndex < LastPageIndex);
         foreach (ImportedPrompt prompt in importedPromptSources)
         {
             importedPromptItems.Add(new ImportedPromptViewModel(prompt));
@@ -1046,15 +1091,82 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
 
     public ReadOnlyObservableCollection<QuestionDesignItemViewModel> Questions { get; }
 
+    /// <summary>The current page contains the original editors from Questions, not copies.</summary>
+    public ReadOnlyObservableCollection<QuestionDesignItemViewModel> VisibleQuestions { get; }
+
+    /// <summary>The logical editing target; a separately browsed page need not contain it.</summary>
     public QuestionDesignItemViewModel? SelectedQuestion
     {
         get => selectedQuestion;
         set
         {
-            if (SetProperty(ref selectedQuestion, value))
+            // List changes can write back null (or an old item) through SelectedItem.
+            // This presentation guard is independent of the input/primary-column guards.
+            if (updatingPresentation)
             {
-                NotifyPromptTargetChanged();
+                return;
             }
+
+            int selectedIndex = value is null ? -1 : questionItems.IndexOf(value);
+            if (value is not null && selectedIndex < 0)
+            {
+                return;
+            }
+
+            int nextPageIndex = selectedIndex >= 0 ? selectedIndex / pageSize : pageIndex;
+            if (!ReferenceEquals(selectedQuestion, value) || pageIndex != nextPageIndex)
+            {
+                UpdatePresentation(value, nextPageIndex, pageSize);
+            }
+        }
+    }
+
+    /// <summary>A positive layout capacity; four is provisional until the view measures its space.</summary>
+    public int PageSize
+    {
+        get => pageSize;
+        set
+        {
+            if (value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Page size must be positive.");
+            }
+
+            if (pageSize != value)
+            {
+                int selectedIndex = selectedQuestion is null ? -1 : questionItems.IndexOf(selectedQuestion);
+                UpdatePresentation(selectedQuestion, selectedIndex >= 0 ? selectedIndex / value : pageIndex, value);
+            }
+        }
+    }
+
+    /// <summary>Zero-based and clamped to the available pages. Browsing does not change selection.</summary>
+    public int PageIndex
+    {
+        get => pageIndex;
+        set
+        {
+            int nextPageIndex = Math.Clamp(value, 0, LastPageIndex);
+            if (pageIndex != nextPageIndex)
+            {
+                UpdatePresentation(selectedQuestion, nextPageIndex, pageSize);
+            }
+        }
+    }
+
+    public string PageSummary
+    {
+        get
+        {
+            if (questionItems.Count == 0)
+            {
+                return "設問はありません（0 件）";
+            }
+
+            int start = pageIndex * pageSize;
+            int end = start + Math.Min(pageSize, questionItems.Count - start);
+            return string.Format(CultureInfo.InvariantCulture,
+                "{0:N0}–{1:N0} / {2:N0} 件", start + 1, end, questionItems.Count);
         }
     }
 
@@ -1214,6 +1326,65 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
     public ICommand ApplyImportedPromptCommand => applyImportedPromptCommand;
 
     public ICommand ValidateCommand => validateCommand;
+
+    public ICommand PreviousPageCommand => previousPageCommand;
+
+    public ICommand NextPageCommand => nextPageCommand;
+
+    private int LastPageIndex => questionItems.Count == 0 ? 0 : (questionItems.Count - 1) / pageSize;
+
+    internal bool IsSynchronizingFromInput { get; private set; }
+
+    /// <summary>
+    /// Synchronizes the current input draft without replacing surviving editor VMs
+    /// or applying imported prompts. The caller owns the Input/Design edit boundary.
+    /// </summary>
+    public void SynchronizeFromInput(
+        QuantificationDefinition definition,
+        IReadOnlyList<string> availableColumns)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(availableColumns);
+        IReadOnlyList<string> columns = NormalizeAvailableColumns(definition, availableColumns);
+        bool columnsChanged = !availableColumnNames.SequenceEqual(columns, StringComparer.Ordinal);
+        bool definitionChanged = !HasSameContent(draft, definition);
+        if (!columnsChanged && !definitionChanged)
+        {
+            return;
+        }
+
+        bool wasSynchronizingFromInput = IsSynchronizingFromInput;
+        IsSynchronizingFromInput = true;
+        try
+        {
+            if (columnsChanged)
+            {
+                availableColumnNames = columns;
+            }
+
+            if (definitionChanged)
+            {
+                Commit(definition);
+                NotifyPromptTargetChanged();
+            }
+            else
+            {
+                foreach (QuestionDesignItemViewModel question in questionItems)
+                {
+                    question.RefreshAll();
+                }
+            }
+
+            if (columnsChanged)
+            {
+                OnPropertyChanged(nameof(AvailableColumnNames));
+            }
+        }
+        finally
+        {
+            IsSynchronizingFromInput = wasSynchronizingFromInput;
+        }
+    }
 
     public void ApplyImportedPrompt()
     {
@@ -1776,31 +1947,88 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
 
     private void SynchronizeQuestions()
     {
-        string? selectedQuestionId = selectedQuestion?.Id;
-        Dictionary<string, QuestionDesignItemViewModel> existing = questionItems
-            .ToDictionary(item => item.Id, StringComparer.Ordinal);
-        List<QuestionDesignItemViewModel> ordered = [];
-        foreach (QuestionDefinition question in draft.Questions)
+        bool wasUpdatingPresentation = updatingPresentation;
+        updatingPresentation = true;
+        try
         {
-            if (!existing.Remove(question.Id, out QuestionDesignItemViewModel? item))
+            QuestionDesignItemViewModel? previousSelection = selectedQuestion;
+            Dictionary<string, QuestionDesignItemViewModel> existing = questionItems
+                .ToDictionary(item => item.Id, StringComparer.Ordinal);
+            List<QuestionDesignItemViewModel> ordered = [];
+            foreach (QuestionDefinition question in draft.Questions)
             {
-                item = new QuestionDesignItemViewModel(this, question);
-            }
-            else
-            {
-                item.Synchronize(question);
+                if (!existing.Remove(question.Id, out QuestionDesignItemViewModel? item))
+                {
+                    item = new QuestionDesignItemViewModel(this, question);
+                }
+                else
+                {
+                    item.Synchronize(question);
+                }
+
+                ordered.Add(item);
             }
 
-            ordered.Add(item);
+            bool orderChanged = !questionItems.SequenceEqual(ordered);
+            QuestionDesignItemViewModel? nextSelection = QuestionDesignItemViewModel.SynchronizeCollection(
+                questionItems, ordered, previousSelection);
+            // Structural edits follow the surviving selection or T05's adjacent fallback.
+            // Value-only edits leave a separately browsed page in place.
+            int nextPageIndex = orderChanged && nextSelection is not null
+                ? questionItems.IndexOf(nextSelection) / pageSize
+                : pageIndex;
+            UpdatePresentation(nextSelection, nextPageIndex, pageSize);
         }
+        finally
+        {
+            updatingPresentation = wasUpdatingPresentation;
+        }
+    }
 
-        QuestionDesignItemViewModel.SynchronizeCollection(questionItems, ordered);
-        SelectedQuestion = selectedQuestionId is null
-            ? questionItems.FirstOrDefault()
-            : questionItems.FirstOrDefault(item => string.Equals(
-                item.Id,
-                selectedQuestionId,
-                StringComparison.Ordinal)) ?? questionItems.FirstOrDefault();
+    private void UpdatePresentation(
+        QuestionDesignItemViewModel? selection,
+        int requestedPageIndex,
+        int requestedPageSize)
+    {
+        bool wasUpdatingPresentation = updatingPresentation;
+        updatingPresentation = true;
+        try
+        {
+            bool sizeChanged = pageSize != requestedPageSize;
+            bool selectionChanged = !ReferenceEquals(selectedQuestion, selection);
+            pageSize = requestedPageSize;
+            int nextPageIndex = Math.Clamp(requestedPageIndex, 0, LastPageIndex);
+            bool pageChanged = pageIndex != nextPageIndex;
+            pageIndex = nextPageIndex;
+            QuestionDesignItemViewModel[] visible = questionItems.Skip(pageIndex * pageSize).Take(pageSize).ToArray();
+            QuestionDesignItemViewModel.SynchronizeCollection(visibleQuestionItems, visible);
+            selectedQuestion = selection;
+
+            if (sizeChanged)
+            {
+                OnPropertyChanged(nameof(PageSize));
+            }
+
+            if (pageChanged)
+            {
+                OnPropertyChanged(nameof(PageIndex));
+            }
+
+            // Signal settled items while writebacks are still guarded. The view uses
+            // UpdateTarget: a compiled TwoWay binding suppresses same-reference notifications.
+            OnPropertiesChanged(nameof(PageSummary), nameof(SelectedQuestion));
+            if (selectionChanged)
+            {
+                NotifyPromptTargetChanged();
+            }
+
+            previousPageCommand.RaiseCanExecuteChanged();
+            nextPageCommand.RaiseCanExecuteChanged();
+        }
+        finally
+        {
+            updatingPresentation = wasUpdatingPresentation;
+        }
     }
 
     private void Revalidate()
@@ -2191,6 +2419,77 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
     };
 
     private static string NewId(string prefix) => $"{prefix}-{Guid.NewGuid():N}";
+
+    private static bool HasSameContent(
+        QuantificationDefinition current,
+        QuantificationDefinition next)
+    {
+        if (current == next)
+        {
+            return true;
+        }
+
+        // Input clones the immutable arrays even on a plain round trip, so record
+        // equality alone cannot distinguish an edit from an unchanged draft.
+        ImmutableArray<QuestionDefinition> questions = next.Questions.IsDefault ? [] : next.Questions;
+        if (current != (next with { Questions = current.Questions })
+            || current.Questions.Length != questions.Length)
+        {
+            return false;
+        }
+
+        for (int questionIndex = 0; questionIndex < questions.Length; questionIndex++)
+        {
+            QuestionDefinition question = current.Questions[questionIndex];
+            QuestionDefinition candidate = questions[questionIndex];
+            ImmutableArray<string> supportingColumns = candidate.SupportingSourceColumns.IsDefault
+                ? [] : candidate.SupportingSourceColumns;
+            ImmutableArray<EvaluatorDefinition> evaluators = candidate.Evaluators.IsDefault
+                ? [] : candidate.Evaluators;
+            ImmutableArray<SpecialEvaluationDefinition> specials = candidate.SpecialEvaluations.IsDefault
+                ? [] : candidate.SpecialEvaluations;
+            if (question != (candidate with
+                {
+                    SupportingSourceColumns = question.SupportingSourceColumns,
+                    Evaluators = question.Evaluators,
+                    SpecialEvaluations = question.SpecialEvaluations,
+                })
+                || !question.SupportingSourceColumns.SequenceEqual(supportingColumns, StringComparer.Ordinal)
+                || question.Evaluators.Length != evaluators.Length
+                || question.SpecialEvaluations.Length != specials.Length)
+            {
+                return false;
+            }
+
+            for (int evaluatorIndex = 0; evaluatorIndex < evaluators.Length; evaluatorIndex++)
+            {
+                EvaluatorDefinition evaluator = question.Evaluators[evaluatorIndex];
+                EvaluatorDefinition candidateEvaluator = evaluators[evaluatorIndex];
+                ImmutableArray<CriterionDefinition> criteria = candidateEvaluator.Criteria.IsDefault
+                    ? [] : candidateEvaluator.Criteria;
+                if (evaluator != (candidateEvaluator with { Criteria = evaluator.Criteria })
+                    || !evaluator.Criteria.SequenceEqual(criteria))
+                {
+                    return false;
+                }
+            }
+
+            for (int specialIndex = 0; specialIndex < specials.Length; specialIndex++)
+            {
+                SpecialEvaluationDefinition special = question.SpecialEvaluations[specialIndex];
+                SpecialEvaluationDefinition candidateSpecial = specials[specialIndex];
+                ImmutableArray<string> specialColumns = candidateSpecial.SupportingSourceColumns.IsDefault
+                    ? [] : candidateSpecial.SupportingSourceColumns;
+                if (special != (candidateSpecial with { SupportingSourceColumns = special.SupportingSourceColumns })
+                    || !special.SupportingSourceColumns.SequenceEqual(specialColumns, StringComparer.Ordinal))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
 
     private static QuantificationDefinition CloneDefinition(QuantificationDefinition definition)
     {

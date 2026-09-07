@@ -1,5 +1,7 @@
+using System.Security;
 using StudyReportEvaluator.App.Navigation;
 using StudyReportEvaluator.App.Launch;
+using StudyReportEvaluator.App.Settings;
 using StudyReportEvaluator.App.ViewModels;
 using StudyReportEvaluator.App.Views;
 
@@ -7,6 +9,8 @@ namespace StudyReportEvaluator.App.Composition;
 
 public sealed class ServiceRegistration
 {
+    private readonly SettingsFileStore? settingsStore;
+
     public ServiceRegistration()
         : this(new WorkflowNavigator(), LaunchStartupState.Empty)
     {
@@ -19,23 +23,73 @@ public sealed class ServiceRegistration
 
     public ServiceRegistration(
         WorkflowNavigator workflowNavigator,
-        LaunchStartupState startup)
+        LaunchStartupState startup,
+        SettingsFileStore? settingsStore = null)
     {
         WorkflowNavigator = workflowNavigator
             ?? throw new ArgumentNullException(nameof(workflowNavigator));
         Startup = startup ?? throw new ArgumentNullException(nameof(startup));
+        this.settingsStore = settingsStore;
     }
 
     public WorkflowNavigator WorkflowNavigator { get; }
 
     public LaunchStartupState Startup { get; }
 
-    public static ServiceRegistration FromStartup(LaunchStartupState startup) =>
-        new(new WorkflowNavigator(), startup);
-
-    public MainWindowViewModel CreateMainWindowViewModel()
+    /// <summary>Production-only path resolution. Neither construction nor resolution reads settings.</summary>
+    public static ServiceRegistration FromStartup(LaunchStartupState startup)
     {
-        InputViewModel input = new();
+        ArgumentNullException.ThrowIfNull(startup);
+        string? localApplicationDataDirectory;
+        try
+        {
+            localApplicationDataDirectory = Environment.GetFolderPath(
+                Environment.SpecialFolder.LocalApplicationData,
+                Environment.SpecialFolderOption.DoNotVerify);
+        }
+        catch (Exception exception) when (IsSettingsPathFailure(exception))
+        {
+            localApplicationDataDirectory = null;
+        }
+
+        return FromStartup(startup, localApplicationDataDirectory);
+    }
+
+    /// <summary>Use an explicit local-data directory without changing process environment or launch options.</summary>
+    public static ServiceRegistration FromStartup(
+        LaunchStartupState startup,
+        string? localApplicationDataDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(startup);
+        SettingsFileStore? store = null;
+        if (!string.IsNullOrWhiteSpace(localApplicationDataDirectory)
+            && Path.IsPathFullyQualified(localApplicationDataDirectory))
+        {
+            try
+            {
+                store = new SettingsFileStore(Path.Combine(
+                    localApplicationDataDirectory, "StudyReportEvaluator", "setting.txt"));
+            }
+            catch (Exception exception) when (IsSettingsPathFailure(exception))
+            {
+                // The existing null-store status disables persistence and explains why.
+                // Never repair the path, create directories, or fall back to cwd/EXE.
+            }
+        }
+
+        return new ServiceRegistration(new WorkflowNavigator(), startup, store);
+    }
+
+    public MainWindowViewModel CreateMainWindowViewModel() =>
+        CreateMainWindowViewModel(new InputViewModel(), new ExecutionViewModel());
+
+    /// <summary>Compose existing input/runtime boundaries; no input read or runtime action occurs here.</summary>
+    public MainWindowViewModel CreateMainWindowViewModel(
+        InputViewModel input,
+        ExecutionViewModel execution)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(execution);
         if (Startup.Options?.InputPath is string inputPath)
         {
             input.ApplyLaunchInput(inputPath);
@@ -48,10 +102,46 @@ public sealed class ServiceRegistration
                 initialDefinition: null,
                 availableColumnNames: null,
                 importedPrompts: Startup.Prompts),
-            new ExecutionViewModel(),
-            new ResultsOutputViewModel());
+            execution,
+            new ResultsOutputViewModel(),
+            settingsStore);
     }
 
-    public MainWindow CreateMainWindow() =>
-        new(CreateMainWindowViewModel());
+    /// <summary>Awaitable, idempotent settings startup on the caller's UI context, never an AI/input startup.</summary>
+    public Task InitializeAsync(
+        MainWindowViewModel viewModel,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+        Task initialization = viewModel.Settings.InitializeAsync(cancellationToken);
+        _ = ObserveInitializationAsync(initialization);
+        return initialization;
+    }
+
+    public MainWindow CreateMainWindow()
+    {
+        MainWindow window = new(CreateMainWindowViewModel());
+        // App delegates here. Do not wait on the UI thread or defer this to Settings
+        // navigation. MainWindow already owns parent disposal and read cancellation.
+        _ = InitializeAsync(window.ViewModel);
+        return window;
+    }
+
+    private static async Task ObserveInitializationAsync(Task initialization)
+    {
+        try
+        {
+            await initialization;
+        }
+        catch
+        {
+            // Settings reports IO failures. Even a throwing notification subscriber
+            // must not leave an unobserved startup fault or expose private IO details.
+            // The original task remains available to explicit callers for observation.
+        }
+    }
+
+    private static bool IsSettingsPathFailure(Exception exception) =>
+        exception is IOException or UnauthorizedAccessException or SecurityException
+            or ArgumentException or NotSupportedException;
 }

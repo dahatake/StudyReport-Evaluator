@@ -4,8 +4,8 @@
   <Style Selector="Button">
     <Setter Property="MinWidth" Value="44" />
     <Setter Property="MinHeight" Value="44" />
-    <Setter Property="Padding" Value="14,10" />
-    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="CornerRadius" Value="8" />
     <Setter Property="FontSize" Value="14" />
   </Style>
   <Style Selector="Button:disabled">
@@ -24,15 +24,15 @@
     <Setter Property="FontSize" Value="14" />
   </Style>
   <Style Selector="Button.step-button">
-    <Setter Property="MinHeight" Value="72" />
-    <Setter Property="Padding" Value="14" />
+    <Setter Property="MinHeight" Value="48" />
+    <Setter Property="Padding" Value="12,4" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="CornerRadius" Value="8" />
   </Style>
   <Style Selector="Button.step-button.current">
     <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
@@ -59,11 +59,11 @@
   </Style>
   <Style Selector="TextBlock.step-english">
     <Setter Property="FontSize" Value="10" />
-    <Setter Property="Opacity" Value="0.78" />
-    <Setter Property="LetterSpacing" Value="0.5" />
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="LetterSpacing" Value="0" />
   </Style>
   <Style Selector="TextBlock.step-status">
-    <Setter Property="FontSize" Value="10" />
+    <Setter Property="FontSize" Value="12" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="Button:focus-visible">

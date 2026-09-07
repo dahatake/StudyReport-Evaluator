@@ -2,44 +2,58 @@
 
 このフォルダーは、StudyReport Evaluatorの操作説明に使う実際のAvalonia viewのPNGを保存します。
 
-> **対象版:** 7枚の画像は**UNRELEASED（未リリース）の`0.8.4`候補**のUI説明用で、公開`0.8.1`の画面を示すものではありません。設問text同期・固定表示の採点計算式・幅に応じたカード配置を`0.8.1`の機能として扱わないでください。既存PNGは生成後のcode/UI変更の検証証跡ではありません。
+> **対象版:** この画像一覧は**UNRELEASED（未リリース）の`0.8.5`候補**のUI説明用です。**8枚のPNGの生成時の製品版は`0.8.4`**で、公開`0.8.1`の画面を示すものではありません。公開版`0.8.1`は変更していません。設問text同期・固定表示の採点計算式・幅に応じたカード配置を`0.8.1`の機能として扱わないでください。既存PNGは生成後のcode/UI変更の検証証跡ではありません。
+
+F02は版metadataと文書表記の更新です。UI実装と既存8枚のPNG bytesは変更せず、PNGを再生成していません。`0.8.5`への表記更新だけを新たなUI検証と扱いません。
 
 ## Provenance
 
-- 生成日: 2026-09-05
+- 生成日: 2026-09-07（親T28での実際のPNG生成日。fixture内の固定日時や出力名の日付とは別）
+- 生成時の製品版: `0.8.4`（現在の`0.8.5`候補への版metadata更新前）
 - renderer: Avalonia 12.1.1 Headless + Skia
-- size: 1440 × 1050 pixels
+- size: 1440 × 1050 pixels、8枚
 - generator source: `tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs`（repositoryでのみ利用。配布ZIPにはsourceを含めない）
 - definition/question/evaluator/criterion IDs: fixture内で固定し、同一環境での2回描画が一致することを検証。本番のID生成は変更しない
-- input state: header 1行 + 回答100行 × 2設問を模した合成workbook metadata
+- input state: テストが生成した一時合成workbookから読み込んだmetadata。header 1行 + 回答100行 × 2設問。`sample/`や実データは使用しない
 - displayed path: `C:\Synthetic\StudyReport-100x2.xlsx`
 - design state: Base 60、Special 0、Question points 20/20、Similarity penalty weight 0.1
-- Copilot state: bundled CLI 1.0.79を模したfake authentication boundary。live loginやnetwork requestは実行していない
-- login UI state（05再生成時）: `NotChecked`（認証未確認）・ログイン未開始の合成状態。ログインボタンとstatusは認証済み／live loginの証跡ではない。password・token・device codeなどの資格情報は含めない。modelは未選択で、Autoの選択は06/07用のfake状態確認後のみ
-- run state: production durable orchestratorをfake row/AI/checkpoint/output boundariesで実行。Reference 2 + 100行 × Normal 2 + Similarity 2 = 402 operations
-- result state: fake runnerが返すraw 8、similarity 0.2、任意override 9。AI品質や実データ結果を表さない
-- output state: synthetic final/partial pathと、別名override出力候補。実fileを作成した証跡ではない
-- personal/student data: なし
+- Copilot state: bundled CLI 1.0.79を模した合成runtime identityとfake authentication boundary。実CLIプロセス・live login・network requestは実行していない
+- login UI state（05）: 状態確認前の`NotChecked`（認証未確認）・ログイン未開始。表示は「固定 auto／未確認」で、model未選択、認証確認・ログイン・runはいずれも未実施。ログインボタンとstatusは認証済み／live loginの証跡ではない
+- run state（06/07のみ）: production durable orchestratorをfake row/AI/input-snapshot/checkpoint/path-planner/finalizer/output boundariesで実行。Reference 2 + 100行 ×（Normal 2 + Similarity 2）= 402 operations。認証と完了・final出力成功もfake応答であり、実入力fileの検証や実結果workbook作成の証跡ではない
+- result state: fake runnerのraw 8・similarity 0.2を実際の計算処理へ渡す。06はoverrideなしでFinal score 91.2。07は選択行の設問1のraw 8を保持したままoverride 9とし、Final score 93.2。AI品質や実データ結果を表さない
+- output state: final/partialは合成path。07の`C:\Synthetic\result\eval-20260902-1200-reviewed.xlsx`は元のfinalとは別名の**未保存候補**で、exportは未実行。出力可能表示はfake path判定であり、実file作成の証跡ではない
+- settings state（08）: fake認証確認・runより前のSettings / Common。合成デモでは`settingsStore: null`を明示し、保存・読込再試行は無効。「保存先が構成されていません。ファイルへの読込・保存は行いません。」と表示し、`setting.txt`の読込・保存は行わない。本番アプリはユーザー用の保存先を解決するため、利用者に環境変数の設定を求める状態ではない
+- personal/student data・secret: なし。password・token・device codeなどの資格情報や実ユーザーの保存先を含めず、画面上のpathは合成値のみ
 
 画像はproduction XAML / ViewModelをheadless Skiaでrenderした画面です。物理ディスプレイを撮影したものではなく、OS window chromeも含みません。UI layoutの説明には使用できますが、Windowsのfont rendering、DPI、window decorationを保証する証跡ではありません。
+
+### 親T28の生成・検証実績
+
+- `t28.trx`: `STUDY_REPORT_EVALUATOR_GENERATE_DOC_IMAGES=1`で通常サイズ8枚を生成し、`images/`への保存後のfile検証と画像テストが成功。
+- 当時の`t28-reviewed.trx`: **216/216成功**。この中に`DocumentationScreenshotTests`の4テストを含む。
+- 通常サイズ: **1440 × 1050の8フレーム**を実描画し、同一環境での2回生成のSHA-256一致が成功。
+- 最小client size: **1024 × 720の8フレーム**について実際のclient size・framebufferのpixel dimensions・非単色のpixel data・保存PNGの寸法を検証。要求サイズだけからの推定ではない。一時画像のみで、`images/`へはコピーしていない。
+
+上記は製品`0.8.4`時点の親T28の実績で、T29では生成・テストを再実行していません。T01〜T38は対象範囲でREVIEWEDとなり、T36の文書・画像contractは21/21成功です。この文書contractの成功を、native表示確認や版更新後のUI検証へ読み替えません。非opt-inの自動テストによるrepository画像との一致保証や、native DPIでの動作保証を意味しません。
 
 ## Image index
 
 | File | 表示内容 | 主な確認項目 |
 |---|---|---|
-| [`01-input-workbook.png`](01-input-workbook.png) | 入力画面上部 | native picker、full path、read-only読込、sheet、質問文行、回答行、候補 |
-| [`02-input-mapping.png`](02-input-mapping.png) | 入力mapping | question表示名、設問text、primary / supporting columns |
-| [`03-design-knowledge.png`](03-design-knowledge.png) | 設問一覧とKnowledge選択 | 採点計算式、現在値、2設問カード、選択カード |
-| [`04-design-custom-prompt.png`](04-design-custom-prompt.png) | Custom設計 | 採点計算式、適用先、editable Prompt、required placeholders、criterion |
-| [`05-execution-auto.png`](05-execution-auto.png) | 実行準備（合成の認証未確認・ログイン未開始） | GitHubにログイン、状態確認、未開始status、concurrency 2、new/resume、output directory（Auto選択前） |
-| [`06-results-review.png`](06-results-review.png) | 結果review | 402 operations、自動final path、row別配点・減点・Final score |
-| [`07-output-export.png`](07-output-export.png) | override出力 | synthetic raw/overrideと未使用の別名output path |
+| [`01-input-workbook.png`](01-input-workbook.png) | Input主画面 | 合成workbookのpath、100行・2設問、設問一覧とファイル選択ボタン（native pickerを開いた画像ではない） |
+| [`02-input-mapping.png`](02-input-mapping.png) | Settings / Mapping | 設問2を選択、primary C・supporting D、設問表示名、read-onlyの設問text、候補概要 |
+| [`03-design-knowledge.png`](03-design-knowledge.png) | DesignのKnowledge概要 | 設問1のKnowledge summary、2設問の配点20/20、Base 60、採点計算式（Prompt editorではない） |
+| [`04-design-custom-prompt.png`](04-design-custom-prompt.png) | Settings / Evaluation / Prompt | 設問2の実際のCustom Prompt editor（編集可）とread-only preview |
+| [`05-execution-auto.png`](05-execution-auto.png) | Executionの状態確認前 | `NotChecked`・ログイン未開始・固定auto未確認、状態確認／ログインボタン、concurrency 2、実行無効、read-onlyの実効output directory |
+| [`06-results-review.png`](06-results-review.png) | Results一覧（fake run完了） | 402 operations、100行の結果、raw 8・similarity 0.2によるFinal score 91.2、overrideなし。final pathはfake完了応答で、実workbook出力ではない |
+| [`07-output-export.png`](07-output-export.png) | Results詳細（override編集中） | 選択行の設問1はraw 8 → override 9、Final score 93.2。別名reviewed pathは未保存候補、export未実行 |
+| [`08-settings.png`](08-settings.png) | Settings / Common（合成デモのstore未構成） | 定義名・revision・丸め桁数・実効output directory、未保存変更、保存無効、ファイル読込・保存なし。本番の保存先設定手順ではない |
 
 ## Regeneration
 
 ### 05のみ（一時生成・比較・review用）
 
-05だけの更新では、次のtestを完全一致で選択します。既存の7枚生成testと再現性testはそのまま維持しています。
+05だけの更新では、次のtestを完全一致で選択します。8枚生成・再現性・最小サイズtestと同じ`GenerateAsync` fixtureを使用し、既存のopt-inを維持しています。
 
 - test: `StudyReportEvaluator.App.Tests.UI.DocumentationScreenshotTests.Execution_documentation_screenshot_renders_are_repeatable`
 - filter: `FullyQualifiedName=StudyReportEvaluator.App.Tests.UI.DocumentationScreenshotTests.Execution_documentation_screenshot_renders_are_repeatable`
@@ -48,11 +62,11 @@
 
 testは共有fixtureの画面遷移を再利用し、別々の一時directoryへ**05のみを2回**描画します。各directoryに05以外のfileがないこと、file size、1440 × 1050 pixels、SHA-256の一致、ログインボタン／statusの表示・位置と未確認状態を検証し、fake runへは進みません。一時画像は成功・失敗を問わず削除します。専用opt-inがある場合だけ、検証成功後に上記2枚のartifactを上書き保存します。
 
-このtestは`images/`へコピーしません。親タスクがtest成功と今回の2枚の一致を確認し、画像をreviewしてから、**05のPNGだけ**を`images/05-execution-auto.png`へコピーしてください。コピーするまで既存PNGは更新されません。他6枚は変更しません。旧opt-in `STUDY_REPORT_EVALUATOR_GENERATE_DOC_IMAGES`は不要で、05だけの更新にclass全体のfilterや下記の7枚更新手順を使わないでください。
+このtestは`images/`へコピーしません。今後05だけを更新する場合は、親タスクがtest成功と2枚の一致を確認し、画像をreviewしてから、**05のPNGだけ**を`images/05-execution-auto.png`へコピーしてください。コピーするまで既存PNGは更新されません。他7枚は変更しません。8枚生成用の既存opt-in `STUDY_REPORT_EVALUATOR_GENERATE_DOC_IMAGES`は不要で、これが設定済みでも05専用testは`images/`へコピーしません。05だけの更新にclass全体のfilterや下記の8枚更新手順を使わないでください。
 
-### 7枚すべて（既存の公開画像更新）
+### 8枚すべて（未リリース候補の説明画像更新）
 
-PowerShell 7でrepository rootからvisual documentation testを明示的にopt-inして再生成します。
+今後の再生成では、最新のインストール済みPowerShell 7+でrepository rootから既存のvisual documentation testを明示的にopt-inします。次のfilterは4テストを対象にしますが、`images/`へ保存するのは通常サイズの生成testだけです。
 
 ```powershell
 $previousGenerateImages = $env:STUDY_REPORT_EVALUATOR_GENERATE_DOC_IMAGES
@@ -66,7 +80,14 @@ finally {
 }
 ```
 
-通常のtest runも現行UIを一時directoryへ描画し、主要controlの位置、pixel dimensions、2回生成の一致を検証します。既存PNGの存在・file size・pixel dimensionsも検査しますが、repository画像を書き換えるのは上記opt-in時だけです。一時画像はtest後に削除します。同一環境での再現性を別OS／font／DPIのpixel一致へ一般化しません。
+### 自動検証と保存の範囲
+
+- `Documentation_screenshots_use_only_synthetic_state_and_have_expected_dimensions`: 通常サイズ8枚を一時directoryへ描画し、file集合・file size・保存PNGのpixel dimensionsを検証。既存opt-inが`1`の場合だけ、検証済みの通常サイズ8枚を`images/`へコピーし、保存先の存在・file size・pixel dimensionsも確認します。**非opt-inではrepository画像を検査・更新しません**。
+- `Synthetic_screenshot_renders_are_repeatable`: 一時directoryへ通常サイズ8枚を2回生成し、対応するPNG bytesのSHA-256を比較。比較対象は2組の一時画像で、`images/`内のPNGではありません。
+- `Minimum_client_screenshots_verify_all_eight_actual_pixel_frames_without_publishing`: 一時directoryで1024 × 720の8枚を検証。共有capture処理で実client size・実framebuffer寸法・非単色のpixel dataを確認し、保存PNGを再読込して寸法も検証します。どのopt-inでも最小サイズ画像は`images/`へコピーしません。
+- `Execution_documentation_screenshot_renders_are_repeatable`: 上記の05専用test。専用opt-inの保存先はreview用artifactのみです。
+
+各testの一時画像は成功・失敗を問わず削除します。2回生成の一致や最小サイズtestの成功を、repository画像と現行UIの自動的一致確認へ拡張しません。同一環境での再現性を別OS／font／native DPIのpixel一致へ一般化しません。新しいopt-inやCLIは追加していません。
 
 ## Source
 

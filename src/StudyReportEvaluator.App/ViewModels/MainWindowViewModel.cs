@@ -4,6 +4,8 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using StudyReportEvaluator.App.Navigation;
+using StudyReportEvaluator.App.Settings;
+using StudyReportEvaluator.Core.Domain;
 
 namespace StudyReportEvaluator.App.ViewModels;
 
@@ -29,11 +31,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private readonly DelegateCommand navigateCommand;
     private readonly DelegateCommand nextCommand;
     private readonly DelegateCommand previousCommand;
+    private readonly DelegateCommand openSettingsCommand;
     private readonly ExecutionViewModel executionViewModel;
     private readonly ResultsOutputViewModel resultsOutputViewModel;
+    private readonly SettingsViewModel settingsViewModel;
     private ImmutableArray<WorkflowStepPresentation> stepPresentations;
-    private QuantificationDesignViewModel designViewModel;
-    private WorkflowStep previousStep;
+    private readonly QuantificationDesignViewModel designViewModel;
+    private bool synchronizingDrafts;
+    private QuantificationDefinition? latestObservedDraft;
+    private SettingsCategory observedSettingsCategory;
+    private bool observedSettingsApplying;
+    private bool isSettingsOpen;
     private bool disposed;
 
     public MainWindowViewModel(WorkflowNavigator navigator)
@@ -42,7 +50,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             new InputViewModel(),
             new QuantificationDesignViewModel(),
             new ExecutionViewModel(),
-            new ResultsOutputViewModel())
+            new ResultsOutputViewModel(),
+            null)
     {
     }
 
@@ -55,7 +64,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             inputViewModel,
             designViewModel,
             new ExecutionViewModel(),
-            new ResultsOutputViewModel())
+            new ResultsOutputViewModel(),
+            null)
     {
     }
 
@@ -64,7 +74,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         InputViewModel inputViewModel,
         QuantificationDesignViewModel designViewModel,
         ExecutionViewModel executionViewModel,
-        ResultsOutputViewModel resultsOutputViewModel)
+        ResultsOutputViewModel resultsOutputViewModel,
+        SettingsFileStore? settingsStore = null)
     {
         this.navigator = navigator ?? throw new ArgumentNullException(nameof(navigator));
         InputViewModel = inputViewModel ?? throw new ArgumentNullException(nameof(inputViewModel));
@@ -73,19 +84,32 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             ?? throw new ArgumentNullException(nameof(executionViewModel));
         this.resultsOutputViewModel = resultsOutputViewModel
             ?? throw new ArgumentNullException(nameof(resultsOutputViewModel));
-        previousStep = navigator.CurrentStep;
+        settingsViewModel = new SettingsViewModel(
+            InputViewModel,
+            this.designViewModel,
+            this.executionViewModel,
+            settingsStore);
+        observedSettingsCategory = settingsViewModel.SelectedCategory;
         stepPresentations = BuildStepPresentations();
         navigateCommand = new DelegateCommand(
             ExecuteNavigate,
             CanNavigate);
         nextCommand = new DelegateCommand(
-            _ => this.navigator.MoveNext(),
+            _ => ExecuteMoveNext(),
             _ => this.navigator.CanMoveNext);
         previousCommand = new DelegateCommand(
-            _ => this.navigator.MovePrevious(),
+            _ => ExecuteMovePrevious(),
             _ => this.navigator.CanMovePrevious);
+        openSettingsCommand = new DelegateCommand(
+            ExecuteOpenSettings,
+            CanOpenSettings);
         this.navigator.CurrentStepChanged += HandleCurrentStepChanged;
+        InputViewModel.PropertyChanged += HandleInputViewModelPropertyChanged;
+        this.designViewModel.PropertyChanged += HandleDesignViewModelPropertyChanged;
+        this.executionViewModel.PropertyChanged += HandleExecutionViewModelPropertyChanged;
         this.executionViewModel.RunCompleted += HandleRunCompleted;
+        settingsViewModel.PropertyChanged += HandleSettingsViewModelPropertyChanged;
+        settingsViewModel.CloseRequested += HandleSettingsCloseRequested;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -100,16 +124,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public ResultsOutputViewModel ResultsOutputViewModel => resultsOutputViewModel;
 
+    public SettingsViewModel Settings => settingsViewModel;
+
     public WorkflowStep CurrentStep => navigator.CurrentStep;
 
-    public UiObservableObject? CurrentEditorViewModel => CurrentStep switch
-    {
-        WorkflowStep.Input => InputViewModel,
-        WorkflowStep.Design => DesignViewModel,
-        WorkflowStep.Execution => ExecutionViewModel,
-        WorkflowStep.Results => ResultsOutputViewModel,
-        _ => throw new ArgumentOutOfRangeException(nameof(CurrentStep), CurrentStep, "Unknown workflow step."),
-    };
+    public bool IsSettingsOpen => isSettingsOpen;
+
+    public UiObservableObject? CurrentEditorViewModel => IsSettingsOpen
+        ? Settings
+        : CurrentStep switch
+        {
+            WorkflowStep.Input => InputViewModel,
+            WorkflowStep.Design => DesignViewModel,
+            WorkflowStep.Execution => ExecutionViewModel,
+            WorkflowStep.Results => ResultsOutputViewModel,
+            _ => throw new ArgumentOutOfRangeException(nameof(CurrentStep), CurrentStep, "Unknown workflow step."),
+        };
 
     public bool HasEditorContent => CurrentEditorViewModel is not null;
 
@@ -131,6 +161,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public ICommand PreviousCommand => previousCommand;
 
+    public ICommand OpenSettingsCommand => openSettingsCommand;
+
     public string CurrentStepKicker =>
         $"STEP {(navigator.CurrentIndex + 1).ToString("00", CultureInfo.InvariantCulture)} / 04 · {navigator.CurrentDefinition.EnglishTitle}";
 
@@ -150,7 +182,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     public string NavigationProgressText =>
         $"{(navigator.CurrentIndex + 1).ToString(CultureInfo.InvariantCulture)} / {WorkflowNavigator.StepCount.ToString(CultureInfo.InvariantCulture)} ステップ";
 
-    public string NextButtonText => navigator.CanMoveNext ? "次へ  →" : "最終ステップ";
+    public string NextButtonText => navigator.CanMoveNext
+        ? $"{navigator.Steps[navigator.CurrentIndex + 1].Title}へ  →"
+        : "最終ステップ";
+
+    public string PreviousButtonText => navigator.CanMovePrevious
+        ? $"←  {navigator.Steps[navigator.CurrentIndex - 1].Title}へ戻る"
+        : "←  前へ";
 
     private WorkflowStepPresentation CurrentPresentation => stepPresentations[navigator.CurrentIndex];
 
@@ -165,26 +203,156 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
         disposed = true;
         navigator.CurrentStepChanged -= HandleCurrentStepChanged;
+        InputViewModel.PropertyChanged -= HandleInputViewModelPropertyChanged;
+        designViewModel.PropertyChanged -= HandleDesignViewModelPropertyChanged;
+        executionViewModel.PropertyChanged -= HandleExecutionViewModelPropertyChanged;
         executionViewModel.RunCompleted -= HandleRunCompleted;
+        settingsViewModel.PropertyChanged -= HandleSettingsViewModelPropertyChanged;
+        settingsViewModel.CloseRequested -= HandleSettingsCloseRequested;
+        settingsViewModel.Dispose();
         executionViewModel.Dispose();
         resultsOutputViewModel.Dispose();
+    }
+
+    public void OpenSettings() => OpenSettings(settingsViewModel.SelectedCategory);
+
+    public void OpenSettings(SettingsCategory category)
+    {
+        if (!Enum.IsDefined(category))
+        {
+            throw new ArgumentOutOfRangeException(nameof(category));
+        }
+
+        if (disposed)
+        {
+            return;
+        }
+
+        // A category change already synchronizes. A same-category open must do so
+        // explicitly, before showing editors that may still contain the old input.
+        // Capture the source ID BEFORE draft synchronization can replace editors.
+        // Common has no question target and must not align independent selections.
+        string? sourceQuestionId = category == SettingsCategory.Common ? null
+            : SettingsSourceQuestionId(IsSettingsOpen ? settingsViewModel.SelectedCategory : null);
+        bool wasSynchronizingDrafts = synchronizingDrafts;
+        synchronizingDrafts = true;
+        try
+        {
+            if (settingsViewModel.SelectedCategory == category)
+            {
+                settingsViewModel.SynchronizeDrafts();
+            }
+            else
+            {
+                settingsViewModel.SelectedCategory = category;
+            }
+
+            SynchronizeSettingsQuestionSelection(sourceQuestionId, category);
+        }
+        finally
+        {
+            synchronizingDrafts = wasSynchronizingDrafts;
+        }
+
+        RefreshNextDraftSummary(InputViewModel.DefinitionDraft);
+        SetSettingsOpen(true);
+    }
+
+    public void CloseSettings() => CloseSettings(synchronizeDrafts: true);
+
+    private string? SettingsSourceQuestionId(SettingsCategory? sourceCategory) => sourceCategory switch
+    {
+        SettingsCategory.Mapping => InputViewModel.SelectedQuestion?.Id,
+        SettingsCategory.Evaluation or SettingsCategory.Special or SettingsCategory.ImportedPrompts =>
+            designViewModel.SelectedQuestion?.Id,
+        _ => CurrentStep switch
+        {
+            WorkflowStep.Input => InputViewModel.SelectedQuestion?.Id,
+            WorkflowStep.Design => designViewModel.SelectedQuestion?.Id,
+            _ => null,
+        },
+    };
+
+    private void SynchronizeSettingsQuestionSelection(string? sourceQuestionId, SettingsCategory targetCategory)
+    {
+        if (sourceQuestionId is null || targetCategory == SettingsCategory.Common
+            || InputViewModel.IsBusy || settingsViewModel.IsApplying)
+        {
+            return;
+        }
+
+        // Match identities in each existing VM; never copy an editor, choose by
+        // display name/index, or clear a selection when an ID no longer exists.
+        InputQuestionMappingViewModel? inputQuestion = InputViewModel.Questions
+            .FirstOrDefault(question => question.Id == sourceQuestionId);
+        QuestionDesignItemViewModel? designQuestion = designViewModel.Questions
+            .FirstOrDefault(question => question.Id == sourceQuestionId);
+        if (inputQuestion is not null && !ReferenceEquals(InputViewModel.SelectedQuestion, inputQuestion))
+        {
+            InputViewModel.SelectedQuestion = inputQuestion;
+        }
+
+        if (designQuestion is not null && !ReferenceEquals(designViewModel.SelectedQuestion, designQuestion))
+        {
+            designViewModel.SelectedQuestion = designQuestion;
+        }
     }
 
     private bool CanNavigate(object? parameter) =>
         parameter is WorkflowStep step && navigator.CanNavigateTo(step);
 
+    private bool CanOpenSettings(object? parameter)
+    {
+        if (disposed)
+        {
+            return false;
+        }
+
+        return parameter is null
+            || parameter is SettingsCategory category && Enum.IsDefined(category);
+    }
+
     private void ExecuteNavigate(object? parameter)
     {
         if (parameter is WorkflowStep step)
         {
+            CloseSettings(synchronizeDrafts: true);
             navigator.NavigateTo(step);
+        }
+    }
+
+    private void ExecuteMoveNext()
+    {
+        CloseSettings(synchronizeDrafts: true);
+        navigator.MoveNext();
+    }
+
+    private void ExecuteMovePrevious()
+    {
+        CloseSettings(synchronizeDrafts: true);
+        navigator.MovePrevious();
+    }
+
+    private void ExecuteOpenSettings(object? parameter)
+    {
+        if (parameter is SettingsCategory category)
+        {
+            OpenSettings(category);
+        }
+        else if (parameter is null)
+        {
+            OpenSettings();
         }
     }
 
     private void HandleCurrentStepChanged(object? sender, EventArgs e)
     {
-        SynchronizeDraftsForTransition(previousStep, navigator.CurrentStep);
-        previousStep = navigator.CurrentStep;
+        if (disposed)
+        {
+            return;
+        }
+
+        RefreshExecutionConfiguration();
         stepPresentations = BuildStepPresentations();
         OnPropertyChanged(nameof(DesignViewModel));
         OnPropertyChanged(nameof(CurrentStep));
@@ -205,35 +373,185 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(CurrentStepStatusText));
         OnPropertyChanged(nameof(NavigationProgressText));
         OnPropertyChanged(nameof(NextButtonText));
+        OnPropertyChanged(nameof(PreviousButtonText));
         navigateCommand.RaiseCanExecuteChanged();
         nextCommand.RaiseCanExecuteChanged();
         previousCommand.RaiseCanExecuteChanged();
+        openSettingsCommand.RaiseCanExecuteChanged();
     }
 
-    private void SynchronizeDraftsForTransition(WorkflowStep from, WorkflowStep to)
+    private void HandleRunCompleted(object? sender, ExecutionRunCompletedEventArgs e)
     {
-        if (from == WorkflowStep.Design && InputViewModel.HasLoadedWorkbook)
+        if (disposed)
         {
-            InputViewModel.SynchronizeFromDesignDraft(DesignViewModel.Draft);
+            return;
         }
 
-        if (to == WorkflowStep.Design)
+        resultsOutputViewModel.Load(e.Context);
+        if (!IsSettingsOpen && navigator.CurrentStep == WorkflowStep.Execution)
         {
-            designViewModel = new QuantificationDesignViewModel(
-                InputViewModel.DefinitionDraft,
-                InputViewModel.AvailableColumnNames,
-                designViewModel.ImportedPromptSources);
+            navigator.MoveNext();
+        }
+    }
+
+    private void HandleInputViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (disposed || synchronizingDrafts)
+        {
+            return;
         }
 
-        if (to == WorkflowStep.Execution
-            && from != WorkflowStep.Results
-            && !executionViewModel.IsRunning)
+        // Loading publishes metadata before its draft is complete. Synchronize only
+        // after IsBusy clears, including an already-open Common settings page.
+        if (e.PropertyName == nameof(InputViewModel.IsBusy) && !InputViewModel.IsBusy)
         {
-            if (InputViewModel.HasLoadedWorkbook
-                && InputViewModel.Metadata is { } metadata)
+            RefreshExecutionConfiguration();
+            return;
+        }
+
+        // FilePath is published before the old loaded state is cleared. Wait for
+        // the matching cleared/completed draft instead of pairing a new path with old metadata.
+        if (string.IsNullOrEmpty(e.PropertyName)
+            || e.PropertyName is nameof(InputViewModel.DefinitionDraft)
+                or nameof(InputViewModel.Metadata)
+                or nameof(InputViewModel.HasLoadedWorkbook))
+        {
+            RefreshExecutionConfiguration(InputViewModel.DefinitionDraft);
+        }
+    }
+
+    private void HandleDesignViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(QuantificationDesignViewModel.Draft))
+        {
+            RefreshExecutionConfiguration(designViewModel.Draft);
+        }
+    }
+
+    private void HandleExecutionViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // RunCompleted is raised while IsRunning is still true. A failed/cancelled
+        // run can leave Execution visible after settings were closed during the run.
+        if (e.PropertyName == nameof(ExecutionViewModel.IsRunning) && !executionViewModel.IsRunning)
+        {
+            RefreshExecutionConfiguration();
+        }
+    }
+
+    private void HandleSettingsCloseRequested(object? sender, EventArgs e) =>
+        CloseSettings(synchronizeDrafts: false);
+
+    private void HandleSettingsViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SettingsViewModel.SelectedCategory))
+        {
+            SettingsCategory sourceCategory = observedSettingsCategory;
+            observedSettingsCategory = settingsViewModel.SelectedCategory;
+            // T17's category buttons use Settings.SelectCategoryCommand directly.
+            // Its synchronization preserves surviving source IDs; OpenSettings
+            // handles its own pre-sync capture and must not run this path twice.
+            if (IsSettingsOpen && !synchronizingDrafts)
+            {
+                SynchronizeSettingsQuestionSelection(
+                    SettingsSourceQuestionId(sourceCategory), observedSettingsCategory);
+            }
+        }
+
+        // Navigation may close Settings while applying awaits the input loader.
+        // Its final notification follows both editor commits; earlier changes are gated.
+        // Startup loads/saves also notify IsApplying=false, without an editor sync boundary.
+        if (e.PropertyName == nameof(SettingsViewModel.IsApplying))
+        {
+            bool wasApplying = observedSettingsApplying;
+            observedSettingsApplying = settingsViewModel.IsApplying;
+            if (wasApplying && !observedSettingsApplying)
+            {
+                // Apply owns both commits (or neither). Its completion is not an
+                // edit boundary, even when navigation closed Settings during the await.
+                RefreshExecutionConfiguration(synchronizeEditors: false);
+            }
+        }
+    }
+
+    private void CloseSettings(bool synchronizeDrafts)
+    {
+        if (disposed || !IsSettingsOpen)
+        {
+            return;
+        }
+
+        if (synchronizeDrafts)
+        {
+            settingsViewModel.SynchronizeDrafts();
+        }
+
+        SetSettingsOpen(false);
+        if (navigator.CurrentStep == WorkflowStep.Execution)
+        {
+            RefreshExecutionConfiguration();
+        }
+    }
+
+    private void RefreshNextDraftSummary(QuantificationDefinition latestDraft)
+    {
+        if (disposed || synchronizingDrafts
+            || InputViewModel.IsBusy || settingsViewModel.IsApplying)
+        {
+            return;
+        }
+
+        latestObservedDraft = latestDraft;
+        executionViewModel.UpdateNextDraftSummary(
+            InputViewModel.HasLoadedWorkbook ? latestDraft : null,
+            InputViewModel.HasLoadedWorkbook ? InputViewModel.FilePath : null);
+    }
+
+    private void RefreshExecutionConfiguration(
+        QuantificationDefinition? latestDraft = null,
+        bool synchronizeEditors = true)
+    {
+        if (disposed || synchronizingDrafts)
+        {
+            return;
+        }
+
+        // Remember deferred presentation only; Settings still owns peer synchronization.
+        latestObservedDraft = latestDraft ?? latestObservedDraft;
+        if (InputViewModel.IsBusy || settingsViewModel.IsApplying)
+        {
+            return;
+        }
+
+        bool previewOnly = IsSettingsOpen || navigator.CurrentStep != WorkflowStep.Execution;
+        if (previewOnly && latestDraft is not null)
+        {
+            // Ordinary edits keep their peer untouched until the existing sync boundary.
+            RefreshNextDraftSummary(latestDraft);
+            return;
+        }
+
+        synchronizingDrafts = true;
+        try
+        {
+            // Settings alone chooses the latest editor. Keep its peer notifications
+            // inside this scope so they cannot recursively Configure a stale draft.
+            if (synchronizeEditors)
+            {
+                settingsViewModel.SynchronizeDrafts();
+                latestObservedDraft = InputViewModel.DefinitionDraft;
+            }
+
+            QuantificationDefinition executionDraft = latestObservedDraft ?? InputViewModel.DefinitionDraft;
+            if (previewOnly || executionViewModel.IsRunning)
+            {
+                executionViewModel.UpdateNextDraftSummary(
+                    InputViewModel.HasLoadedWorkbook ? executionDraft : null,
+                    InputViewModel.HasLoadedWorkbook ? InputViewModel.FilePath : null);
+            }
+            else if (InputViewModel.HasLoadedWorkbook && InputViewModel.Metadata is { } metadata)
             {
                 executionViewModel.Configure(
-                    InputViewModel.DefinitionDraft,
+                    executionDraft,
                     metadata,
                     InputViewModel.FilePath);
             }
@@ -242,15 +560,24 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
                 executionViewModel.ClearConfiguration();
             }
         }
+        finally
+        {
+            synchronizingDrafts = false;
+        }
     }
 
-    private void HandleRunCompleted(object? sender, ExecutionRunCompletedEventArgs e)
+    private void SetSettingsOpen(bool value)
     {
-        resultsOutputViewModel.Load(e.Context);
-        if (navigator.CurrentStep == WorkflowStep.Execution)
+        if (isSettingsOpen == value)
         {
-            navigator.MoveNext();
+            return;
         }
+
+        isSettingsOpen = value;
+        OnPropertyChanged(nameof(IsSettingsOpen));
+        OnPropertyChanged(nameof(CurrentEditorViewModel));
+        OnPropertyChanged(nameof(HasEditorContent));
+        OnPropertyChanged(nameof(HasPlaceholderContent));
     }
 
     private ImmutableArray<WorkflowStepPresentation> BuildStepPresentations() =>
@@ -266,20 +593,20 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
                     definition.EnglishTitle,
                     state switch
                     {
-                        WorkflowStepState.Completed => "✓",
+                        WorkflowStepState.Visited => "◉",
                         WorkflowStepState.Current => "●",
                         WorkflowStepState.Upcoming => "○",
                         _ => throw new InvalidOperationException("Unknown workflow step state."),
                     },
                     state switch
                     {
-                        WorkflowStepState.Completed => "完了",
+                        WorkflowStepState.Visited => "訪問済み",
                         WorkflowStepState.Current => "現在・選択中",
                         WorkflowStepState.Upcoming => "未着手",
                         _ => throw new InvalidOperationException("Unknown workflow step state."),
                     },
                     state == WorkflowStepState.Current,
-                    state == WorkflowStepState.Completed,
+                    state == WorkflowStepState.Visited,
                     state == WorkflowStepState.Upcoming);
             }),
         ];

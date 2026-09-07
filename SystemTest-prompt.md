@@ -1,13 +1,15 @@
-# StudyReport Evaluator v4.5 システムテスト Prompt集
+# StudyReport Evaluator v4.6 システムテスト Prompt集
 
 | 項目 | 内容 |
 |---|---|
 | 文書用途 | ソフトウェアエンジニアまたはテスト支援AIが、ユースケース単位でコピーして実行するPrompt集 |
-| 対象 | StudyReport Evaluator v4.5 |
-| 基準日 | 2026-09-06 |
-| 要求正本 | `docs/requirements-definition.md` v4.5 |
+| 対象 | StudyReport Evaluator v4.6 |
+| 基準日 | 2026-09-07 |
+| 要求正本 | `docs/requirements-definition.md` v4.6 |
+| 版の区別 | v4.6は要求版。製品正本は親担当が0.8.5へPATCH済み（UNRELEASED・未公開候補）、F01はREVIEWED、公開済みはv0.8.1 ZIP。利用者不在時の自律続行指示によりT39 BLOCKEDのままF01／F02を進める。F02最終再検証は本同期時点では親担当で未完了、以後は実行記録の最新F02欄を参照 |
 | 設計正本 | `dev/docs/detailed-design.md`、ADR-0012、ADR-0013、ADR-0015、ADR-0016 |
-| 対象環境 | Windows 11 x64。public artifactはunsigned single-file EXE（主導線）とunsigned ZIP（代替）+ sidecar。development MSIXはnon-public mechanism、macOSはsource foundationのみ |
+| UI/settings契約 | `dev/docs/ui-layout-contract.md`と`dev/docs/traceability.md`。T01の未実装記録は履歴。T01〜T38はREVIEWED、現行差分はVERIFIED_SCOPED。0.8.4のT36文書contract・T37実ZIP・T38実EXE・T39自動回帰／MSIX機構確認は記録済み。T39追加native FAIL／人手未実施は解消せず、F02最終0.8.5の再検証と分離 |
+| 対象環境 | Windows 11 x64。公開済みv0.8.1はunsigned ZIP＋sidecarの2 asset。0.8.5候補の将来主導線はunsigned single-file EXE、ZIPは代替、公開目標は各sidecarを含む4 asset。development MSIXはnon-public mechanism、macOSはsource foundationのみ |
 | 必須決定的fixture | `tests/fixtures/system-test/SystemTest-10Students.xlsx` |
 | 注意 | 本書はテスト結果ではない。未実施、過去結果、文書上の期待値を今回のPASSとして扱わない |
 
@@ -21,7 +23,7 @@
 
 - repositoryに実在する要求正本は`docs/requirements-definition.md`である。
 - `/hve-dev/requirement-definition.md`は本repositoryに存在しないため参照しない。
-- 要求定義§19のTR-01〜TR-33を欠番なく網羅する。
+- 要求定義§19のTR-01〜TR-36を欠番なく網羅する。既存ST-UC-01〜26を再番号付けせず、保存・明示適用・往復のST-UC-27〜29を末尾へ追加する。通常／例外layoutはST-UC-12へ追補する。
 - 10人fixture E2Eは、Promptを小規模かつ決定的に反復できるよう追加した補助scenarioであり、要求定義を改変しない。
 - 531行synthetic E2E、10人synthetic E2E、canonical SampleReport technical E2Eを相互代用しない。
 - optional Live Copilotとexternal recalculationをrequired deterministic testへ代用しない。
@@ -126,7 +128,7 @@ Kは、設問(4)(5)に関連してPrompt作成時に工夫した点、観点、�
 
 ## 4. 使い方
 
-1. 実行したい`ST-UC-01`〜`ST-UC-26`を1件選ぶ。
+1. 実行したい`ST-UC-01`〜`ST-UC-29`を1件選ぶ。
 2. 直下の`text`コードブロック全体を1個だけコピーする。
 3. コマンド実行可能なAI agentまたはテスト担当者へ渡す。
 4. 各Promptはrepository root、fixture path、evidence directoryを実行時に解決する。原則として置換は不要。
@@ -160,16 +162,41 @@ Kは、設問(4)(5)に関連してPrompt作成時に工夫した点、観点、�
 | `PASS` | Promptに書かれた必須確認を全て今回実測し、期待と一致 |
 | `FAIL` | 実行できたが1件以上が期待と不一致 |
 | `BLOCKED` | 必須fixture、tool、permission、対応環境等がなく開始不能 |
-| `NOT_RUN` | 任意testを意図的に実行していない |
+| `NOT_RUN` | 対象の実処理を実行していない。必須・任意を別記し、未実装・過去結果をPASSにしない |
 | `NOT_RUN_UI_AUTOMATION_UNAVAILABLE` | user-visible UIを観測する手段がない |
 | `NOT_RUN_POLICY_REAL_DATA` | 実データのproduction AI送信をpolicyにより実施しない固定status |
 | `SKIPPED_NOT_AUTHENTICATED` | optional synthetic Live Copilotだけ、既存loginがない |
 | `FAILED_ADVISORY` | optional testを実行したが期待と不一致。required gateへ影響させない |
 | `SKIPPED_NOT_INSTALLED` | optional external spreadsheetが未install |
-| `NOT_RUN_EXTERNAL_PREREQUISITE` | external recalculationの別の任意前提がない |
+| `NOT_RUN_EXTERNAL_PREREQUISITE` | requiredなfresh OS／本人／Narrator／隔離利用者等、またはoptional external recalculationの前提がなく未実施。必須と任意を別記する |
 | `PASS_MECHANISM` | test certificateまたはunsigned artifactでpackage mechanismだけを今回確認 |
+| `PASS_DEVELOPMENT` | 開発hostの明記したartifact／観測範囲だけの成功。clean-host／本人認証／公開の成功へ拡張しない |
 | `PASS_PRODUCTION` | production identityとclean target OSでrequired trust/journeyを今回確認 |
 | `BLOCKED_EXTERNAL` | signing identity、credential、native test host等がなくproduction scopeを開始不能 |
+
+### 6.1 既存の局所検証と今回のscenario判定
+
+T01で追加したAC-035〜037／TR-34〜36／ST-UC-27〜29／C-045〜047は維持する。要求所有者の2026-09-07の後続承認を優先し、元プランの承認前表記は履歴として読む。現在の実装と直接testは[traceability](dev/docs/traceability.md)、親担当のT01〜T38 REVIEWED／T39 BLOCKEDとF02最終再検証は[実行記録](work/20260907-ui-settings-execution-record.md)の最新欄に接続する。以下は0.8.4の記録済み結果で、0.8.5やこのPromptの新規実行結果ではない。
+
+| 既存対象集合 | 記録済み結果・出典 | 今回のPromptへの適用限界 |
+|---|---|---|
+| T18〜T21 | 540/540、`artifacts/test/ui-settings/t18-21/t18-21-reviewed.trx` | 主画面の対象回帰。後続修正や全体gateの代替ではない |
+| T23 | 275/275、`artifacts/test/ui-settings/t23/t23-fixed.trx` | SettingsComposition／MainWindowSettingsと関連回帰。nativeではない |
+| T24 | 67/67、`artifacts/test/ui-settings/t24/t24.trx` | WorkflowStateの12ケースを含む。実shell・実設定fileだがrun／出力receiptはfake |
+| T25〜T27 | 74/74、`artifacts/test/ui-settings/t25-27/t25-27-reviewed.trx` | T26の27ケースとT27の7ケースは内数。headless layout／keyboardと実file E2Eを分ける |
+| T28・最新修正 | 216/216、`artifacts/test/ui-settings/t28/t28-reviewed.trx` | 出力先表示・適用失敗時draft保持・読込競合の最新回帰と、synthetic画像生成・2回一致・最小frame検証。T32／T34の修正確認も同じ集合 |
+| T35の対象文書試験 | 4/4、`artifacts/test/ui-settings/t35/t35-reviewed.trx` | 要求mapping・UI/settings baseline・当時の公開文書集合のlocal link／anchorの4件。T36の11文書・8画像contract全体の今回PASSではない |
+| T36 | 21/21、`artifacts/test/ui-settings/t36/t36-current.trx` | 公開文書11件・画像8枚、設定境界、対象版、local links／anchors。T35とは別scopeでREVIEWED、F02変更後の文書再検証ではない |
+| T37 | 9/9、`artifacts/test/ui-settings/t37/t37.trx` | 実ZIPのpublish／生成／再現性／展開起動とMSIX静的契約。MSIX実物とは別 |
+| T38 | 114/114、`artifacts/test/ui-settings/t38/t38.trx`。同`native/`配下のP06 7/7・P07 PASS_DEVELOPMENT | 20公開ファイル・CLI・標準展開・移動／再起動／同時起動・Prompt設定の開発host検証。EXE 0.8.4、283,408,986 bytes、SHA-256 `4D80FA246EB64E6984B6D8B4A5EA37C1F62BCDD28C40F6D9A63F41522C89E507` |
+| T39自動回帰 | Core 190＋App 1702＝1892/1892、skip 0。`artifacts/test/ui-settings/t39/reviewed/`の2026-09-07（+09:00）の2 TRX | CI同等の3クラス除外（実学生sample構造・別実行ZIP・P06）とP02 artifact検査opt-in。初回fixture 1失敗→実入力読込・通常ナビへ修正→126/126・レビュー指摘0→全体再実行成功。実AI等の無効経路をlive成功にしない |
+| T39 MSIX実物 | PASS_MECHANISM、256 entries、0.8.4.0。`artifacts/package/mechanism/StudyReportEvaluator-win-x64.unsigned.test.evidence.json` | package／unpack／integrity／policy／cleanupのみ。install／署名／一般公開は未実施 |
+
+集合は重複し得るため、合算してfull gateを作らない。これらは既存実行の記録で、再実行時の件数を固定するoracleでも、ST-UC全体の今回PASSでもない。実行時は対象メソッドのdiscovery、展開ケース、outcome、環境、fixtureを今回証跡から照合し、未実施caseを既存PASSで埋めない。
+
+`VERIFIED_SCOPED`は追跡上の限定確認で、§6のscenario `PASS`とは別。T35の対象文書試験は4/4成功・敵対的レビュー済み（指摘0）。T35は画像bytesの読込・目視・再生成を行っていない。T36は別scopeの21/21でAC-022／TR-22へ接続し、T38のP06 7/7はAC-032／TR-31の限定確認とする。disk-full／directory ACL／抽出中断／EXE・ZIP間checkpoint再開は未実施で、全faultのPASS_REQUIREDではない。
+
+C-045〜047のBLOCKEDはT36待ちではなく、T39追加native FAILと人手確認等の未達を維持する判定である。最新`artifacts/test/ui-settings/t39/native-final-attempt.json`はCONTROL_ID_PREDICATE_NOT_UNIQUEでFAIL、3試行後は再試行を停止した。120 DPI・実client 1475×1000 pixel＝1180×800 DIP・合成入力読込・入力／EXE不変・実利用者設定非作成だけを観測し、4画面・5カテゴリ・1024×720・実keyboardは未完了。Narrator、本人walkthrough4項目、隔離利用者native保存とCH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITE。本人login・実AI・実学生data・公開操作は未実施で、F01／F02の自律続行をG4・全タスクDONE・公開PASSへ拡張しない。
 
 ## 7. 共通報告契約
 
@@ -202,7 +229,7 @@ Kは、設問(4)(5)に関連してPrompt作成時に工夫した点、観点、�
 | ST-UC-09 | checkpoint、fault、resume mismatch | TR-13、TR-14 / AC-014、AC-015 |
 | ST-UC-10 | auth／timeout／network／schema／cleanup／cancel | TR-15 / AC-012、AC-016 |
 | ST-UC-11 | same-row privacy、literal、no-content log | TR-16 / AC-019 |
-| ST-UC-12 | 4-step UI、mapping同期、warning、progress、accessibility | TR-17 / AC-002、AC-016、AC-017 |
+| ST-UC-12 | 4-step＋設定、通常非scroll／ページ切替、長文・拡大例外、mapping同期、warning、accessibility | TR-17 / AC-002、AC-016、AC-017 |
 | ST-UC-13 | command-line Prompt launch | TR-18 / AC-018 |
 | ST-UC-14 | Windows publish、bundled CLI、clean launch | TR-19 / AC-020 |
 | ST-UC-15 | ZIP integrity、sidecar、再現性、tamper | TR-20 / AC-020 |
@@ -217,6 +244,9 @@ Kは、設問(4)(5)に関連してPrompt作成時に工夫した点、観点、�
 | ST-UC-24 | macOS future trust order static contract | TR-27 / AC-025 |
 | ST-UC-25 | Windows ZIP E2E、release matrix、secret boundary | TR-28、TR-29 / AC-026〜AC-028 |
 | ST-UC-26 | clean-host単一EXE起動・同梱CLI状態確認・本人login・公開境界 | TR-30〜TR-33 / AC-029〜AC-034 |
+| ST-UC-27 | 共通＋定義1件の明示保存、平文境界、atomic失敗、明示出力先復元／null | TR-34 / AC-035 |
+| ST-UC-28 | 保存定義の明示適用、別header検証、失敗・取消無変更、ID／Prompt保持 | TR-35 / AC-036 |
+| ST-UC-29 | 設定往復、model希望、no-auto、現在snapshot／前回結果保持、保存→再読込→fake run E2E | TR-36 / AC-016〜AC-019、AC-035〜AC-037 |
 
 ## 9. Scenario Prompt
 
@@ -225,7 +255,7 @@ Kは、設問(4)(5)に関連してPrompt作成時に工夫した点、観点、�
 ### ST-UC-01: Forms／Google question row 1/2と10人fixture mapping
 
 ```text
-あなたはStudyReport Evaluator v4.5のシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のシステムテスト担当者です。
 Test ID: ST-UC-01
 Requirement: TR-01 / AC-001 / AC-002
 
@@ -279,7 +309,7 @@ UIで未観測の内部候補はmetadata/mapping testの結果として報告し
 ### ST-UC-02: Canonical SampleReport identityとF〜K role候補
 
 ```text
-あなたはStudyReport Evaluator v4.5のcanonical repository sampleシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のcanonical repository sampleシステムテスト担当者です。
 Test ID: ST-UC-02
 Requirement: TR-02 / AC-003 / docs/requirements-definition.md §4.4
 
@@ -325,7 +355,7 @@ Requirement: TR-02 / AC-003 / docs/requirements-definition.md §4.4
 ### ST-UC-03: Native picker、direct path、unsupported input
 
 ```text
-あなたはStudyReport Evaluator v4.5のinput workflowシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のinput workflowシステムテスト担当者です。
 Test ID: ST-UC-03
 Requirement: TR-03 / AC-001 / AC-002
 
@@ -361,7 +391,7 @@ Requirement: TR-03 / AC-001 / AC-002
 ### ST-UC-04: 絶対配点、均等化、range、run前validation
 
 ```text
-あなたはStudyReport Evaluator v4.5の採点設計システムテスト担当者です。
+あなたはStudyReport Evaluator v4.6の採点設計システムテスト担当者です。
 Test ID: ST-UC-04
 Requirement: TR-04 / TR-05 / AC-004 / AC-005 / AC-006 / AC-008
 
@@ -409,7 +439,7 @@ validation matrix:
 ### ST-UC-05: Knowledge／Custom／Special Promptとclosed tool schema
 
 ```text
-あなたはStudyReport Evaluator v4.5のPrompt・structured resultシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のPrompt・structured resultシステムテスト担当者です。
 Test ID: ST-UC-05
 Requirement: TR-06 / AC-007 / AC-008
 
@@ -443,7 +473,7 @@ Requirement: TR-06 / AC-007 / AC-008
 ### ST-UC-06: Reference-firstとnormal／special／similarity境界
 
 ```text
-あなたはStudyReport Evaluator v4.5の4 AI operationシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6の4 AI operationシステムテスト担当者です。
 Test ID: ST-UC-06
 Requirement: TR-07 / TR-08 / AC-009 / AC-010 / AC-012
 
@@ -490,7 +520,7 @@ attempt/session/call countとcheckpoint順はtest double/store記録から取得
 ### ST-UC-07: Score hand oracleとConfig参照formula
 
 ```text
-あなたはStudyReport Evaluator v4.5のscore・Excel formulaシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のscore・Excel formulaシステムテスト担当者です。
 Test ID: ST-UC-07
 Requirement: TR-09 / TR-10 / AC-006 / AC-011 / AC-012
 
@@ -544,7 +574,7 @@ formula surface:
 ### ST-UC-08: Final workbook、output path、no-overwrite atomic commit
 
 ```text
-あなたはStudyReport Evaluator v4.5のfinal workbook・output commitシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のfinal workbook・output commitシステムテスト担当者です。
 Test ID: ST-UC-08
 Requirement: TR-11 / TR-12 / AC-013
 
@@ -569,7 +599,7 @@ final workbook oracle:
 - OpenXmlValidator error 0。
 
 output path oracle（local minute 2026-09-02 14:35固定）:
-- default directoryはinputの隣の`result`で、なければ作成する。
+- 明示出力先がnullの場合だけdefault directoryはinputの隣の`result`で、runの既存path準備時に必要なら作成する。設定復元だけで作成せず、再起動・入力変更後の明示出力先保持はST-UC-27で別に検証する。
 - first pairは`eval-20260902-1435.xlsx`と`eval-20260902-1435.partial.xlsx`。
 - finalまたはpartialのどちらかが存在すれば、次は共通suffix`-02`。
 - `-02`のどちらかが存在すれば`-03`。
@@ -593,7 +623,7 @@ atomic final oracle:
 ### ST-UC-09: Checkpoint、atomic fault、resume mismatch
 
 ```text
-あなたはStudyReport Evaluator v4.5のdurable checkpoint・resumeシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のdurable checkpoint・resumeシステムテスト担当者です。
 Test ID: ST-UC-09
 Requirement: TR-13 / TR-14 / AC-014 / AC-015
 
@@ -651,7 +681,7 @@ resume期待:
 ### ST-UC-10: Auth／timeout／network／schema／cleanup／cancel
 
 ```text
-あなたはStudyReport Evaluator v4.5のAI failure・cancelシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のAI failure・cancelシステムテスト担当者です。
 Test ID: ST-UC-10
 Requirement: TR-15 / AC-012 / AC-016
 
@@ -686,7 +716,7 @@ normal、reference、special、similarityの各operationで単一原因ごとに
 ### ST-UC-11: Selected same-row privacy、literal text、no-content log
 
 ```text
-あなたはStudyReport Evaluator v4.5のprivacy・formula injectionシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のprivacy・formula injectionシステムテスト担当者です。
 Test ID: ST-UC-11
 Requirement: TR-16 / AC-019
 
@@ -723,37 +753,42 @@ logging oracle:
 報告順: Test ID / 環境 / operation / sent source IDs / forbidden canary absent/present（値なし） / logger surface / workbook cell type・formula count / input不変 / 証跡 / Status / 差異。
 ```
 
-### ST-UC-12: 4-step UI、warning、progress、keyboard、200% scale
+### ST-UC-12: 4-step＋設定、通常非scroll／ページ切替、長文・拡大例外
 
 ```text
-あなたはStudyReport Evaluator v4.5のuser-visible UI・accessibilityシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のuser-visible UI・accessibilityシステムテスト担当者です。
 Test ID: ST-UC-12
 Requirement: TR-17 / AC-002 / AC-016 / AC-017
 
 捏造禁止。manual UIで観測していない項目を目視PASSと書きません。headless deterministic testで補完した項目はその方法を明記します。実在回答やprivate pathをscreen captureへ含めません。repositoryを変更、stash、reset、clean、commitしません。PowerShellはpwsh.exe -NoLogo -NoProfile、7+ Coreだけを使います。
 
+T01時点の未実装・NOT_RUNは履歴です。現在はMainWindow／SettingsViewの実装、MainWindowSettingsTests、ResponsiveLayoutTests／CompactWorkflowLayoutTests等の直接ownerがあり、親担当のT25〜27合同74/74にT26の27ケースが含まれます。これはheadless／計算の既存証跡に限り、このPromptの今回PASSやnative実DPI／Narratorの成功ではありません。実行時に必要caseのdiscoveryを確認し、欠落はBLOCKEDとします。旧縦scroll試験の意図を通常非scrollと例外到達に分け、clippingで合格にしません。
+
+0.8.4のT39追加nativeは3試行後に停止し、最新native-final-attempt.jsonはCONTROL_ID_PREDICATE_NOT_UNIQUEでFAILです。120 DPI・1180×800 DIPと入力読込等の部分観測を、4画面・5カテゴリ・1024×720・実keyboardの成功へ拡張しません。Narratorと本人確認のNOT_RUN_EXTERNAL_PREREQUISITE、T26のheadless測定、F02後の0.8.5再検証は別々に扱います。
+
 準備:
 1. `StudyReportEvaluator.slnx`を上位探索してrepository rootへ移動します。
 2. Windows 11 x64、x64 process、PowerShell Core 7+、global.json SDK、HEAD、UTC開始、worktree status hashを記録します。
 3. `tests/fixtures/system-test/SystemTest-10Students.xlsx`のsize 7,652、SHA-256 `7F473879B3C43319D842881C5DFD1D01B2A60091A5B0C7B39B70B8D574D801C8`を確認します。
-4. repository外にevidence directoryを作り、locked restore後、`EthicsWarningTests`、`MainWindowTests`、`InputViewTests`、`QuantificationDesignViewTests`、Execution/Results UI testsとaccessibility testsをReleaseで実行します。exact warningのsource/docs同期は`DocumentationContractTests.Ethics_warning_is_exact_in_readme_and_user_guides`でも確認します。
+4. repository外にevidence directoryを作り、locked restore後、`EthicsWarningTests`、`MainWindowTests`、`MainWindowSettingsTests`、`SettingsViewTests`、`PrimaryJourneyAccessibilityTests`、`CopilotLoginCommandTests`、`InputViewTests`、`QuantificationDesignViewTests`、`ExecutionViewTests`、`ResultsOutputViewTests`、`ResponsiveLayoutTests`／`CompactWorkflowLayoutTests`をReleaseで実行します。class指定はそのclassだけの全discoveryを指します。exact warningのsource/docs同期は`DocumentationContractTests.Ethics_warning_is_exact_in_readme_and_user_guides`でも確認します。
 5. Desktop UIを観測できる場合だけRelease apphostを10人fixture付きで起動し、render scaling 200%、keyboard中心で確認します。観測手段がなければmanual scopeを`NOT_RUN_UI_AUTOMATION_UNAVAILABLE`とし、headless scopeと分離します。
 
 全step共通のexact warning:
 `生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません`
 
 warning oracle:
-- Input、Design、Execution、Resultsの全stepでshell rootのpersistent bannerとして常時表示する。
+- Input、Design、Execution、Resultsと設定でshell rootのpersistent bannerとして常時全文表示する。
 - non-focusable、non-modalで、checkbox、dismiss、consent、role、score gate、実行blockがない。
 - warning操作をsnapshot、run、cancel、resume、formula、finalizationの条件にしない。
 
 control／navigation oracle:
 - Input: native picker、direct path、question row 1/2、sheet、row範囲、mappingへTabで到達する。
 - Inputの主回答列ComboBoxを操作すると、同じQuestion cardの可視設問text TextBoxが、選択中sheet・question row・columnの交差セル値へ即時更新される。別Questionは変更されない。
-- Design: Base/Special/Similarity、Question Points、equalize、Knowledge/Custom、special editor、Imported Promptへ到達する。
-- Execution: auth、model、`auto` availability、concurrency、新規/resume、output directory/partial path、start/cancelへ到達する。
+- Design: Base/Special/Similarity、Question Points、equalizeを主画面に残し、Knowledge/Custom、special editor、Imported Promptへ同じ対象の設定を1操作で開いて到達する。
+- Execution: auth、実効model／`auto`、実効出力先、新規/resume、partial、start/cancelを主画面に残し、model／concurrency／出力先変更は設定へ到達する。
 - Results: row-level QuestionEarned、SpecialEarned、SimilarityPenalty、FinalRaw、FinalScore、final/partial path、cleanup warning、output folder操作を表示する。
-- completed runはResultsへ自動遷移する。起動しただけでは遷移しない。
+- 設定は同一windowの独立内容で5カテゴリとし、第5ステップにはしない。カテゴリを変えてもworkflowは進まず、終了時に元の対象とfocusへ戻る。同じ入力欄を二重配置しない。
+- completed runの結果到着は維持するが、設定表示中は通知だけで強制遷移しない。起動しただけではResultsへ遷移しない。全画面で現在runの進捗入口と停止を利用できる。
 
 progress oracle:
 - stageはPreparing、GeneratingReferences、EvaluatingRows、SavingCheckpoint、FinalizingWorkbook、Completed/Cancelling。
@@ -762,7 +797,11 @@ progress oracle:
 - partial failure/cancelとvalid final completionを同じ表示にしない。
 
 accessibility oracle:
-- 200%でも縦横scrollで全主要controlへ到達する。
+- 最小1024×720 DIPと初期1180×800 DIPを引き上げず、実ClientSizeを記録する。通常画面は初期offsetで警告全文・主操作・状態・前後移動が完全包含され、外側scroll不要、horizontal overflowなし。外側ScrollViewerはExtent <= Viewportを確認し、Disabledやclippingだけを合格にしない。
+- 多数設問／結果は前・次・表示範囲・全件数・結果元行への移動で全件へ到達する。空／1件／境界前後／最終ページ、追加・削除・並替え・リサイズでIDとページを補正し、有限高さのvirtualizationを維持する。
+- 長文／全文path／dropdownは局所scrollを許容する。760×600 standaloneと200%はreflow・行数削減を先に行い、足りない場合だけ本文縦scrollで全操作へ到達する。固定領域でfocusを覆わず、例外の成功を通常非scrollへ算入しない。
+- 本文・入力14 DIPと主操作target最小44 DIP、日本語ラベル、focus／文字／iconのcontrastを維持する。表示件数は残領域と実際の行高で測定し、5件／6行等の未測定値を固定しない。
+- UIは100行／530行synthetic、20,000件は別のページ境界計算で検証し、全件実画面の性能成功へ読み替えない。実測欄は`dev/docs/ui-layout-contract.md`に従い、未実測はNOT_RUNとする。
 - keyboardだけで主要操作へ移動でき、focus ringが視認できる。
 - realized control内のautomation IDが重複しない。
 - warningは読み上げ可能だがTab stopではない。
@@ -778,7 +817,7 @@ apphost起動時に`Copilot 状態を確認`や`定量化を開始`を押す必�
 ### ST-UC-13: `--input`／`--prompt`、explicit apply、no-auto-run
 
 ```text
-あなたはStudyReport Evaluator v4.5のcommand-line Prompt launchシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のcommand-line Prompt launchシステムテスト担当者です。
 Test ID: ST-UC-13
 Requirement: TR-18 / AC-018
 
@@ -788,7 +827,7 @@ Requirement: TR-18 / AC-018
 1. `StudyReportEvaluator.slnx`を上位探索しrepository rootへ移動します。
 2. Windows 11 x64、PowerShell Core 7+、global.json SDK、HEAD、UTC開始、worktree status hashを記録します。
 3. repository外にevidence directoryと、UTF-8 BOMあり／なし、invalid UTF-8、空、valid上限32,767 UTF-16 code units、invalid上限超過32,768 UTF-16 code units、複数Promptの一時`.txt` fixtureを作ります。本文はreportへ記録しません。
-4. locked restore後、`LaunchOptionsTests`（PromptFileLoaderとstartup compositionのcaseを含む）とDesign imported Prompt UI testsをReleaseで実行します。存在しない別名のPromptFileLoader test classを推測しません。
+4. locked restore後、`LaunchOptionsTests`（PromptFileLoaderとstartup compositionのcaseを含む）、`ImportedPromptSettingsViewTests`、`SettingsViewTests`、`SettingsCompositionTests`、`CopilotLoginCommandTests`をReleaseで実行します。実在する`ImportedPromptSettingsView`／`ApplyImportedPromptCommand`と設定のCanEditDefinitionが移設先です。直接anchorは`ImportedPromptSettingsViewTests.Explicit_apply_copies_only_to_selected_custom_evaluator`／`Explicit_apply_copies_only_to_selected_special_evaluation_without_changing_points`、`SettingsViewTests.Alternating_category_edits_and_imported_prompt_reach_the_latest_draft_before_explicit_save`、`SettingsCompositionTests.Settings_initialization_does_not_consume_the_existing_one_time_launch_input_request`です。存在しないPromptFileLoader専用classを推測せず、移設後caseの欠落を旧Design試験で代替しません。T01の未実装表記は履歴で、今回結果は新規実測からだけ記録します。
 
 parser oracle:
 - option名はordinal-ignore-caseの`--input` 0/1回と`--prompt` 0回以上だけ。
@@ -801,7 +840,7 @@ parser oracle:
 Prompt loader oracle:
 - UTF-8 BOMあり／なしを受理する。
 - invalid UTF-8、0文字、32,768 UTF-16 code units以上、read failureを拒否する。
-- basenameと本文をImported Promptsへ指定順に表示する。
+- basenameと本文を設定の「読込Prompt」へ指定順に表示し、Designに件数と同じ適用対象の入口を残す。
 - safe error windowへoption value、Prompt本文、private pathを表示しない。
 
 explicit apply oracle:
@@ -809,7 +848,7 @@ explicit apply oracle:
 - selected Custom evaluatorまたはspecial itemをtargetにして「Promptを適用」した時だけtemplateをcopyする。
 - 同じPromptを複数targetへ再利用できる。
 - filename規則でquestionへ暗黙割当しない。
-- applyはstep遷移やAI処理を開始しない。
+- applyはstep遷移、認証確認、loginやAI処理を開始しない。未適用の一覧・本文・順序はsetting.txtに保存せず、保存定義の明示適用でも変更しない。
 - startup後のCopilot runner/session/send countは0。利用者がExecutionのstartを明示するまで0のまま。
 
 各args caseは別process／startup stateで実行し、前caseのstateを引き継ぎません。10人fixtureのidentityを起動前後で比較し、result/final/partialが作られていないことも確認します。
@@ -822,7 +861,7 @@ explicit apply oracle:
 ### ST-UC-14: Windows x64 publish、bundled CLI、clean launch
 
 ```text
-あなたはStudyReport Evaluator v4.5のWindows ZIP代替経路システムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のWindows ZIP代替経路システムテスト担当者です。
 Test ID: ST-UC-14
 Requirement: TR-19 / AC-020
 
@@ -866,7 +905,7 @@ clean launch:
 ### ST-UC-15: Unsigned ZIP integrity、sidecar、再現性、tamper
 
 ```text
-あなたはStudyReport Evaluator v4.5のWindows ZIP package integrityシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のWindows ZIP package integrityシステムテスト担当者です。
 Test ID: ST-UC-15
 Requirement: TR-20 / AC-020
 
@@ -906,7 +945,7 @@ negative case:
 ### ST-UC-16: Windows-only claim、documentation、screenshots
 
 ```text
-あなたはStudyReport Evaluator v4.5の公開scope・documentation整合システムテスト担当者です。
+あなたはStudyReport Evaluator v4.6の公開scope・documentation整合システムテスト担当者です。
 Test ID: ST-UC-16
 Requirement: TR-21 / TR-22 / AC-021 / AC-022
 
@@ -918,8 +957,9 @@ Requirement: TR-21 / TR-22 / AC-021 / AC-022
 3. repository外にevidence directoryを作り、locked restore後、`DocumentationContractTests`、`DocumentationScreenshotTests`、`WindowsPublishPackageTests`をReleaseで実行します。
 
 Delivery transition oracle:
-- 要求v4.5はv4.4の業務契約とADR-0015のZIP／development MSIX境界をcarry forwardし、ADR-0016のApp限定unsigned single-file EXE、login導線、matrix v2を追加する。
-- current READMEと利用者文書は公開`v0.8.1`のZIPと、UNRELEASED `0.8.4`候補の将来EXE主導線／ZIP代替を明確に分離する。
+- 要求v4.6はv4.5の業務契約、ADR-0015のZIP／development MSIX境界、ADR-0016のApp限定unsigned single-file EXE、login導線、matrix v2を維持し、UI簡素化・明示設定保存／適用／出力先復元を追加する。
+- current READMEと利用者文書は公開`v0.8.1`のZIPと、UNRELEASED `0.8.5`候補の将来EXE主導線／ZIP代替を明確に分離する。0.8.4のT28画像生成履歴とF02の現在ソース版を混同しない。
+- T01の未実装・NOT_RUNは当時の履歴。T01〜T38はREVIEWED、実装と記録済み局所試験はVERIFIED_SCOPED。T35の対象文書試験4/4成功・レビュー済みとT36の21/21は別scopeで、それぞれのTRXへ接続する。C-045〜047のBLOCKEDはT39追加native FAIL／人手未実施等のためで、T36待ちを理由にしない。T28の216/216に8画像の生成・2回一致が含まれてもnative・実保存を成功扱いにしない。F01はREVIEWED、親担当は0.8.5へPATCH済み。F02最終再検証は実行記録の最新欄で確認し、T39をBLOCKEDのまま進める指示をG4・全タスクDONE・公開成功へ読み替えない。
 - single-file／ZIP package testsはそれぞれの実成果物とsidecarを検証し、development MSIXは`PASS_MECHANISM`として非公開に分離する。
 - 開発hostのP06／P07、fake login、CLI helpをfresh OSのCH-01〜06や本人login成功へ読み替えず、新EXEを公開済みと記載しない。
 - development MSIX、macOS、installer、code signing、notarization、SmartScreen／Gatekeeper結果を対応済みまたはpublic assetと記載しない。
@@ -939,7 +979,7 @@ screenshot oracle:
 - 生成手順、fake authentication/row/AI/checkpoint/output境界、synthetic provenanceを`images/README.md`へ記録する。
 - `DocumentationContractTests`で`images/README.md`の存在、synthetic data、fake authentication/row/AI/checkpoint/output境界、各正式PNGの列挙を検証する。
 - captureにprivate path、real answer、credential、実在個人情報がない。
-- current UIのInput、mapping、Knowledge、Custom Prompt、Execution、Results、output journeyと一致する。
+- current UIのInput、mapping、Knowledge、Custom Prompt、Execution、Results、output journey、設定の8画像と説明が一致する。0.8.4での生成履歴を0.8.5での再生成・実保存の証拠へ読み替えない。
 - mockupや過去UI画像を実画面証跡として扱わない。
 
 read-onlyでdocument inventory、local link、claim文字列、script/package entry contract、image metadata/provenanceを検査します。1箇所でも現在対応と誤読できるclaim、broken link、実装との不一致、provenance不足があればFAILです。
@@ -950,7 +990,7 @@ read-onlyでdocument inventory、local link、claim文字列、script/package en
 ### ST-UC-17: 10人fixture new→interrupt→resume E2E
 
 ```text
-あなたはStudyReport Evaluator v4.5の10人synthetic durable E2Eシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6の10人synthetic durable E2Eシステムテスト担当者です。
 Test ID: ST-UC-17
 Requirement: supplemental deterministic scenario / AC-009〜AC-016 / AC-019
 
@@ -1003,7 +1043,7 @@ Requirement: supplemental deterministic scenario / AC-009〜AC-016 / AC-019
 ### ST-UC-18: Fixed-seed 531-row synthetic new/resume E2E
 
 ```text
-あなたはStudyReport Evaluator v4.5の531-row fixed-seed synthetic E2Eシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6の531-row fixed-seed synthetic E2Eシステムテスト担当者です。
 Test ID: ST-UC-18
 Requirement: TR-23 / AC-009〜AC-016 / AC-019
 
@@ -1052,7 +1092,7 @@ fixture／definition:
 ### ST-UC-19: Canonical SampleReport no-network technical durable E2E
 
 ```text
-あなたはStudyReport Evaluator v4.5のcanonical SampleReport technical durable E2Eシステムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のcanonical SampleReport technical durable E2Eシステムテスト担当者です。
 Test ID: ST-UC-19
 Requirement: real-data technical E2E / AC-009〜AC-016 / AC-019
 
@@ -1070,8 +1110,8 @@ Requirement: real-data technical E2E / AC-009〜AC-016 / AC-019
 8. evidenceはrepository外の一意なdirectoryへ保存します。
 
 正本:
-- `docs/requirements-definition.md` v4.5
-- `SystemTest-prompt.md` v4.5
+- `docs/requirements-definition.md` v4.6
+- `SystemTest-prompt.md` v4.6
 - `docs/getting-started.md`
 - `docs/privacy-and-data-handling.md`
 - `tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs`
@@ -1153,8 +1193,8 @@ technical oracle:
 19. external recalculation statusはadvisoryとしてrequired pathから分離する。
 
 evidence整合性:
-- JSONのsource requirements=`docs/requirements-definition.md v4.5`、system_test_prompt=`SystemTest-prompt.md v4.5`。
-- driver固定run IDを今回のunique external run IDと誤認せず、`NON_UNIQUE_DRIVER_RUN_ID`として記録する。
+- JSONのsource requirements=`docs/requirements-definition.md v4.6`、system_test_prompt=`SystemTest-prompt.md v4.6`。
+- driver固定run IDは履歴の識別値のまま維持し、その版・日付を現在の要求版・実行日時と誤認せず、`NON_UNIQUE_DRIVER_RUN_ID`として今回のunique external run IDと区別する。
 - runtime CLI identityがtest value／zero hashであるため、bundled production CLI検証済みと報告しない。
 - JSON privacy flagだけを信用せず、input absolute path、user profile path、16文字以上のworkbook文字列が完全一致で混入していないことを値非表示で再確認する。
 - TRXを共有privacy artifactとして扱わない。
@@ -1194,7 +1234,7 @@ Required technical E2Eは全technical oracleを今回確認した場合だけPAS
 ### ST-UC-20: Optional authenticated synthetic Copilot smoke
 
 ```text
-あなたはStudyReport Evaluator v4.5のoptional authenticated synthetic Copilot smoke担当者です。
+あなたはStudyReport Evaluator v4.6のoptional authenticated synthetic Copilot smoke担当者です。
 Test ID: ST-UC-20
 Requirement: TR-24A advisory
 
@@ -1227,7 +1267,7 @@ PASSはsession/tool/schema/cleanupの1件のtechnical smoke成功だけを意味
 ### ST-UC-21: Optional external spreadsheet recalculation
 
 ```text
-あなたはStudyReport Evaluator v4.5のoptional external spreadsheet recalculation smoke担当者です。
+あなたはStudyReport Evaluator v4.6のoptional external spreadsheet recalculation smoke担当者です。
 Test ID: ST-UC-21
 Requirement: TR-24B advisory
 
@@ -1262,7 +1302,7 @@ PASSは登録済みspreadsheet 1環境でsynthetic formulaが再計算された�
 ### ST-UC-22: Windows development MSIX mechanismと非公開境界
 
 ```text
-あなたはStudyReport Evaluator v4.5のWindows development MSIX mechanismテスト担当者です。
+あなたはStudyReport Evaluator v4.6のWindows development MSIX mechanismテスト担当者です。
 Test ID: ST-UC-22
 Requirement: TR-25 / AC-023 / AC-027
 
@@ -1285,7 +1325,7 @@ install／launch／upgrade／repair／uninstallは現版のrequired scopeでは�
 ### ST-UC-23: macOS source foundation static contract
 
 ```text
-あなたはStudyReport Evaluator v4.5のmacOS source foundationテスト担当者です。
+あなたはStudyReport Evaluator v4.6のmacOS source foundationテスト担当者です。
 Test ID: ST-UC-23
 Requirement: TR-26 / AC-024
 
@@ -1304,7 +1344,7 @@ Requirement: TR-26 / AC-024
 ### ST-UC-24: macOS future trust order static contract
 
 ```text
-あなたはStudyReport Evaluator v4.5のmacOS future trust order contractテスト担当者です。
+あなたはStudyReport Evaluator v4.6のmacOS future trust order contractテスト担当者です。
 Test ID: ST-UC-24
 Requirement: TR-27 / AC-025
 
@@ -1324,7 +1364,7 @@ Requirement: TR-27 / AC-025
 ### ST-UC-25: Windows ZIP E2Eとrelease matrix
 
 ```text
-あなたはStudyReport Evaluator v4.5のdeterministic platform release gate担当者です。
+あなたはStudyReport Evaluator v4.6のdeterministic platform release gate担当者です。
 Test ID: ST-UC-25
 Requirement: TR-28 / TR-29 / AC-026 / AC-027 / AC-028
 
@@ -1346,7 +1386,7 @@ Requirement: TR-28 / TR-29 / AC-026 / AC-027 / AC-028
 ### ST-UC-26: clean-host単一EXE・同梱CLI状態確認・本人login・公開境界
 
 ```text
-あなたはStudyReport Evaluator v4.5のclean-host公開判定システムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のclean-host公開判定システムテスト担当者です。
 Test ID: ST-UC-26
 Requirement: TR-30 / TR-31 / TR-32 / TR-33 / AC-029 / AC-030 / AC-031 / AC-032 / AC-033 / AC-034
 
@@ -1394,4 +1434,126 @@ Requirement: TR-30 / TR-31 / TR-32 / TR-33 / AC-029 / AC-030 / AC-031 / AC-032 /
 報告順: Test ID / candidate identity binding / host前提(CH-01) / offline GUI(CH-02) / bundled CLI state(CH-03) / lifecycle invariants(CH-04) / MOTW-protection-operations(CH-05) / personal login-cancel-close(CH-06) / optional ADV status / metadata-only evidence / public 4 assets再照合 / Status / 差異 / 非保証事項。
 
 最後に、P06/P07はdevelopment-host試験でありV02 clean-host判定を代替しないこと、CH未実施はNOT_RUNのままであることを明記します。
+```
+
+### ST-UC-27: 共通＋定義1件の明示保存、atomic失敗、出力先復元
+
+```text
+あなたはStudyReport Evaluator v4.6の設定保存・復元システムテスト担当者です。
+Test ID: ST-UC-27
+Requirement: TR-34 / AC-035
+
+T01時点の未実装・NOT_RUNは履歴です。現在はApplicationSettings／SettingsFileStore、SettingsViewModel、ServiceRegistration、ExecutionViewModelの実装と直接testがあります。§6.1の局所証跡をこのPromptの今回PASSへ転記しません。捏造禁止。実利用者のsetting.txt・credential・canonical sampleを読み書きせず、合成dataと注入した一時absolute pathだけを使用します。production AI、実認証確認、本人login、branch、commit、公開を実行しません。E2Eの明示確認／実行はtest内のfake境界だけです。sourceや既存差分を変更、stash、reset、cleanしません。PowerShellはpwsh.exe -NoLogo -NoProfile、7+ Coreだけを使用します。
+
+準備:
+1. StudyReportEvaluator.slnxを上位探索してrootを確定し、要求§9.1／11.6とdev/docs/ui-layout-contract.mdを読みます。HEAD、status hash、UTC、Windows 11 x64、PowerShell、global.json選択SDKを記録します。
+2. 実在owner ApplicationSettingsTests／SettingsFileStoreTests（Tests/Settings）、SettingsViewModelTests／ExecutionSettingsTests／MainWindowTests（Tests/UI）、SettingsCompositionTests（Tests/Composition）、SettingsWorkflowSystemTests（Tests/E2E）のdiscoveryを確認します。直接anchorはSettingsFileStoreTests.Unicode_nested_definition_round_trip_preserves_every_field_order_and_canonical_hash／SettingsFileStoreTests.Exclusive_handle_refuses_read_and_replace_keeps_old_bytes_and_cleans_only_own_temp、SettingsViewModelTests.Save_freezes_values_before_notifications_blocks_duplicate_commands_and_keeps_new_edits_dirty、SettingsCompositionTests.Legacy_registration_constructors_never_resolve_or_read_user_settings、ExecutionSettingsTests.Output_override_survives_input_changes_and_restore_while_null_recomputes_resultです。Testsはtests/StudyReportEvaluator.App.Tests配下を指します。必要case未接続ならBLOCKEDとし、旧path testを代用しません。
+3. repository外の一意な一時directoryをstoreへ注入します。既定コンストラクターやproduction構成が実利用者pathへ触れる経路は使いません。単一runnerで必要なlocked restore／Release build後、対象testを名前指定し、今回のcase・件数を記録します。
+
+保存oracle:
+- UTF-8 JSON、schema整数1、共通設定＋任意の採点定義1件。通常model希望ID、並列度1〜3（既定1）、absolute出力override／nullを保持する。
+- fileなしで既定値を使い、最初の明示保存までfileを作らない。読込完了前に未読定義を空で上書きせず、入力未読込で共通設定だけ保存しても読込済み保存定義を保つ。
+- 有効編集・主列変更・遷移・終了だけではdiskを書かない。定義ID、順序、decimal、Unicode、改行、brace、Prompt、canonical hashは保存→別storeの読込で一致する。
+- BOMあり／なしを受理する。schema欠損／不正型／未知版、同schema未知項目、不正enum／範囲／Prompt／配点は安全に拒否する。
+- 保存時点を固定し同directoryの一意tempへwrite／flush／close後にatomic置換。旧file先行削除・直接切り詰めなし。同一画面二重保存なし、別processは最後に成功した保存が残る。
+- 保存中再編集した現在draftは保存成功後も未保存。失敗時は旧fileと現在draftを保持し、保存失敗を表示、自分のtempだけを後始末する。
+- 破損・未知版・読込拒否でもfileを保持し通知してoffline継続。自動修復・削除なし。
+
+単一原因のIO拒否:
+- 一時既存fileをFileShare.None等で保持した読込／置換拒否、親directory予定pathが通常fileである作成失敗等を使い、実際の失敗を確認する。WindowsのReadOnlyディレクトリだけをアクセス拒否の根拠にしない。
+- handle／属性はfinallyで戻し、解放後に旧bytes／hashを比較する。無関係なfolderやcredentialをcleanupしない。
+
+実証範囲の分離:
+- SettingsFileStoreTests.Save_uses_the_supplied_record_and_last_successful_save_wins_across_store_instancesは同processの別storeによる順次保存です。別process同時保存・電源断・network filesystemの実測成功とは書きません。
+- SettingsWorkflowSystemTests.Saved_output_preference_survives_new_instances_and_input_change_before_real_final_outputは明示先／nullの2ケースで、新store／VMへの復元と入力変更後の実finalを扱います。別process再起動やnative操作とは区別します。
+- 最新の表示修正はMainWindowTests.Initial_input_common_settings_preview_does_not_configure_execution／Common_settings_after_input_replacement_preserves_configuration_and_overrideで確認します。Settingsへ移動した時の実効先を確認し、表示更新だけでExecutionを再構成・保存・認証しません。
+
+平文・非保存oracle:
+- 合成header由来の設問textと利用者貼付相当の合成Promptは、定義の明示保存時に平文で含まれる。主列変更だけの自動保存はない。
+- 入力xlsx path／bytes、回答行の自動コピー、AI結果／reason／evidence／参照回答、run／checkpoint、credential／login／CLI hash、未適用Prompt一覧、選択ID／ページ／履歴を保存しない。
+- log・共有evidenceには本文やprivate pathを含めず、canaryの値ではなく存在／不在とhashだけを報告する。暗号化済みとは主張しない。
+
+出力先oracle（D20）:
+- 今回の明示編集 → 保存済み明示指定 → null。nullのときだけ入力A隣接result、入力Bへ変更後はB隣接resultを算出する。自動算出値を明示指定として保存しない。
+- 明示absolute pathを保存→再起動相当読込→入力Bでも同じ指定先。主画面の実効先が一致する。
+- 空欄はnullへの明示変更として古い保存値より優先し、明示保存・再読込後も既定へ戻る。
+- 利用不可指定はno fallbackで修正を要求し、復元だけでdirectoryを作らない。checkpointの既存予約pathを変更しない。
+
+全必須caseの今回実測一致だけをPASS、不一致をFAIL、実装・観測手段不足をBLOCKEDとします。未実施はNOT_RUNのままで、過去PASSや要求承認を根拠にしません。
+報告順: Test ID / source・環境 / test実在・前提 / case別期待・実測 / 保存・復元・IO拒否 / 旧file・draft保持 / privacy・cleanup / 証跡hash / Status / 未確認点。
+```
+
+### ST-UC-28: 保存定義の明示適用と失敗・取消時の無変更
+
+```text
+あなたはStudyReport Evaluator v4.6の保存定義明示適用システムテスト担当者です。
+Test ID: ST-UC-28
+Requirement: TR-35 / AC-036
+
+T01の未実装・NOT_RUNは履歴で、現在はInputViewModel.ApplySavedDefinitionAsync、SettingsViewModel.ApplySavedDefinitionAsyncと親shellの同期を実装済みです。既存局所証跡は§6.1と分離し、今回結果を捏造しません。合成workbookと一時pathの設定storeだけを使い、実利用者設定・canonical sample・credentialへ触れません。sourceを変更、stash、reset、clean、commitせず、production AI／実認証確認／本人login／公開を実行しません。E2Eの明示確認／実行はfake境界だけです。本文、Prompt、header、private pathをlogやreportへ出しません。PowerShellはpwsh.exe -NoLogo -NoProfile、7+ Coreだけを使います。
+
+準備:
+1. StudyReportEvaluator.slnxを上位探索してrootを確定し、要求§11.7とdev/docs/ui-layout-contract.mdを確認します。HEAD、status hash、UTC、Windows 11 x64、PowerShell、global.json SDKを記録します。
+2. SavedDefinitionApplicationTests／SettingsViewModelTests／SettingsViewTests／MainWindowTests／WorkflowStateTests（tests/StudyReportEvaluator.App.Tests/UI）とSettingsWorkflowSystemTests（同E2E）のdiscoveryを確認します。直接anchorはSavedDefinitionApplicationTests.Application_reloads_the_saved_header_and_preserves_ids_order_prompts_points_and_canonical_content／Mapping_failures_preserve_all_loaded_state_without_sheet_column_or_row_fallback、SettingsViewModelTests.Explicit_apply_updates_both_editors_on_success_and_preserves_instances_and_imported_prompts、MainWindowTests.Failed_saved_definition_apply_preserves_divergent_drafts_and_latest_preview、SettingsWorkflowSystemTests.Saved_definition_admission_rejects_missing_sheet_without_mutation_then_accepts_the_matching_inputです。存在しないcaseはBLOCKEDとし、旧mapping試験だけでPASSにしません。
+3. 単一runnerで必要なlocked restore／Release build後に対象testを名前指定します。fixtureのinput／settings hashとメモリ内metadata／draft／Design／Imported Promptの比較基点を取得します。本文は報告しません。
+
+単一原因caseとoracle:
+- 起動時の保存定義は保持だけ。入力未読込では適用できず、Excel読込後も明示操作前はInput／Designを変更しない。
+- 保存済みsheet・header・行範囲・mapping・設問数を表示し、明示適用時に保存headerのmetadataをread-only loaderで取得する。異なるheaderの古いmetadataを流用しない。
+- 同入力／別headerで全定義を検証し、成功時だけInput metadata・選択値・draftとDesignを一緒に更新する。
+- sheet欠落、列欠落、行範囲不一致、invalid定義、取消の各caseで現在状態と保存fileを変更しない。先に一部を適用してから失敗する状態を残さない。
+- 成功時のID・順序・設問text・Prompt・配点・canonical hashが保存定義と一致する。候補再生成でIDを変えたり、別header textで黙って置換したりしない。
+- 適用後の利用者による主回答列変更は従来どおり交差セルtextへ同期する。空header・metadata不一致の既存検証も維持する。
+- --promptの取込一覧・本文・順序を変更／消去せず、未適用Promptを定義へcopyしない。
+- run中の一括適用は禁止して理由を表示し、現在request／snapshot／checkpointを変えない。適用で認証確認・login・AI送信を発生させない。
+- sheet／列の存在だけを授業内容の意味的一致としない。resumeは既存checkpoint admissionで判断し、不一致checkpointを変更しない。
+
+全必須case一致だけをPASS、不一致をFAIL、実装・test・前提不足をBLOCKEDとします。未実施はNOT_RUNです。
+報告順: Test ID / source・環境 / test実在 / case / metadata・ID・hash比較（本文なし） / 失敗・取消無変更 / Imported Prompt保持 / AI等call count / input・file不変 / 証跡 / Status / 未確認点。
+```
+
+### ST-UC-29: 設定往復、model希望、現在run不変とdeterministic設定E2E
+
+```text
+あなたはStudyReport Evaluator v4.6の設定・workflow結合システムテスト担当者です。
+Test ID: ST-UC-29
+Requirement: TR-36 / AC-016 / AC-017 / AC-018 / AC-019 / AC-035 / AC-036 / AC-037
+
+T01の未実装・NOT_RUNは履歴で、現在はMainWindow／SettingsView、既存Input／Design／Execution／ResultsとSettingsViewModelによる往復・固定requestの実装があります。§6.1の既存局所検証を今回PASSへ転記しません。捏造禁止。合成workbook、一時absolute pathの設定store、fake認証／AI／制御runだけを使います。実利用者setting.txt・credential・実学生dataを使わず、本人login・Live AI・外部spreadsheetを実行しません。sourceや既存変更を修正、stash、reset、clean、commitせず、branchや公開操作を行いません。PowerShellはpwsh.exe -NoLogo -NoProfile、7+ Coreだけを使い、本文・private pathを報告しません。
+
+準備:
+1. StudyReportEvaluator.slnxを上位探索し、要求§9.1／11.4〜11.8／12.2とdev/docs/ui-layout-contract.mdを読みます。HEAD、status hash、UTC、Windows 11 x64、PowerShell、global.json SDKを記録します。
+2. MainWindowSettingsTests／MainWindowTests／SettingsViewModelTests／SettingsViewTests／WorkflowStateTests／ExecutionSettingsTests／ResultsPresentationTests（tests/StudyReportEvaluator.App.Tests/UI）とSettingsWorkflowSystemTests（同E2E）のdiscoveryを確認します。headless往復の直接anchorはWorkflowStateTests.Shell_round_trip_saves_the_latest_mapping_or_evaluator_edit／Deferred_run_uses_captured_request_and_delivers_results_without_closing_edited_settings／Next_draft_changes_neither_previous_result_values_nor_the_last_export_request、固定runはMainWindowSettingsTests.Active_run_progress_and_stop_are_fixed_in_all_five_viewsです。最新競合回帰はMainWindowTests.Input_replacement_during_reload_publishes_only_coherent_execution_stateへ接続します。必要testなしはBLOCKEDとし、既存E2EのPASSで代用しません。
+3. 単一runnerで必要なlocked restore／Release build後、対象testを名前指定します。現在runと次回draftを別々に観測できるfake boundaryを使い、実利用者保存先には構成しません。
+
+往復oracle:
+- Input→Design→Settings→Input→Executionとカテゴリ間の交互編集→保存で、最新draftを1回同期し、古いDesign参照で上書きしない。
+- 設定は4ステップ外の独立内容で、5カテゴリと共通内のDesign定義情報を扱う。対象を保ち1操作で開き、値・対象ID・ページ・カテゴリ・入力途中のtextを保持して元位置へ戻る。
+- 同じ入力／定義の往復は新規／再開、partial、進捗、直前runを初期化しない。入力／定義変更時だけ再開指定を再確認または解除し理由を示す。新規／再開・partialは設定fileへ保存しない。
+- 保存希望modelあり／なし／欠落、明示確認失敗、auto欠落を別caseにする。希望IDは明示確認の候補にある場合だけ実効選択とし、不在は未選択でno fallback。確認失敗だけで保存希望を消さない。希望なし初回の従来選択とauto検証を分離する。
+- 遷移、Prompt適用、設定読込／保存／適用、login完了から認証確認／login／runのcall countは0。明示開始だけが検証済み有効値でrequestを作る。
+
+現在run／前回結果oracle:
+- 実行中の前工程・設定編集は次回用で、現在request／immutable snapshot／予約pathを変更しない。保存定義の一括適用は禁止する。
+- 全画面で進捗入口・停止を使い、取消後は新規送信なし、既存checkpointを保持する。設定中に完了しても通知だけで強制移動しない。
+- 対象数・配点exact合計・実効値、予定名／予約済み／保存中／完成、未保存／保存済みを実データから区別し、経過時間だけで進捗・scoreを作らない。
+- 前回結果を次回draftへ混ぜず、一覧ページ移動後も元Results collectionのoverrideを保持する。0とblank、完成版と未保存修正版、別名出力済みを区別し、元finalを上書きしない。
+
+deterministic E2E:
+1. 共通設定と有効な定義を明示保存し、新VM／storeで再読込します。設定復元だけでinput／final／partialやoutput directoryを作成しません。
+2. 合成Excelをread-onlyで読み、保存定義を明示適用してID／canonical hashを比較します。明示出力先ありとnullを別caseにします。
+3. SettingsWorkflowSystemTestsのtest専用adapterで認証・model／runtime identity・AI応答・時刻だけを合成にし、実durable orchestrator→実checkpoint→中断→新instanceで再開→実final／別名override出力を実行します。既存identity admission、参照回答再利用、完了行AIのskip、元本不変、exact100、zero／blank、formula／cached previewを既存独立oracleで確認します。RunSummary／writer成功receiptだけのfakeをこの実file経路へ代用しません。
+4. 未適用Prompt一覧・本文・順序と現在snapshotが保存／適用／往復で壊れないことを確認します。今回の一時fileだけをcleanupします。
+
+実file E2Eの直接anchor（SettingsWorkflowSystemTests、4合成回答行、6メソッド・7ケース）:
+- Saved_output_preference_survives_new_instances_and_input_change_before_real_final_output（明示出力先／nullの2ケース）
+- Saved_definition_admission_rejects_missing_sheet_without_mutation_then_accepts_the_matching_input
+- Cancel_saves_a_real_partial_and_new_instances_resume_without_repeating_completed_AI_or_reference
+- Override_exports_a_separate_real_workbook_using_the_run_snapshot_not_next_settings
+- Real_final_and_preview_distinguish_missing_answer_numeric_zero_and_technical_failure
+- Real_atomic_final_validation_rejects_a_corrupted_cached_score_and_does_not_publish_it
+後5メソッドは各1ケースです。既存74件と最新216件への収録は過去実行の記録であり、今回のdiscovery・outcomeを別に確認します。WorkflowStateTestsのrun／outputはfake receiptで、Imported Prompt保持等のheadless／VM試験を担当します。T27の新instance復元を別process再起動・native操作とせず、既存530行E2Eも置き換えません。
+
+layout／keyboardはST-UC-12、store障害はST-UC-27、明示適用の失敗はST-UC-28の今回結果へ個別接続し、未実施をまとめてPASSにしません。0.8.4のT39追加nativeは部分観測でFAIL、Narrator・本人walkthrough・隔離利用者native保存はNOT_RUN_EXTERNAL_PREREQUISITEという別scopeの記録を保持し、headless/fake成功で代替しません。本人walkthrough4項目は入力／30・10配点、設定保存と復帰、再起動・明示適用、override未保存の識別です。全必須caseの今回一致だけをdeterministic scopeのPASS、不一致をFAIL、実装・test・前提不足をBLOCKEDとします。
+報告順: Test ID / source・環境 / test実在 / 往復・model case / request・snapshot不変 / call count / 前回結果・override / save-read-apply-fake-run-resume結果 / input・privacy・cleanup / scope別Status / 未確認点。
 ```

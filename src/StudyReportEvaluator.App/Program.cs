@@ -14,9 +14,7 @@ public static class Program
     }
 
     public static AppBuilder BuildAvaloniaApp() =>
-        AppBuilder.Configure<App>()
-            .UsePlatformDetect()
-            .LogToTrace();
+        BuildAvaloniaApp(LaunchStartupState.Empty);
 
     public static AppBuilder BuildAvaloniaApp(LaunchStartupState startup)
     {

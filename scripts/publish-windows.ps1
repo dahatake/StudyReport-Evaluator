@@ -637,6 +637,8 @@ function Get-SingleFileDocumentationPaths {
         'docs/prompt-launch.md',
         'docs/privacy-and-data-handling.md',
         'docs/troubleshooting.md',
+        'docs/settings.md',
+        'docs/third-party-notices.md',
         'images/README.md',
         'images/01-input-workbook.png',
         'images/02-input-mapping.png',
@@ -644,7 +646,8 @@ function Get-SingleFileDocumentationPaths {
         'images/04-design-custom-prompt.png',
         'images/05-execution-auto.png',
         'images/06-results-review.png',
-        'images/07-output-export.png'
+        'images/07-output-export.png',
+        'images/08-settings.png'
     )
 }
 
@@ -729,6 +732,7 @@ function Assert-SafePublishLayout {
 
             if ($forbiddenExtensions.Contains([System.IO.Path]::GetExtension($item.Name)) -or
                 $item.Name -ieq '.env' -or
+                $item.Name -ieq 'setting.txt' -or
                 [System.Text.RegularExpressions.Regex]::IsMatch(
                     $item.Name,
                     '(^|[._-])(secret|password|credential|token)([._-]|$)',

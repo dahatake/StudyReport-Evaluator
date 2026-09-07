@@ -12,7 +12,7 @@ public enum WorkflowStep
 
 public enum WorkflowStepState
 {
-    Completed,
+    Visited,
     Current,
     Upcoming,
 }
@@ -61,10 +61,10 @@ public sealed class WorkflowNavigator
     public WorkflowStepState GetState(WorkflowStep step)
     {
         int index = IndexOf(step);
-        return index < currentIndex
-            ? WorkflowStepState.Completed
-            : index == currentIndex
+        return index == currentIndex
                 ? WorkflowStepState.Current
+                : index <= furthestReachedIndex
+                    ? WorkflowStepState.Visited
                 : WorkflowStepState.Upcoming;
     }
 

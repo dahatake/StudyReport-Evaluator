@@ -34,10 +34,12 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
     [
         "README.md", "LICENSE", "docs/README.md", "docs/getting-started.md",
         "docs/features.md", "docs/custom-evaluator-guide.md", "docs/prompt-launch.md",
-        "docs/privacy-and-data-handling.md", "docs/troubleshooting.md", "images/README.md",
+        "docs/privacy-and-data-handling.md", "docs/troubleshooting.md",
+        "docs/settings.md", "docs/third-party-notices.md", "images/README.md",
         "images/01-input-workbook.png", "images/02-input-mapping.png",
         "images/03-design-knowledge.png", "images/04-design-custom-prompt.png",
         "images/05-execution-auto.png", "images/06-results-review.png", "images/07-output-export.png",
+        "images/08-settings.png",
     ];
 
     // Import ONLY these already-tested P02 validators, never the script's entry point/launcher.
@@ -155,8 +157,8 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
             "--prompt", Path.GetRelativePath(run.WorkingDirectory, Path.Combine(run.DataDirectory, FirstPromptName)),
             "--prompt", Path.GetRelativePath(run.WorkingDirectory, Path.Combine(run.DataDirectory, SecondPromptName)));
 
-        // UIA reads InputFilePath, loaded sheet metadata, Design list order and both previews.
-        // It never invokes login, status checking, Prompt application or evaluation.
+        // UIA reads InputFilePath and loaded metadata, then Design -> Settings list order and both previews.
+        // It returns to Design without login, authentication checks, Prompt application, saving or evaluation.
         await run.ObserveAsync(app, withPrompts: true);
         await run.CloseAsync(app);
     }
@@ -437,7 +439,11 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
                 }
                 $expectedDocs = @({{string.Join(",", DocumentationFiles.Select(Quote))}})
                 $actualDocs = @(Get-SingleFileDocumentationPaths)
-                if ($actualDocs.Count -ne $expectedDocs.Count) { throw 'P01 public documentation allowlist changed.' }
+                $actualDocSet = [Collections.Generic.HashSet[string]]::new([string[]]$actualDocs, [StringComparer]::Ordinal)
+                if ($expectedDocs.Count -ne 20 -or $actualDocs.Count -ne 20 -or $actualDocSet.Count -ne 20 -or
+                    -not $actualDocSet.SetEquals([string[]]$expectedDocs)) {
+                    throw 'P01 public documentation allowlist must contain exactly the 20 approved paths without duplicates.'
+                }
                 foreach ($relative in $expectedDocs) {
                     if ($relative -cnotin $actualDocs -or
                         (Get-Sha256Hex -Path (Join-Path $base $relative)) -cne
@@ -454,10 +460,10 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
                     if ($appProcess.HasExited -or $appProcess.MainWindowHandle -eq [IntPtr]::Zero) { throw 'P06 GUI is not alive.' }
                     $window = [Windows.Automation.AutomationElement]::FromHandle($appProcess.MainWindowHandle)
                     if ($window.Current.ProcessId -ne {{app.Process.Id}}) { throw 'UIA window belongs to another process.' }
-                    function Find-Control([string] $Id) {
+                    function Find-Control([string] $Id, [Windows.Automation.AutomationElement] $Root = $window) {
                         $condition = [Windows.Automation.PropertyCondition]::new(
                             [Windows.Automation.AutomationElement]::AutomationIdProperty, $Id)
-                        $control = $window.FindFirst([Windows.Automation.TreeScope]::Descendants, $condition)
+                        $control = $Root.FindFirst([Windows.Automation.TreeScope]::Descendants, $condition)
                         if ($null -eq $control) { throw "Required UIA control was not found: $Id" }
                         return $control
                     }
@@ -475,12 +481,13 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
                         throw 'UIA InputFilePath does not match the launch cwd (no path values logged).'
                     }
                     if ({{(withPrompts ? "$true" : "$false")}}) {
-                        # This metadata exists only after the real workbook read, not just argv prefill.
-                        $metadataCondition = [Windows.Automation.PropertyCondition]::new(
-                            [Windows.Automation.AutomationElement]::NameProperty, '1 sheets · 5 package parts')
+                        # InputView now puts StatusText in Name and WorkbookSummary in ToolTip/HelpText.
+                        # Require both the completed read/snapshot and the exact metadata, not argv prefill.
                         $loadDeadline = [Diagnostics.Stopwatch]::StartNew()
                         do {
-                            $metadataLoaded = $null -ne $window.FindFirst([Windows.Automation.TreeScope]::Descendants, $metadataCondition)
+                            $loadStatus = (Find-Control 'InputLoadStatus').Current
+                            $metadataLoaded = $loadStatus.Name -ceq 'read-only 読込と入力 snapshot の取得が完了しました。' -and
+                                $loadStatus.HelpText -ceq '1 sheets · 5 package parts'
                             $headerReady = (Find-Control 'RefreshInputHeader').Current.IsEnabled
                             if ($metadataLoaded -and $headerReady) { break }
                             if ($loadDeadline.Elapsed.TotalSeconds -ge 10) {
@@ -504,11 +511,22 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
                         $design = Find-Control 'WorkflowStepDesign'
                         ([Windows.Automation.InvokePattern]$design.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)).Invoke()
                         Assert-GuiStillLive
-                        $list = Find-Control 'ImportedPrompts'
+                        $designStepName = (Find-Control 'WorkflowStepDesign').Current.Name
+                        $openPrompts = Find-Control 'DesignOpenImportedPrompts'
+                        if ($openPrompts.Current.ControlType -ne [Windows.Automation.ControlType]::Button -or
+                            $openPrompts.Current.Name -cne '同じ設問を対象に読込Promptの設定を開く' -or
+                            -not $openPrompts.Current.IsEnabled) {
+                            throw 'Design did not expose the labelled, enabled imported-Prompt settings button.'
+                        }
+                        ([Windows.Automation.InvokePattern]$openPrompts.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)).Invoke()
+                        Assert-GuiStillLive
+                        $settings = Find-Control 'SettingsView'
+                        $promptSettings = Find-Control 'ImportedPromptSettingsView' $settings
+                        $list = Find-Control 'ImportedPrompts' $promptSettings
                         $condition = [Windows.Automation.PropertyCondition]::new(
                             [Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::ListItem)
                         $items = @($list.FindAll([Windows.Automation.TreeScope]::Descendants, $condition))
-                        if ($items.Count -ne 2) { throw 'Design did not expose exactly two imported Prompt items.' }
+                        if ($items.Count -ne 2) { throw 'Settings did not expose exactly two imported Prompt items.' }
                         $names = @({{Quote(FirstPromptName)}}, {{Quote(SecondPromptName)}})
                         $contents = @({{Quote(FirstPrompt)}}, {{Quote(SecondPrompt)}})
                         $textCondition = [Windows.Automation.PropertyCondition]::new(
@@ -516,14 +534,25 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
                         for ($index = 0; $index -lt 2; $index++) {
                             $text = $items[$index].FindFirst([Windows.Automation.TreeScope]::Descendants, $textCondition)
                             if ($null -eq $text -or $text.Current.Name -cne $names[$index]) {
-                                throw "Actual Design Prompt order mismatch at index $index."
+                                throw "Actual Settings Prompt order mismatch at index $index."
                             }
                             ([Windows.Automation.SelectionItemPattern]$items[$index].GetCurrentPattern(
                                 [Windows.Automation.SelectionItemPattern]::Pattern)).Select()
                             Assert-GuiStillLive
-                            if ((Read-Value (Find-Control 'ImportedPromptPreview')) -cne $contents[$index]) {
-                                throw "Actual Design Prompt preview mismatch at index $index (content not logged)."
+                            $preview = Find-Control 'ImportedPromptPreview' $promptSettings
+                            if ((Read-Value $preview) -cne $contents[$index]) {
+                                throw "Actual Settings Prompt preview mismatch at index $index (content not logged)."
                             }
+                        }
+                        $back = Find-Control 'SettingsRequestClose' $settings
+                        if ($back.Current.Name -cne '設定から元のステップへ戻る' -or -not $back.Current.IsEnabled) {
+                            throw 'Settings did not expose the labelled return-to-step button.'
+                        }
+                        ([Windows.Automation.InvokePattern]$back.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)).Invoke()
+                        Assert-GuiStillLive
+                        [void](Find-Control 'QuantificationDesignView')
+                        if ((Find-Control 'WorkflowStepDesign').Current.Name -cne $designStepName) {
+                            throw 'Closing Settings did not preserve the original Design step.'
                         }
                     }
                     Assert-NoStartupChildProcesses -ProcessId {{app.Process.Id}}

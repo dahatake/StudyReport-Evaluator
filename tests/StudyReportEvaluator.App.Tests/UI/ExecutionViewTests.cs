@@ -1,9 +1,12 @@
 using System.Collections.Immutable;
+using System.ComponentModel;
 using System.Globalization;
+using System.Reflection;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Data;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -11,6 +14,8 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using StudyReportEvaluator.App.Copilot;
+using StudyReportEvaluator.App.Navigation;
+using StudyReportEvaluator.App.Settings;
 using StudyReportEvaluator.App.Tests.Workflow;
 using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.App.ViewModels;
@@ -39,7 +44,7 @@ public sealed class ExecutionViewTests
         RecordingAuthenticationBoundary authentication = new(
             new ExecutionAuthenticationSnapshot(
                 ExecutionAuthenticationState.Available,
-                [U04TestSupport.Model("model-a"), U04TestSupport.Model("model-b"), U04TestSupport.Model("model-a")],
+                [U04TestSupport.Model("model-a"), U04TestSupport.Model("model-b"), U04TestSupport.Model("model-a"), U04TestSupport.Model("auto")],
                 identity));
         RecordingRunBoundary runner = new((request, progress, _) =>
         {
@@ -71,7 +76,8 @@ public sealed class ExecutionViewTests
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(ExecutionAuthenticationState.Available, viewModel.AuthenticationState);
-        Assert.Equal(["model-a", "model-b"], viewModel.AvailableModelIds);
+        Assert.Equal(["model-a", "model-b", "auto"], viewModel.AvailableModelIds);
+        Assert.True(viewModel.IsAutoModelAvailable);
         Assert.Equal("model-a", viewModel.SelectedModelId);
         Assert.Contains("1.0.82", viewModel.RuntimeIdentityText, StringComparison.Ordinal);
         Assert.Contains(identity.CliSha256[..12], viewModel.RuntimeIdentityText, StringComparison.Ordinal);
@@ -220,6 +226,8 @@ public sealed class ExecutionViewTests
 
         Assert.Equal(state, viewModel.AuthenticationState);
         Assert.False(viewModel.CanStart);
+        Assert.DoesNotContain("開始できます", viewModel.ValidationSummary, StringComparison.Ordinal);
+        Assert.False(viewModel.HasCurrentRun);
         Assert.Empty(viewModel.AvailableModelIds);
         if (expectedErrorCode is not null)
         {
@@ -254,6 +262,52 @@ public sealed class ExecutionViewTests
         Assert.DoesNotContain(exceptionCanary, failure.ToString(), StringComparison.Ordinal);
         Assert.Null(viewModel.LastRunContext);
         Assert.False(viewModel.CanStart);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Definition_weight_errors_preserve_node_ids_and_paths_without_exposing_contents(bool duplicateIds)
+    {
+        QuantificationDefinition definition = DefinitionWithTwoWeightErrors(duplicateIds);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RecordingRunBoundary runner = new((_, _, _) => throw new InvalidOperationException("must not run"));
+        using ExecutionViewModel viewModel = U04TestSupport.ConfiguredExecutionViewModel(definition, metadata, runner);
+        await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+
+        ExecutionTechnicalError[] errors = viewModel.TechnicalErrors
+            .Where(error => error.Code == "WEIGHT_MUST_BE_POSITIVE").ToArray();
+        Assert.Equal(2, errors.Length);
+        Assert.Equal(new[] { "C1", duplicateIds ? "C1" : "C2" }, errors.Select(error => error.NodeId));
+        Assert.Equal(new[]
+        {
+            "$.questions[0].evaluators[0].criteria[0]",
+            "$.questions[0].evaluators[0].criteria[1]",
+        }, errors.Select(error => error.Path));
+        Assert.All(errors, error =>
+        {
+            Assert.Equal("Weight", error.Field);
+            Assert.Contains(error.NodeId!, error.TargetText, StringComparison.Ordinal);
+            Assert.Contains(error.Path!, error.TargetText, StringComparison.Ordinal);
+            Assert.Contains(error.TargetText, error.AccessibleText, StringComparison.Ordinal);
+            Assert.DoesNotContain(error.NodeId!, error.ToString(), StringComparison.Ordinal);
+            Assert.DoesNotContain(error.Path!, error.ToString(), StringComparison.Ordinal);
+        });
+        Assert.Equal(duplicateIds ? 3 : 2, viewModel.TechnicalErrors.Count);
+        Assert.All(viewModel.TechnicalErrors, error =>
+        {
+            string presentation = string.Join('\n', error.Message, error.TargetText, error.AccessibleText, error.ToString());
+            Assert.DoesNotContain(TechnicalPromptCanary, presentation, StringComparison.Ordinal);
+            Assert.DoesNotContain(TechnicalBodyCanary, presentation, StringComparison.Ordinal);
+            Assert.DoesNotContain(TechnicalNameCanary, presentation, StringComparison.Ordinal);
+        });
+        Assert.False(viewModel.CanStart);
+        Assert.False(viewModel.StartCommand.CanExecute(null));
+        viewModel.StartCommand.Execute(null);
+        await viewModel.StartAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, runner.CallCount);
+        Assert.False(viewModel.HasCurrentRun);
+        Assert.Equal(2, viewModel.TechnicalErrors.Count(error => error.Code == "WEIGHT_MUST_BE_POSITIVE"));
     }
 
     [Fact]
@@ -316,7 +370,7 @@ public sealed class ExecutionViewTests
             new RecordingAuthenticationBoundary(
                 new ExecutionAuthenticationSnapshot(
                     ExecutionAuthenticationState.Available,
-                    [new CopilotModelAvailability("model-unknown", null, 128_000)],
+                    [new CopilotModelAvailability("model-unknown", null, 128_000), U04TestSupport.Model("auto")],
                     U04TestSupport.RuntimeIdentity())),
             runner);
         viewModel.Configure(
@@ -326,7 +380,8 @@ public sealed class ExecutionViewTests
 
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(["model-unknown"], viewModel.AvailableModelIds);
+        Assert.Equal(["model-unknown", "auto"], viewModel.AvailableModelIds);
+        Assert.True(viewModel.IsAutoModelAvailable);
         Assert.Equal("model-unknown", viewModel.SelectedModelId);
         Assert.Contains(
             viewModel.TechnicalErrors,
@@ -385,6 +440,85 @@ public sealed class ExecutionViewTests
     }
 
     [AvaloniaFact]
+    public async Task Checking_without_technical_errors_never_claims_start_and_notifies_the_bound_status()
+    {
+        TaskCompletionSource<ExecutionAuthenticationSnapshot> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        ExecutionAuthenticationSnapshot available = new(ExecutionAuthenticationState.Available,
+            [U04TestSupport.Model("model-a"), U04TestSupport.Model("auto")], U04TestSupport.RuntimeIdentity());
+        RecordingRunBoundary runner = new((_, _, _) => throw new InvalidOperationException("must not run"));
+        using ExecutionViewModel viewModel = new(new DeferredAuthenticationBoundary(completion.Task), runner);
+        QuantificationDefinition definition = U04TestSupport.Definition(2, 2);
+        viewModel.Configure(definition, U01TestSupport.ValidateMapping(definition).Metadata,
+            Path.Combine(Path.GetTempPath(), "T20-checking-input.xlsx"));
+        List<(bool CanStart, string Summary)> notifications = [];
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(ExecutionViewModel.ValidationSummary))
+            {
+                notifications.Add((viewModel.CanStart, viewModel.ValidationSummary));
+            }
+        };
+        ExecutionView view = new(viewModel);
+        Window window = new() { Width = 950, Height = 450, Content = view };
+        Task? checking = null;
+        try
+        {
+            window.Show();
+            Render();
+            checking = viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+            Render();
+
+            Assert.False(checking.IsCompleted);
+            Assert.True(viewModel.IsCheckingAuthentication);
+            Assert.Equal(ExecutionAuthenticationState.Checking, viewModel.AuthenticationState);
+            Assert.Empty(viewModel.TechnicalErrors);
+            Assert.False(viewModel.HasTechnicalErrors);
+            Assert.True(viewModel.IsTechnicallyValid);
+            Assert.False(viewModel.CanStart);
+            AssertValidationStatus(view, viewModel, "確認中");
+            Assert.NotEmpty(notifications);
+            Assert.Equal(viewModel.ValidationSummary, notifications[^1].Summary);
+            await viewModel.StartAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(0, runner.CallCount);
+            Assert.False(viewModel.HasCurrentRun);
+            Assert.False(Required<TextBox>(view, "CurrentRunOutputTextBox").IsEffectivelyVisible);
+            Assert.StartsWith("次回 ", Required<TextBox>(view, "EffectiveModelTextBox").Text, StringComparison.Ordinal);
+
+            completion.TrySetResult(available);
+            await checking.WaitAsync(LoginTestWait, TestContext.Current.CancellationToken);
+            Render();
+
+            Assert.False(viewModel.IsCheckingAuthentication);
+            Assert.Empty(viewModel.TechnicalErrors);
+            Assert.True(viewModel.CanStart);
+            AssertValidationStatus(view, viewModel, "run を開始できます");
+            Assert.Equal(viewModel.ValidationSummary, notifications[^1].Summary);
+            Assert.All(notifications, state => Assert.Equal(state.CanStart,
+                state.Summary.Contains("開始できます", StringComparison.Ordinal)));
+            Assert.False(viewModel.HasCurrentRun); // Readiness is not a started run.
+            Assert.Null(viewModel.CurrentRunModelId);
+            Assert.Null(viewModel.CurrentRunMaxConcurrency);
+            Assert.Equal(string.Empty, viewModel.CurrentRunOutputSummary);
+            Assert.Equal(0, runner.CallCount);
+        }
+        finally
+        {
+            completion.TrySetResult(available);
+            try
+            {
+                if (checking is not null)
+                {
+                    await checking.WaitAsync(LoginTestWait, TestContext.Current.CancellationToken);
+                }
+            }
+            finally
+            {
+                window.Close();
+            }
+        }
+    }
+
+    [AvaloniaFact]
     public void Login_controls_bind_accessible_commands_without_automatic_activity()
     {
         using LoginViewHarness harness = new();
@@ -423,9 +557,11 @@ public sealed class ExecutionViewTests
         Assert.Equal("cancel", cancelRun.Content);
         Assert.Same(check, harness.Window.FocusManager?.GetFocusedElement());
         Assert.Contains("別のブラウザー", instructions.Text, StringComparison.Ordinal);
-        Assert.Contains("パスワードやトークンを取得・保存しません", instructions.Text, StringComparison.Ordinal);
+        Assert.Contains("パスワードやトークンを取得・保存しません", ToolTip.GetTip(login)?.ToString(), StringComparison.Ordinal);
         Assert.Contains("完了後は「Copilot 状態を確認」", instructions.Text, StringComparison.Ordinal);
         Assert.Contains("自動で開始しません", instructions.Text, StringComparison.Ordinal);
+        Assert.All(new[] { check, login, cancelLogin, start, cancelRun }, button =>
+            Assert.False(string.IsNullOrWhiteSpace(ToolTip.GetTip(button)?.ToString())));
         Assert.Empty(panel.GetVisualDescendants().OfType<TextBox>());
         Assert.Null(harness.View.FindControl<Border>("EthicsWarningBanner"));
         AssertLoginStatus(harness);
@@ -466,6 +602,7 @@ public sealed class ExecutionViewTests
         Activate(harness.Window, check, useKeyboard);
         Assert.Equal(1, harness.Authentication.CallCount);
         Assert.True(start.IsEffectivelyEnabled);
+        AssertValidationStatus(harness.View, viewModel, "run を開始できます");
 
         int clicks = 0;
         login.Click += (_, _) => clicks++;
@@ -488,6 +625,7 @@ public sealed class ExecutionViewTests
         Assert.Empty(viewModel.AvailableModelIds);
         Assert.Null(viewModel.SelectedModelId);
         AssertLoginStatus(harness);
+        AssertValidationStatus(harness.View, viewModel, "ログイン中");
 
         harness.Process.Complete(0);
         await task.WaitAsync(LoginTestWait, TestContext.Current.CancellationToken);
@@ -508,6 +646,7 @@ public sealed class ExecutionViewTests
         Assert.Equal(0, harness.Runner.CallCount);
         Assert.Null(viewModel.LastRunContext);
         AssertLoginStatus(harness);
+        AssertValidationStatus(harness.View, viewModel, "技術的な問題");
 
         Activate(harness.Window, check, useKeyboard);
 
@@ -609,16 +748,16 @@ public sealed class ExecutionViewTests
     {
         using LoginViewHarness harness = new();
         harness.Window.Width = 760;
-        harness.Window.Height = 600;
+        harness.Window.Height = 450;
         harness.Window.SetRenderScaling(2d);
         Render();
         StackPanel panel = Required<StackPanel>(harness.View, "CopilotLoginPanel");
         WrapPanel actions = Required<WrapPanel>(harness.View, "CopilotLoginActions");
-        ScrollViewer scroll = Required<ScrollViewer>(harness.View, "ExecutionScrollViewer");
+        ScrollViewer scroll = Required<ScrollViewer>(harness.View, "ExecutionAuthenticationScroll");
         Button check = Required<Button>(harness.View, "CheckAuthenticationButton");
         Button login = Required<Button>(harness.View, "StartCopilotLogin");
         Button cancel = Required<Button>(harness.View, "CancelCopilotLogin");
-        ComboBox model = Required<ComboBox>(harness.View, "ModelComboBox");
+        Button settings = Required<Button>(harness.View, "ChangeExecutionSettingsButton");
         TextBlock instructions = Required<TextBlock>(harness.View, "CopilotLoginInstructions");
         TextBlock status = Required<TextBlock>(harness.View, "CopilotLoginStatus");
 
@@ -628,7 +767,7 @@ public sealed class ExecutionViewTests
         Assert.True(scroll.Extent.Width <= scroll.Viewport.Width + 1d);
         Assert.True(scroll.Extent.Height > scroll.Viewport.Height);
         Assert.Equal(new Control[] { check, login, cancel }, actions.Children);
-        Assert.Equal([0, 1, 2, 3], new[] { check.TabIndex, login.TabIndex, cancel.TabIndex, model.TabIndex });
+        Assert.Equal([0, 1, 2, 3], new[] { check.TabIndex, login.TabIndex, cancel.TabIndex, settings.TabIndex });
         Assert.True(cancel.Bounds.Y > check.Bounds.Y, "The narrow viewport must wrap the login actions.");
         Assert.Equal(TextWrapping.Wrap, instructions.TextWrapping);
         foreach (Control control in new Control[] { actions, check, login, cancel, instructions, status })
@@ -640,14 +779,14 @@ public sealed class ExecutionViewTests
         Press(harness.Window, Key.Tab);
         Assert.Same(login, harness.Window.FocusManager?.GetFocusedElement());
         Press(harness.Window, Key.Tab);
-        Assert.Same(model, harness.Window.FocusManager?.GetFocusedElement());
+        Assert.Same(settings, harness.Window.FocusManager?.GetFocusedElement());
         Press(harness.Window, Key.Tab, RawInputModifiers.Shift);
         Assert.Same(login, harness.Window.FocusManager?.GetFocusedElement());
         Assert.Equal(0, harness.FactoryCallCount);
 
         Activate(harness.Window, login, useKeyboard: true);
         Task task = Assert.IsAssignableFrom<Task>(harness.ViewModel.LastLoginTask);
-        Assert.True(model.Focus(NavigationMethod.Tab, KeyModifiers.None));
+        Assert.True(settings.Focus(NavigationMethod.Tab, KeyModifiers.None));
         Press(harness.Window, Key.Tab, RawInputModifiers.Shift);
         Assert.Same(cancel, harness.Window.FocusManager?.GetFocusedElement());
         Press(harness.Window, Key.Space);
@@ -666,11 +805,748 @@ public sealed class ExecutionViewTests
         Assert.Equal(0, harness.Runner.CallCount);
     }
 
+    [AvaloniaFact]
+    public void Compact_execution_fits_950_by_450_with_fixed_actions_and_local_scrolling_only()
+    {
+        using LoginViewHarness harness = new();
+        Assert.Equal(new Size(950, 450), harness.Window.ClientSize);
+        Assert.IsType<Grid>(harness.View.Content);
+        Assert.Equal(44d, Required<Grid>(harness.View, "ExecutionSettingsSummary").Bounds.Height);
+        Assert.Equal(346d, Required<Grid>(harness.View, "ExecutionBody").Bounds.Height);
+        Assert.Equal(44d, Required<Grid>(harness.View, "ExecutionActions").Bounds.Height);
+        Assert.False(Required<TextBox>(harness.View, "CurrentRunOutputTextBox").IsEffectivelyVisible);
+        Assert.False(harness.ViewModel.HasCurrentRun);
+        Assert.Null(harness.View.FindControl<ScrollViewer>("ExecutionScrollViewer"));
+        Assert.Null(harness.View.FindControl<ComboBox>("ModelComboBox"));
+        Assert.Null(harness.View.FindControl<ComboBox>("ConcurrencyComboBox"));
+        Assert.Null(harness.View.FindControl<TextBox>("OutputDirectoryTextBox"));
+        Assert.Empty(harness.View.GetVisualDescendants().OfType<ComboBox>());
+        Assert.DoesNotContain(harness.View.GetVisualDescendants().OfType<Control>(), control =>
+            AutomationProperties.GetAutomationId(control) is "ExecutionModel" or "ExecutionConcurrency"
+                or "ExecutionOutputDirectory" or "SettingsRuntimeIdentity"
+            || (control.Name?.Contains("Timeout", StringComparison.OrdinalIgnoreCase) ?? false));
+        Assert.DoesNotContain(harness.View.GetVisualDescendants().OfType<TextBlock>(), text =>
+            string.Equals(text.Text, harness.ViewModel.RuntimeIdentityText, StringComparison.Ordinal));
+
+        TemplatedControl[] interactive = harness.View.GetVisualDescendants().OfType<TemplatedControl>()
+            .Where(control => control is Button or CheckBox or TextBox or ListBox)
+            .Where(control => control.IsEffectivelyVisible && !string.IsNullOrEmpty(AutomationProperties.GetAutomationId(control)))
+            .ToArray();
+        Assert.NotEmpty(interactive);
+        foreach (TemplatedControl control in interactive)
+        {
+            Assert.True(control.Bounds.Height >= 44d, control.Name);
+            Assert.True(control.Bounds.Width >= 44d, control.Name);
+            Assert.Equal(14d, control.FontSize);
+            Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(control)), control.Name);
+            Assert.False(string.IsNullOrWhiteSpace(ToolTip.GetTip(control)?.ToString()), control.Name);
+            AssertFullyInside(control, harness.View);
+        }
+
+        foreach (string name in new[] { "ExecutionAuthenticationScroll", "ExecutionProgressScroll" })
+        {
+            ScrollViewer scroll = Required<ScrollViewer>(harness.View, name);
+            Assert.True(double.IsFinite(scroll.Bounds.Height));
+            Assert.True(scroll.Extent.Width <= scroll.Viewport.Width + 1d, name);
+            Assert.True(scroll.Extent.Height <= scroll.Viewport.Height + 1d, name);
+        }
+
+        foreach (string name in new[] { "ChangeExecutionSettingsButton", "StartRunButton", "CancelRunButton" })
+        {
+            Assert.DoesNotContain(Required<Button>(harness.View, name).GetVisualAncestors(), ancestor => ancestor is ScrollViewer);
+        }
+
+        AssertNoAutomaticActivity(harness);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Effective_model_preserves_unavailable_preference_and_reports_fixed_auto_separately(bool autoAvailable)
+    {
+        CopilotModelAvailability[] models = autoAvailable
+            ? [U04TestSupport.Model("model-test"), U04TestSupport.Model("auto")]
+            : [U04TestSupport.Model("model-test")];
+        using LoginViewHarness harness = new(new ExecutionAuthenticationSnapshot(
+            ExecutionAuthenticationState.Available, models, U04TestSupport.RuntimeIdentity()));
+        harness.ViewModel.ApplySettings(new ApplicationSettings { PreferredModelId = "not-listed", MaxConcurrency = 3 });
+        Render();
+        TextBox model = Required<TextBox>(harness.View, "EffectiveModelTextBox");
+        TextBlock fixedAuto = Required<TextBlock>(harness.View, "FixedAutoModelStatus");
+        Assert.Equal("次回 未選択 並列3 · 希望: not-listed", model.Text);
+        Assert.Equal("固定 auto\n未確認", fixedAuto.Text);
+        Assert.Equal("次回並列\n3 件", Required<TextBlock>(harness.View, "ConcurrencySummary").Text);
+        AssertNoAutomaticActivity(harness);
+
+        Activate(harness.Window, Required<Button>(harness.View, "CheckAuthenticationButton"), useKeyboard: true);
+        Render();
+        Assert.Null(harness.ViewModel.SelectedModelId);
+        Assert.Equal("not-listed", harness.ViewModel.PreferredModelId);
+        Assert.Equal("次回 未選択 並列3 · 希望: not-listed", model.Text);
+        Assert.Equal(autoAvailable ? "固定 auto\n利用可能" : "固定 auto\n利用不可", fixedAuto.Text);
+        Assert.False(Required<Button>(harness.View, "StartRunButton").IsEffectivelyEnabled);
+
+        harness.ViewModel.SelectedModelId = "model-test"; // An explicit edit, not an availability fallback.
+        Render();
+        Assert.Equal("次回 model-test 並列3 · 希望: model-test", model.Text);
+        Assert.Equal(autoAvailable, Required<Button>(harness.View, "StartRunButton").IsEffectivelyEnabled);
+        Assert.True(model.IsReadOnly);
+        Assert.Equal(TextWrapping.NoWrap, model.TextWrapping);
+        AssertNoAutomaticActivity(harness, authenticationChecks: 1);
+    }
+
+    [AvaloniaFact]
+    public async Task Common_settings_owns_editors_and_runtime_while_execution_keeps_effective_values_and_commands()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
+            "Responses", 1, 2, 1, new X02Header(1, "Report answer"));
+        InputViewModel input = new();
+        await input.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        using LoginViewHarness harness = new(new ExecutionAuthenticationSnapshot(
+            ExecutionAuthenticationState.Available,
+            [U04TestSupport.Model("model-test"), U04TestSupport.Model("model-other"), U04TestSupport.Model("auto")],
+            U04TestSupport.RuntimeIdentity()));
+        using MainWindowViewModel main = new(new WorkflowNavigator(), input,
+            new QuantificationDesignViewModel(input.DefinitionDraft, input.AvailableColumnNames),
+            harness.ViewModel, new ResultsOutputViewModel());
+        main.NextCommand.Execute(null);
+        main.NextCommand.Execute(null);
+        harness.Window.DataContext = main;
+        SettingsView settings = new(main.Settings);
+        int fallbackRequests = 0;
+        harness.View.CommonSettingsRequested += (_, _) => fallbackRequests++;
+        main.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(MainWindowViewModel.IsSettingsOpen))
+            {
+                harness.Window.Content = main.IsSettingsOpen ? settings : harness.View;
+            }
+        };
+        main.Settings.SelectedCategory = SettingsCategory.ImportedPrompts;
+        await harness.ViewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+        Render();
+        Assert.True(input.HasLoadedWorkbook);
+        Assert.Equal(WorkflowStep.Execution, main.CurrentStep);
+        Assert.Equal(100m, main.DesignViewModel.AllocationTotal);
+        Assert.True(harness.ViewModel.IsConfigured);
+        Assert.True(harness.ViewModel.CanStart);
+        string derivedOutput = harness.ViewModel.OutputDirectory;
+        Button start = Required<Button>(harness.View, "StartRunButton");
+        Button cancel = Required<Button>(harness.View, "CancelRunButton");
+        Button change = Required<Button>(harness.View, "ChangeExecutionSettingsButton");
+
+        Activate(harness.Window, change, useKeyboard: true);
+
+        Assert.True(main.IsSettingsOpen);
+        Assert.Equal(SettingsCategory.Common, main.Settings.SelectedCategory);
+        Assert.Same(settings, harness.Window.Content);
+        Assert.Null(TopLevel.GetTopLevel(harness.View));
+        Assert.Equal(0, fallbackRequests);
+        ComboBox model = ById<ComboBox>(settings, "ExecutionModel");
+        ComboBox concurrency = ById<ComboBox>(settings, "ExecutionConcurrency");
+        TextBox output = ById<TextBox>(settings, "ExecutionOutputDirectory");
+        Assert.Same(harness.ViewModel.AvailableModelIds, model.ItemsSource);
+        Assert.Same(harness.ViewModel.ConcurrencyOptions, concurrency.ItemsSource);
+        Assert.NotNull(BindingOperations.GetBindingExpressionBase(output, TextBox.TextProperty));
+        Assert.False(output.IsReadOnly);
+        model.SetCurrentValue(ComboBox.SelectedItemProperty, "model-other");
+        concurrency.SetCurrentValue(ComboBox.SelectedItemProperty, 3);
+        string explicitOutput = Path.Combine(Path.GetTempPath(), "T20-explicit-output");
+        output.SetCurrentValue(TextBox.TextProperty, explicitOutput);
+        Render();
+        Assert.Equal("model-other", harness.ViewModel.SelectedModelId);
+        Assert.Equal("model-other", harness.ViewModel.PreferredModelId);
+        Assert.Equal(3, harness.ViewModel.MaxConcurrency);
+        Assert.Equal(explicitOutput, harness.ViewModel.OutputDirectoryOverride);
+        Assert.Equal(explicitOutput, ById<TextBox>(settings, "SettingsEffectiveOutputDirectory").Text);
+
+        ById<TabControl>(settings, "SettingsCommonTabs").SelectedIndex = 2;
+        Render();
+        TextBox runtime = ById<TextBox>(settings, "SettingsRuntimeIdentity");
+        Assert.True(runtime.IsReadOnly);
+        Assert.Equal(harness.ViewModel.RuntimeIdentityText, runtime.Text);
+        Assert.Equal(harness.ViewModel.AuthenticationStatusText, ById<TextBox>(settings, "SettingsAuthenticationStatus").Text);
+        Activate(harness.Window, ById<Button>(settings, "SettingsRequestClose"), useKeyboard: true);
+
+        Assert.False(main.IsSettingsOpen);
+        Assert.Same(harness.View, harness.Window.Content);
+        Assert.Equal("次回 model-other 並列3 · 希望: model-other", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+        Assert.Equal("次回並列\n3 件", Required<TextBlock>(harness.View, "ConcurrencySummary").Text);
+        Assert.Equal(explicitOutput, Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox").Text);
+        Assert.Contains("明示指定", Required<TextBlock>(harness.View, "OutputDirectorySource").Text, StringComparison.Ordinal);
+        Assert.Same(start, Required<Button>(harness.View, "StartRunButton"));
+        Assert.Same(cancel, Required<Button>(harness.View, "CancelRunButton"));
+        Assert.Same(harness.ViewModel.StartCommand, start.Command);
+        Assert.Same(harness.ViewModel.CancelCommand, cancel.Command);
+        Assert.True(start.IsEffectivelyEnabled);
+        Assert.DoesNotContain(harness.View.GetVisualDescendants().OfType<TextBlock>(), text =>
+            string.Equals(text.Text, runtime.Text, StringComparison.Ordinal));
+
+        Activate(harness.Window, change, useKeyboard: false);
+        ById<TabControl>(settings, "SettingsCommonTabs").SelectedIndex = 0;
+        Render();
+        ById<TextBox>(settings, "ExecutionOutputDirectory").SetCurrentValue(TextBox.TextProperty, string.Empty);
+        Render();
+        Activate(harness.Window, ById<Button>(settings, "SettingsRequestClose"), useKeyboard: false);
+        Assert.Null(harness.ViewModel.OutputDirectoryOverride);
+        Assert.Equal(derivedOutput, Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox").Text);
+        Assert.Contains("入力隣接", Required<TextBlock>(harness.View, "OutputDirectorySource").Text, StringComparison.Ordinal);
+        Assert.Null(main.Settings.LastLoadTask);
+        Assert.Null(main.Settings.LastSaveTask);
+        Assert.Equal(0, fallbackRequests);
+        AssertNoAutomaticActivity(harness, authenticationChecks: 1);
+    }
+
+    [AvaloniaFact]
+    public void Long_paths_are_single_line_read_only_for_outputs_and_editable_only_for_resume()
+    {
+        using LoginViewHarness harness = new();
+        string directory = Path.Combine(Path.GetTempPath(), "T20-" + new string('長', 200), new string('値', 100));
+        harness.ViewModel.OutputDirectoryOverride = directory;
+        Render();
+        TextBox output = Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox");
+        AssertReadOnlySingleLine(output, directory, harness.Window);
+        Assert.Equal(directory, harness.ViewModel.OutputDirectoryOverride);
+        AssertFullyInside(output, harness.View);
+
+        CheckBox resume = Required<CheckBox>(harness.View, "ResumeModeCheckBox");
+        TextBox partial = Required<TextBox>(harness.View, "ResumePartialPathTextBox");
+        Assert.False(partial.IsEffectivelyVisible);
+        resume.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
+        Render();
+        Assert.True(harness.ViewModel.IsResumeMode);
+        Assert.True(partial.IsEffectivelyVisible);
+        Assert.False(partial.IsReadOnly);
+        Assert.Equal(TextWrapping.NoWrap, partial.TextWrapping);
+        string resumePath = Path.Combine(directory, "synthetic.partial.xlsx");
+        partial.SetCurrentValue(TextBox.TextProperty, resumePath);
+        Render();
+        Assert.Equal(resumePath, harness.ViewModel.ResumePartialPath);
+        Assert.Equal(directory, output.Text);
+        Assert.Equal(directory, harness.ViewModel.OutputDirectoryOverride);
+        Assert.Equal(harness.ViewModel.OutputModeText, Required<TextBlock>(harness.View, "OutputModeSummary").Text);
+        AssertFullyInside(partial, harness.View);
+
+        resume.SetCurrentValue(ToggleButton.IsCheckedProperty, false);
+        Render();
+        Assert.False(harness.ViewModel.IsResumeMode);
+        Assert.False(partial.IsEffectivelyVisible);
+        Assert.Equal(resumePath, harness.ViewModel.ResumePartialPath);
+        Assert.Equal(directory, output.Text);
+        AssertNoAutomaticActivity(harness);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Live_progress_keeps_current_run_separate_from_next_settings_through_completion(bool cancelRun)
+    {
+        QuantificationDefinition definition = U04TestSupport.Definition(2, 3);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RunSummary summary = await U04TestSupport.CreateSummaryAsync(definition, metadata, cancelAfterFirst: cancelRun);
+        TaskCompletionSource<RunSummary> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken runToken = default;
+        string runOutput = Path.Combine(Path.GetTempPath(), "T20-current-output-" + new string('長', 150));
+        string nextOutput = Path.Combine(Path.GetTempPath(), "T20-next-output-" + new string('次', 150));
+        string directory = Path.Combine(Path.GetTempPath(), "T20-reserved-" + new string('長', 150));
+        string finalPath = Path.Combine(directory, "reserved.xlsx");
+        string partialPath = Path.Combine(directory, "reserved.partial.xlsx");
+        RecordingRunBoundary runner = new((_, report, token) =>
+        {
+            runToken = token;
+            report?.Invoke(new EvaluationProgress(5, 3, 1, EvaluationProgressStatus.Running,
+                DurableEvaluationStage.EvaluatingRows, referenceCompleted: 1, referenceTotal: 1,
+                rowCompleted: 1, rowTotal: 2, finalPath: finalPath, partialPath: partialPath));
+            return completion.Task;
+        });
+        using LoginViewHarness harness = new(new ExecutionAuthenticationSnapshot(ExecutionAuthenticationState.Available,
+            [U04TestSupport.Model("model-a"), U04TestSupport.Model("model-b"), U04TestSupport.Model("auto")],
+            U04TestSupport.RuntimeIdentity()), runner);
+        harness.ViewModel.Configure(definition, metadata, Path.Combine(Path.GetTempPath(), "T20-progress-input.xlsx"));
+        harness.ViewModel.ApplySettings(new ApplicationSettings
+        {
+            PreferredModelId = "model-a", MaxConcurrency = 1, OutputDirectoryOverride = runOutput,
+        });
+        await harness.ViewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+        Render();
+        Button start = Required<Button>(harness.View, "StartRunButton");
+        Assert.False(harness.ViewModel.HasCurrentRun);
+        Assert.False(Required<TextBox>(harness.View, "CurrentRunOutputTextBox").IsEffectivelyVisible);
+        Assert.Equal("次回 model-a 並列1 · 希望: model-a", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+        TaskCompletionSource finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        void ObserveRunFinished(object? sender, PropertyChangedEventArgs args)
+        {
+            if (args.PropertyName == nameof(ExecutionViewModel.IsRunning) && !harness.ViewModel.IsRunning)
+            {
+                finished.TrySetResult();
+            }
+        }
+
+        harness.ViewModel.PropertyChanged += ObserveRunFinished;
+        try
+        {
+            Activate(harness.Window, start, useKeyboard: true);
+            Assert.Equal(1, runner.CallCount);
+            Assert.True(harness.ViewModel.IsRunning);
+            Assert.False(start.IsEffectivelyEnabled);
+            QuantificationRunRequest request = Assert.IsType<QuantificationRunRequest>(runner.LastRequest);
+            QuantificationDefinition runDefinition = request.DraftDefinition;
+            Assert.True(harness.ViewModel.HasCurrentRun);
+            Assert.Equal("実行中 model-a 並列1 / 次回 model-a 並列1 · 希望: model-a",
+                Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+            AssertValidationStatus(harness.View, harness.ViewModel, "実行中");
+
+            harness.ViewModel.ApplySettings(new ApplicationSettings
+            {
+                PreferredModelId = "model-b", MaxConcurrency = 3, OutputDirectoryOverride = nextOutput,
+            });
+            Render();
+
+            Assert.Equal("実行中 model-a 並列1 / 次回 model-b 並列3 · 希望: model-b",
+                Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+            Assert.Equal("次回並列\n3 件", Required<TextBlock>(harness.View, "ConcurrencySummary").Text);
+            Assert.Equal("model-a", harness.ViewModel.CurrentRunModelId);
+            Assert.Equal(1, harness.ViewModel.CurrentRunMaxConcurrency);
+            Assert.Equal("今回run 新規出力先: " + runOutput, harness.ViewModel.CurrentRunOutputSummary);
+            Assert.Equal(nextOutput, Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox").Text);
+            Assert.Contains("次回", Required<TextBlock>(harness.View, "OutputDirectorySource").Text, StringComparison.Ordinal);
+            TextBox currentOutput = Required<TextBox>(harness.View, "CurrentRunOutputTextBox");
+            AssertReadOnlySingleLine(currentOutput, "今回run 新規出力先: " + runOutput, harness.Window);
+            AssertFullyInside(currentOutput, harness.View);
+            Assert.Equal(44d, Required<Grid>(harness.View, "ExecutionSettingsSummary").Bounds.Height);
+            Assert.Equal(346d, Required<Grid>(harness.View, "ExecutionBody").Bounds.Height);
+            Assert.Equal(44d, Required<Grid>(harness.View, "ExecutionActions").Bounds.Height);
+            Assert.True(Required<Button>(harness.View, "ChangeExecutionSettingsButton").IsEffectivelyEnabled);
+            Assert.False(start.IsEffectivelyEnabled);
+            Assert.Same(request, runner.LastRequest);
+            Assert.Same(runDefinition, request.DraftDefinition);
+            Assert.Equal("model-a", request.ModelId);
+            Assert.Equal(1, request.MaxConcurrency);
+            Assert.Equal(runOutput, request.OutputDirectory);
+            Assert.Null(request.ResumePartialPath);
+            AssertValidationStatus(harness.View, harness.ViewModel, "実行中");
+            Assert.Contains("送信済み件数ではありません", Required<TextBlock>(harness.View, "PlanSummaryLabel").Text, StringComparison.Ordinal);
+            Assert.Equal(harness.ViewModel.PlanSummary, Required<TextBlock>(harness.View, "PlanSummaryText").Text);
+            Assert.Equal("学生行を評価中", Required<TextBlock>(harness.View, "ExecutionStage").Text);
+            Assert.Equal("処理単位: " + harness.ViewModel.ProgressText, Required<TextBlock>(harness.View, "OperationProgressSummary").Text);
+            Assert.Equal("実測: 参照 1 / 1 · 行 1 / 2", Required<TextBlock>(harness.View, "DurableProgressSummary").Text);
+            Assert.Equal(5d, Required<ProgressBar>(harness.View, "RunProgressBar").Maximum);
+            Assert.Equal(3d, Required<ProgressBar>(harness.View, "RunProgressBar").Value);
+            Assert.Equal(harness.ViewModel.RunStatusText, Required<TextBlock>(harness.View, "RunStatusSummary").Text);
+            Assert.Contains("作成済みとは限りません", Required<TextBlock>(harness.View, "ReservedPathsLabel").Text, StringComparison.Ordinal);
+            TextBox final = Required<TextBox>(harness.View, "ReservedFinalPathTextBox");
+            TextBox checkpoint = Required<TextBox>(harness.View, "PartialPathTextBox");
+            AssertReadOnlySingleLine(final, finalPath, harness.Window);
+            AssertReadOnlySingleLine(checkpoint, partialPath, harness.Window);
+            AssertFullyInside(final, harness.View);
+            AssertFullyInside(checkpoint, harness.View);
+            Assert.Equal(finalPath, harness.ViewModel.ReservedFinalPath);
+            Assert.Equal(partialPath, harness.ViewModel.PartialPath);
+            Assert.NotEqual(runOutput, Path.GetDirectoryName(harness.ViewModel.ReservedFinalPath));
+            Assert.NotEqual(nextOutput, Path.GetDirectoryName(harness.ViewModel.ReservedFinalPath));
+            Assert.Null(harness.ViewModel.LastRunContext); // A reservation is not a successful output.
+
+            Button cancel = Required<Button>(harness.View, "CancelRunButton");
+            Assert.True(cancel.IsEffectivelyEnabled);
+            if (cancelRun)
+            {
+                Activate(harness.Window, cancel, useKeyboard: false);
+                Assert.True(runToken.IsCancellationRequested);
+                Assert.True(harness.ViewModel.IsCancelling);
+                Assert.False(cancel.IsEffectivelyEnabled);
+                AssertValidationStatus(harness.View, harness.ViewModel, "取消処理中");
+                Assert.Equal("実行中 model-a 並列1 / 次回 model-b 並列3 · 希望: model-b",
+                    Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+                Assert.Equal("今回run 新規出力先: " + runOutput, currentOutput.Text);
+            }
+            else
+            {
+                Assert.False(runToken.IsCancellationRequested);
+            }
+        }
+        finally
+        {
+            completion.TrySetResult(summary);
+            try
+            {
+                if (runner.CallCount > 0)
+                {
+                    await finished.Task.WaitAsync(LoginTestWait, TestContext.Current.CancellationToken);
+                }
+            }
+            finally
+            {
+                harness.ViewModel.PropertyChanged -= ObserveRunFinished;
+            }
+        }
+
+        Render();
+        Assert.False(harness.ViewModel.IsRunning);
+        Assert.Same(summary, harness.ViewModel.LastRunContext?.Summary);
+        Assert.Contains(cancelRun ? "部分結果" : "検証済みfinal", Required<TextBlock>(harness.View, "RunStatusSummary").Text, StringComparison.Ordinal);
+        Assert.True(harness.ViewModel.HasCurrentRun);
+        Assert.Equal("model-a", harness.ViewModel.CurrentRunModelId);
+        Assert.Equal(1, harness.ViewModel.CurrentRunMaxConcurrency);
+        Assert.Equal("前回run model-a 並列1 / 次回 model-b 並列3 · 希望: model-b",
+            Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+        Assert.Equal("前回run 新規出力先: " + runOutput, Required<TextBox>(harness.View, "CurrentRunOutputTextBox").Text);
+        Assert.Equal(nextOutput, Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox").Text);
+        Assert.Equal(finalPath, Required<TextBox>(harness.View, "ReservedFinalPathTextBox").Text);
+        Assert.Equal(partialPath, Required<TextBox>(harness.View, "PartialPathTextBox").Text);
+        AssertValidationStatus(harness.View, harness.ViewModel, "run を開始できます");
+        Assert.Equal(1, runner.CallCount);
+        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Equal(0, harness.FactoryCallCount);
+    }
+
+    [AvaloniaFact]
+    public async Task Technical_errors_keep_selection_virtualize_long_lists_and_hide_when_resolved()
+    {
+        using LoginViewHarness harness = new();
+        harness.ViewModel.MaxConcurrency = 4;
+        Render();
+        ListBox list = Required<ListBox>(harness.View, "TechnicalErrorsList");
+        TextBox detail = Required<TextBox>(harness.View, "SelectedTechnicalErrorDetail");
+        Border pane = Required<Border>(harness.View, "ExecutionValidationSummary");
+        ExecutionTechnicalError selected = Assert.Single(harness.ViewModel.TechnicalErrors, error => error.Code == "CONCURRENCY_OUT_OF_RANGE");
+        list.SelectedItem = selected;
+        Render();
+        Assert.Equal(ErrorDetail(selected), detail.Text);
+        harness.ViewModel.MaxConcurrency = 0;
+        Render();
+        ExecutionTechnicalError replacement = Assert.IsType<ExecutionTechnicalError>(list.SelectedItem);
+        Assert.NotSame(selected, replacement);
+        Assert.Equal(selected.Code, replacement.Code);
+        Assert.Equal(selected.Field, replacement.Field);
+        Assert.Equal(ErrorDetail(replacement), detail.Text);
+
+        // Stress only presentation with synthetic items; never change VM validation
+        // or the U04 shared fixtures to manufacture many live validation errors.
+        ExecutionTechnicalError[] many = Enumerable.Range(1, 200).Select(index => new ExecutionTechnicalError(
+            $"SYNTHETIC_{index}", $"対象 {index} " + new string('項', 80),
+            string.Join('\n', Enumerable.Repeat("全説明を省略せず表示する合成エラー。", 50)) + "末尾確認")).ToArray();
+        list.SetCurrentValue(ItemsControl.ItemsSourceProperty, many);
+        list.SelectedItem = many[^1];
+        list.ScrollIntoView(many[^1]);
+        Render();
+        Assert.Same(many[^1], list.SelectedItem);
+        Assert.Equal(ErrorDetail(many[^1]), detail.Text);
+        Assert.True(detail.IsReadOnly);
+        Assert.Equal(TextWrapping.Wrap, detail.TextWrapping);
+        Assert.InRange(list.Bounds.Height, 44d, 108d);
+        Assert.True(list.GetVisualDescendants().OfType<ListBoxItem>().Count() < many.Length);
+        ScrollViewer local = Assert.Single(detail.GetVisualDescendants().OfType<ScrollViewer>());
+        Assert.True(local.Extent.Height > local.Viewport.Height);
+        local.ScrollToEnd();
+        Render();
+        Assert.True(local.Offset.Y > 0d);
+        AssertFullyInside(detail, pane);
+        AssertFullyInside(list, pane);
+        AssertFullyInside(Required<Button>(harness.View, "StartRunButton"), harness.View);
+        Assert.False(Required<Button>(harness.View, "StartRunButton").IsEffectivelyEnabled);
+        AssertNoAutomaticActivity(harness);
+
+        list.SetCurrentValue(ItemsControl.ItemsSourceProperty, harness.ViewModel.TechnicalErrors);
+        harness.ViewModel.MaxConcurrency = 1;
+        await harness.ViewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+        Render();
+        Assert.Empty(harness.ViewModel.TechnicalErrors);
+        Assert.False(pane.IsEffectivelyVisible);
+        Assert.False(list.IsEffectivelyVisible);
+        Assert.False(detail.IsEffectivelyVisible);
+        Assert.Null(list.SelectedItem);
+        Assert.Equal(string.Empty, detail.Text);
+        Assert.True(Required<Button>(harness.View, "StartRunButton").IsEffectivelyEnabled);
+        AssertNoAutomaticActivity(harness, authenticationChecks: 1);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Definition_weight_error_selection_retains_the_second_target_after_revalidation_and_first_fix(bool duplicateIds)
+    {
+        using LoginViewHarness harness = new();
+        QuantificationDefinition definition = DefinitionWithTwoWeightErrors(duplicateIds);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        string inputPath = Path.Combine(Path.GetTempPath(), "T20-error-targets.xlsx");
+        harness.ViewModel.Configure(definition, metadata, inputPath);
+        await harness.ViewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+        Render();
+        ListBox list = Required<ListBox>(harness.View, "TechnicalErrorsList");
+        TextBox detail = Required<TextBox>(harness.View, "SelectedTechnicalErrorDetail");
+        ExecutionTechnicalError[] weightErrors = harness.ViewModel.TechnicalErrors
+            .Where(error => error.Code == "WEIGHT_MUST_BE_POSITIVE").ToArray();
+        Assert.Equal(2, weightErrors.Length);
+        ExecutionTechnicalError selected = weightErrors[1];
+        list.SelectedItem = selected;
+        Render();
+        Assert.Equal(ErrorDetail(selected), detail.Text);
+        Assert.Contains(selected.NodeId!, detail.Text, StringComparison.Ordinal);
+        Assert.Contains(selected.Path!, detail.Text, StringComparison.Ordinal);
+        Assert.Contains("Weight", detail.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain(TechnicalPromptCanary, detail.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain(TechnicalBodyCanary, detail.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain(TechnicalNameCanary, detail.Text, StringComparison.Ordinal);
+
+        harness.ViewModel.MaxConcurrency = 2;
+        Render();
+        ExecutionTechnicalError revalidated = Assert.IsType<ExecutionTechnicalError>(list.SelectedItem);
+        Assert.NotSame(selected, revalidated);
+        Assert.Equal((selected.Code, selected.NodeId, selected.Path, selected.Field),
+            (revalidated.Code, revalidated.NodeId, revalidated.Path, revalidated.Field));
+        Assert.Equal(ErrorDetail(revalidated), detail.Text);
+
+        QuestionDefinition question = definition.Questions[0];
+        EvaluatorDefinition evaluator = question.Evaluators[0];
+        evaluator = evaluator with { Criteria = evaluator.Criteria.SetItem(0, evaluator.Criteria[0] with { Weight = 1m }) };
+        definition = definition with { Questions = [question with { Evaluators = [evaluator] }] };
+        harness.ViewModel.Configure(definition, metadata, inputPath);
+        Render();
+        ExecutionTechnicalError remaining = Assert.Single(harness.ViewModel.TechnicalErrors,
+            error => error.Code == "WEIGHT_MUST_BE_POSITIVE");
+        Assert.Same(remaining, list.SelectedItem);
+        Assert.Equal(selected.NodeId, remaining.NodeId);
+        Assert.Equal(selected.Path, remaining.Path);
+        Assert.Equal(ErrorDetail(remaining), detail.Text);
+        Assert.False(Required<Button>(harness.View, "StartRunButton").IsEffectivelyEnabled);
+
+        evaluator = evaluator with
+        {
+            Criteria = evaluator.Criteria.SetItem(1, evaluator.Criteria[1] with { Id = "C2", Weight = 1m }),
+        };
+        harness.ViewModel.Configure(definition with { Questions = [question with { Evaluators = [evaluator] }] }, metadata, inputPath);
+        Render();
+        Assert.Empty(harness.ViewModel.TechnicalErrors);
+        Assert.Null(list.SelectedItem);
+        Assert.Equal(string.Empty, detail.Text);
+        Assert.False(Required<Border>(harness.View, "ExecutionValidationSummary").IsEffectivelyVisible);
+        Assert.True(Required<Button>(harness.View, "StartRunButton").IsEffectivelyEnabled);
+        AssertNoAutomaticActivity(harness, authenticationChecks: 1);
+    }
+
+    [AvaloniaFact]
+    public async Task Reattachment_and_owner_replacement_keep_one_observer_and_do_not_restart_owned_login()
+    {
+        using LoginViewHarness harness = new();
+        int settingsRequests = 0;
+        harness.View.CommonSettingsRequested += (_, _) => settingsRequests++;
+        for (int repeat = 0; repeat < 3; repeat++)
+        {
+            Assert.Equal(1, ViewObserverCount(harness.ViewModel, harness.View));
+            harness.Window.Content = null;
+            Render();
+            Assert.Equal(0, ViewObserverCount(harness.ViewModel, harness.View));
+            harness.Window.Content = harness.View;
+            Render();
+            Assert.Equal(1, ViewObserverCount(harness.ViewModel, harness.View));
+        }
+
+        Activate(harness.Window, Required<Button>(harness.View, "ChangeExecutionSettingsButton"), useKeyboard: true);
+        Assert.Equal(1, settingsRequests);
+        AssertNoAutomaticActivity(harness);
+        Activate(harness.Window, Required<Button>(harness.View, "StartCopilotLogin"), useKeyboard: true);
+        Task login = Assert.IsAssignableFrom<Task>(harness.ViewModel.LastLoginTask);
+        harness.Window.Content = null;
+        Render();
+        Assert.Equal(0, ViewObserverCount(harness.ViewModel, harness.View));
+        Assert.True(harness.ViewModel.IsLoggingIn);
+        Assert.Empty(harness.Process.KillTreeArguments);
+        harness.Window.Content = harness.View;
+        Render();
+        Assert.Equal(1, ViewObserverCount(harness.ViewModel, harness.View));
+        Assert.Same(login, harness.ViewModel.LastLoginTask);
+        Assert.Equal(1, harness.FactoryCallCount);
+        Assert.Equal(1, harness.Process.StartCount);
+        Assert.Equal(0, harness.Process.DisposeCount);
+        harness.Process.Complete(0);
+        await login.WaitAsync(LoginTestWait, TestContext.Current.CancellationToken);
+        Render();
+        Assert.Equal(1, harness.Process.DisposeCount);
+        Assert.Empty(harness.Process.KillTreeArguments);
+
+        RecordingAuthenticationBoundary authentication = new(new ExecutionAuthenticationSnapshot(ExecutionAuthenticationState.AuthRequired));
+        RecordingRunBoundary runner = new((_, _, _) => throw new InvalidOperationException("must not run"));
+        using ExecutionViewModel next = new(authentication, runner);
+        harness.View.DataContext = next;
+        next.ApplySettings(new ApplicationSettings { PreferredModelId = "new-owner" });
+        harness.ViewModel.SelectedModelId = "old-owner";
+        Render();
+        Assert.Equal(0, ViewObserverCount(harness.ViewModel, harness.View));
+        Assert.Equal(1, ViewObserverCount(next, harness.View));
+        Assert.Equal("次回 未選択 並列1 · 希望: new-owner", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+        Assert.Same(next.CheckAuthenticationCommand, Required<Button>(harness.View, "CheckAuthenticationButton").Command);
+        Assert.Same(next.StartCommand, Required<Button>(harness.View, "StartRunButton").Command);
+        Assert.Same(next.LoginCommand, Required<Button>(harness.View, "StartCopilotLogin").Command);
+        Activate(harness.Window, Required<Button>(harness.View, "ChangeExecutionSettingsButton"), useKeyboard: false);
+        Assert.Equal(2, settingsRequests);
+        Assert.Equal(0, authentication.CallCount);
+        Assert.Equal(0, runner.CallCount);
+        Assert.Null(next.LastLoginTask);
+        Assert.Equal(0, harness.Authentication.CallCount);
+        Assert.Equal(0, harness.Runner.CallCount);
+        Assert.Equal(1, harness.FactoryCallCount);
+
+        harness.Window.Content = null;
+        Render();
+        Assert.Equal(0, ViewObserverCount(next, harness.View));
+    }
+
+    [AvaloniaTheory]
+    [InlineData(ExecutionAuthenticationState.AuthRequired)]
+    [InlineData(ExecutionAuthenticationState.CliUnavailable)]
+    [InlineData(ExecutionAuthenticationState.RuntimeFailed)]
+    public async Task Authentication_status_wraps_to_its_measured_height_without_runtime_diagnostics(ExecutionAuthenticationState state)
+    {
+        using LoginViewHarness harness = new(new ExecutionAuthenticationSnapshot(state));
+        await harness.ViewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+        Render();
+        TextBlock authentication = Required<TextBlock>(harness.View, "CopilotAuthenticationStatus");
+        Assert.Equal(harness.ViewModel.AuthenticationStatusText, authentication.Text);
+        AssertFullyWrapped(authentication);
+        AssertFitsLoginPanel(authentication, Required<StackPanel>(harness.View, "CopilotLoginPanel"));
+        AssertLoginStatus(harness);
+        Assert.False(Required<Button>(harness.View, "StartRunButton").IsEffectivelyEnabled);
+        Assert.DoesNotContain(harness.View.GetVisualDescendants().OfType<TextBlock>(), text =>
+            string.Equals(text.Text, harness.ViewModel.RuntimeIdentityText, StringComparison.Ordinal));
+        AssertNoAutomaticActivity(harness, authenticationChecks: 1);
+    }
+
     private const string LoginTokenCanary = "PRIVATE-A03-TOKEN-CANARY";
     private static readonly TimeSpan LoginTestWait = TimeSpan.FromSeconds(10);
 
+    private const string TechnicalPromptCanary = "PRIVATE-T20-PROMPT-CANARY";
+    private const string TechnicalBodyCanary = "PRIVATE-T20-ANSWER-CANARY";
+    private const string TechnicalNameCanary = "PRIVATE-T20-DISPLAY-NAME-CANARY";
+
+    private static QuantificationDefinition DefinitionWithTwoWeightErrors(bool duplicateIds)
+    {
+        QuantificationDefinition definition = U04TestSupport.Definition(2, 2);
+        QuestionDefinition question = definition.Questions[0];
+        EvaluatorDefinition evaluator = question.Evaluators[0];
+        CriterionDefinition criterion = evaluator.Criteria[0] with
+        {
+            DisplayName = TechnicalNameCanary,
+            Description = TechnicalBodyCanary,
+            Weight = 0m,
+        };
+        return definition with
+        {
+            Name = TechnicalNameCanary,
+            Questions = [question with
+            {
+                DisplayName = TechnicalNameCanary,
+                QuestionText = TechnicalBodyCanary,
+                Evaluators = [evaluator with
+                {
+                    DisplayName = TechnicalNameCanary,
+                    CustomPromptTemplate = TechnicalPromptCanary + " {回答} {評価項目}",
+                    Criteria = [criterion, criterion with { Id = duplicateIds ? "C1" : "C2" }],
+                }],
+            }],
+        };
+    }
+
+    private sealed class DeferredAuthenticationBoundary(Task<ExecutionAuthenticationSnapshot> response)
+        : IExecutionAuthenticationBoundary
+    {
+        public Task<ExecutionAuthenticationSnapshot> CheckAsync(CancellationToken cancellationToken) =>
+            response.WaitAsync(cancellationToken);
+    }
+
     private static T Required<T>(Control root, string name)
         where T : Control => Assert.IsType<T>(root.FindControl<T>(name));
+
+    private static T ById<T>(Control root, string id) where T : Control =>
+        Assert.Single(root.GetVisualDescendants().OfType<T>(), control => AutomationProperties.GetAutomationId(control) == id);
+
+    private static string ErrorDetail(ExecutionTechnicalError error) =>
+        $"{error.Code}{Environment.NewLine}{error.TargetText}{Environment.NewLine}{error.Message}";
+
+    private static void AssertValidationStatus(ExecutionView view, ExecutionViewModel viewModel, string expectedPart)
+    {
+        TextBlock status = Required<TextBlock>(view, "ExecutionValidationStatus");
+        Assert.Equal(viewModel.ValidationSummary, status.Text);
+        Assert.Contains(expectedPart, status.Text, StringComparison.Ordinal);
+        Assert.Equal(viewModel.CanStart, status.Text!.Contains("開始できます", StringComparison.Ordinal));
+        Assert.Equal(viewModel.CanStart, Required<Button>(view, "StartRunButton").IsEffectivelyEnabled);
+        AssertFullyWrapped(status);
+    }
+
+    private static int ViewObserverCount(ExecutionViewModel owner, ExecutionView view)
+    {
+        FieldInfo field = typeof(UiObservableObject).GetField(nameof(INotifyPropertyChanged.PropertyChanged),
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("The observable's event backing field must exist.");
+        return ((Delegate?)field.GetValue(owner))?.GetInvocationList().Count(handler => ReferenceEquals(handler.Target, view)) ?? 0;
+    }
+
+    private static void AssertNoAutomaticActivity(LoginViewHarness harness, int authenticationChecks = 0)
+    {
+        Assert.Equal(authenticationChecks, harness.Authentication.CallCount);
+        Assert.Equal(0, harness.Resolver.CallCount);
+        Assert.Equal(0, harness.FactoryCallCount);
+        Assert.Equal(0, harness.Process.StartCount);
+        Assert.Equal(0, harness.Runner.CallCount);
+        Assert.Null(harness.ViewModel.LastLoginTask);
+        Assert.False(harness.ViewModel.IsLoggingIn);
+        Assert.False(harness.ViewModel.IsRunning);
+    }
+
+    private static void AssertReadOnlySingleLine(TextBox field, string expected, Window window)
+    {
+        Assert.Equal(expected, field.Text);
+        Assert.True(field.IsReadOnly);
+        Assert.False(field.AcceptsReturn);
+        Assert.Equal(TextWrapping.NoWrap, field.TextWrapping);
+        Assert.Equal(44d, field.Bounds.Height);
+        Assert.Equal(14d, field.FontSize);
+        Assert.NotNull(BindingOperations.GetBindingExpressionBase(field, TextBox.TextProperty));
+        Assert.True(field.Focus(NavigationMethod.Tab));
+        field.SelectionStart = 0;
+        field.SelectionEnd = expected.Length;
+        Render();
+        Assert.Equal(expected.Length, field.SelectionEnd - field.SelectionStart);
+        window.KeyTextInput("読取専用欄は変更しない");
+        Render();
+        Assert.Equal(expected, field.Text);
+        ScrollViewer local = Assert.Single(field.GetVisualDescendants().OfType<ScrollViewer>());
+        Assert.True(local.Extent.Width > local.Viewport.Width);
+        local.Offset = new Vector(local.Extent.Width, 0d);
+        Render();
+        Assert.True(local.Offset.X > 0d);
+        Assert.Equal(expected, field.Text);
+    }
+
+    private static void AssertFullyInside(Control control, Control container)
+    {
+        Point origin = control.TranslatePoint(default, container)
+            ?? throw new InvalidOperationException("The control must be attached to its container.");
+        Assert.True(origin.X >= -1d && origin.Y >= -1d, control.Name);
+        Assert.True(origin.X + control.Bounds.Width <= container.Bounds.Width + 1d, control.Name);
+        Assert.True(origin.Y + control.Bounds.Height <= container.Bounds.Height + 1d, control.Name);
+    }
+
+    private static void AssertFullyWrapped(TextBlock text)
+    {
+        Assert.Equal(TextWrapping.Wrap, text.TextWrapping);
+        Assert.Equal(TextTrimming.None, text.TextTrimming);
+        Assert.True(text.Bounds.Width > 0d);
+        TextBlock measure = new()
+        {
+            Text = text.Text,
+            FontFamily = text.FontFamily,
+            FontSize = text.FontSize,
+            FontWeight = text.FontWeight,
+            FontStyle = text.FontStyle,
+            FontStretch = text.FontStretch,
+            LineHeight = text.LineHeight,
+            LetterSpacing = text.LetterSpacing,
+            TextWrapping = TextWrapping.Wrap,
+        };
+        measure.Measure(new Size(text.Bounds.Width, double.PositiveInfinity));
+        Assert.True(text.Bounds.Height >= measure.DesiredSize.Height - 1d,
+            $"{text.Name} must allocate the measured wrapped height, not just keep the source string.");
+    }
 
     private static void AssertLoginStatus(LoginViewHarness harness)
     {
@@ -682,6 +1558,7 @@ public sealed class ExecutionViewTests
         Assert.Equal(TextWrapping.Wrap, status.TextWrapping);
         Assert.True(status.IsEffectivelyVisible);
         Assert.False(status.Focusable);
+        AssertFullyWrapped(status);
         string visible = string.Join("\n", status.Text,
             AutomationProperties.GetName(status), AutomationProperties.GetHelpText(status));
         Assert.DoesNotContain(LoginTokenCanary, visible, StringComparison.Ordinal);
@@ -698,6 +1575,10 @@ public sealed class ExecutionViewTests
         Assert.True(control.Bounds.Width > 0d);
         Assert.True(origin.X >= -1d && origin.X + control.Bounds.Width <= panel.Bounds.Width + 1d,
             $"{control.Name} must fit within the login panel without horizontal clipping.");
+        if (control is TextBlock text)
+        {
+            AssertFullyWrapped(text);
+        }
     }
 
     private static void Activate(Window window, Button button, bool useKeyboard, Key key = Key.Enter)
@@ -745,8 +1626,12 @@ public sealed class ExecutionViewTests
     // Reuse U04's configuration/auth/run fakes; A01/A02's login fakes are private to their test classes.
     private sealed class LoginViewHarness : IDisposable
     {
-        public LoginViewHarness()
+        public LoginViewHarness(ExecutionAuthenticationSnapshot? snapshot = null, RecordingRunBoundary? runner = null)
         {
+            Authentication = new RecordingAuthenticationBoundary(snapshot ?? new ExecutionAuthenticationSnapshot(
+                ExecutionAuthenticationState.Available,
+                [U04TestSupport.Model("model-test"), U04TestSupport.Model("auto")], U04TestSupport.RuntimeIdentity()));
+            Runner = runner ?? new RecordingRunBoundary((_, _, _) => throw new InvalidOperationException("must not run"));
             BundledCopilotLoginService service = new(Resolver, _ =>
             {
                 FactoryCallCount++;
@@ -757,15 +1642,13 @@ public sealed class ExecutionViewTests
             ViewModel.Configure(definition, U01TestSupport.ValidateMapping(definition).Metadata,
                 Path.Combine(Path.GetTempPath(), "PRIVATE-A03-INPUT-CANARY.xlsx"));
             View = new ExecutionView(ViewModel);
-            Window = new Window { Width = 1080, Height = 760, Content = View };
+            Window = new Window { Width = 950, Height = 450, Content = View };
             Window.Show();
             Render();
         }
 
-        public RecordingAuthenticationBoundary Authentication { get; } = new(
-            new ExecutionAuthenticationSnapshot(ExecutionAuthenticationState.Available,
-                [U04TestSupport.Model("model-test")], U04TestSupport.RuntimeIdentity()));
-        public RecordingRunBoundary Runner { get; } = new((_, _, _) => throw new InvalidOperationException("must not run"));
+        public RecordingAuthenticationBoundary Authentication { get; }
+        public RecordingRunBoundary Runner { get; }
         public LoginViewResolver Resolver { get; } = new();
         public LoginViewProcess Process { get; set; } = new();
         public int FactoryCallCount { get; private set; }
@@ -879,7 +1762,7 @@ internal static class U04TestSupport
             new RecordingAuthenticationBoundary(
                 new ExecutionAuthenticationSnapshot(
                     ExecutionAuthenticationState.Available,
-                    [Model("model-test")],
+                    [Model("model-test"), Model("auto")],
                     RuntimeIdentity())),
             runBoundary);
         viewModel.Configure(

@@ -22,496 +22,236 @@
 
   <Window.Resources>
     <DataTemplate x:Key="WorkflowStepTemplate" x:DataType="viewModels:WorkflowStepPresentation">
-      <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*" ColumnSpacing="11">
-        <Border
-            Grid.RowSpan="2"
-            Width="38"
-            Height="38"
-            CornerRadius="19"
-            Background="#22FFFFFF"
-            VerticalAlignment="Center">
-          <TextBlock
-              Text="{Binding StatusIcon}"
-              FontSize="17"
-              FontWeight="Bold"
-              HorizontalAlignment="Center"
-              VerticalAlignment="Center" />
-        </Border>
-        <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="7">
-          <TextBlock Text="{Binding NumberText}" Classes="step-number" VerticalAlignment="Center" />
-          <TextBlock
-              Grid.Column="1"
-              Text="{Binding Title}"
-              Classes="step-title"
-              TextTrimming="CharacterEllipsis" />
-        </Grid>
-        <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="6">
-          <TextBlock Text="{Binding EnglishTitle}" Classes="step-english" TextTrimming="CharacterEllipsis" />
-          <TextBlock Grid.Column="1" Text="·" Classes="step-english" />
-          <TextBlock Grid.Column="2" Text="{Binding StatusText}" Classes="step-status" TextTrimming="CharacterEllipsis" />
-        </Grid>
+      <Grid RowDefinitions="18,16" ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <TextBlock Grid.RowSpan="2" Text="{Binding Number}" FontSize="16" FontWeight="Bold"
+                   VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="14" LineHeight="18"
+                   FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding StatusText}" FontSize="12" LineHeight="16"
+                   TextTrimming="CharacterEllipsis" />
       </Grid>
     </DataTemplate>
   </Window.Resources>
 
   <Window.Styles>
-    <Style Selector="ScrollViewer#ShellScrollViewer">
-      <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
-    </Style>
-    <Style Selector="ScrollViewer#ShellScrollViewer.design">
-      <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
-    </Style>
-    <Style Selector="Border.surface-card">
-      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="18" />
-    </Style>
     <Style Selector="Border.ethics-warning">
       <Setter Property="Background" Value="{DynamicResource WarningBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" />
-      <Setter Property="BorderThickness" Value="1.5" />
-      <Setter Property="CornerRadius" Value="14" />
-      <Setter Property="Padding" Value="16,13" />
-    </Style>
-    <Style Selector="Border.warning-icon">
-      <Setter Property="Background" Value="{DynamicResource WarningTextBrush}" />
-      <Setter Property="CornerRadius" Value="16" />
-      <Setter Property="Width" Value="32" />
-      <Setter Property="Height" Value="32" />
-    </Style>
-    <Style Selector="Border.hero-card">
-      <Setter Property="Background" Value="{DynamicResource AppHeroBrush}" />
-      <Setter Property="CornerRadius" Value="22" />
-      <Setter Property="Padding" Value="28" />
-    </Style>
-    <Style Selector="Border.detail-card">
-      <Setter Property="Background" Value="#18FFFFFF" />
-      <Setter Property="BorderBrush" Value="#35FFFFFF" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="12" />
-      <Setter Property="Padding" Value="14" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="8,4" />
     </Style>
     <Style Selector="Border.technical-validation">
       <Setter Property="Background" Value="{DynamicResource TechnicalBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource TechnicalBorderBrush}" />
       <Setter Property="BorderThickness" Value="2,0,0,0" />
       <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Padding" Value="16" />
+      <Setter Property="Padding" Value="8" />
     </Style>
-    <Style Selector="Border.technical-icon">
-      <Setter Property="Background" Value="{DynamicResource TechnicalTextBrush}" />
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Width" Value="32" />
-      <Setter Property="Height" Value="32" />
+    <Style Selector="Button.step-button">
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="Padding" Value="8,2" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
-    <Style Selector="TextBlock.page-title">
-      <Setter Property="FontSize" Value="24" />
-      <Setter Property="FontWeight" Value="Bold" />
+    <!-- IsCompleted is the existing VM's visited flag, not a successful run. -->
+    <Style Selector="Button.step-button.visited">
+      <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppAccentStrongBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
     </Style>
-    <Style Selector="TextBlock.section-kicker">
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="LetterSpacing" Value="1.1" />
-      <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
-    </Style>
-    <Style Selector="TextBlock.hero-title">
-      <Setter Property="FontSize" Value="30" />
-      <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="Foreground" Value="White" />
-    </Style>
-    <Style Selector="TextBlock.hero-body">
-      <Setter Property="FontSize" Value="15" />
-      <Setter Property="LineHeight" Value="23" />
-      <Setter Property="Foreground" Value="{DynamicResource AppHeroMutedBrush}" />
-    </Style>
-    <Style Selector="TextBlock.card-heading">
-      <Setter Property="FontSize" Value="16" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-    </Style>
-    <Style Selector="TextBlock.muted">
-      <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}" />
-    </Style>
-    <Style Selector="Button.primary-action">
-      <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
-      <Setter Property="Foreground" Value="White" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Padding" Value="20,11" />
-    </Style>
-    <Style Selector="Button.secondary-action">
+    <Style Selector="Button.shell-action">
+      <Setter Property="MinWidth" Value="44" />
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Padding" Value="8,4" />
       <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Padding" Value="20,11" />
+      <Setter Property="ToolTip.ShowOnDisabled" Value="True" />
+    </Style>
+    <Style Selector="Button.shell-action.primary-action">
+      <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.shell-action.selected">
+      <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppAccentStrongBrush}" />
+    </Style>
+    <Style Selector="Button.shell-action.cancel">
+      <Setter Property="Background" Value="{DynamicResource TechnicalBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TechnicalTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource TechnicalBorderBrush}" />
+    </Style>
+    <Style Selector="Button.shell-action:focus-visible, Button.step-button:focus-visible">
+      <Setter Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+      <Setter Property="BorderThickness" Value="3" />
     </Style>
   </Window.Styles>
 
-  <Grid RowDefinitions="Auto,*" KeyboardNavigation.TabNavigation="Continue">
-    <Border
-        x:Name="EthicsWarningBanner"
-        Grid.Row="0"
-        Margin="24,20,24,0"
-        Classes="ethics-warning"
-        Focusable="False"
-        IsTabStop="False"
-        IsHitTestVisible="False"
-        AutomationProperties.AutomationId="EthicsWarningBanner">
-      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-        <Border Classes="warning-icon" VerticalAlignment="Top">
-          <TextBlock
-              Text="!"
-              FontSize="18"
-              FontWeight="Bold"
-              Foreground="White"
-              HorizontalAlignment="Center"
-              VerticalAlignment="Center" />
-        </Border>
-        <StackPanel Grid.Column="1" Spacing="3">
-          <TextBlock
-              Text="AI 定量化について"
-              FontSize="14"
-              FontWeight="Bold"
-              Foreground="{DynamicResource WarningTextBrush}" />
-          <TextBlock
-              x:Name="EthicsWarningMessage"
-              Text="{x:Static resources:EthicsWarningText.Message}"
-              FontSize="14"
-              Foreground="{DynamicResource WarningTextBrush}"
-              TextWrapping="Wrap" />
+  <!-- Local Tab groups follow navigation -> current editor -> fixed actions,
+       independently of the visual placement of the Settings button. -->
+  <Grid x:Name="ShellLayout" Margin="8" RowDefinitions="Auto,*,Auto" RowSpacing="8"
+        KeyboardNavigation.TabNavigation="Local">
+    <Grid x:Name="ShellHeader" RowDefinitions="44,Auto,Auto" ColumnDefinitions="*,*,*,*"
+          RowSpacing="8" ColumnSpacing="8" TabIndex="0" KeyboardNavigation.TabNavigation="Local">
+      <TextBlock Grid.ColumnSpan="3" Text="StudyReport Evaluator" FontSize="18" FontWeight="SemiBold"
+                 VerticalAlignment="Center" />
+      <Button x:Name="SettingsOpenButton" Grid.Column="3" Classes="shell-action"
+              Classes.selected="{Binding IsSettingsOpen}" Command="{Binding OpenSettingsCommand}"
+              MinWidth="88" HorizontalAlignment="Right" TabIndex="4"
+              AutomationProperties.AutomationId="SettingsOpen" AutomationProperties.Name="設定を開く"
+              ToolTip.Tip="現在の対象と編集を保って設定を開きます。設定はワークフローの追加ステップではありません。">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <PathIcon Data="{StaticResource WorkflowSettingsIcon}" Width="20" Height="20" />
+          <TextBlock Text="設定" VerticalAlignment="Center" />
         </StackPanel>
-      </Grid>
-    </Border>
+      </Button>
 
-    <ScrollViewer
-        x:Name="ShellScrollViewer"
-        Grid.Row="1"
-        Classes.design="{Binding DesignStep.IsCurrent}"
-        HorizontalScrollBarVisibility="Disabled">
-      <Grid
-          Margin="24"
-          RowDefinitions="Auto,Auto,Auto,*,Auto"
-          RowSpacing="20">
-
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
-          <Border
-              Width="48"
-              Height="48"
-              CornerRadius="14"
-              Background="{DynamicResource AppAccentBrush}">
-            <TextBlock
-                Text="SR"
-                FontSize="17"
-                FontWeight="Bold"
-                Foreground="White"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center" />
-          </Border>
-          <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
-            <TextBlock Text="StudyReport Evaluator" Classes="page-title" />
-            <TextBlock
-                Text="回答を、説明可能な定量値と Excel 数式へ。"
-                Classes="muted"
-                FontSize="13" />
-          </StackPanel>
-          <Border
-              Grid.Column="2"
-              Padding="12,7"
-              CornerRadius="12"
-              Background="{DynamicResource AppAccentSoftBrush}"
-              VerticalAlignment="Center">
-            <TextBlock
-              Text="LOCAL DESKTOP · 4-STEP WORKFLOW"
-                Foreground="{DynamicResource AppAccentStrongBrush}"
-                FontSize="11"
-                FontWeight="SemiBold"
-                LetterSpacing="0.8"
-                TextWrapping="Wrap" />
-          </Border>
+      <Border x:Name="EthicsWarningBanner" Grid.Row="1" Grid.ColumnSpan="4" Classes="ethics-warning"
+              Focusable="False" IsTabStop="False" IsHitTestVisible="False"
+              AutomationProperties.AutomationId="EthicsWarningBanner">
+        <Grid ColumnDefinitions="20,*" ColumnSpacing="8">
+          <TextBlock Text="!" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"
+                     Foreground="{DynamicResource WarningTextBrush}" />
+          <TextBlock x:Name="EthicsWarningMessage" Grid.Column="1"
+                     Text="{x:Static resources:EthicsWarningText.Message}" FontSize="14" LineHeight="20"
+                     Foreground="{DynamicResource WarningTextBrush}" TextWrapping="Wrap" />
         </Grid>
+      </Border>
 
-        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="12">
-          <StackPanel Spacing="3">
-            <TextBlock Text="ワークフロー" Classes="card-heading" />
-            <TextBlock
-                Text="{Binding NavigationProgressText}"
-                Classes="muted"
-                FontSize="13" />
-          </StackPanel>
-          <TextBlock
-              Grid.Column="1"
-              Text="Tab / Enter で操作できます"
-              Classes="muted"
-              FontSize="12"
-              VerticalAlignment="Bottom"
-              TextTrimming="CharacterEllipsis" />
-        </Grid>
+      <Button x:Name="InputStepButton" Grid.Row="2" Classes="step-button"
+              Classes.current="{Binding InputStep.IsCurrent}" Classes.visited="{Binding InputStep.IsCompleted}"
+              Classes.upcoming="{Binding InputStep.IsUpcoming}" Content="{Binding InputStep}"
+              ContentTemplate="{StaticResource WorkflowStepTemplate}" Command="{Binding NavigateCommand}"
+              CommandParameter="{x:Static navigation:WorkflowStep.Input}" TabIndex="0"
+              AutomationProperties.AutomationId="WorkflowStepInput" AutomationProperties.Name="{Binding InputStep.AccessibleName}" />
+      <Button x:Name="DesignStepButton" Grid.Row="2" Grid.Column="1" Classes="step-button"
+              Classes.current="{Binding DesignStep.IsCurrent}" Classes.visited="{Binding DesignStep.IsCompleted}"
+              Classes.upcoming="{Binding DesignStep.IsUpcoming}" Content="{Binding DesignStep}"
+              ContentTemplate="{StaticResource WorkflowStepTemplate}" Command="{Binding NavigateCommand}"
+              CommandParameter="{x:Static navigation:WorkflowStep.Design}" TabIndex="1"
+              AutomationProperties.AutomationId="WorkflowStepDesign" AutomationProperties.Name="{Binding DesignStep.AccessibleName}" />
+      <Button x:Name="ExecutionStepButton" Grid.Row="2" Grid.Column="2" Classes="step-button"
+              Classes.current="{Binding ExecutionStep.IsCurrent}" Classes.visited="{Binding ExecutionStep.IsCompleted}"
+              Classes.upcoming="{Binding ExecutionStep.IsUpcoming}" Content="{Binding ExecutionStep}"
+              ContentTemplate="{StaticResource WorkflowStepTemplate}" Command="{Binding NavigateCommand}"
+              CommandParameter="{x:Static navigation:WorkflowStep.Execution}" TabIndex="2"
+              AutomationProperties.AutomationId="WorkflowStepExecution" AutomationProperties.Name="{Binding ExecutionStep.AccessibleName}" />
+      <Button x:Name="ResultsStepButton" Grid.Row="2" Grid.Column="3" Classes="step-button"
+              Classes.current="{Binding ResultsStep.IsCurrent}" Classes.visited="{Binding ResultsStep.IsCompleted}"
+              Classes.upcoming="{Binding ResultsStep.IsUpcoming}" Content="{Binding ResultsStep}"
+              ContentTemplate="{StaticResource WorkflowStepTemplate}" Command="{Binding NavigateCommand}"
+              CommandParameter="{x:Static navigation:WorkflowStep.Results}" TabIndex="3"
+              AutomationProperties.AutomationId="WorkflowStepResults" AutomationProperties.Name="{Binding ResultsStep.AccessibleName}" />
+    </Grid>
 
-        <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
-          <Button
-              x:Name="InputStepButton"
-              Grid.Column="0"
-              Classes="step-button"
-              Classes.current="{Binding InputStep.IsCurrent}"
-              Classes.completed="{Binding InputStep.IsCompleted}"
-              Classes.upcoming="{Binding InputStep.IsUpcoming}"
-              Content="{Binding InputStep}"
-              ContentTemplate="{StaticResource WorkflowStepTemplate}"
-              Command="{Binding NavigateCommand}"
-              CommandParameter="{x:Static navigation:WorkflowStep.Input}"
-              TabIndex="0"
-              AutomationProperties.AutomationId="WorkflowStepInput"
-              AutomationProperties.Name="{Binding InputStep.AccessibleName}" />
-          <Button
-              x:Name="DesignStepButton"
-              Grid.Column="1"
-              Classes="step-button"
-              Classes.current="{Binding DesignStep.IsCurrent}"
-              Classes.completed="{Binding DesignStep.IsCompleted}"
-              Classes.upcoming="{Binding DesignStep.IsUpcoming}"
-              Content="{Binding DesignStep}"
-              ContentTemplate="{StaticResource WorkflowStepTemplate}"
-              Command="{Binding NavigateCommand}"
-              CommandParameter="{x:Static navigation:WorkflowStep.Design}"
-              TabIndex="1"
-              AutomationProperties.AutomationId="WorkflowStepDesign"
-              AutomationProperties.Name="{Binding DesignStep.AccessibleName}" />
-          <Button
-              x:Name="ExecutionStepButton"
-              Grid.Column="2"
-              Classes="step-button"
-              Classes.current="{Binding ExecutionStep.IsCurrent}"
-              Classes.completed="{Binding ExecutionStep.IsCompleted}"
-              Classes.upcoming="{Binding ExecutionStep.IsUpcoming}"
-              Content="{Binding ExecutionStep}"
-              ContentTemplate="{StaticResource WorkflowStepTemplate}"
-              Command="{Binding NavigateCommand}"
-              CommandParameter="{x:Static navigation:WorkflowStep.Execution}"
-              TabIndex="2"
-              AutomationProperties.AutomationId="WorkflowStepExecution"
-              AutomationProperties.Name="{Binding ExecutionStep.AccessibleName}" />
-          <Button
-              x:Name="ResultsStepButton"
-              Grid.Column="3"
-              Classes="step-button"
-              Classes.current="{Binding ResultsStep.IsCurrent}"
-              Classes.completed="{Binding ResultsStep.IsCompleted}"
-              Classes.upcoming="{Binding ResultsStep.IsUpcoming}"
-              Content="{Binding ResultsStep}"
-              ContentTemplate="{StaticResource WorkflowStepTemplate}"
-              Command="{Binding NavigateCommand}"
-              CommandParameter="{x:Static navigation:WorkflowStep.Results}"
-              TabIndex="3"
-              AutomationProperties.AutomationId="WorkflowStepResults"
-              AutomationProperties.Name="{Binding ResultsStep.AccessibleName}" />
-        </Grid>
+    <!-- Kept by name for existing capture/layout fixtures, but only the body
+         scrolls now. The window assigns its actual remaining finite height. -->
+    <ScrollViewer x:Name="ShellScrollViewer" Grid.Row="1" TabIndex="1" KeyboardNavigation.TabNavigation="Local"
+                  HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                  SizeChanged="HandleBodySizeChanged" AutomationProperties.AutomationId="ShellScrollViewer"
+                  AutomationProperties.Name="現在の画面の本文（狭い表示ではスクロール）">
+      <Grid x:Name="ShellBody" Height="450" KeyboardNavigation.TabNavigation="Local">
+        <ContentControl x:Name="CurrentStepContent" IsVisible="{Binding HasEditorContent}"
+                        HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                        KeyboardNavigation.TabNavigation="Local" AutomationProperties.AutomationId="CurrentStepContent">
+          <!-- The window builds each template once per VM reference, then attaches
+               only that cached control. ShowCurrentEditor sets its DataContext once;
+               do not bind the root to this host's inherited shell context.
+               Uncommitted TextBox values stay in-place. -->
+          <ContentControl.DataTemplates>
+            <DataTemplate DataType="{x:Type viewModels:InputViewModel}" x:DataType="viewModels:InputViewModel">
+              <views:InputView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:QuantificationDesignViewModel}" x:DataType="viewModels:QuantificationDesignViewModel">
+              <views:QuantificationDesignView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:ExecutionViewModel}" x:DataType="viewModels:ExecutionViewModel">
+              <views:ExecutionView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:ResultsOutputViewModel}" x:DataType="viewModels:ResultsOutputViewModel">
+              <views:ResultsOutputView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:SettingsViewModel}" x:DataType="viewModels:SettingsViewModel">
+              <views:SettingsView />
+            </DataTemplate>
+          </ContentControl.DataTemplates>
+        </ContentControl>
 
-        <Grid Grid.Row="3">
-          <ContentControl
-              x:Name="CurrentStepContent"
-              Content="{Binding CurrentEditorViewModel}"
-              IsVisible="{Binding HasEditorContent}"
-              KeyboardNavigation.TabNavigation="Local"
-              AutomationProperties.AutomationId="CurrentStepContent">
-            <ContentControl.DataTemplates>
-              <DataTemplate DataType="{x:Type viewModels:InputViewModel}" x:DataType="viewModels:InputViewModel">
-                <views:InputView DataContext="{Binding}" />
-              </DataTemplate>
-              <DataTemplate DataType="{x:Type viewModels:QuantificationDesignViewModel}" x:DataType="viewModels:QuantificationDesignViewModel">
-                <views:QuantificationDesignView DataContext="{Binding}" />
-              </DataTemplate>
-              <DataTemplate DataType="{x:Type viewModels:ExecutionViewModel}" x:DataType="viewModels:ExecutionViewModel">
-                <views:ExecutionView DataContext="{Binding}" />
-              </DataTemplate>
-              <DataTemplate DataType="{x:Type viewModels:ResultsOutputViewModel}" x:DataType="viewModels:ResultsOutputViewModel">
-                <views:ResultsOutputView DataContext="{Binding}" />
-              </DataTemplate>
-            </ContentControl.DataTemplates>
-          </ContentControl>
-
-          <Grid
-              x:Name="CurrentStepPlaceholderHost"
-              ColumnDefinitions="2*,*"
-              ColumnSpacing="20"
+        <!-- Retain the non-editor compatibility fixtures without the old hero. -->
+        <Grid x:Name="CurrentStepPlaceholderHost" RowDefinitions="Auto,Auto" RowSpacing="8"
               IsVisible="{Binding HasPlaceholderContent}">
-          <StackPanel Grid.Column="0" Spacing="16">
-            <Border
-                x:Name="CurrentStepPlaceholder"
-                Classes="hero-card"
-                AutomationProperties.AutomationId="CurrentStepPlaceholder">
-              <StackPanel Spacing="18">
-                <StackPanel Spacing="7">
-                  <TextBlock
-                      Text="{Binding CurrentStepKicker}"
-                      Foreground="#9FABFF"
-                      FontSize="12"
-                      FontWeight="SemiBold"
-                      LetterSpacing="1.2" />
-                  <TextBlock Text="{Binding CurrentStepTitle}" Classes="hero-title" />
-                  <TextBlock
-                      Text="{Binding CurrentStepDescription}"
-                      Classes="hero-body"
-                      TextWrapping="Wrap"
-                      MaxWidth="700"
-                      HorizontalAlignment="Left" />
-                </StackPanel>
-
-                <Border
-                    Padding="12,8"
-                    CornerRadius="10"
-                    Background="#20AAB6FF"
-                    HorizontalAlignment="Left">
-                  <TextBlock
-                      Text="4 ステップで入力から出力まで進みます"
-                      Foreground="White"
-                      FontSize="12"
-                      FontWeight="SemiBold" />
-                </Border>
-
-                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
-                  <Border Grid.Column="0" Classes="detail-card">
-                    <StackPanel Spacing="7">
-                      <TextBlock Text="01" Foreground="#9FABFF" FontWeight="Bold" />
-                      <TextBlock
-                          Text="{Binding CurrentDetailOne}"
-                          Foreground="White"
-                          TextWrapping="Wrap" />
-                    </StackPanel>
-                  </Border>
-                  <Border Grid.Column="1" Classes="detail-card">
-                    <StackPanel Spacing="7">
-                      <TextBlock Text="02" Foreground="#9FABFF" FontWeight="Bold" />
-                      <TextBlock
-                          Text="{Binding CurrentDetailTwo}"
-                          Foreground="White"
-                          TextWrapping="Wrap" />
-                    </StackPanel>
-                  </Border>
-                  <Border Grid.Column="2" Classes="detail-card">
-                    <StackPanel Spacing="7">
-                      <TextBlock Text="03" Foreground="#9FABFF" FontWeight="Bold" />
-                      <TextBlock
-                          Text="{Binding CurrentDetailThree}"
-                          Foreground="White"
-                          TextWrapping="Wrap" />
-                    </StackPanel>
-                  </Border>
-                </Grid>
-              </StackPanel>
-            </Border>
-
-            <Border
-                x:Name="TechnicalValidationPlaceholder"
-                Classes="technical-validation"
-                AutomationProperties.AutomationId="TechnicalValidationPlaceholder">
-              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                <Border Classes="technical-icon">
-                  <TextBlock
-                      Text="◆"
-                      FontSize="12"
-                      Foreground="White"
-                      HorizontalAlignment="Center"
-                      VerticalAlignment="Center" />
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="3">
-                  <TextBlock
-                      Text="技術的検証メッセージ"
-                      Foreground="{DynamicResource TechnicalTextBrush}"
-                      FontWeight="Bold" />
-                  <TextBlock
-                      x:Name="TechnicalValidationMessage"
-                      Text="ファイル形式や設定値など、処理可否に関わる技術的な問題はここへ明確に表示されます。"
-                      Foreground="{DynamicResource TechnicalTextBrush}"
-                      TextWrapping="Wrap" />
-                  <TextBlock
-                      Text="問題を解消すると次の操作へ進めます。"
-                      Foreground="{DynamicResource TechnicalTextBrush}"
-                      FontSize="12" />
-                </StackPanel>
-              </Grid>
-            </Border>
-          </StackPanel>
-
-          <Border Grid.Column="1" Classes="surface-card" Padding="22">
-            <StackPanel Spacing="18">
-              <StackPanel Spacing="4">
-                <TextBlock Text="SHELL PRINCIPLES" Classes="section-kicker" />
-                <TextBlock Text="迷わず進める設計" Classes="card-heading" />
-                <TextBlock
-                    Text="色だけに頼らず、番号・記号・状態文で現在地を伝えます。"
-                    Classes="muted"
-                    TextWrapping="Wrap" />
-              </StackPanel>
-
-              <Border Height="1" Background="{DynamicResource AppBorderBrush}" />
-
-              <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="Auto,*" RowSpacing="14" ColumnSpacing="11">
-                <TextBlock Grid.Row="0" Text="⌨" FontSize="18" Foreground="{DynamicResource AppAccentBrush}" />
-                <StackPanel Grid.Row="0" Grid.Column="1" Spacing="2">
-                  <TextBlock Text="Keyboard first" FontWeight="SemiBold" />
-                  <TextBlock Text="Tab 順序と明瞭なフォーカス" Classes="muted" FontSize="12" />
-                </StackPanel>
-
-                <TextBlock Grid.Row="1" Text="↕" FontSize="18" Foreground="{DynamicResource AppAccentBrush}" />
-                <StackPanel Grid.Row="1" Grid.Column="1" Spacing="2">
-                  <TextBlock Text="Scale friendly" FontWeight="SemiBold" />
-                  <TextBlock Text="論理ピクセルとスクロールで 200% に対応" Classes="muted" FontSize="12" TextWrapping="Wrap" />
-                </StackPanel>
-
-                <TextBlock Grid.Row="2" Text="✓" FontSize="18" Foreground="{DynamicResource AppCompletedBrush}" />
-                <StackPanel Grid.Row="2" Grid.Column="1" Spacing="2">
-                  <TextBlock Text="State in words" FontWeight="SemiBold" />
-                  <TextBlock Text="完了・現在・未着手を文字でも表示" Classes="muted" FontSize="12" />
-                </StackPanel>
-
-                <TextBlock Grid.Row="3" Text="∞" FontSize="18" Foreground="{DynamicResource AppAccentBrush}" />
-                <StackPanel Grid.Row="3" Grid.Column="1" Spacing="2">
-                  <TextBlock Text="Non-blocking notice" FontWeight="SemiBold" />
-                  <TextBlock Text="注意表示は操作や処理の条件にしません" Classes="muted" FontSize="12" TextWrapping="Wrap" />
-                </StackPanel>
-              </Grid>
+          <Border x:Name="CurrentStepPlaceholder" Padding="8" AutomationProperties.AutomationId="CurrentStepPlaceholder">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding CurrentStepTitle}" FontSize="16" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding CurrentStepDescription}" TextWrapping="Wrap" />
             </StackPanel>
           </Border>
-          </Grid>
-        </Grid>
-
-        <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
-          <Button
-              x:Name="PreviousStepButton"
-              Grid.Column="0"
-              Classes="secondary-action"
-              Content="←  前へ"
-              Command="{Binding PreviousCommand}"
-              TabIndex="10"
-              AutomationProperties.AutomationId="PreviousStepButton"
-              AutomationProperties.Name="前のステップへ移動" />
-          <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
-            <TextBlock
-                Text="{Binding CurrentStepStatusText}"
-                FontWeight="SemiBold"
-                HorizontalAlignment="Center"
-                TextWrapping="Wrap"
-                TextAlignment="Center" />
-            <TextBlock
-                Text="{Binding NavigationProgressText}"
-                Classes="muted"
-                FontSize="12"
-                HorizontalAlignment="Center"
-                TextWrapping="Wrap"
-                TextAlignment="Center" />
-          </StackPanel>
-          <Button
-              x:Name="NextStepButton"
-              Grid.Column="2"
-              Classes="primary-action"
-              Content="{Binding NextButtonText}"
-              Command="{Binding NextCommand}"
-              TabIndex="11"
-              AutomationProperties.AutomationId="NextStepButton"
-              AutomationProperties.Name="次のステップへ移動" />
+          <Border x:Name="TechnicalValidationPlaceholder" Grid.Row="1" Classes="technical-validation"
+                  AutomationProperties.AutomationId="TechnicalValidationPlaceholder">
+            <TextBlock x:Name="TechnicalValidationMessage" TextWrapping="Wrap"
+                       Text="ファイル形式や設定値など、処理可否に関わる技術的な問題はここへ明確に表示されます。"
+                       Foreground="{DynamicResource TechnicalTextBrush}" />
+          </Border>
         </Grid>
       </Grid>
     </ScrollViewer>
+
+    <Grid x:Name="ShellFooter" Grid.Row="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8"
+          MinHeight="44" TabIndex="2" KeyboardNavigation.TabNavigation="Local"
+          AutomationProperties.AutomationId="ShellFooter">
+      <Button x:Name="PreviousStepButton" Classes="shell-action" Content="{Binding PreviousButtonText}"
+              Command="{Binding PreviousCommand}" IsVisible="{Binding !IsSettingsOpen}" TabIndex="0"
+              AutomationProperties.AutomationId="PreviousStepButton" AutomationProperties.Name="{Binding PreviousButtonText}"
+              ToolTip.Tip="入力と選択を保って、表示された前のステップへ戻ります。" />
+      <Grid Grid.Column="1" TabIndex="1" KeyboardNavigation.TabNavigation="Local">
+        <Grid IsVisible="{Binding !ExecutionViewModel.IsRunning}" VerticalAlignment="Center">
+          <TextBlock Text="{Binding CurrentStepStatusText}" IsVisible="{Binding !IsSettingsOpen}"
+                     FontSize="14" FontWeight="SemiBold" TextAlignment="Center" TextTrimming="CharacterEllipsis" />
+          <TextBlock x:Name="SettingsNavigationHint" Text="設定画面の「設定から戻る」で元のステップへ"
+                     IsVisible="{Binding IsSettingsOpen}" FontSize="14" TextAlignment="Center" TextWrapping="Wrap"
+                     AutomationProperties.AutomationId="SettingsNavigationHint" />
+        </Grid>
+        <Grid x:Name="ShellCurrentRun" IsVisible="{Binding ExecutionViewModel.IsRunning}"
+              ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" KeyboardNavigation.TabNavigation="Local"
+              AutomationProperties.AutomationId="ShellCurrentRun">
+          <Grid RowDefinitions="18,18,4" RowSpacing="2" VerticalAlignment="Center">
+            <TextBlock x:Name="ShellRunStage" Text="{Binding ExecutionViewModel.StageText, StringFormat='今回run: {0}'}"
+                       IsVisible="{Binding !ExecutionViewModel.IsCancelling}" FontSize="14" LineHeight="18"
+                       TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ExecutionViewModel.RunStatusText}" />
+            <TextBlock Text="今回run: 停止処理中" IsVisible="{Binding ExecutionViewModel.IsCancelling}"
+                       FontSize="14" LineHeight="18" TextTrimming="CharacterEllipsis"
+                       ToolTip.Tip="{Binding ExecutionViewModel.RunStatusText}" />
+            <TextBlock x:Name="ShellRunProgressText" Grid.Row="1" Text="{Binding ExecutionViewModel.ProgressText}"
+                       FontSize="14" LineHeight="18" TextTrimming="CharacterEllipsis"
+                       AutomationProperties.AutomationId="ShellCurrentRunProgressText"
+                       AutomationProperties.Name="{Binding ExecutionViewModel.ProgressText}"
+                       ToolTip.Tip="{Binding ExecutionViewModel.ProgressText}" />
+            <ProgressBar x:Name="ShellRunProgressBar" Grid.Row="2" Height="4" Minimum="0"
+                         Maximum="{Binding ExecutionViewModel.ProgressTotal}" Value="{Binding ExecutionViewModel.ProgressCompleted}"
+                         AutomationProperties.AutomationId="ShellCurrentRunProgress"
+                         AutomationProperties.Name="今回runの処理単位の完了数（成功数とは別）" />
+          </Grid>
+          <Button x:Name="ShellOpenRunButton" Grid.Column="1" Classes="shell-action" Content="進捗へ"
+                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static navigation:WorkflowStep.Execution}"
+                  MinWidth="72" TabIndex="0" AutomationProperties.AutomationId="ShellOpenCurrentRun"
+                  AutomationProperties.Name="今回runの進捗を実行画面で確認"
+                  ToolTip.Tip="進行中runの実測進捗と出力の状態を確認します。再実行はしません。" />
+          <Button x:Name="ShellCancelRunButton" Grid.Column="2" Classes="shell-action cancel" Content="停止"
+                  Command="{Binding ExecutionViewModel.CancelCommand}" MinWidth="64" TabIndex="1"
+                  AutomationProperties.AutomationId="ShellCancelQuantification"
+                  AutomationProperties.Name="今回runの新規送信を停止"
+                  ToolTip.Tip="新規送信を停止し、進行中処理の安全な終了と部分結果の保持を待ちます。次回設定やログインの取消とは別です。" />
+        </Grid>
+      </Grid>
+      <Grid Grid.Column="2" IsVisible="{Binding !IsSettingsOpen}" TabIndex="2" KeyboardNavigation.TabNavigation="Local">
+        <Button x:Name="NextStepButton" Classes="shell-action primary-action" Content="{Binding NextButtonText}"
+                Command="{Binding NextCommand}" IsVisible="{Binding !ResultsStep.IsCurrent}"
+                AutomationProperties.AutomationId="NextStepButton" AutomationProperties.Name="{Binding NextButtonText}"
+                ToolTip.Tip="表示された次のステップへ進みます。移動だけではAI評価を開始しません。" />
+      </Grid>
+    </Grid>
   </Grid>
 </Window>

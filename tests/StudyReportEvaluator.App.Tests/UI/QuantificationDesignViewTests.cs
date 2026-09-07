@@ -3,12 +3,16 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Data;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
-using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using StudyReportEvaluator.App.Launch;
+using StudyReportEvaluator.App.Navigation;
+using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.App.ViewModels;
 using StudyReportEvaluator.App.Views;
 using StudyReportEvaluator.Core.Domain;
@@ -396,14 +400,14 @@ public sealed class QuantificationDesignViewTests
     }
 
     [AvaloniaFact]
-    public void Large_valid_definition_realizes_question_summaries_and_virtualizes_nested_navigators()
+    public void Large_valid_definition_pages_question_summaries_without_rendering_nested_editors()
     {
         QuantificationDesignViewModel viewModel = new(CreateLargeDefinition());
         QuantificationDesignView view = new(viewModel);
         Window window = new()
         {
-            Width = 1260,
-            Height = 900,
+            Width = 950,
+            Height = 450,
             Content = view,
         };
 
@@ -411,7 +415,7 @@ public sealed class QuantificationDesignViewTests
         {
             window.Show();
             window.SetRenderScaling(2d);
-            Dispatcher.UIThread.RunJobs();
+            Render();
 
             Assert.True(viewModel.IsValid);
             Assert.Equal(10, viewModel.Questions.Count);
@@ -420,15 +424,62 @@ public sealed class QuantificationDesignViewTests
                 1_000,
                 viewModel.Questions.Sum(question => question.Evaluators.Sum(evaluator => evaluator.Criteria.Count)));
             Assert.True(viewModel.BuildSnapshot().HasValidHash());
+            QuantificationDefinition draft = viewModel.Draft;
+            QuestionDesignItemViewModel selected = viewModel.SelectedQuestion!;
+            ListBox list = Required<ListBox>(view, "QuestionEditorList");
+            Assert.Same(viewModel.VisibleQuestions, list.ItemsSource);
+            Assert.NotNull(BindingOperations.GetBindingExpressionBase(list, ListBox.SelectedItemProperty));
+            AssertMeasuredPage(view, viewModel);
+            Assert.InRange(viewModel.PageSize, 1, 9);
+            int initialCapacity = viewModel.PageSize;
+            AssertNormalBodyFits(view);
+            AssertAccessibleInputsFit(view);
+            Assert.Contains(view.GetVisualDescendants(), control => control is VirtualizingStackPanel);
+            // Fluent also materializes a hidden PART_EditableTextBox for ComboBox.
+            // Count actual editable surfaces, not that template part or read-only details.
             Assert.Equal(
-                10,
-                view.GetVisualDescendants().OfType<Border>().Count(border =>
-                    (AutomationProperties.GetAutomationId(border) ?? string.Empty).StartsWith(
-                        "DesignQuestion-",
-                        StringComparison.Ordinal)));
-            Assert.True(view.GetVisualDescendants().OfType<VirtualizingStackPanel>().Count() >= 3);
-            Assert.InRange(view.GetVisualDescendants().OfType<TextBox>().Count(), 1, 60);
+                ["BasePointsTextBox", "SelectedQuestionPointsTextBox", "SimilarityPenaltyWeightTextBox", "SpecialPointsTextBox"],
+                view.GetVisualDescendants().OfType<TextBox>()
+                    .Where(textBox => textBox.IsEffectivelyVisible && !textBox.IsReadOnly)
+                    .Select(textBox => Assert.IsType<string>(textBox.Name)).OrderBy(name => name, StringComparer.Ordinal).ToArray());
+            Assert.True(Required<TextBox>(view, "AllocationSummaryText").IsReadOnly);
+            TextBox errorDetail = Assert.IsType<TextBox>(
+                Assert.IsType<Flyout>(Required<Button>(view, "ErrorDetailsButton").Flyout).Content);
+            Assert.True(errorDetail.IsReadOnly);
+            Assert.DoesNotContain(view.GetVisualDescendants().OfType<Control>(), control =>
+                (AutomationProperties.GetAutomationId(control) ?? string.Empty).StartsWith("DesignEvaluator-", StringComparison.Ordinal)
+                || (AutomationProperties.GetAutomationId(control) ?? string.Empty).StartsWith("DesignCriterion-", StringComparison.Ordinal));
             Assert.Equal(2d, window.RenderScaling);
+
+            List<QuestionDesignItemViewModel> visited = [];
+            do
+            {
+                visited.AddRange(viewModel.VisibleQuestions);
+                AssertMeasuredPage(view, viewModel);
+                Assert.Same(selected, viewModel.SelectedQuestion);
+                Assert.Equal(viewModel.VisibleQuestions.Contains(selected) ? selected : null, list.SelectedItem);
+                if (!viewModel.NextPageCommand.CanExecute(null))
+                {
+                    break;
+                }
+
+                Activate(Required<Button>(view, "NextQuestionPageButton"));
+            }
+            while (true);
+
+            Assert.Equal(viewModel.Questions.ToArray(), visited.ToArray());
+            Assert.False(Required<Button>(view, "NextQuestionPageButton").IsEffectivelyEnabled);
+            window.Height = 550;
+            Render();
+            Assert.True(viewModel.PageSize > initialCapacity);
+            AssertMeasuredPage(view, viewModel);
+            window.Height = 450;
+            Render();
+            Assert.Equal(initialCapacity, viewModel.PageSize);
+            AssertMeasuredPage(view, viewModel);
+            Assert.Same(selected, viewModel.SelectedQuestion);
+            Assert.Same(draft, viewModel.Draft);
+            AssertNormalBodyFits(view);
         }
         finally
         {
@@ -440,11 +491,16 @@ public sealed class QuantificationDesignViewTests
     public void Formula_guide_remains_fixed_and_reflects_current_values()
     {
         QuantificationDesignViewModel viewModel = new();
+        for (int index = 0; index < 8; index++)
+        {
+            viewModel.AddQuestion();
+        }
+
         QuantificationDesignView view = new(viewModel);
         Window window = new()
         {
-            Width = 1260,
-            Height = 900,
+            Width = 950,
+            Height = 450,
             Content = view,
         };
 
@@ -453,33 +509,30 @@ public sealed class QuantificationDesignViewTests
             window.Show();
             Render();
 
-            Required<Expander>(view, "FormulaDetailsExpander").IsExpanded = true;
-            Render();
-
-            ScrollViewer scroll = Required<ScrollViewer>(view, "QuantificationDesignScrollViewer");
             Border formulaGuide = Required<Border>(view, "FormulaGuide");
-            Border formulaDetails = Required<Border>(view, "FormulaDetails");
             TextBlock baseValue = RequiredByAutomationId<TextBlock>(view, "FormulaBaseValue");
             TextBlock specialValue = RequiredByAutomationId<TextBlock>(view, "FormulaSpecialValue");
             TextBlock similarityValue = RequiredByAutomationId<TextBlock>(view, "FormulaSimilarityValue");
 
-            Assert.Equal(ScrollBarVisibility.Disabled, scroll.HorizontalScrollBarVisibility);
-            Assert.DoesNotContain(
-                formulaGuide.GetVisualAncestors(),
-                ancestor => ReferenceEquals(ancestor, scroll));
+            AssertNormalBodyFits(view);
             Assert.Equal("60", baseValue.Text);
             Assert.Equal("0", specialValue.Text);
             Assert.Equal("0.1", similarityValue.Text);
-            Assert.Contains("計算の各段階", ToolTip.GetTip(Required<TextBox>(view, "RoundingDigitsTextBox"))?.ToString() ?? string.Empty);
+            Assert.Equal("B + Σ(Pq×Rq) + SpecialEarned − Σ(Pq×Lq×W)",
+                RequiredByAutomationId<TextBlock>(view, "DesignFormulaSummary").Text);
+            Button detailsButton = Required<Button>(view, "FormulaDetailsButton");
+            Activate(detailsButton);
+            Flyout details = Assert.IsType<Flyout>(detailsButton.Flyout);
+            Border formulaDetails = Assert.IsType<Border>(details.Content);
             Assert.Contains(
                 formulaDetails.GetVisualDescendants().OfType<TextBlock>(),
                 text => string.Equals(text.Text, "設問獲得点", StringComparison.Ordinal));
             Assert.Contains(
                 formulaDetails.GetVisualDescendants().OfType<TextBlock>(),
-                text => string.Equals(text.Text, "FinalRaw", StringComparison.Ordinal));
+                text => text.Text == "FinalRaw = Base + Σ(Pq × Rq) + SpecialEarned − Σ(Pq × Lq × W)");
             Assert.Contains(
                 formulaDetails.GetVisualDescendants().OfType<TextBlock>(),
-                text => string.Equals(text.Text, "FinalScore", StringComparison.Ordinal));
+                text => text.Text == "FinalScore = FinalRaw がblankならblank、それ以外は clamp(FinalRaw, 0, 100)");
             TextBlock earnedLabel = Assert.Single(
                 formulaDetails.GetVisualDescendants().OfType<TextBlock>(),
                 text => string.Equals(text.Text, "設問獲得点", StringComparison.Ordinal));
@@ -495,23 +548,20 @@ public sealed class QuantificationDesignViewTests
                 ToolTip.GetTip(penaltyLabel)?.ToString() ?? string.Empty,
                 StringComparison.Ordinal);
             Assert.Contains(
-                formulaGuide.GetVisualDescendants().OfType<TextBlock>(),
-                text => (text.Text ?? string.Empty).Contains(
-                    "FinalRaw がblankならblank",
-                    StringComparison.Ordinal));
+                formulaDetails.GetVisualDescendants().OfType<TextBlock>(),
+                text => (text.Text ?? string.Empty).Contains("計算の各段階", StringComparison.Ordinal));
             Assert.Contains(
-                formulaDetails.GetVisualDescendants().OfType<Border>(),
-                border => (ToolTip.GetTip(border)?.ToString() ?? string.Empty).Contains(
-                    "有効設問間でも等分平均",
-                    StringComparison.Ordinal));
+                formulaDetails.GetVisualDescendants().OfType<TextBlock>(),
+                text => (text.Text ?? string.Empty).Contains("有効設問間でも等分平均", StringComparison.Ordinal));
+            details.Hide();
+            Render();
 
             Point before = formulaGuide.TranslatePoint(default, window)
                 ?? throw new InvalidOperationException("Formula guide position is unavailable.");
-            Assert.True(scroll.Extent.Height > scroll.Viewport.Height);
-            scroll.Offset = new Vector(0d, Math.Min(300d, scroll.Extent.Height - scroll.Viewport.Height));
+            viewModel.NextPageCommand.Execute(null);
             Render();
             Point after = formulaGuide.TranslatePoint(default, window)
-                ?? throw new InvalidOperationException("Formula guide position is unavailable after scrolling.");
+                ?? throw new InvalidOperationException("Formula guide position is unavailable after paging.");
             Assert.InRange(Math.Abs(after.Y - before.Y), 0d, 1d);
 
             viewModel.BasePoints = 55m;
@@ -522,6 +572,88 @@ public sealed class QuantificationDesignViewTests
             Assert.Equal("55", baseValue.Text);
             Assert.Equal("5", specialValue.Text);
             Assert.Equal("0.25", similarityValue.Text);
+
+            viewModel.RoundingDigits = 0;
+            viewModel.Questions[^1].Points = 0.000000000000000001m;
+            viewModel.PageIndex = 0;
+            Render();
+            TextBox allocation = Required<TextBox>(view, "AllocationSummaryText");
+            Assert.True(allocation.IsReadOnly);
+            Assert.Equal("配点合計 100.000000000000000001 / 100 · 残り -0.000000000000000001", allocation.Text);
+            Assert.Equal(100.000000000000000001m, viewModel.AllocationTotal);
+            Assert.Equal(-0.000000000000000001m, viewModel.AllocationRemaining);
+            Assert.False(viewModel.IsAllocationValid);
+            Assert.Contains(viewModel.ValidationErrors, error => error.Code == "ALLOCATION_TOTAL_INVALID");
+            Assert.Null(view.FindControl<TextBox>("RoundingDigitsTextBox"));
+
+            viewModel.Questions[^1].Points = 0m;
+            viewModel.Questions[0].Points = 39.999999999999999999m;
+            Render();
+            Assert.Equal("配点合計 99.999999999999999999 / 100 · 残り 0.000000000000000001", allocation.Text);
+            Assert.Equal(99.999999999999999999m, viewModel.AllocationTotal);
+            Assert.Equal(0.000000000000000001m, viewModel.AllocationRemaining);
+            Assert.False(viewModel.IsAllocationValid);
+
+            viewModel.Questions[0].Points = 40m;
+            Render();
+            Assert.Equal("配点合計 100 / 100 · 残り 0", allocation.Text);
+            Assert.True(viewModel.IsAllocationValid);
+
+            viewModel.Questions[0].Points = decimal.MaxValue;
+            Render();
+            Assert.Null(viewModel.AllocationTotal);
+            Assert.Equal(viewModel.AllocationSummary, allocation.Text);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Increasing_the_finite_body_above_550_grows_page_capacity_and_actual_rendered_rows(double scale)
+    {
+        QuantificationDesignViewModel design = new(CreateLargeDefinition());
+        QuestionDesignItemViewModel selected = design.Questions[5];
+        design.SelectedQuestion = selected;
+        QuantificationDefinition draft = design.Draft;
+        QuantificationDesignView view = new(design);
+        Window window = new()
+        {
+            Width = 950, Height = 550, WindowDecorations = WindowDecorations.None, Content = view,
+        };
+        try
+        {
+            window.Show();
+            window.SetRenderScaling(scale);
+            Render();
+            ListBox list = Required<ListBox>(view, "QuestionEditorList");
+            int compactCapacity = design.PageSize;
+            int compactRows = list.GetVisualDescendants().OfType<ListBoxItem>().Count();
+            Assert.InRange(compactRows, 1, design.Questions.Count - 1);
+            AssertMeasuredPage(view, design);
+            AssertNormalBodyFits(view);
+
+            window.Height = 800;
+            Render();
+
+            Assert.True(design.PageSize > compactCapacity);
+            Assert.True(list.GetVisualDescendants().OfType<ListBoxItem>().Count() > compactRows);
+            AssertMeasuredPage(view, design);
+            AssertNormalBodyFits(view);
+            AssertAccessibleInputsFit(view);
+            Assert.Same(selected, design.SelectedQuestion);
+            Assert.Same(draft, design.Draft);
+
+            window.Height = 550;
+            Render();
+            Assert.Equal(compactCapacity, design.PageSize);
+            Assert.Equal(compactRows, list.GetVisualDescendants().OfType<ListBoxItem>().Count());
+            Assert.Same(selected, design.SelectedQuestion);
+            AssertMeasuredPage(view, design);
+            AssertNormalBodyFits(view);
         }
         finally
         {
@@ -530,9 +662,136 @@ public sealed class QuantificationDesignViewTests
     }
 
     [AvaloniaFact]
-    public void Many_long_question_names_leave_a_usable_editor_viewport()
+    public async Task Loaded_input_A_and_design_B_mapping_link_opens_B_and_returns_to_input_B()
     {
-        QuantificationDefinition seed = new QuantificationDesignViewModel().Draft;
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        InputViewModel input = new();
+        await input.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        using MainWindowViewModel shell = new(new WorkflowNavigator(), input, new QuantificationDesignViewModel());
+        shell.NextCommand.Execute(null);
+        InputQuestionMappingViewModel inputA = input.Questions[0];
+        InputQuestionMappingViewModel inputB = input.Questions[1];
+        QuestionDesignItemViewModel designB = shell.DesignViewModel.Questions.Single(question => question.Id == inputB.Id);
+        shell.DesignViewModel.SelectedQuestion = designB;
+        Assert.Same(inputA, input.SelectedQuestion);
+        QuantificationDesignView view = new(shell.DesignViewModel);
+        Window window = new() { Width = 950, Height = 550, DataContext = shell, Content = view };
+        try
+        {
+            window.Show();
+            Render();
+            Button link = Required<Button>(view, "OpenQuestionSettingsButton");
+            Assert.Same(shell.OpenSettingsCommand, link.Command);
+            Activate(link);
+            Assert.True(shell.IsSettingsOpen);
+            Assert.Equal(SettingsCategory.Mapping, shell.Settings.SelectedCategory);
+            Assert.Same(inputB, input.SelectedQuestion);
+            Assert.Same(designB, shell.DesignViewModel.SelectedQuestion);
+            MappingSettingsView mapping = new(shell.Settings.Input);
+            window.Content = mapping;
+            Render();
+            Assert.Same(inputB, Required<ComboBox>(mapping, "QuestionSelector").SelectedItem);
+            Assert.Equal(designB.QuestionText, Required<TextBox>(mapping, "QuestionTextEditor").Text);
+            Assert.True(Required<TextBox>(mapping, "QuestionTextEditor").IsReadOnly);
+
+            shell.NavigateCommand.Execute(WorkflowStep.Input);
+            InputView mainInput = new(input);
+            window.Content = mainInput;
+            Render();
+            Assert.False(shell.IsSettingsOpen);
+            Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
+            Assert.Same(inputB, input.SelectedQuestion);
+            Assert.Same(inputB, Required<ComboBox>(mainInput, "QuestionSelector").SelectedItem);
+            Assert.Same(inputB, Required<TextBox>(mainInput, "QuestionTextEditor").DataContext);
+            Assert.Equal(inputB.QuestionText, Required<TextBox>(mainInput, "QuestionTextEditor").Text);
+            Assert.False(Required<TextBox>(mainInput, "QuestionTextEditor").IsReadOnly);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData("FirstDataRow", "FirstDataRowTextBox")]
+    [InlineData("LastDataRow", "LastDataRowTextBox")]
+    [InlineData("HeaderRow", "HeaderRowComboBox")]
+    [InlineData("SourceSheet", "WorksheetComboBox")]
+    [InlineData("SelectedRowCount", "LastDataRowTextBox")]
+    [InlineData("QuestionText", "QuestionTextEditor")]
+    [InlineData("PrimarySourceColumn", "PrimaryColumnComboBox")]
+    public async Task Input_owned_design_errors_navigate_to_the_actual_input_editor_not_mapping(string field, string editorName)
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        InputViewModel input = new();
+        await input.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        InputQuestionMappingViewModel target = input.Questions[1];
+        switch (field)
+        {
+            case "FirstDataRow": input.FirstDataRow = 0; break;
+            case "LastDataRow": input.LastDataRow = 0; break;
+            case "SourceSheet": input.SelectedSheet = string.Empty; break;
+            case "SelectedRowCount": input.LastDataRow = 20_003; break;
+            case "QuestionText": target.QuestionText = string.Empty; break;
+            case "PrimarySourceColumn": target.PrimarySourceColumn = string.Empty; break;
+        }
+
+        using MainWindowViewModel shell = new(new WorkflowNavigator(), input, new QuantificationDesignViewModel());
+        MainWindow window = new(shell) { Width = 1180, Height = 1000 };
+        try
+        {
+            window.Show();
+            shell.NextCommand.Execute(null);
+            if (field == "HeaderRow")
+            {
+                // Invalid imported root values can reach Design even though the
+                // Input selector only permits 1 or 2; its repair owner is Input.
+                shell.DesignViewModel.SynchronizeFromInput(
+                    shell.DesignViewModel.Draft with { HeaderRow = 3 }, input.AvailableColumnNames);
+            }
+
+            Render();
+            QuantificationDesignView view = Assert.Single(window.GetVisualDescendants().OfType<QuantificationDesignView>());
+            DesignValidationError error = Assert.Single(shell.DesignViewModel.ValidationErrors, item => item.Field == field);
+            Required<ComboBox>(view, "ValidationErrorSelector").SetCurrentValue(ComboBox.SelectedItemProperty, error);
+            Render();
+            Assert.Equal(WorkflowStep.Design, shell.CurrentStep);
+            Activate(Required<Button>(view, "GoToProblemButton"));
+            Render();
+
+            Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
+            Assert.False(shell.IsSettingsOpen);
+            Assert.DoesNotContain(window.GetVisualDescendants(), control => control is MappingSettingsView);
+            InputView inputView = Assert.Single(window.GetVisualDescendants().OfType<InputView>());
+            Assert.Same(input, inputView.DataContext);
+            Control editor = inputView.FindControl<Control>(editorName)!;
+            Assert.NotNull(editor);
+            Assert.True(editor.IsEffectivelyVisible && editor.IsEffectivelyEnabled);
+            Assert.Same(editor, window.FocusManager?.GetFocusedElement());
+            if (field == "FirstDataRow")
+            {
+                Assert.Equal(0, input.FirstDataRow);
+                Assert.Equal("0", Assert.IsType<TextBox>(editor).Text);
+            }
+            else if (field is "QuestionText" or "PrimarySourceColumn")
+            {
+                Assert.Same(target, input.SelectedQuestion);
+                Assert.Same(target, editor.DataContext);
+            }
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Many_long_question_names_leave_a_usable_editor_viewport()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
+        InputViewModel input = new();
+        await input.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
+        QuantificationDefinition seed = input.CreateDesignDefinition();
         QuantificationDefinition definition = seed with
         {
             Questions = [.. Enumerable.Range(1, 40).Select(index => seed.Questions[0] with
@@ -547,9 +806,13 @@ public sealed class QuantificationDesignViewTests
                 }],
             })],
         };
-        QuantificationDesignViewModel viewModel = new(definition);
+        QuantificationDesignViewModel viewModel = new(definition, input.AvailableColumnNames);
+        Assert.True(await input.ApplySavedDefinitionAsync(definition, TestContext.Current.CancellationToken));
+        using MainWindowViewModel shell = new(new WorkflowNavigator(), input, viewModel);
+        shell.NextCommand.Execute(null);
+        Assert.Equal(40, viewModel.Questions.Count);
         QuantificationDesignView view = new(viewModel);
-        Window window = new() { Width = 760, Height = 600, Content = view };
+        Window window = new() { Width = 760, Height = 600, DataContext = shell, Content = view };
         try
         {
             window.Show();
@@ -557,13 +820,35 @@ public sealed class QuantificationDesignViewTests
             ScrollViewer scroll = Required<ScrollViewer>(view, "QuantificationDesignScrollViewer");
             Assert.True(scroll.Viewport.Height >= 200d,
                 $"Question names consumed the editor viewport: {scroll.Viewport.Height:F1} DIP.");
+            AssertMeasuredPage(view, viewModel);
+            AssertAccessibleInputsFit(view);
+            foreach (QuestionDesignItemViewModel question in viewModel.VisibleQuestions)
+            {
+                TextBlock name = RequiredByAutomationId<TextBlock>(view, question.NameAutomationId);
+                Assert.Equal(TextTrimming.CharacterEllipsis, name.TextTrimming);
+                Assert.Equal(1, name.MaxLines);
+                Assert.Equal(question.DisplayName, AutomationProperties.GetName(name));
+            }
 
-            Button validate = RequiredByAutomationId<Button>(view, "ValidateDesignDraft");
-            validate.BringIntoView();
+            Button open = Required<Button>(view, "OpenQuestionSettingsButton");
+            Activate(open);
+            Assert.Equal(SettingsCategory.Mapping, shell.Settings.SelectedCategory);
+            Assert.Same(viewModel.Questions[0], viewModel.SelectedQuestion);
+            // T22 owns cross-VM selection sync; verify the new mapping view's full
+            // text surface, not another Input/Design synchronization implementation.
+            MappingSettingsView settings = new(input);
+            window.Content = settings;
             Render();
-            Point origin = validate.TranslatePoint(default, scroll)!.Value;
-            Assert.InRange(origin.Y, 0d, scroll.Viewport.Height - validate.Bounds.Height + 1d);
-            Assert.True(validate.Focus(NavigationMethod.Tab));
+            TextBox fullName = Required<TextBox>(settings, "QuestionNameEditor");
+            Assert.NotNull(viewModel.SelectedQuestion);
+            Assert.Equal(viewModel.SelectedQuestion.DisplayName, fullName.Text);
+            Assert.True(fullName.Focus(NavigationMethod.Tab));
+            Press(window, Key.End, RawInputModifiers.Control);
+            Assert.Equal(fullName.Text!.Length, fullName.CaretIndex);
+            shell.CloseSettings();
+            window.Content = view;
+            Render();
+            AssertMeasuredPage(view, viewModel);
         }
         finally
         {
@@ -572,22 +857,27 @@ public sealed class QuantificationDesignViewTests
     }
 
     [AvaloniaFact]
-    public void Multiple_questions_render_together_and_identify_the_prompt_target()
+    public void Paged_questions_and_direct_settings_links_preserve_the_same_prompt_target()
     {
-        QuantificationDesignViewModel viewModel = new();
+        ImportedPrompt source = new() { Path = "t19.txt", DisplayName = "t19.txt", Content = "原文\n{回答} {評価項目}" };
+        QuantificationDesignViewModel viewModel = new(null, ["A", "B"], [source]);
         QuestionDesignItemViewModel first = Assert.Single(viewModel.Questions);
         first.DisplayName = "設問A";
         QuestionDesignItemViewModel second = viewModel.DuplicateQuestion(first.Id);
         second.DisplayName = "設問B";
         viewModel.EqualizeQuestionPoints();
         EvaluatorDesignItemViewModel custom = viewModel.AddEvaluator(first.Id, EvaluatorType.CustomPrompt);
+        SpecialEvaluationDesignItemViewModel special = viewModel.AddSpecialEvaluation(first.Id);
         first.SelectedEvaluator = custom;
+        first.SelectedSpecialEvaluation = special;
         viewModel.SelectedQuestion = first;
+        using MainWindowViewModel shell = new(new WorkflowNavigator(), new InputViewModel(), viewModel);
         QuantificationDesignView view = new(viewModel);
         Window window = new()
         {
-            Width = 1260,
-            Height = 900,
+            Width = 950,
+            Height = 450,
+            DataContext = shell,
             Content = view,
         };
 
@@ -596,22 +886,41 @@ public sealed class QuantificationDesignViewTests
             window.Show();
             Render();
 
-            WrapPanel questionPanel = Assert.Single(
-                view.GetVisualDescendants().OfType<WrapPanel>(),
-                panel => AutomationProperties.GetAutomationId(panel) == "QuestionCardPanel");
-            TextBlock promptTarget = RequiredByAutomationId<TextBlock>(view, "SelectedPromptTargetSummary");
+            AssertMeasuredPage(view, viewModel);
+            QuantificationDefinition draft = viewModel.Draft;
+            foreach ((string name, SettingsCategory category) in new[]
+            {
+                ("OpenEvaluatorSettingsButton", SettingsCategory.Evaluation),
+                ("OpenSpecialSettingsButton", SettingsCategory.Special),
+                ("OpenImportedPromptsButton", SettingsCategory.ImportedPrompts),
+            })
+            {
+                Button link = Required<Button>(view, name);
+                Assert.Same(shell.OpenSettingsCommand, link.Command);
+                Assert.Equal(category, Assert.IsType<SettingsCategory>(link.CommandParameter));
+                Activate(link);
+                Assert.True(shell.IsSettingsOpen);
+                Assert.Equal(category, shell.Settings.SelectedCategory);
+                Assert.Same(first, viewModel.SelectedQuestion);
+                Assert.Same(custom, first.SelectedEvaluator);
+                Assert.Same(special, first.SelectedSpecialEvaluation);
+                Assert.Equal(ImportedPromptTarget.CustomEvaluator, viewModel.SelectedPromptTarget);
+                Assert.Same(draft, viewModel.Draft);
+                shell.CloseSettings();
+            }
 
-            Assert.Equal(Orientation.Horizontal, questionPanel.Orientation);
+            Assert.Equal("読込Prompt (1)", Required<Button>(view, "OpenImportedPromptsButton").Content);
+            Assert.Contains(custom.DisplayName, Required<TextBlock>(view, "EvaluatorSummaryText").Text!, StringComparison.Ordinal);
+            Assert.Contains(custom.Criteria[0].DisplayName, Required<TextBlock>(view, "EvaluatorSummaryText").Text!, StringComparison.Ordinal);
+            Assert.Contains(special.DisplayName, Required<TextBlock>(view, "SpecialSummaryText").Text!, StringComparison.Ordinal);
+            ImportedPromptSettingsView prompts = new(viewModel);
+            window.Content = prompts;
+            Render();
+            TextBlock promptTarget = Required<TextBlock>(prompts, "SelectedPromptTargetSummary");
             Assert.Equal($"設問A → Custom: {custom.DisplayName}", promptTarget.Text);
-            Assert.Equal(
-                2,
-                view.GetVisualDescendants().OfType<Border>().Count(border =>
-                    (AutomationProperties.GetAutomationId(border) ?? string.Empty).StartsWith(
-                        "DesignQuestion-",
-                        StringComparison.Ordinal)));
-
-            SpecialEvaluationDesignItemViewModel special = viewModel.AddSpecialEvaluation(first.Id);
-            first.SelectedSpecialEvaluation = special;
+            Assert.Same(viewModel.ImportedPrompts, Required<ListBox>(prompts, "ImportedPromptList").ItemsSource);
+            Assert.True(Required<TextBox>(prompts, "ImportedPromptPreview").IsReadOnly);
+            Assert.Equal(source.Content, Required<TextBox>(prompts, "ImportedPromptPreview").Text);
             viewModel.SelectedPromptTarget = ImportedPromptTarget.SpecialEvaluation;
             Render();
             Assert.Equal($"設問A → 固有評価: {special.DisplayName}", promptTarget.Text);
@@ -622,6 +931,8 @@ public sealed class QuantificationDesignViewTests
             Render();
 
             Assert.Equal("設問B → Custom評価方法を選択してください", promptTarget.Text);
+            window.Content = view;
+            Render();
             ListBoxItem selectedCard = Assert.Single(
                 view.GetVisualDescendants().OfType<ListBoxItem>(),
                 item => ReferenceEquals(item.DataContext, second));
@@ -632,7 +943,12 @@ public sealed class QuantificationDesignViewTests
             Render();
 
             Assert.Same(first, viewModel.SelectedQuestion);
+            AssertMeasuredPage(view, viewModel);
+            window.Content = prompts;
+            Render();
             Assert.Equal($"設問A → Custom: {custom.DisplayName}", promptTarget.Text);
+            Assert.Same(first, Required<ComboBox>(prompts, "ImportedPromptQuestionSelector").SelectedItem);
+            Assert.Same(source, Assert.Single(viewModel.ImportedPromptSources));
         }
         finally
         {
@@ -641,7 +957,7 @@ public sealed class QuantificationDesignViewTests
     }
 
     [AvaloniaFact]
-    public void Standalone_design_view_exposes_read_only_and_editable_prompt_surfaces_with_keyboard_and_two_hundred_percent_scroll()
+    public void Standalone_design_keeps_keyboard_points_and_independent_settings_keep_full_prompt_surfaces()
     {
         QuantificationDesignViewModel viewModel = new();
         QuestionDesignItemViewModel question = Assert.Single(viewModel.Questions);
@@ -650,8 +966,8 @@ public sealed class QuantificationDesignViewTests
         QuantificationDesignView view = new(viewModel);
         Window window = new()
         {
-            Width = 1260,
-            Height = 900,
+            Width = 950,
+            Height = 450,
             Content = view,
         };
 
@@ -659,56 +975,431 @@ public sealed class QuantificationDesignViewTests
         {
             window.Show();
             window.SetRenderScaling(2d);
-            Dispatcher.UIThread.RunJobs();
+            Render();
 
-            TextBox name = Required<TextBox>(view, "DefinitionNameTextBox");
             TextBox basePoints = Required<TextBox>(view, "BasePointsTextBox");
             TextBox specialPoints = Required<TextBox>(view, "SpecialPointsTextBox");
             TextBox similarityWeight = Required<TextBox>(view, "SimilarityPenaltyWeightTextBox");
             Button equalize = Required<Button>(view, "EqualizeQuestionPointsButton");
-            ScrollViewer scroll = Required<ScrollViewer>(view, "QuantificationDesignScrollViewer");
             ListBox questions = Required<ListBox>(view, "QuestionEditorList");
             Border validation = Required<Border>(view, "DesignValidationSummary");
-            TextBox knowledgePreview = Assert.Single(
-                view.GetVisualDescendants().OfType<TextBox>(),
-                textBox => AutomationProperties.GetAutomationId(textBox) == knowledge.PromptPreviewAutomationId);
 
             Assert.Same(viewModel, view.DataContext);
             Assert.Equal(2d, window.RenderScaling);
-            Assert.Equal(ScrollBarVisibility.Disabled, scroll.HorizontalScrollBarVisibility);
-            Assert.Equal(ScrollBarVisibility.Auto, scroll.VerticalScrollBarVisibility);
+            AssertNormalBodyFits(view);
+            AssertAccessibleInputsFit(view);
             Assert.Equal("DesignQuestions", AutomationProperties.GetAutomationId(questions));
             Assert.Equal("DesignValidationSummary", AutomationProperties.GetAutomationId(validation));
             Assert.Equal("DesignBasePoints", AutomationProperties.GetAutomationId(basePoints));
             Assert.Equal("DesignSpecialPoints", AutomationProperties.GetAutomationId(specialPoints));
             Assert.Equal("DesignSimilarityPenaltyWeight", AutomationProperties.GetAutomationId(similarityWeight));
             Assert.Equal("EqualizeQuestionPoints", AutomationProperties.GetAutomationId(equalize));
-            Assert.Same(name, window.FocusManager?.GetFocusedElement());
-            Assert.True(name.MinHeight >= 44d);
-            Assert.True(knowledgePreview.IsVisible);
-            Assert.True(knowledgePreview.IsReadOnly);
-            Assert.Contains("説明", knowledgePreview.Text ?? string.Empty, StringComparison.Ordinal);
+            Assert.Same(basePoints, window.FocusManager?.GetFocusedElement());
+            Press(window, Key.Tab);
+            Assert.Same(specialPoints, window.FocusManager?.GetFocusedElement());
+            Press(window, Key.Tab, RawInputModifiers.Shift);
+            Assert.Same(basePoints, window.FocusManager?.GetFocusedElement());
+            TextBox points = Required<TextBox>(view, "SelectedQuestionPointsTextBox");
+            Assert.Equal(question.WeightAutomationId, AutomationProperties.GetAutomationId(points));
+            Assert.True(points.Focus(NavigationMethod.Tab));
+            Assert.Equal(new Thickness(3d), points.BorderThickness);
             Assert.Contains(view.GetVisualDescendants(), descendant => descendant is VirtualizingStackPanel);
             Assert.Null(view.FindControl<Border>("EthicsWarningBanner"));
+            Assert.Null(view.FindControl<TextBox>("DefinitionNameTextBox"));
+            Assert.Null(view.FindControl<ListBox>("ImportedPromptList"));
+            foreach (string name in new[]
+            {
+                "OpenQuestionSettingsButton", "OpenEvaluatorSettingsButton", "OpenSpecialSettingsButton", "OpenImportedPromptsButton",
+            })
+            {
+                Button link = Required<Button>(view, name);
+                Assert.Null(link.Command);
+                Assert.False(link.IsEnabled);
+                Assert.False(link.IsEffectivelyEnabled);
+            }
+
+            basePoints.SetCurrentValue(TextBox.TextProperty, "55");
+            similarityWeight.SetCurrentValue(TextBox.TextProperty, "0.25");
+            points.SetCurrentValue(TextBox.TextProperty, "44");
+            Render();
+            Assert.Equal(55m, viewModel.BasePoints);
+            Assert.Equal(0.25m, viewModel.SimilarityPenaltyWeight);
+            Assert.Equal(44m, question.Points);
+            Assert.Equal(99m, viewModel.AllocationTotal);
+            CheckBox enabled = Required<CheckBox>(view, "SelectedQuestionEnabled");
+            enabled.SetCurrentValue(ToggleButton.IsCheckedProperty, false);
+            Render();
+            Assert.False(question.Enabled);
+            Assert.False(viewModel.Draft.Questions[0].Enabled);
+            Assert.Equal(44m, question.Points);
+            enabled.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
+            Render();
+            Activate(equalize);
+            Assert.Equal(45m, question.Points);
+            Assert.Equal("45", points.Text);
+            Assert.Equal(100m, viewModel.AllocationTotal);
+
+            using ExecutionViewModel execution = new();
+            using SettingsViewModel settingsOwner = new(new InputViewModel(), viewModel, execution);
+            SettingsView settings = new(settingsOwner);
+            window.Content = settings;
+            Render();
+            Assert.Equal(viewModel.DefinitionName, RequiredByAutomationId<TextBox>(settings, "DesignDefinitionName").Text);
+            Assert.Equal(viewModel.Revision, RequiredByAutomationId<TextBox>(settings, "DesignRevision").Text);
+            Assert.NotNull(RequiredByAutomationId<TextBox>(settings, "DesignRoundingDigits"));
+
+            EvaluatorSettingsView evaluators = new(viewModel);
+            window.Content = evaluators;
+            Render();
+            Required<TabControl>(evaluators, "EditorTabs").SelectedIndex = 1;
+            Render();
+            TextBox knowledgePreview = RequiredByAutomationId<TextBox>(evaluators, knowledge.PromptPreviewAutomationId);
+            Assert.True(knowledgePreview.IsEffectivelyVisible);
+            Assert.True(knowledgePreview.IsReadOnly);
+            Assert.Contains("説明", knowledgePreview.Text ?? string.Empty, StringComparison.Ordinal);
 
             question.SelectedEvaluator = custom;
-            Dispatcher.UIThread.RunJobs();
-            TextBox customEditor = Assert.Single(
-                view.GetVisualDescendants().OfType<TextBox>(),
-                textBox => AutomationProperties.GetAutomationId(textBox) == custom.PromptAutomationId);
-            TextBox customPreview = Assert.Single(
-                view.GetVisualDescendants().OfType<TextBox>(),
-                textBox => AutomationProperties.GetAutomationId(textBox) == custom.PromptPreviewAutomationId);
+            Render();
+            TextBox customEditor = RequiredByAutomationId<TextBox>(evaluators, custom.PromptAutomationId);
+            TextBox customPreview = RequiredByAutomationId<TextBox>(evaluators, custom.PromptPreviewAutomationId);
             Assert.False(customEditor.IsReadOnly);
-            Assert.True(customEditor.IsVisible);
-            Assert.True(customPreview.IsVisible);
+            Assert.True(customEditor.IsEffectivelyVisible);
+            Assert.True(customPreview.IsEffectivelyVisible);
             Assert.True(customPreview.IsReadOnly);
-
-            Press(window, Key.Tab);
-            Assert.NotSame(name, window.FocusManager?.GetFocusedElement());
             Assert.True(customEditor.Focus(NavigationMethod.Tab, KeyModifiers.None));
             Assert.Same(customEditor, window.FocusManager?.GetFocusedElement());
             Assert.Equal(new Thickness(3d), customEditor.BorderThickness);
+            Press(window, Key.Tab);
+            Assert.Same(customPreview, window.FocusManager?.GetFocusedElement());
+            Press(window, Key.Tab, RawInputModifiers.Shift);
+            Assert.Same(customEditor, window.FocusManager?.GetFocusedElement());
+
+            SpecialEvaluationDesignItemViewModel special = viewModel.AddSpecialEvaluation(question.Id);
+            SpecialEvaluationSettingsView specials = new(viewModel);
+            window.Content = specials;
+            Render();
+            TabItem promptTab = RequiredByAutomationId<TabItem>(specials, "SpecialSettingsPromptTab");
+            promptTab.GetVisualAncestors().OfType<TabControl>().Single().SelectedItem = promptTab;
+            Render();
+            Assert.False(RequiredByAutomationId<TextBox>(specials, special.PromptAutomationId).IsReadOnly);
+            Assert.Equal(special.PromptTemplate, RequiredByAutomationId<TextBox>(specials, special.PromptAutomationId).Text);
+            Assert.True(RequiredByAutomationId<TextBox>(specials, special.CardAutomationId + "-PromptPreview").IsReadOnly);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void Validation_overview_preserves_exact_errors_and_opens_each_selected_problem()
+    {
+        QuantificationDesignViewModel design = new();
+        QuestionDesignItemViewModel question = design.Questions[0];
+        EvaluatorDesignItemViewModel custom = design.AddEvaluator(question.Id, EvaluatorType.CustomPrompt);
+        CriterionDesignItemViewModel criterion = custom.Criteria[0];
+        SpecialEvaluationDesignItemViewModel special = design.AddSpecialEvaluation(question.Id);
+        QuestionDesignItemViewModel other = design.AddQuestion();
+        custom.CustomPromptTemplate = "{回答}";
+        criterion.Weight = 0m;
+        special.PromptTemplate = "placeholder不足";
+        design.RoundingDigits = 7;
+        QuantificationDefinition draft = design.Draft;
+        using MainWindowViewModel shell = new(new WorkflowNavigator(), new InputViewModel(), design);
+        QuantificationDesignView view = new(design);
+        Window window = new() { Width = 950, Height = 450, DataContext = shell, Content = view };
+        try
+        {
+            window.Show();
+            Render();
+            ComboBox errors = Required<ComboBox>(view, "ValidationErrorSelector");
+            Assert.Same(design.ValidationErrors, errors.ItemsSource);
+            Assert.InRange(errors.MaxDropDownHeight, 44d, 220d);
+            foreach ((string id, string field, SettingsCategory category) in new[]
+            {
+                (custom.Id, "CustomPromptTemplate", SettingsCategory.Evaluation),
+                (criterion.Id, "Weight", SettingsCategory.Evaluation),
+                (special.Id, "PromptTemplate", SettingsCategory.Special),
+                (design.Draft.Id, "RoundingDigits", SettingsCategory.Common),
+            })
+            {
+                design.SelectedQuestion = other;
+                DesignValidationError error = Assert.Single(design.ValidationErrors, item => item.NodeId == id && item.Field == field);
+                errors.SetCurrentValue(ComboBox.SelectedItemProperty, error);
+                Render();
+                Activate(Required<Button>(view, "ValidateDesignButton"));
+                DesignValidationError refreshed = Assert.IsType<DesignValidationError>(errors.SelectedItem);
+                Assert.Equal((error.NodeId, error.Field, error.Code), (refreshed.NodeId, refreshed.Field, refreshed.Code));
+                Button detailsButton = Required<Button>(view, "ErrorDetailsButton");
+                Flyout details = Assert.IsType<Flyout>(detailsButton.Flyout);
+                TextBox detail = Assert.IsType<TextBox>(details.Content);
+                Assert.Equal(refreshed.AccessibleText, detail.Text);
+                Activate(detailsButton);
+                Assert.True(detail.Focus(NavigationMethod.Tab));
+                Press(Assert.IsAssignableFrom<TopLevel>(TopLevel.GetTopLevel(detail)), Key.End, RawInputModifiers.Control);
+                Assert.Equal(detail.Text!.Length, detail.CaretIndex);
+                details.Hide();
+                Render();
+                Activate(Required<Button>(view, "GoToProblemButton"));
+                Assert.Equal(category, shell.Settings.SelectedCategory);
+                Assert.True(shell.IsSettingsOpen);
+                if (id != design.Draft.Id)
+                {
+                    Assert.Same(question, design.SelectedQuestion);
+                }
+
+                if (id == criterion.Id)
+                {
+                    Assert.Same(custom, question.SelectedEvaluator);
+                    Assert.Same(criterion, custom.SelectedCriterion);
+                }
+
+                if (id == special.Id)
+                {
+                    Assert.Same(special, question.SelectedSpecialEvaluation);
+                }
+
+                Assert.Same(draft, design.Draft);
+                shell.CloseSettings();
+            }
+
+            other.Points = -1m;
+            Render();
+            errors.SetCurrentValue(ComboBox.SelectedItemProperty,
+                Assert.Single(design.ValidationErrors, error => error.NodeId == other.Id && error.Field == "Points"));
+            Activate(Required<Button>(view, "GoToProblemButton"));
+            Assert.Same(other, design.SelectedQuestion);
+            Assert.Same(Required<TextBox>(view, "SelectedQuestionPointsTextBox"), window.FocusManager?.GetFocusedElement());
+            Assert.False(shell.IsSettingsOpen);
+            AssertNormalBodyFits(view);
+            AssertAccessibleInputsFit(view);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void Uncommitted_numeric_text_survives_paging_resize_and_cached_view_reattach()
+    {
+        QuantificationDesignViewModel design = new(CreateLargeDefinition());
+        QuantificationDesignView view = new(design);
+        Window window = new() { Width = 950, Height = 450, Content = view };
+        try
+        {
+            window.Show();
+            Render();
+            TextBox basePoints = Required<TextBox>(view, "BasePointsTextBox");
+            TextBox points = Required<TextBox>(view, "SelectedQuestionPointsTextBox");
+            QuestionDesignItemViewModel selected = design.SelectedQuestion!;
+            QuantificationDefinition draft = design.Draft;
+            basePoints.SetCurrentValue(TextBox.TextProperty, "-");
+            points.SetCurrentValue(TextBox.TextProperty, "編集中");
+            Render();
+            Assert.True(DataValidationErrors.GetHasErrors(basePoints));
+            Assert.True(DataValidationErrors.GetHasErrors(points));
+            Assert.Contains("未反映", Required<TextBlock>(view, "DesignStatusText").Text!, StringComparison.Ordinal);
+            Assert.False(Required<Button>(view, "EqualizeQuestionPointsButton").IsEffectivelyEnabled);
+            AssertNormalBodyFits(view);
+            AssertAccessibleInputsFit(view);
+            design.NextPageCommand.Execute(null);
+            window.Height = 550;
+            Render();
+            window.Content = null;
+            Render();
+            window.Content = view; // T23's cache contract: same controls, not reconstructed VMs.
+            Render();
+            Assert.Same(basePoints, Required<TextBox>(view, "BasePointsTextBox"));
+            Assert.Same(points, Required<TextBox>(view, "SelectedQuestionPointsTextBox"));
+            Assert.Equal("-", basePoints.Text);
+            Assert.Equal("編集中", points.Text);
+            Assert.Same(selected, design.SelectedQuestion);
+            Assert.Same(draft, design.Draft);
+            Assert.Equal(45m, design.BasePoints);
+            Assert.Equal(1m, selected.Points);
+            basePoints.SetCurrentValue(TextBox.TextProperty, "45");
+            points.SetCurrentValue(TextBox.TextProperty, "1");
+            Render();
+            Assert.False(DataValidationErrors.GetHasErrors(basePoints));
+            Assert.False(DataValidationErrors.GetHasErrors(points));
+            Assert.DoesNotContain("未反映", Required<TextBlock>(view, "DesignStatusText").Text!, StringComparison.Ordinal);
+            Assert.True(Required<Button>(view, "EqualizeQuestionPointsButton").IsEffectivelyEnabled);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void Uncommitted_question_points_survive_selection_switches_and_same_value_correction()
+    {
+        QuantificationDesignViewModel design = new(CreateLargeDefinition());
+        QuestionDesignItemViewModel first = design.Questions[0];
+        QuestionDesignItemViewModel second = design.Questions[1];
+        QuantificationDefinition draft = design.Draft;
+        QuantificationDesignView view = new(design);
+        Window window = new() { Width = 950, Height = 600, Content = view };
+        try
+        {
+            window.Show();
+            Render();
+            ListBox list = Required<ListBox>(view, "QuestionEditorList");
+            TextBox points = Required<TextBox>(view, "SelectedQuestionPointsTextBox");
+            TextBlock status = Required<TextBlock>(view, "DesignStatusText");
+            var pointsBinding = BindingOperations.GetBindingExpressionBase(points, TextBox.TextProperty);
+            var selectionBinding = BindingOperations.GetBindingExpressionBase(list, ListBox.SelectedItemProperty);
+            Assert.NotNull(pointsBinding);
+            Assert.NotNull(selectionBinding);
+            Assert.NotEqual(first.Points, second.Points);
+            Assert.True(points.Focus(NavigationMethod.Tab));
+            points.SelectAll();
+            window.KeyTextInput("-");
+            Render();
+            Assert.True(DataValidationErrors.GetHasErrors(points));
+
+            list.SetCurrentValue(ListBox.SelectedItemProperty, second);
+            Render();
+            Assert.Same(second, design.SelectedQuestion);
+            Assert.Equal("2", points.Text);
+            Assert.False(DataValidationErrors.GetHasErrors(points));
+            Assert.Contains("未反映の入力 1 件", status.Text, StringComparison.Ordinal);
+            Assert.Contains(first.Id, status.Text, StringComparison.Ordinal);
+            Assert.False(Required<Button>(view, "EqualizeQuestionPointsButton").IsEffectivelyEnabled);
+            Activate(Required<Button>(view, "GoToProblemButton"));
+            Assert.Same(first, design.SelectedQuestion);
+            Assert.Same(points, window.FocusManager?.GetFocusedElement());
+            Assert.Equal("-", points.Text);
+            Assert.True(DataValidationErrors.GetHasErrors(points));
+
+            // Exercise the actual TwoWay selection binding, including switches
+            // before a queued validation/restore pass has run.
+            list.SetCurrentValue(ListBox.SelectedItemProperty, second);
+            list.SetCurrentValue(ListBox.SelectedItemProperty, first);
+            Render();
+            Assert.Same(first, list.SelectedItem);
+            Assert.Equal("-", points.Text);
+            Assert.True(DataValidationErrors.GetHasErrors(points));
+            Assert.Same(draft, design.Draft);
+            Assert.Equal(1m, first.Points);
+            Assert.Equal(2m, second.Points);
+
+            points.SetCurrentValue(TextBox.TextProperty, "1");
+            list.SetCurrentValue(ListBox.SelectedItemProperty, second);
+            Render();
+            list.SetCurrentValue(ListBox.SelectedItemProperty, first);
+            Render();
+            Assert.Equal("1", points.Text);
+            Assert.False(DataValidationErrors.GetHasErrors(points));
+            Assert.DoesNotContain("未反映", status.Text, StringComparison.Ordinal);
+            Assert.True(Required<Button>(view, "EqualizeQuestionPointsButton").IsEffectivelyEnabled);
+            Assert.Same(draft, design.Draft);
+            Assert.Same(pointsBinding, BindingOperations.GetBindingExpressionBase(points, TextBox.TextProperty));
+            Assert.Same(selectionBinding, BindingOperations.GetBindingExpressionBase(list, ListBox.SelectedItemProperty));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void Pending_question_points_are_counted_by_id_and_removed_with_the_question()
+    {
+        QuantificationDesignViewModel design = new(CreateLargeDefinition());
+        QuestionDesignItemViewModel first = design.Questions[0];
+        QuestionDesignItemViewModel second = design.Questions[1];
+        first.DisplayName = second.DisplayName = "同名の設問";
+        QuantificationDefinition draft = design.Draft;
+        QuantificationDesignView view = new(design);
+        Window window = new() { Width = 950, Height = 600, Content = view };
+        try
+        {
+            window.Show();
+            Render();
+            ListBox list = Required<ListBox>(view, "QuestionEditorList");
+            TextBox points = Required<TextBox>(view, "SelectedQuestionPointsTextBox");
+            TextBlock status = Required<TextBlock>(view, "DesignStatusText");
+            TextBox detail = Assert.IsType<TextBox>(Assert.IsType<Flyout>(Required<Button>(view, "ErrorDetailsButton").Flyout).Content);
+            points.SetCurrentValue(TextBox.TextProperty, "-");
+            list.SetCurrentValue(ListBox.SelectedItemProperty, second);
+            Render();
+            points.SetCurrentValue(TextBox.TextProperty, "編集中");
+            Render();
+
+            Assert.Contains("未反映の入力 2 件", status.Text, StringComparison.Ordinal);
+            Assert.Contains(first.Id, detail.Text, StringComparison.Ordinal);
+            Assert.Contains(second.Id, detail.Text, StringComparison.Ordinal);
+            Assert.Same(draft, design.Draft);
+            list.SetCurrentValue(ListBox.SelectedItemProperty, first);
+            Render();
+            Assert.Equal("-", points.Text);
+            points.SetCurrentValue(TextBox.TextProperty, "1");
+            Render();
+            Assert.Contains("未反映の入力 1 件", status.Text, StringComparison.Ordinal);
+            Assert.DoesNotContain(first.Id, detail.Text, StringComparison.Ordinal);
+            Assert.Contains(second.Id, detail.Text, StringComparison.Ordinal);
+            Activate(Required<Button>(view, "GoToProblemButton"));
+            Assert.Same(second, design.SelectedQuestion);
+            Assert.Equal("編集中", points.Text);
+            Assert.True(DataValidationErrors.GetHasErrors(points));
+
+            design.DeleteQuestion(second.Id);
+            Render();
+            Assert.DoesNotContain("未反映", status.Text, StringComparison.Ordinal);
+            Assert.DoesNotContain(second.Id, detail.Text, StringComparison.Ordinal);
+            Assert.False(DataValidationErrors.GetHasErrors(points));
+            Assert.Equal(1m, first.Points);
+            Assert.Equal(2m, second.Points);
+            Assert.True(Required<Button>(view, "EqualizeQuestionPointsButton").IsEffectivelyEnabled);
+
+            // Reintroducing the deleted ID must not resurrect its old local text.
+            design.SynchronizeFromInput(draft, design.AvailableColumnNames);
+            Render();
+            QuestionDesignItemViewModel restored = Assert.Single(design.Questions, question => question.Id == second.Id);
+            list.SetCurrentValue(ListBox.SelectedItemProperty, restored);
+            Render();
+            Assert.Equal("2", points.Text);
+            Assert.False(DataValidationErrors.GetHasErrors(points));
+            Assert.DoesNotContain("未反映", status.Text, StringComparison.Ordinal);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void Pending_question_points_do_not_leak_when_the_view_is_rebound()
+    {
+        QuantificationDesignViewModel original = new(CreateLargeDefinition());
+        QuantificationDesignViewModel replacement = new(CreateLargeDefinition());
+        QuantificationDefinition originalDraft = original.Draft;
+        QuantificationDefinition replacementDraft = replacement.Draft;
+        QuantificationDesignView view = new(original);
+        Window window = new() { Width = 950, Height = 600, Content = view };
+        try
+        {
+            window.Show();
+            Render();
+            TextBox points = Required<TextBox>(view, "SelectedQuestionPointsTextBox");
+            points.SetCurrentValue(TextBox.TextProperty, "-");
+            Render();
+            Assert.True(DataValidationErrors.GetHasErrors(points));
+            Assert.Equal(original.SelectedQuestion!.Id, replacement.SelectedQuestion!.Id);
+
+            view.DataContext = replacement;
+            Render();
+
+            Assert.Same(points, Required<TextBox>(view, "SelectedQuestionPointsTextBox"));
+            Assert.Same(replacement, view.ViewModel);
+            Assert.Equal("1", points.Text);
+            Assert.False(DataValidationErrors.GetHasErrors(points));
+            Assert.DoesNotContain("未反映", Required<TextBlock>(view, "DesignStatusText").Text, StringComparison.Ordinal);
+            Assert.True(Required<Button>(view, "EqualizeQuestionPointsButton").IsEffectivelyEnabled);
+            Assert.Same(originalDraft, original.Draft);
+            Assert.Same(replacementDraft, replacement.Draft);
         }
         finally
         {
@@ -788,6 +1479,71 @@ public sealed class QuantificationDesignViewTests
             root.GetVisualDescendants().OfType<T>(),
             control => AutomationProperties.GetAutomationId(control) == automationId);
 
+    private static void AssertMeasuredPage(QuantificationDesignView view, QuantificationDesignViewModel design)
+    {
+        ListBox list = Required<ListBox>(view, "QuestionEditorList");
+        ListBoxItem[] rows = list.GetVisualDescendants().OfType<ListBoxItem>().ToArray();
+        Assert.Equal(design.VisibleQuestions.Count, rows.Length);
+        Assert.NotEmpty(rows);
+        double rowHeight = rows[0].Bounds.Height;
+        Assert.True(rowHeight >= 44d);
+        Assert.Equal(Math.Max(1, (int)Math.Floor(list.Bounds.Height / rowHeight)), design.PageSize);
+        Assert.All(rows, row =>
+        {
+            Assert.Equal(rowHeight, row.Bounds.Height);
+            AssertFits(row, list);
+        });
+        Assert.Equal(design.PageSummary, Required<TextBlock>(view, "QuestionPageSummary").Text);
+        Assert.Equal(design.VisibleQuestions.Count, view.GetVisualDescendants().OfType<Border>()
+            .Count(border => (AutomationProperties.GetAutomationId(border) ?? string.Empty).StartsWith("DesignQuestion-", StringComparison.Ordinal)));
+    }
+
+    private static void AssertNormalBodyFits(QuantificationDesignView view)
+    {
+        ScrollViewer scroll = Required<ScrollViewer>(view, "QuantificationDesignScrollViewer");
+        Assert.True(double.IsFinite(scroll.Extent.Height) && double.IsFinite(scroll.Extent.Width));
+        Assert.True(scroll.Extent.Height <= scroll.Viewport.Height + 1d);
+        Assert.True(scroll.Extent.Width <= scroll.Viewport.Width + 1d);
+        Assert.Equal(default, scroll.Offset);
+    }
+
+    private static void AssertAccessibleInputsFit(Control view)
+    {
+        TemplatedControl[] targets = view.GetVisualDescendants().OfType<TemplatedControl>()
+            .Where(control => control.IsEffectivelyVisible && control is Button or TextBox or CheckBox or ComboBox
+                && !string.IsNullOrWhiteSpace(AutomationProperties.GetAutomationId(control))).ToArray();
+        Assert.NotEmpty(targets);
+        foreach (TemplatedControl control in targets)
+        {
+            Assert.True(control.MinHeight >= 44d);
+            Assert.True(control.Bounds.Height >= 44d);
+            Assert.True(control.Bounds.Width >= 44d);
+            Assert.Equal(14d, control.FontSize);
+            Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(control)));
+            Assert.False(string.IsNullOrWhiteSpace(ToolTip.GetTip(control)?.ToString()));
+            AssertFits(control, view);
+        }
+
+        string[] ids = view.GetVisualDescendants().OfType<Control>().Select(AutomationProperties.GetAutomationId)
+            .Where(id => !string.IsNullOrWhiteSpace(id)).Cast<string>().ToArray();
+        Assert.Equal(ids.Length, ids.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    private static void AssertFits(Control control, Control container)
+    {
+        Point origin = control.TranslatePoint(default, container)!.Value;
+        Assert.True(origin.X >= -1d && origin.Y >= -1d);
+        Assert.True(origin.X + control.Bounds.Width <= container.Bounds.Width + 1d);
+        Assert.True(origin.Y + control.Bounds.Height <= container.Bounds.Height + 1d);
+    }
+
+    private static void Activate(Button button)
+    {
+        Assert.True(button.IsEffectivelyEnabled);
+        Assert.True(button.Focus(NavigationMethod.Tab));
+        Press(Assert.IsAssignableFrom<TopLevel>(TopLevel.GetTopLevel(button)), Key.Enter);
+    }
+
     private static void Render()
     {
         Dispatcher.UIThread.RunJobs();
@@ -795,16 +1551,17 @@ public sealed class QuantificationDesignViewTests
         Dispatcher.UIThread.RunJobs();
     }
 
-    private static void Press(TopLevel window, Key key)
+    private static void Press(TopLevel window, Key key, RawInputModifiers modifiers = RawInputModifiers.None)
     {
         PhysicalKey physicalKey = key switch
         {
             Key.Tab => PhysicalKey.Tab,
             Key.Enter => PhysicalKey.Enter,
+            Key.End => PhysicalKey.End,
             _ => throw new ArgumentOutOfRangeException(nameof(key), key, "Unsupported test key."),
         };
-        window.KeyPress(key, RawInputModifiers.None, physicalKey, null);
-        window.KeyRelease(key, RawInputModifiers.None, physicalKey, null);
-        Dispatcher.UIThread.RunJobs();
+        window.KeyPress(key, modifiers, physicalKey, null);
+        window.KeyRelease(key, modifiers, physicalKey, null);
+        Render();
     }
 }

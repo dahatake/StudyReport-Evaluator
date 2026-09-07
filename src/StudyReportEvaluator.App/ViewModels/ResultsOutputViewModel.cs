@@ -109,10 +109,25 @@ public sealed class ResultsOutputResult
         $"{nameof(ResultsOutputResult)} {{ Code = {Code}, CauseCode = {CauseCode ?? "<none>"}, Content = <redacted> }}";
 }
 
+// Presentation categories, not run/output status codes or conclusions inferred from scores.
+// Missing durable rows are Unprocessed; otherwise technical errors precede cancellation,
+// all-empty (ignoring zero-budget skips) precedes Success. Mixed successful/empty work is Success.
+public enum ResultsRowStatus
+{
+    Success,
+    Empty,
+    Cancelled,
+    // No committed durable row, or only undispatched legacy cancellation records.
+    // A discarded in-progress durable row may have attempted work; it is not a saved result.
+    Unprocessed,
+    TechnicalError,
+}
+
 public sealed class ResultsRowScoreViewModel
 {
     internal ResultsRowScoreViewModel(
         int sourceRowNumber,
+        ResultsRowStatus status,
         string questionEarnedText,
         decimal? specialEarned,
         decimal? similarityPenalty,
@@ -120,6 +135,7 @@ public sealed class ResultsRowScoreViewModel
         decimal? finalScore)
     {
         SourceRowNumber = sourceRowNumber;
+        Status = status;
         QuestionEarnedText = questionEarnedText;
         SpecialEarned = specialEarned;
         SimilarityPenalty = similarityPenalty;
@@ -128,6 +144,18 @@ public sealed class ResultsRowScoreViewModel
     }
 
     public int SourceRowNumber { get; }
+
+    public ResultsRowStatus Status { get; }
+
+    public string StatusText => Status switch
+    {
+        ResultsRowStatus.Success => "成功",
+        ResultsRowStatus.Empty => "回答空欄",
+        ResultsRowStatus.Cancelled => "取消",
+        ResultsRowStatus.Unprocessed => "未処理・未確定",
+        ResultsRowStatus.TechnicalError => "技術エラー",
+        _ => throw new InvalidOperationException("The result row status is invalid."),
+    };
 
     public string QuestionEarnedText { get; }
 
@@ -159,6 +187,9 @@ public interface IResultsOutputBoundary
 {
     ResultsOutputPathAssessment AssessPath(string inputPath, string outputPath);
 
+    // SUCCESS is the boundary's commit receipt. Prefer its nonblank FinalPath; for legacy
+    // boundaries a null/blank FinalPath means the captured request.OutputPath, not a later edit.
+    // Presentation consumes this receipt without probing whether a file exists.
     Task<ResultsOutputResult> ExportAsync(
         ResultsOutputRequest request,
         CancellationToken cancellationToken);
@@ -568,12 +599,30 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
     private readonly WeightedScoreCalculator scoreCalculator = new();
     private readonly ObservableCollection<ResultsCriterionViewModel> resultItems = [];
     private readonly ObservableCollection<ResultsRowScoreViewModel> rowScoreItems = [];
+    private readonly ObservableCollection<ResultsRowScoreViewModel> visibleRowScoreItems = [];
+    private readonly ObservableCollection<ResultsCriterionViewModel> selectedRowCriterionItems = [];
     private readonly ViewModelCommand exportCommand;
     private readonly ViewModelCommand cancelExportCommand;
+    private readonly ViewModelCommand previousPageCommand;
+    private readonly ViewModelCommand nextPageCommand;
+    private readonly ViewModelCommand goToRowCommand;
+    private readonly ViewModelCommand nextOverrideErrorCommand;
+    private readonly ViewModelCommand showDetailCommand;
+    private readonly ViewModelCommand showListCommand;
     private ExecutionRunContext? context;
+    private ResultsRowScoreViewModel? selectedRow;
+    private ResultsCriterionViewModel? selectedCriterion;
+    private int pageSize = 4;
+    private int pageIndex;
+    private int? goToRowNumber;
+    private bool isDetailVisible;
+    private bool updatingPresentation;
+    private bool hasUnsavedOverrides;
+    private long overrideRevision;
     private string outputPath = string.Empty;
+    private string lastSuccessfulExportPath = string.Empty;
     private ResultsOutputPathAssessment pathAssessment = InvalidInitialPath();
-    private bool hasOverrideErrors;
+    private int overrideErrorCount;
     private bool isExporting;
     private bool isExportCancelling;
     private string lastExportCode = ResultsOutputStatusCodes.Ready;
@@ -594,12 +643,32 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
             ?? throw new ArgumentNullException(nameof(outputBoundary));
         Results = new ReadOnlyObservableCollection<ResultsCriterionViewModel>(resultItems);
         RowScores = new ReadOnlyObservableCollection<ResultsRowScoreViewModel>(rowScoreItems);
+        VisibleRowScores = new ReadOnlyObservableCollection<ResultsRowScoreViewModel>(visibleRowScoreItems);
+        SelectedRowCriteria = new ReadOnlyObservableCollection<ResultsCriterionViewModel>(selectedRowCriterionItems);
         exportCommand = new ViewModelCommand(
             _ => _ = ExportAsync(),
             _ => CanExport);
         cancelExportCommand = new ViewModelCommand(
             _ => CancelExport(),
             _ => CanCancelExport);
+        previousPageCommand = new ViewModelCommand(
+            _ => PageIndex--,
+            _ => !disposed && PageIndex > 0);
+        nextPageCommand = new ViewModelCommand(
+            _ => PageIndex++,
+            _ => !disposed && PageIndex < LastPageIndex);
+        goToRowCommand = new ViewModelCommand(
+            _ => SelectedRow = FindRow(GoToRowNumber),
+            _ => !disposed && FindRow(GoToRowNumber) is not null);
+        nextOverrideErrorCommand = new ViewModelCommand(
+            _ => SelectNextOverrideError(),
+            _ => !disposed && HasOverrideErrors);
+        showDetailCommand = new ViewModelCommand(
+            _ => IsDetailVisible = true,
+            _ => !disposed && SelectedRow is not null && !IsDetailVisible);
+        showListCommand = new ViewModelCommand(
+            _ => IsDetailVisible = false,
+            _ => !disposed && IsDetailVisible);
         if (context is not null)
         {
             Load(context);
@@ -610,6 +679,140 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
 
     public ReadOnlyObservableCollection<ResultsRowScoreViewModel> RowScores { get; }
 
+    public ReadOnlyObservableCollection<ResultsRowScoreViewModel> VisibleRowScores { get; }
+
+    public ReadOnlyObservableCollection<ResultsCriterionViewModel> SelectedRowCriteria { get; }
+
+    public ResultsCriterionViewModel? SelectedCriterion
+    {
+        get => selectedCriterion;
+        set
+        {
+            if (updatingPresentation
+                || (value is not null && !selectedRowCriterionItems.Contains(value)))
+            {
+                return;
+            }
+
+            SetProperty(ref selectedCriterion, value);
+        }
+    }
+
+    public ResultsRowScoreViewModel? SelectedRow
+    {
+        get => selectedRow;
+        set
+        {
+            if (updatingPresentation || ReferenceEquals(selectedRow, value))
+            {
+                return;
+            }
+
+            if (value is null)
+            {
+                SetSelectedRow(null);
+                return;
+            }
+
+            int index = rowScoreItems.IndexOf(value);
+            if (index < 0)
+            {
+                return;
+            }
+
+            if (SetProperty(ref pageIndex, index / PageSize, nameof(PageIndex)))
+            {
+                RefreshPresentation(value);
+            }
+            else
+            {
+                SetSelectedRow(value);
+            }
+        }
+    }
+
+    // The view may replace this provisional size with the number of rows that fit.
+    public int PageSize
+    {
+        get => pageSize;
+        set
+        {
+            if (value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "The page size must be positive.");
+            }
+
+            if (SetProperty(ref pageSize, value))
+            {
+                int selectedIndex = selectedRow is null ? -1 : rowScoreItems.IndexOf(selectedRow);
+                if (selectedIndex >= 0)
+                {
+                    SetProperty(ref pageIndex, selectedIndex / value, nameof(PageIndex));
+                }
+
+                RefreshPresentation(selectedRow);
+            }
+        }
+    }
+
+    public int PageIndex
+    {
+        get => pageIndex;
+        set
+        {
+            if (SetProperty(ref pageIndex, Math.Clamp(value, 0, LastPageIndex)))
+            {
+                RefreshPresentation(selectedRow);
+            }
+        }
+    }
+
+    public string PageSummary => RowScores.Count == 0
+        ? "結果はありません（0 行）"
+        : $"{(PageIndex * PageSize + 1).ToString("N0", CultureInfo.InvariantCulture)}–{(PageIndex * PageSize + VisibleRowScores.Count).ToString("N0", CultureInfo.InvariantCulture)} / {RowScores.Count.ToString("N0", CultureInfo.InvariantCulture)} 行";
+
+    public int? GoToRowNumber
+    {
+        get => goToRowNumber;
+        set
+        {
+            if (SetProperty(ref goToRowNumber, value))
+            {
+                goToRowCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsDetailVisible
+    {
+        get => isDetailVisible;
+        private set
+        {
+            if (SetProperty(ref isDetailVisible, value))
+            {
+                RaiseCommandStates();
+            }
+        }
+    }
+
+    public bool HasUnsavedOverrides
+    {
+        get => hasUnsavedOverrides;
+        private set => SetProperty(ref hasUnsavedOverrides, value);
+    }
+
+    public ICommand PreviousPageCommand => previousPageCommand;
+
+    public ICommand NextPageCommand => nextPageCommand;
+
+    public ICommand GoToRowCommand => goToRowCommand;
+
+    public ICommand NextOverrideErrorCommand => nextOverrideErrorCommand;
+
+    public ICommand ShowDetailCommand => showDetailCommand;
+
+    public ICommand ShowListCommand => showListCommand;
+
     public bool IsLoaded => context is not null;
 
     public bool IsPartial => context?.Summary.IsPartial == true;
@@ -619,6 +822,15 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
     public string FinalPath => context?.Summary.FinalPath ?? string.Empty;
 
     public string PartialPath => context?.Summary.PartialPath ?? string.Empty;
+
+    // Empty until this loaded run receives an explicit export SUCCESS; Load clears the receipt.
+    public string LastSuccessfulExportPath => lastSuccessfulExportPath;
+
+    public bool HasSuccessfulExport => LastSuccessfulExportPath.Length > 0;
+
+    public string LastSuccessfulExportText => HasSuccessfulExport
+        ? $"保存済み修正版: {LastSuccessfulExportPath}"
+        : string.Empty;
 
     public bool PartialCleanupFailed => context?.Summary.PartialCleanupFailed == true;
 
@@ -632,7 +844,16 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         _ => $"partial: {PartialPath}",
     };
 
-    public bool IsInputUnchanged => context?.Summary.IsExportReady == true;
+    // The loaded run has an input snapshot and has not reported INPUT_CHANGED.
+    // This is neither export readiness nor proof of a fresh/end-of-run filesystem check;
+    // InputStateText states which verification stage the summary actually establishes.
+    public bool IsInputUnchanged => context is { } run
+        && run.Summary.StatusCode != QuantificationRunStatusCodes.InputChanged
+        && run.Summary.FinalizationCode != ResultsOutputStatusCodes.InputChanged;
+
+    public string RunIdentityText => context is { } run
+        ? $"入力: {Path.GetFileName(run.InputPath)} · 開始: {run.Summary.StartedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture)} · 終了: {run.Summary.EndedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture)}"
+        : string.Empty;
 
     public int PlannedEvaluationCount => context?.Summary.PlannedOperationCount ?? 0;
 
@@ -650,11 +871,25 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         ? "部分結果です。完了済み学生行だけをpartial checkpointへ保存しています。"
         : "全operationの実行とfinalizationが終了しています。";
 
-    public string InputStateText => IsInputUnchanged
-        ? IsAutomaticOutput
-            ? "run終了時とfinal commit直前のexact hash / size / mtimeを確認しました。"
-            : "run 終了時の exact hash / size / mtime は一致しています。final commit 直前にも再確認します。"
-        : "run 終了時に入力変更を検出しました。出力は停止されています。";
+    public string InputStateText => context?.Summary switch
+    {
+        null => "入力不変性は未確認です。",
+        _ when !IsInputUnchanged => "入力変更を検出しました（INPUT_CHANGED）。出力は停止されています。",
+        { IsDurable: false } =>
+            "run 終了時の exact hash / size / mtime は一致しています。final commit 直前にも再確認します。",
+        { StatusCode: QuantificationRunStatusCodes.Success, FinalPath: not null,
+            FinalizationCode: ResultsOutputStatusCodes.Success } =>
+            "run終了時とfinal commit直前のexact hash / size / mtimeを確認しました。",
+        { StatusCode: QuantificationRunStatusCodes.CheckpointFailed } =>
+            "run開始時の入力snapshotは取得済みです。checkpoint保存に失敗したため、run終了時・final commit直前の不変性は未確認です。",
+        { StatusCode: QuantificationRunStatusCodes.Cancelled, FinalizationCode: null } =>
+            "run開始時の入力snapshotは取得済みです。取消による部分結果で、run終了時・final commit直前の不変性確認は未実施です。",
+        { StatusCode: QuantificationRunStatusCodes.Cancelled } =>
+            "run終了時のexact hash / size / mtimeは一致しています。final出力を取り消したため、commit直前の再確認・保存成功は未確認です。",
+        { StatusCode: QuantificationRunStatusCodes.OutputInvalid } =>
+            "run終了時のexact hash / size / mtimeは一致しています。final出力に失敗したため、commit直前の再確認・保存成功は未確認です。",
+        _ => "run終了時のexact hash / size / mtimeは一致しています。final commit直前の再確認・保存成功は未確認です。",
+    };
 
     public string OutputPath
     {
@@ -670,14 +905,16 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         }
     }
 
-    public bool HasOverrideErrors
+    public int OverrideErrorCount
     {
-        get => hasOverrideErrors;
+        get => overrideErrorCount;
         private set
         {
-            if (SetProperty(ref hasOverrideErrors, value))
+            if (SetProperty(ref overrideErrorCount, value))
             {
                 OnPropertiesChanged(
+                    nameof(HasOverrideErrors),
+                    nameof(OverrideErrorNavigationText),
                     nameof(OverrideValidationText),
                     nameof(CanExport));
                 RaiseCommandStates();
@@ -685,8 +922,13 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         }
     }
 
+    public bool HasOverrideErrors => OverrideErrorCount > 0;
+
+    public string OverrideErrorNavigationText =>
+        $"エラー {OverrideErrorCount.ToString("N0", CultureInfo.InvariantCulture)} 件・次へ";
+
     public string OverrideValidationText => HasOverrideErrors
-        ? "override の技術検証エラーを修正してください。出力は停止されています。"
+        ? $"override の技術検証エラー {OverrideErrorCount.ToString("N0", CultureInfo.InvariantCulture)} 件を修正してください。出力は停止されています。"
         : "override は snapshot の scorable flag と effective range に適合しています。";
 
     public bool IsOutputPathValid => pathAssessment.IsValid;
@@ -807,6 +1049,12 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         IsExporting = false;
         IsExportCancelling = false;
         LastExportCode = ResultsOutputStatusCodes.Ready;
+        SetLastSuccessfulExportPath(string.Empty);
+        overrideRevision = 0;
+        HasUnsavedOverrides = false;
+        SetSelectedRow(null);
+        SetProperty(ref pageIndex, 0, nameof(PageIndex));
+        GoToRowNumber = null;
         resultItems.Clear();
         rowScoreItems.Clear();
         BuildResultItems(runContext.Summary);
@@ -822,6 +1070,7 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
             nameof(PartialCleanupFailed),
             nameof(DurableOutputText),
             nameof(IsInputUnchanged),
+            nameof(RunIdentityText),
             nameof(PlannedEvaluationCount),
             nameof(CompletedEvaluationCount),
             nameof(FailureCount),
@@ -850,6 +1099,7 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         ExecutionRunContext exportContext = context;
         string exportPath = OutputPath;
         ImmutableArray<RunCriterionOverride> exportOverrides = CreateOverrides();
+        long exportOverrideRevision = overrideRevision;
         exportCancellation?.Cancel();
         exportCancellation?.Dispose();
         CancellationTokenSource currentCancellation =
@@ -866,6 +1116,16 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
             if (sequence == Volatile.Read(ref exportSequence) && !disposed)
             {
                 LastExportCode = result.Code;
+                if (result.IsSuccess)
+                {
+                    SetLastSuccessfulExportPath(string.IsNullOrWhiteSpace(result.FinalPath)
+                        ? exportPath
+                        : result.FinalPath);
+                    if (exportOverrideRevision == overrideRevision)
+                    {
+                        HasUnsavedOverrides = false;
+                    }
+                }
             }
         }
         catch (OperationCanceledException) when (currentCancellation.IsCancellationRequested)
@@ -949,16 +1209,28 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
                     canOverride,
                     criterionResult?.RawScore,
                     unit.StatusCode,
-                    _ => RevalidateOverridesAndPreview()));
+                    OverrideChanged));
             }
         }
+    }
+
+    private void OverrideChanged(ResultsCriterionViewModel item)
+    {
+        if (disposed || !resultItems.Contains(item))
+        {
+            return;
+        }
+
+        overrideRevision++;
+        HasUnsavedOverrides = true;
+        RevalidateOverridesAndPreview();
     }
 
     private void RevalidateOverridesAndPreview()
     {
         if (context is null)
         {
-            HasOverrideErrors = false;
+            OverrideErrorCount = 0;
             return;
         }
 
@@ -980,7 +1252,7 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
                 : null;
         }
 
-        HasOverrideErrors = !validation.IsValid;
+        OverrideErrorCount = validation.Errors.Length;
         RecomputePreview();
         OnPropertyChanged(nameof(CanExport));
         RaiseCommandStates();
@@ -995,12 +1267,18 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
 
         RunSummary summary = context.Summary;
         QuantificationDefinition definition = summary.Snapshot.Definition;
-        RunOutputPreparation output = summary.PrepareOutput(CreateOverrides());
-        Dictionary<int, ResultsSheetRowInput> outputRows = output.Rows.ToDictionary(
+        ILookup<int, EvaluationUnitResult> unitsByRow = summary.Units.ToLookup(
+            unit => unit.Item.SourceRowNumber);
+        Dictionary<int, CheckpointCompletedRow> completedRows = summary.CompletedRows.ToDictionary(
             row => row.SourceRowNumber);
         rowScoreItems.Clear();
         foreach (IGrouping<int, ResultsCriterionViewModel> sourceRow in resultItems.GroupBy(item => item.SourceRowNumber))
         {
+            CheckpointCompletedRow? completedRow = completedRows.GetValueOrDefault(sourceRow.Key);
+            ResultsRowStatus rowStatus = GetRowStatus(
+                summary.IsDurable,
+                unitsByRow[sourceRow.Key],
+                completedRow);
             Dictionary<ResultKey, ResultsCriterionViewModel> rowItems = sourceRow.ToDictionary(Key);
             Dictionary<string, decimal?> evaluatorScores = new(StringComparer.Ordinal);
             Dictionary<string, decimal?> questionScores = new(StringComparer.Ordinal);
@@ -1044,80 +1322,88 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
                     definition.RoundingDigits);
             }
 
-                    decimal? legacyOverall = scoreCalculator.Aggregate(
+            decimal? legacyOverall = summary.IsDurable ? null : scoreCalculator.Aggregate(
                 definition.Questions
-                    .Where(item => item.Enabled)
+                    .Where(item => item.Enabled && item.Points > 0m)
                     .Select(question => new WeightedScoreInput(
                         questionScores[question.Id],
                         question.Points)),
                 definition.RoundingDigits);
-            decimal? finalScore = null;
-            if (outputRows.TryGetValue(sourceRow.Key, out ResultsSheetRowInput? outputRow))
+            List<(string QuestionId, decimal? Earned)> questionEarned = [];
+            List<decimal?> similarityPenalties = [];
+            List<decimal?> specialQuestionRates = [];
+            foreach (QuestionDefinition question in definition.Questions.Where(item => item.Enabled))
             {
-                List<(string QuestionId, decimal? Earned)> questionEarned = [];
-                List<decimal?> similarityPenalties = [];
-                List<decimal?> specialQuestionRates = [];
-                foreach (QuestionDefinition question in definition.Questions.Where(item => item.Enabled))
+                QuestionResultInput questionInput = CreateDisplayQuestionInput(
+                    summary, sourceRow.Key, question, completedRow);
+                EvaluationUnitResult[] questionUnits = unitsByRow[sourceRow.Key]
+                    .Where(unit => string.Equals(unit.Item.QuestionId, question.Id, StringComparison.Ordinal))
+                    .ToArray();
+                // Workbook Answer_Present=0 also covers unknown/undispatched input. The UI
+                // must not call that an earned zero; only completed, known input has a score.
+                bool questionComplete = (!summary.IsDurable || completedRow is not null)
+                    && questionUnits.Any(unit => unit.ScorableKnown)
+                    && questionUnits.All(unit => unit.StatusCode != ResultsStatusCodes.Cancelled);
+                decimal? rate = questionComplete
+                    ? scoreCalculator.QuestionRate(questionInput.Scorable, questionScores[question.Id])
+                    : null;
+                decimal? earned = scoreCalculator.QuestionEarned(
+                    rate,
+                    question.Points,
+                    definition.RoundingDigits);
+                questionEarned.Add((question.Id, earned));
+
+                // Match ResultsSheetWriter: only a missing legacy object gets a default.
+                // A durable CANCELLED/error object with AiRaw=null must stay unevaluated.
+                decimal? similarity = questionInput.Similarity is { } similarityInput
+                    ? similarityInput.AiRaw
+                    : questionInput.Scorable ? null : 0m;
+                similarityPenalties.Add(scoreCalculator.SimilarityPenalty(
+                    question.Points,
+                    similarity,
+                    definition.SimilarityPenaltyWeight,
+                    definition.RoundingDigits));
+
+                SpecialEvaluationDefinition[] enabledSpecials = question.SpecialEvaluations
+                    .Where(special => special.Enabled)
+                    .ToArray();
+                if (definition.SpecialPoints > 0m && enabledSpecials.Length > 0)
                 {
-                    QuestionResultInput questionInput = outputRow.Questions.Single(item =>
-                        string.Equals(item.QuestionId, question.Id, StringComparison.Ordinal));
-                    decimal? rate = scoreCalculator.QuestionRate(
-                        questionInput.Scorable,
-                        questionScores[question.Id]);
-                    decimal? earned = scoreCalculator.QuestionEarned(
-                        rate,
-                        question.Points,
-                        definition.RoundingDigits);
-                    questionEarned.Add((question.Id, earned));
-
-                    decimal? similarity = questionInput.Similarity?.AiRaw
-                        ?? (questionInput.Scorable ? null : 0m);
-                    similarityPenalties.Add(scoreCalculator.SimilarityPenalty(
-                        question.Points,
-                        similarity,
-                        definition.SimilarityPenaltyWeight,
+                    specialQuestionRates.Add(scoreCalculator.SpecialQuestionRate(
+                        enabledSpecials.Select(special => questionInput.SpecialResults
+                            .SingleOrDefault(result => string.Equals(
+                                result.SpecialEvaluationId,
+                                special.Id,
+                                StringComparison.Ordinal))?.AiRaw),
                         definition.RoundingDigits));
-
-                    SpecialEvaluationDefinition[] enabledSpecials = question.SpecialEvaluations
-                        .Where(special => special.Enabled)
-                        .ToArray();
-                    if (definition.SpecialPoints > 0m && enabledSpecials.Length > 0)
-                    {
-                        specialQuestionRates.Add(scoreCalculator.SpecialQuestionRate(
-                            enabledSpecials.Select(special => questionInput.SpecialResults
-                                .SingleOrDefault(result => string.Equals(
-                                    result.SpecialEvaluationId,
-                                    special.Id,
-                                    StringComparison.Ordinal))?.AiRaw),
-                            definition.RoundingDigits));
-                    }
                 }
-
-                decimal? specialEarned = scoreCalculator.SpecialEarned(
-                    definition.SpecialPoints,
-                    specialQuestionRates,
-                    definition.RoundingDigits);
-                decimal? finalRaw = scoreCalculator.FinalRaw(
-                    definition.BasePoints,
-                    questionEarned.Select(item => item.Earned),
-                    specialEarned,
-                    similarityPenalties,
-                    definition.RoundingDigits);
-                finalScore = WeightedScoreCalculator.FinalScore(finalRaw);
-                decimal? totalPenalty = similarityPenalties.Any(value => value is null)
-                    ? null
-                    : similarityPenalties.Sum(value => value!.Value);
-                rowScoreItems.Add(new ResultsRowScoreViewModel(
-                    sourceRow.Key,
-                    string.Join(
-                        " · ",
-                        questionEarned.Select(item =>
-                            $"{item.QuestionId}: {(item.Earned?.ToString("G29", CultureInfo.InvariantCulture) ?? "—")}")),
-                    specialEarned,
-                    totalPenalty,
-                    finalRaw,
-                    finalScore));
             }
+
+            decimal? specialEarned = scoreCalculator.SpecialEarned(
+                definition.SpecialPoints,
+                specialQuestionRates,
+                definition.RoundingDigits);
+            decimal? finalRaw = scoreCalculator.FinalRaw(
+                definition.BasePoints,
+                questionEarned.Select(item => item.Earned),
+                specialEarned,
+                similarityPenalties,
+                definition.RoundingDigits);
+            decimal? finalScore = WeightedScoreCalculator.FinalScore(finalRaw);
+            decimal? totalPenalty = similarityPenalties.Any(value => value is null)
+                ? null
+                : similarityPenalties.Sum(value => value!.Value);
+            rowScoreItems.Add(new ResultsRowScoreViewModel(
+                sourceRow.Key,
+                rowStatus,
+                string.Join(
+                    " · ",
+                    questionEarned.Select(item =>
+                        $"{item.QuestionId}: {(item.Earned?.ToString("G29", CultureInfo.InvariantCulture) ?? "—")}")),
+                specialEarned,
+                totalPenalty,
+                finalRaw,
+                finalScore));
 
             decimal? overall = summary.IsDurable ? finalScore : legacyOverall;
             foreach (ResultsCriterionViewModel item in sourceRow)
@@ -1130,6 +1416,178 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
                     overall);
             }
         }
+
+        RefreshPresentation(selectedRow);
+    }
+
+    private static QuestionResultInput CreateDisplayQuestionInput(
+        RunSummary summary,
+        int sourceRowNumber,
+        QuestionDefinition question,
+        CheckpointCompletedRow? completedRow)
+    {
+        // Project only score-bearing fields from the same inputs as RunSummary.BuildRows.
+        // Do not change the run status or borrow export readiness for display; all arithmetic
+        // still uses the ResultsSheetWriter's WeightedScoreCalculator path above.
+        CheckpointSimilarityResult? similarity = completedRow?.SimilarityResults.SingleOrDefault(result =>
+            string.Equals(result.QuestionId, question.Id, StringComparison.Ordinal));
+        return new QuestionResultInput
+        {
+            QuestionId = question.Id,
+            Scorable = QuestionIsScorable(summary, sourceRowNumber, question.Id),
+            SpecialResults = summary.IsDurable
+                ? question.SpecialEvaluations.Where(special => special.Enabled).Select(special =>
+                {
+                    CheckpointSpecialResult? result = completedRow?.SpecialResults.SingleOrDefault(result =>
+                        string.Equals(result.QuestionId, question.Id, StringComparison.Ordinal)
+                        && string.Equals(result.SpecialEvaluationId, special.Id, StringComparison.Ordinal));
+                    return new SpecialResultInput
+                    {
+                        SpecialEvaluationId = special.Id,
+                        AiRaw = result?.AcceptedResult?.Score
+                            ?? (result?.StatusCode == ResultsStatusCodes.Empty ? 0m : null),
+                        Status = result?.StatusCode ?? ResultsStatusCodes.Cancelled,
+                    };
+                }).ToImmutableArray()
+                : [],
+            Similarity = summary.IsDurable
+                ? new SimilarityResultInput
+                {
+                    AiRaw = similarity?.AcceptedResult?.Similarity
+                        ?? (similarity?.StatusCode == ResultsStatusCodes.Empty ? 0m : null),
+                    Status = similarity?.StatusCode ?? ResultsStatusCodes.Cancelled,
+                }
+                : null,
+        };
+    }
+
+    private static ResultsRowStatus GetRowStatus(
+        bool isDurable,
+        IEnumerable<EvaluationUnitResult> sourceUnits,
+        CheckpointCompletedRow? completedRow)
+    {
+        if (isDurable && completedRow is null)
+        {
+            return ResultsRowStatus.Unprocessed;
+        }
+
+        EvaluationUnitResult[] units = sourceUnits.ToArray();
+        string[] statuses = completedRow is null
+            ? units.Select(unit => unit.StatusCode).ToArray()
+            : completedRow.NormalResults.Select(result => result.StatusCode)
+                .Concat(completedRow.SpecialResults.Select(result => result.StatusCode))
+                .Concat(completedRow.SimilarityResults.Select(result => result.StatusCode))
+                .ToArray();
+        if (statuses.Length == 0)
+        {
+            return ResultsRowStatus.Unprocessed;
+        }
+
+        if (statuses.Any(status => status is not ResultsStatusCodes.Success
+            and not ResultsStatusCodes.Empty
+            and not ResultsStatusCodes.Cancelled
+            and not ResultsStatusCodes.NotRunZeroBudget))
+        {
+            return ResultsRowStatus.TechnicalError;
+        }
+
+        if (statuses.Contains(ResultsStatusCodes.Cancelled, StringComparer.Ordinal))
+        {
+            return completedRow is null && units.All(unit =>
+                unit.StatusCode == ResultsStatusCodes.Cancelled
+                && unit.AttemptCount == 0 && !unit.ScorableKnown)
+                ? ResultsRowStatus.Unprocessed
+                : ResultsRowStatus.Cancelled;
+        }
+
+        return statuses.Contains(ResultsStatusCodes.Empty, StringComparer.Ordinal)
+            && statuses.All(status => status is ResultsStatusCodes.Empty or ResultsStatusCodes.NotRunZeroBudget)
+                ? ResultsRowStatus.Empty
+                : ResultsRowStatus.Success;
+    }
+
+    private void SetLastSuccessfulExportPath(string value)
+    {
+        if (SetProperty(ref lastSuccessfulExportPath, value, nameof(LastSuccessfulExportPath)))
+        {
+            OnPropertiesChanged(nameof(HasSuccessfulExport), nameof(LastSuccessfulExportText));
+        }
+    }
+
+    private int LastPageIndex => RowScores.Count == 0 ? 0 : (RowScores.Count - 1) / PageSize;
+
+    private ResultsRowScoreViewModel? FindRow(int? sourceRowNumber) => sourceRowNumber is > 0
+        ? rowScoreItems.FirstOrDefault(row => row.SourceRowNumber == sourceRowNumber.Value)
+        : null;
+
+    private void SelectNextOverrideError()
+    {
+        int start = selectedCriterion is null ? -1 : resultItems.IndexOf(selectedCriterion);
+        ResultsCriterionViewModel? target = resultItems.Skip(start + 1)
+            .Concat(resultItems.Take(start + 1))
+            .FirstOrDefault(item => item.HasOverrideError);
+        if (target is null)
+        {
+            return;
+        }
+
+        SelectedRow = FindRow(target.SourceRowNumber);
+        SelectedCriterion = target;
+        IsDetailVisible = true;
+        // Revisit a single remaining error even if its criterion is already selected.
+        OnPropertyChanged(nameof(SelectedCriterion));
+    }
+
+    private void RefreshPresentation(ResultsRowScoreViewModel? preferredSelection)
+    {
+        updatingPresentation = true;
+        try
+        {
+            SetProperty(ref pageIndex, Math.Clamp(pageIndex, 0, LastPageIndex), nameof(PageIndex));
+            visibleRowScoreItems.Clear();
+            foreach (ResultsRowScoreViewModel row in rowScoreItems.Skip(PageIndex * PageSize).Take(PageSize))
+            {
+                visibleRowScoreItems.Add(row);
+            }
+
+            SetSelectedRow(visibleRowScoreItems.FirstOrDefault(row =>
+                row.SourceRowNumber == preferredSelection?.SourceRowNumber)
+                ?? visibleRowScoreItems.FirstOrDefault());
+        }
+        finally
+        {
+            updatingPresentation = false;
+        }
+
+        OnPropertyChanged(nameof(PageSummary));
+        RaiseCommandStates();
+    }
+
+    private void SetSelectedRow(ResultsRowScoreViewModel? value)
+    {
+        bool rowChanged = selectedRow?.SourceRowNumber != value?.SourceRowNumber;
+        selectedRow = value;
+        if (rowChanged)
+        {
+            selectedRowCriterionItems.Clear();
+            foreach (ResultsCriterionViewModel item in resultItems.Where(item =>
+                         item.SourceRowNumber == value?.SourceRowNumber))
+            {
+                selectedRowCriterionItems.Add(item);
+            }
+
+            SetProperty(ref selectedCriterion, selectedRowCriterionItems.FirstOrDefault(), nameof(SelectedCriterion));
+        }
+
+        if (value is null)
+        {
+            IsDetailVisible = false;
+        }
+
+        // Reassert selection after the visible collection resets, even when the row reference survives.
+        // Do not reset the criterion editors for a score refresh on the same source row.
+        OnPropertyChanged(nameof(SelectedRow));
+        RaiseCommandStates();
     }
 
     private void RefreshPathAssessment()
@@ -1241,6 +1699,12 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
     {
         exportCommand.RaiseCanExecuteChanged();
         cancelExportCommand.RaiseCanExecuteChanged();
+        previousPageCommand.RaiseCanExecuteChanged();
+        nextPageCommand.RaiseCanExecuteChanged();
+        goToRowCommand.RaiseCanExecuteChanged();
+        nextOverrideErrorCommand.RaiseCanExecuteChanged();
+        showDetailCommand.RaiseCanExecuteChanged();
+        showListCommand.RaiseCanExecuteChanged();
     }
 
     private readonly record struct ResultKey(

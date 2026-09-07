@@ -57,6 +57,8 @@ public sealed class WindowsPublishPackageTests
         "docs/prompt-launch.md",
         "docs/privacy-and-data-handling.md",
         "docs/troubleshooting.md",
+        "docs/settings.md",
+        "docs/third-party-notices.md",
         "images/README.md",
         "images/01-input-workbook.png",
         "images/02-input-mapping.png",
@@ -65,6 +67,7 @@ public sealed class WindowsPublishPackageTests
         "images/05-execution-auto.png",
         "images/06-results-review.png",
         "images/07-output-export.png",
+        "images/08-settings.png",
     ];
 
     private static readonly string[] RequiredDependencyPrefixes =
@@ -139,6 +142,18 @@ public sealed class WindowsPublishPackageTests
     public async Task Windows_publish_and_unsigned_package_are_safe_launchable_and_reproducible()
     {
         RequireWindows11X64();
+        AssertDocumentationSet(
+            RequiredDocumentationFiles.Concat(RequiredApplicationFiles).Append("RELEASE-NOTES.txt"));
+        foreach (string unexpectedPath in new[] { "DOCS/extra.md", "Images/extra.png", "docs/settings.md" })
+        {
+            Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+                AssertDocumentationSet(RequiredDocumentationFiles.Append(unexpectedPath)));
+        }
+
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            AssertDocumentationSet(RequiredDocumentationFiles.Select(path =>
+                path == "docs/settings.md" ? "DOCS/settings.md" : path)));
+
         string repositoryRoot = FindRepositoryRoot();
         string publishScript = Path.Combine(repositoryRoot, "scripts", "publish-windows.ps1");
         string packageScript = Path.Combine(repositoryRoot, "scripts", "package-windows.ps1");
@@ -563,6 +578,8 @@ public sealed class WindowsPublishPackageTests
             Assert.Contains(PackageRootName + "/" + requiredFile, entryNames);
         }
 
+        AssertDocumentationSet(entryNames.Select(name => name[(PackageRootName.Length + 1)..]));
+
         ZipArchiveEntry releaseNotesEntry = Assert.Single(
             entries,
             entry => entry.FullName == PackageRootName + "/RELEASE-NOTES.txt");
@@ -577,6 +594,24 @@ public sealed class WindowsPublishPackageTests
         Assert.Contains("GitHub Copilot CLI runtime: BUNDLED\n", releaseNotes, StringComparison.Ordinal);
         Assert.Contains("User guide: README.md and docs/getting-started.md\n", releaseNotes, StringComparison.Ordinal);
         Assert.DoesNotContain("Signing: SIGNED", releaseNotes, StringComparison.Ordinal);
+    }
+
+    private static void AssertDocumentationSet(IEnumerable<string> relativePaths)
+    {
+        // Count only the public documents, license and images, not runtime/package metadata.
+        string[] documentationEntries = relativePaths
+            .Where(path => path.Equals("README.md", StringComparison.OrdinalIgnoreCase) ||
+                path.Equals("LICENSE", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("docs/", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(20, RequiredDocumentationFiles.Length);
+        Assert.Equal(20, documentationEntries.Length);
+        Assert.Equal(
+            RequiredDocumentationFiles.OrderBy(path => path, StringComparer.Ordinal).ToArray(),
+            documentationEntries,
+            StringComparer.Ordinal);
     }
 
     private static string AssertHashSidecar(string zipPath, string hashPath)
@@ -978,6 +1013,7 @@ public sealed class WindowsPublishPackageTests
 
         Assert.DoesNotContain(Path.GetExtension(fileName), ForbiddenExtensions);
         Assert.False(fileName.Equals(".env", StringComparison.OrdinalIgnoreCase));
+        Assert.False(fileName.Equals("setting.txt", StringComparison.OrdinalIgnoreCase));
         Assert.False(
             ContainsSensitiveFileNameToken(fileName),
             $"Potential secret file name is not allowed: {relativePath}");

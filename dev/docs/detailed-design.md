@@ -2,16 +2,17 @@
 
 | 項目 | 内容 |
 |---|---|
-| 対象要求 | `docs/requirements-definition.md` v4.5 |
+| 対象要求 | `docs/requirements-definition.md` v4.6 |
 | 設計決定 | ADR-0012（機能）/ ADR-0016（Windows単一EXE主配布・ZIP代替・明示login・candidate拘束公開gate） |
+| UI / 設定の契約 | [`ui-layout-contract.md`](ui-layout-contract.md) / [UI・設定保存プランv2](../../work/20260907-ui-settings-redesign-plan-v2.md)と後続承認 |
 | 作成日 | 2026-09-02 |
-| 更新日 | 2026-09-06 |
-| 状態 | `0.8.4`未公開candidate（EXE主配布候補 + ZIP代替 + development MSIX非公開記録）。公開済みは`v0.8.1` ZIP |
+| 更新日 | 2026-09-07 |
+| 状態 | `0.8.5`未公開candidate（UNRELEASED、EXE主配布候補 + ZIP代替 + development MSIX非公開記録）。F01はREVIEWED、公開済みは`v0.8.1` ZIP |
 | Production topology | Core + App の2 projectを維持 |
 
 ## 1. 設計目標
 
-本設計は、既存v3実装を必要最小限変更し、次を追加する。
+本設計はv4の業務・配布境界と、v4.6のUI／ローカル設定保存の実装を記述する。T01〜T38は対象検証・REVIEWED、T39は追加native FAILと本人確認等の外部前提によりBLOCKED。0.8.4の記録済み文書contract／実ZIP／実EXE／自動回帰／MSIX機構確認と、F02後の0.8.5最終再検証を分ける。本同期時点のF02再検証は親担当で未完了、以後は[実行記録](../../work/20260907-ui-settings-execution-record.md)の最新F02欄を参照する。件数・適用限界・履歴は[現在状態](implementation-status.md)へ集約し、全タスクDONEや公開PASSを主張しない。
 
 - base／question／specialの絶対配点
 - questionごとの参照回答と学生回答類似度
@@ -22,6 +23,8 @@
 - Windows 11 x64 App限定self-contained単一EXE（主配布候補）とZIP（代替）の併存
 - 同梱CLIの明示login開始/取消/所有process cleanupと、login後の利用者明示再確認
 - candidate → 人手clean-host証跡受領 → protected publish Final v2の公開制御
+- 4ステップ＋独立した設定5カテゴリ、ページ一覧／選択詳細、未確定text・対象・設定往復の保持
+- 共通設定＋任意の採点定義1件の明示保存、保存定義の検証後明示適用、次回draft／現在run／前回結果の分離
 
 追加のdatabase、server、plugin framework、汎用AI operation framework、production projectは作らない。
 
@@ -48,7 +51,9 @@ flowchart LR
 | `App/Copilot` | 4種類のclosed Copilot operation |
 | `App/Workbooks` | read-only input、Config/References/Results/Run/Checkpoint sheet |
 | `App/Workflow` | reference先行、student row単位処理、checkpoint、resume |
-| `App/ViewModels` / `Views` | 4-step UI、picker、Prompt import、progress、completion |
+| `App/Settings` | `ApplicationSettings`、strictな`SettingsFileStore`。Core型を保存するがCoreへI/Oを持ち込まない |
+| `App/ViewModels` / `Views` | 4-step＋設定UI、既存draft同期、picker、Prompt import、progress、結果／override |
+| `App/Composition` | productionだけの設定path解決と明示的な初期読込接続。既定test構成はnull store |
 | `scripts` | Windows x64 publish/ZIP/MSIX、macOS RID publish/bundle/sign/notary/DMG |
 
 ## 3. Domain model
@@ -549,13 +554,15 @@ progressはstage、reference completed/total、row completed/total、unit comple
 
 ## 9. Output path
 
-`OutputPathPlanner`をApp/ViewModelsまたはWorkbooks/Writingへ1型だけ追加する。
+既存`OutputPathPlanner`がrun開始時のfinal／partial予約を担う。設定復元では予約・directory作成を行わない。
 
 ```csharp
 OutputPathReservation Reserve(string inputPath, DateTimeOffset localTime, string? outputDirectory);
 ```
 
-- default directoryは`<input directory>/result`。
+- `ExecutionViewModel.OutputDirectoryOverride`はabsoluteな明示指定または`null`。今回の明示編集 → 保存済み共通設定 → 従来の既定値の順で使い、入力Excel変更後も明示指定を保持する。
+- `OutputDirectory`は次回の実効値。明示指定がない場合だけ`<input directory>/result`を算出し、入力未選択なら未決定とする。空欄への明示編集は`null`へ戻す操作で、自動算出pathを保存値へ昇格しない。
+- 利用不可・相対指定を別pathへfallbackさせない。再開requestは新規出力先ではなくpartial pathを渡し、既存checkpointの予約pathとadmissionを使用する。
 - directoryがなければrun開始時に作成する。
 - basenameは`eval-yyyyMMdd-HHmm`。
 - finalとpartialの両方が未使用となる最小suffixを選ぶ。
@@ -566,15 +573,15 @@ lock fileやglobal reservation serviceは追加しない。
 
 ## 10. UI
 
-- shellの`ShellScrollViewer`はhorizontal scrollを`Disabled`にする。Design以外は縦scrollを許可し、Designでは外側の縦scrollも無効にして残余の有限高を渡す。Design本文のscrollと固定された計算式概要を分離し、page全体を左右へscrollさせない。
+- `MainWindow`は最小1024×720・初期1180×800 DIPを維持する。固定headerに警告全文／4-stepナビ／設定入口、固定footerに前後移動と実行中の進捗入口／停止を置く。設定表示中は設定内の戻る操作を使い、結果画面では不要な次へボタンを隠す。
+- `ShellScrollViewer`はhorizontalを`Disabled`、verticalを`Auto`とし、本文の`ShellBody`だけへ有限高を渡す。本文の最小canvasは通常450 DIP、本文幅856 DIP未満では520 DIP。これはsourceのlayout値で、nativeの実ClientSizeや実測結果ではない。
+- 通常サイズの非scroll・完全包含、多数項目のページ容量、長文／狭小／拡大の例外を別に検証する。scrollbarの非表示やclippingを成功にしない。測定契約・記録先は[`ui-layout-contract.md`](ui-layout-contract.md)。
 
 ### 10.1 Input
 
-- `ファイルを選択` buttonを追加。
-- View code-behindはStorageProviderで1fileを選び、ViewModelの`SetFilePathAsync(path)`を呼ぶ。
+- `ファイルを選択`は`NativeInputWorkbookPicker`／StorageProviderで1fileを選び、ViewModelの`SetFilePathAsync(path)`を呼ぶ。取消は現在の入力を変えず、local path取得不可は直接入力を案内する。
 - `.xlsx` filterはUX補助であり、loaderのformat validationを省略しない。
-- question text row labelを「質問文の行（1または2）」へ変更する。
-- special mappingはDesign画面の各special itemでsourceを選ぶ。
+- 主画面はpath、sheet、質問文行1/2、回答範囲、設問ページ、選択設問のenabled・主回答列・設問本文を扱う。補助列／候補／詳細CRUDは設定の「入力詳細」、special mappingは設定の「固有評価」で扱う。
 - `WorkbookMetadataReader`が選択済みquestion text rowから取得した各`WorkbookHeaderCell.Value`を、`SourceColumnOption.HeaderText`として列名と対応付ける。値はtrim、正規化、代替生成を行わない。
 - 利用者が通常Questionのprimary columnを選択した場合、`InputViewModel.SetPrimaryColumn`は同じimmutable question更新で`PrimarySourceColumn`、対応するraw `QuestionText`、primaryと重複しない`SupportingSourceColumns`をcommitする。既存の`CommitDraft`→`SynchronizeQuestionItems`→`InputQuestionMappingViewModel.Synchronize`の通知経路だけを使用し、View event handlerを追加しない。
 - 対応header cellが空または存在しない場合は`QuestionText`を空にし、fallback文字列を生成しない。既存の`REQUIRED` validationで遷移をblockし、TextBoxからの手入力は許可する。
@@ -582,64 +589,48 @@ lock fileやglobal reservation serviceは追加しない。
 - 見出し行の再読込は選択sheet、行範囲、質問ID、手入力text、配点、評価設定を保持し、metadataだけを更新する。候補一覧の更新中はUIの一時的な空選択を書き戻さない。明示した候補再適用とは区別する。
 - 初回候補と質問追加も空headerへ代替文を生成しない。metadata不一致時の質問追加はtextを空にして手入力／再読込を求める。
 - UI候補にないcolumnがprogrammaticに渡された場合もheader値を推測せず、`QuestionText`を保持したまま既存のsource column validationへ委ねる。
-- `InputScrollViewer`は縦scrollだけを担当し、horizontal scrollを`Disabled`にする。contentが有限幅で計測されるため、`Grid`のstar columnがcontent長ではなくavailable widthで解決される。root gridは固定`MinWidth`を持たない。
-- RANGEとX-02 SUGGESTIONSは単一の`Grid#InputMappingHost`（`2*,3*` / `Auto,Auto`）へ配置する。`Container.Sizing="Width"`で公開したcontainer幅が880未満では両cardを縦積み、880以上では横並びにする。切替は`ContainerQuery`のstyle setter（`Grid.Row`／`Grid.Column`／`Grid.ColumnSpan`／spacing）だけで行い、ViewModelへ表示幅stateを持ち込まない。
-- 候補cardは列名を`Auto`列、role／header／support textを残余列に置き`TextWrapping="Wrap"`とする。文字数による切り詰めを行わず、高さの変動は`MappingSuggestionList`のvirtualized scroll内へ収める。
+- `InputContentRoot`は有限領域のGrid。`InputMappingHost`はページ一覧と単一の選択設問editorを横に置く。回答範囲のfield配置だけを実content幅840 DIPで1行／2行に切り替える。旧880 DIPの候補card用ContainerQueryは現行主画面では使わない。
+- `VisibleQuestions`は元の`Questions`のeditor参照であり、表示copyに編集を閉じ込めない。`QuestionPageViewport`の実高さを44 DIPの行高で割って`PageSize`を更新する。ページ閲覧と論理選択を分離し、構造変更・resizeは残るIDを保って範囲を補正する。
+- `InputSelectionWriteback`とVM側guardでDataContext／候補／ページ差替え中の一時nullや旧選択の書戻しを抑止する。技術エラーは一覧と読取専用全文、`InputGoToProblem`で対象入力へ移動する。
+- 回答行の変換エラーは`NUMERIC_INPUT_UNCOMMITTED`として未反映と示す。未確定textを確定行番号・件数へ読み替えず、往復では同じControlに保持する。設問本文・長いpath／候補は局所領域で全文へ到達できるようにする。
 
 ### 10.2 Design
 
-root card:
-
-- Base points
-- Special points
-- Similarity penalty weight
-- Rounding digits
-- 配点合計／残り
-- `設問配点を均等化` button
-
-question card:
-
-- Points
-- normal evaluators
-- special items add/copy/reorder/disable/delete
-
-imported Prompt card:
-
-- command line指定順のbasename一覧
-- selected Prompt preview
-- target: selected Custom evaluatorまたはselected special item
-- `Promptを適用` button
-- `QuantificationDesignScrollViewer`はhorizontal scrollを`Disabled`、vertical scrollを`Auto`とし、rootへ固定幅を設定しない。
-- 固定部は短い計算式とBase／Special／Wの現在値だけとし、設問数・表示名長で高さを増やさない。式の詳説は本文内の展開欄、設問配点は各設問cardへ表示する。
-- question／evaluator／criterion navigatorはstar列の`Grid`で利用可能幅へ収め、表示名と動的summaryをwrapする。
-- add／copy／reorder／disable／deleteの操作群は`WrapPanel`で折り返し、既存のbinding、command、Automation ID、virtualized listを維持する。
+- 主画面はBase／Special／類似度係数、選択設問のPoints／enabled、均等配分を編集する。定義名・revision・丸めは共通設定、evaluator／criterion・固有項目・Promptは該当設定へ移設した。
+- `AllocationSummaryText`は既存calculatorのexact decimal合計・過不足を読取専用で表示する。微小な差を表示丸めで100にせず、未確定数値入力と確定値の状態を別に示す。
+- `QuestionEditorList`は`VisibleQuestions`の元editor参照を表示し、単一の選択設問editorで編集する。実ListBox高さと実現行高（local styleは48 DIP）からページ容量を求め、ページ移動だけで配点や論理選択を変えない。
+- 数値変換できない設問配点は`pendingQuestionPoints`へID別のtextとして保持する。root数値は同じControlに保持し、不正textを新しい数値へ強制変換しない。未確定textは保存・runに使う確定draftの数値とは別である。
+- 通常／固有評価の有効数・対象概要は実draftから表示し、同じ設問の設定を1操作で開く。設定の入力詳細にある主列／本文や、固有評価にある固有配点は読取専用の再表示で、主画面の入力欄を複製しない。
+- 読込Promptは件数と入口だけを主画面へ残す。本文・適用先・`Promptを適用`は設定の「読込Prompt」。一覧の順序や原文は移動・保存定義適用で失わない。
+- 計算式概要は説明と確定Base／Special／Wだけを表示し、学生ごとの未実行scoreを作らない。詳説は「計算式」のFlyoutで確認する。エラーはnode／field／codeで対象を保ち、「問題箇所へ」で配点、Inputの該当欄、または同じ対象の設定を開く。
+- `QuantificationDesignScrollViewer`は小さすぎる本文でも到達性を残す。`DesignBody`へ幅720・高さ426 DIP以上の有限canvasを与え、通常条件では外側scroll不要、狭小条件は例外として検証する。
 
 ### 10.3 Execution
 
-- normal model listと`auto` availabilityを別表示する。
-- final／partial path previewとoutput directory選択を表示する。
-- new run／resumeを明確に分ける。
-- stage、reference、row、unit progressを表示する。
-- `ExecutionScrollViewer`はhorizontal scrollを`Disabled`、vertical scrollを`Auto`とし、rootへ固定幅を設定しない。
-- path、認証、実行status、進捗、validationの動的文言をwrapし、start／cancel操作は`WrapPanel`で折り返す。
+- normal model／並列度／実効出力先は主画面では読取専用。「変更」でSettings.Commonを開き、model選択・並列度・明示出力先を編集する。`auto` availabilityは通常modelと別表示する。
+- `PreferredModelId`は保存希望、`SelectedModelId`は確認結果に存在する実効選択。不在なら未選択のまま明示変更を要求し、確認失敗だけで希望IDを消さない。希望未指定の初回は既存の明示確認後の初期選択を維持する。
+- `CurrentRunModelId`／`CurrentRunMaxConcurrency`／`CurrentRunOutputSummary`は実際にdispatchしたrequestに由来し、次回の共通設定と区別する。予約final／partial pathも読取専用だが、予約名はfile作成済みの証明ではない。
+- 明示login／取消／状態確認、新規／再開、partial path、開始／停止は主画面に残す。状態確認・loginは画面の表示だけでは開始しない。
+- stage／reference／student row／operation進捗は実progressを表示する。予定単位数・retry込み上限・実行済み送信数を混同せず、完了件数を成功件数と同一視しない。
+- 技術エラーの選択は`(Code, NodeId, Path, Field)`で保持する。ここで`Path`はvalidatorの定義内locationで、利用者のfile pathではない。同じcodeの別対象を一件へ畳まず、読取専用の全文で確認できる。
+- `ExecutionLayout`の条件概要と開始／停止を固定し、認証・進捗・エラー・長いpathは局所領域で到達可能にする。設定や前工程へ移動してもshellの進捗入口と停止は現在runに接続したままにする。
 
 ### 10.4 Results
 
-- completion headline
-- finalまたはpartial path
-- input unchanged
-- row counts、technical failure count
-- per row: QuestionEarned、SpecialEarned、SimilarityPenalty、FinalRaw、FinalScore
-- cleanup warning
-- `ResultsOutputScrollViewer`と内側の結果listはhorizontal scrollを`Disabled`、vertical scrollを`Auto`とし、1120／1050の固定幅を持たない。
-- formula previewはrow／final、QuestionEarned、Special／Penalty／Rawの意味単位、criterion reviewはidentity、status／AI raw／override、effective／normalized／evaluator／overallの意味単位でcard化する。
-- `ResultsList`の固定viewport高と`VirtualizingStackPanel`を維持し、大量行を全件realizeせず縦scrollできるようにする。export／cancel操作は`WrapPanel`で折り返す。
-
-finalizationはrunの一部として自動実行する。Resultsでは既存finalを上書きせず、criterion override反映版を任意の別名workbookとして検証・出力できる。
+- `ExecutionRunContext`／`RunSummary.Snapshot`に由来する「前回の実行結果」を保持し、入力・次回draftを編集しても再評価しない。final／partial、件数、cleanup warning、入力identityを確認できた段階を表示する。取消・checkpoint失敗をfinal commit直前の不変確認済みとは表示しない。
+- `RowScoreList`は`VisibleRowScores`の学生行ページ。元行番号、最終点、固有点、類似減点、行状態、設問別得点概要を示す。`ResultsList`は選択行の`SelectedRowCriteria`、その隣に選択criterionの単一editorを置く。設問数に比例して横へ列や全件editorを増やさない。
+- `Results`が元の`ResultsCriterionViewModel` collectionを所有し、`SelectedRowCriteria`も同じ参照を使う。ページ移動では表示ページ内の行を再選択するが、ページ外のoverrideも元collectionに保持する。再計算で行previewを作り直しても、同じ行のcriterion editorを不要に初期化しない。
+- 「元の行番号」→移動は存在するsource rowだけを対象にする。不正・空のtextでは`GoToRowNumber=null`として旧有効値を実行対象に残さず、Enterも同じ移動commandを使う。一覧のEnter／double tapは詳細表示へ進む。
+- `NextOverrideErrorCommand`は全`Results`から次のエラーを探し、ページ外でも元行・criterion・詳細表示へ移る。残り1件でも再移動でき、Viewは対象criterionをscrollして表示する。
+- AI raw、effective／normalized／evaluator／question／overall previewは読取専用で、編集するのは許可された通常criterionの`OverrideText`だけ。snapshotのscorableとeffective rangeで検証し、空回答・未確定行をoverride可能としない。固有評価・類似度のoverride UIは追加しない。
+- `ResultsRowStatus`は成功／回答空欄／取消／未処理・未確定／技術エラーを区別する。完了済みemptyの0、数値としての0、技術失敗・未処理のblank（表示`—`）を混同せず、計算は既存`WeightedScoreCalculator`を使う。
+- finalizationはrun中の自動処理。任意の修正版は`ResultsOutputBoundary`がrunのsnapshot＋overrideから既存4 sheet writer／validator／atomic committerを通して別名へ出力し、入力・元final・既存fileを上書きしない。
+- `HasUnsavedOverrides`と`LastSuccessfulExportPath`を分離する。成功した出力の受領値だけを保存済みpathとし、後続失敗で前回成功pathを消さない。出力開始時に固定したoverrideのrevisionと現在revisionが違えば、成功後も現在の修正は未保存とする。
+- `ResultsLayout`は最小416 DIPの有限本文を持ち、実viewport／行高からページ容量を更新する。両listの`VirtualizingStackPanel`と長文の局所scrollを維持し、狭小表示の本文scrollを通常非scrollの成功へ数えない。
 
 ### 10.5 Warning
 
-`EthicsWarningText.Message`を要求のexact文面へ置換する。shell rootの既存non-focusable bannerを再利用する。
+`EthicsWarningText.Message`の要求exact文面をshell rootのnon-focusable／nonblocking bannerへ全文表示する。4ステップと設定の両方に共通で、確認・同意・dismissを状態や操作条件へ追加しない。
 
 ### 10.6 Startup error
 
@@ -652,8 +643,55 @@ finalizationはrunの一部として自動実行する。Resultsでは既存fina
 - Microsoftは、responsive breakpointを物理screenではなくapp windowの利用可能領域とeffective pixelで判断し、小さいwindowでは縦積み、大きいwindowでは複数列へreflowする手法を示している。[Microsoft Learn — Screen sizes and breakpoints](https://learn.microsoft.com/windows/apps/design/layout/screen-sizes-and-breakpoints-for-responsive-design)、[Responsive design techniques](https://learn.microsoft.com/windows/apps/design/layout/responsive-design)
 - W3CのReflowは、意味または機能上二次元配置が必要な部分を除き、情報・機能を失わず二方向scrollを避けることを求める。Understanding文書は、二次元表示が必要なtable等を専用scroll containerへ限定し、page全体はreflowさせる例を示す。[WCAG 2.2 SC 1.4.10 Reflow](https://www.w3.org/TR/WCAG22/#reflow)、[Understanding Reflow](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html)
 - W3CのResize Textは、captionとtext imageを除くtextを200%まで拡大してもcontentまたはfunctionalityを失わないことを求める。[WCAG 2.2 SC 1.4.4 Resize Text](https://www.w3.org/TR/WCAG22/#resize-text)
-- `880` DIPはMicrosoft、W3C、Avaloniaが規定する汎用breakpointではなく、このcomponent固有の実装値である。採用根拠は`InputViewTests`の879／880／881境界、760 DIP standalone、1024 DIP shell、1180 DIP wide、および200% render scalingでの直接検証に限定する。
+- 旧Input mapping paneの`880` DIPは過去layout固有の判断値であり、現行Viewのbreakpointではない。現行の有限領域・reflow・ページ容量は§10.1〜10.4の実装に従う。ソース上の寸法、headlessのClientSize／scale、native Windowsの実DPIを分け、現在の限定検証は[`implementation-status.md`](implementation-status.md)、測定欄は[`ui-layout-contract.md`](ui-layout-contract.md)を参照する。
 - 上記WCAG資料はdesktop UIの設計heuristicとして使用する。本製品全体のWCAG適合宣言または第三者認証を意味しない。
+
+### 10.8 Settingsの5カテゴリとView保持
+
+| `SettingsCategory` | 表示 | 値の所有と編集範囲 |
+|---|---|---|
+| `Common` | `SettingsView`内の共通template | 共通値はExecution、定義名／revision／丸めはDesign。「保存定義」「診断」は内部tabで、設定path・保存定義概要・取得済みruntime／認証状態は読取専用 |
+| `Mapping` | `MappingSettingsView` | Inputの設問名・補助列・候補一式再適用・CRUD。主回答列／有効状態／設問本文は主画面の現在値を読取専用表示 |
+| `Evaluation` | `EvaluatorSettingsView` | Designの通常evaluator／criterion CRUD、range、weight。Knowledge固定Promptと合成previewは読取専用、Custom本文は編集可能 |
+| `Special` | `SpecialEvaluationSettingsView` | Designの固有項目・主対象列／補助列／Prompt／enabled。固有配点の再表示と0〜1範囲は読取専用 |
+| `ImportedPrompts` | `ImportedPromptSettingsView` | Designが持つ起動引数順の原文を読取専用表示し、選択Custom／specialへ明示copy。一覧と原文を保持し、未適用本文を定義へ混ぜない |
+
+- Settingsは`UiObservableObject`を継承し、既存Input／Design／Executionを参照する。独立の採点draft、カテゴリ別VM、設定providerは持たない。入力なしでも共通・読込Promptの閲覧は可能だが、定義編集・Prompt適用は`CanEditDefinition`と既存command条件で制限する。
+- `MainWindow.CurrentStepContent`は5種類のDataTemplateを持つ。code-behindはVMの参照同一性をkeyにViewをcacheし、初回だけDataContextを設定、表示中の1つだけを接続する。往復で古いshell DataContextを書き戻さず、隠れた兄弟Viewを並べてAutomation IDを重複させない。
+- `SettingsView.categoryViews`も同じSettings ownerに対してカテゴリごとに保持する。切替はoff-treeへの退避で、Settingsのownerが変わる場合だけ破棄する。共通tabと移設Viewの未確定textを不要な再生成で消さず、設定内TabStripPlacementも脱着時に変動させない。
+- カテゴリ切替後は対象selector等へfocusし、設定終了時は元の呼出しcontrolが可視・有効なら戻す。削除等で復帰できなければ元editorの既定操作へ移す。問題箇所への明示focusをshellの遅延focusで奪わない。閉じたwindowの遅延処理・購読はlifetime／参照の検査とdisposeで無効化する。
+- 設定本文へ幅720・高さ340 DIP以上の有限領域を渡し、footerの保存／戻るを本文scrollへ含めない。数値宣言だけで通常表示の完全包含を検証済みとはしない。
+
+### 10.9 ApplicationSettingsとstrict file store
+
+正本はAppの[`ApplicationSettings.cs`](../../src/StudyReportEvaluator.App/Settings/ApplicationSettings.cs)と[`SettingsFileStore.cs`](../../src/StudyReportEvaluator.App/Settings/SettingsFileStore.cs)。設定schemaは整数1で、Core canonical schema／checkpoint schema／要求版／製品版と独立する。
+
+| JSON property | 永続化する値 |
+|---|---|
+| `schemaVersion` | 必須の整数`1` |
+| `preferredModelId` | 通常model希望IDまたは`null`。利用可能性の確認状態ではない |
+| `maxConcurrency` | 1〜3、既定1 |
+| `outputDirectoryOverride` | fully qualifiedな明示出力先または`null`。自動算出resultは含めない |
+| `definition` | 任意の`QuantificationDefinition`1件。ID・順序・decimal・設問文・mapping・配点・evaluator／criterion／special・適用済みPrompt・丸めを保持 |
+
+1. storeは注入されたfully qualified file pathだけを扱う。constructorとloadはdirectory／fileを作らない。fileなしは`Missing`＋既定値、fileが親directory位置を占める等の失敗は`ReadFailed`として区別する。
+2. strict UTF-8でBOMあり／なしを読み、JSON root、schemaの必須・整数表記を検査する。schema欠損・不正型・小数／指数表記は`JsonInvalid`、1以外の整数版は`UnsupportedVersion`。未知版を移行しない。
+3. System.Text.Jsonのcase-sensitive camelCase／strict number／未知member拒否／重複property拒否／nullable・required検査を使い、ScoreRange両端の欠損、enum、値域、不正Unicodeやnull collection要素も拒否する。定義は既存validatorで検証する。canonical serializerにDeserializeを追加せず、canonical bytes／SHA-256は往復のoracleとして使う。
+4. 明示保存時のimmutable record graphを最初のawait／I/O前にUTF-8 bytesへ固定する。不正な共通値や定義は`InvalidSettings`で拒否する。同directoryの一意`.setting-<GUID>.tmp`を`CreateNew`／`FileShare.None`で作成し、write／flush／close後に`File.Move(temporaryPath, FilePath, overwrite: true)`で置換する。旧fileの先行削除・直接切詰めやcheckpointへの書込は行わない。
+5. 置換前の取消は旧bytesを保ち、置換成功後は後発の取消を保存失敗と誤報しない。I/O失敗は`WriteFailed`、自分のtempだけbest-effort cleanupとする。安全なstatusだけを返し、例外本文・設定本文・pathをlogへ出さない。
+6. 破損・未知版・読込拒否でも元fileを自動修復／削除せずoffline編集を継続する。同processの二重保存はVMが防ぎ、別process間のmerge／監視／履歴はなく最後の成功が優先する。同directory置換の契約であり、電源断や任意network filesystemの無条件な耐久性を保証しない。
+
+### 10.10 最新editor、保存状態、run／結果の分離
+
+- [`SettingsViewModel`](../../src/StudyReportEvaluator.App/ViewModels/SettingsViewModel.cs)はInputの`DefinitionDraft`／Designの`Draft`変更通知で`latestEditor`を追跡する。`SynchronizeDrafts`はその元から相手へ一方向に同期し、同期済み状態と再入guardで古いdraftの逆書戻しを防ぐ。MainWindowは遷移・設定開閉、Settingsはカテゴリ変更・保存前の境界を呼ぶ。同カテゴリopenでも必要な同期を省略しない。
+- Designは同一VMを維持し、`SynchronizeFromInput`で内容が同じ場合は再commitしない。残るquestion／evaluator／criterion／specialのeditorをIDで再利用する。表示ページ・選択とImported Promptの順序／本文も維持し、選択候補更新中のTwoWay feedbackをguardする。
+- 共通値はExecutionが所有し、その編集は最新採点editorを変更しない。初期読込前・読込中の明示編集を優先し、初期読込取消後の再試行でもその履歴を保持する。初期読込完了前は保存を許可せず、取消なら読込待ちのまま再試行を求める。
+- 保存前に最新draftを同期して`ApplicationSettings`をcaptureする。入力未読込の場合はDesignのplaceholderでなく`StoredDefinition`を残す。保存成功時だけ、その固定値を比較baselineにする。`HasUnsavedChanges`は現在値とbaselineを比較し、decimalは比較用に`G29`へ統一する。保存中に編集された現在値を保存済みとせず、比較用bytesをfile形式や第二draft storeへ転用しない。
+- `StoredDefinition`の初期読込はInput／Designへ自動適用しない。「現在の入力に適用」は保存headerのread-only metadata再読込、入力identity・sheet／行／列・定義検証の成功後だけcommitする。失敗／取消／読込中の競合は両draftを保持し、Imported Prompt一覧も変更しない。実行中の一括適用は不可。
+- MainWindowの`RefreshExecutionConfiguration`は設定表示中・入力処理中・適用中の再構成を避け、同期完了後だけExecutionを更新する。`Configure`は同path・同metadata参照・同canonical定義なら再初期化しない。変更時だけ次回準備を更新し、再開指定の解除理由を表示する。
+- `StartAsync`は`IsRunning`通知より前に`QuantificationRunRequest`の定義copy・model・runtime・並列度・出力／再開条件を固定する。実行中は`Configure`を拒否し、`UpdateNextDraftSummary`は次回の表示だけを更新する。後続の設定・draft編集で現在request、workflow snapshot、checkpoint、予約pathを差し替えない。
+- 完了contextはResultsへ渡すが、Settings表示中は閉じず、前工程表示中も強制移動しない。Execution表示中でSettingsが閉じている場合だけ結果へ進む。次回の再構成でExecutionの直前状態が初期化されても、Resultsが所有する前回context／overrideは次の結果読込まで独立して残る。
+- 遷移・設定読込／保存／適用・Prompt表示／適用から認証確認・login・AIを自動開始しない。実Avaloniaの操作とfake境界による呼出し数検証は、本人login／実AIの成功証跡ではない。
 
 ## 11. Command-line launch
 
@@ -679,13 +717,18 @@ finalizationはrunの一部として自動実行する。Resultsでは既存fina
 
 ### 11.3 Startup
 
-`Program.Main`でparseし、safe errorがあればdialog表示後終了する。valid optionsは`App`へ渡し、MainWindow composition時にInputとDesignへ適用する。AI実行commandは呼ばない。
+- `Program.Main`は`LaunchStartupState.Create(args)`を呼び、`BuildAvaloniaApp(startup)`から`ServiceRegistration.FromStartup(startup)`をAppへ渡す。safeな起動errorは`StartupErrorWindow`で表示し、通常windowの構成と分離する。
+- productionの`FromStartup`は`Environment.GetFolderPath(LocalApplicationData, DoNotVerify)`を使い、`StudyReportEvaluator/setting.txt`のstoreを構成する。この段階ではpath解決だけでread／writeしない。解決不能・不正pathならnull storeで保存を無効化し、cwd／EXE隣接へfallbackしない。
+- `App.CreateMainWindow` → `ServiceRegistration.CreateMainWindow`がwindowを構築後、UI threadを同期waitせず`InitializeAsync` → `Settings.InitializeAsync`で初期読込を開始する。初期化は同じSettings VMで冪等で、設定画面を開くことを読込条件にしない。
+- 従来の`new App()`／`new ServiceRegistration()`／MainWindow VM constructorはnull storeで設定I/Oを行わない。テストは一時absolute pathの`SettingsFileStore`または`FromStartup(startup, localDataDirectory)`を注入する。OS実pathを解決するだけの試験ではreadを開始しない。
+- `--input`のpath事前入力はcompositionが設定し、従来のInput Viewの一度限りのLoaded処理がread-only読込を行う。`--prompt`の原文はDesignへ順序どおり渡す。設定初期化はこの入力読込要求を消費せず、保存定義を自動適用せず、認証確認・login・AIを開始しない。
 
 ## 12. Copilot runtime
 
 ### 12.1 pinning
 
 - NuGet SDK exact versionをcentral package managementで固定する。
+- v4.6でもbuild SDK `10.0.400`、要求runtime `.NET 10.0.11`、Avalonia `12.1.1`、Open XML `3.5.1`、Copilot SDK `1.0.11`／bundled CLI `1.0.79`を維持する。UI／設定のための依存追加・lock変更・resolver緩和は行わない。これらの版宣言を新artifactの実測と混同しない。
 - SDKのbundled CLI assetをRID別publishへ含める。
 - package manifestへSDK version、CLI file relative path、CLI SHA-256を保存する。
 - appはmanifestを読んでpackage-relative absolute pathを使用する。
@@ -706,6 +749,7 @@ checkpointとRun sheetへ次を保存する。
 
 - 単一EXEは.NET標準hostのbundle抽出cache（通常`%TEMP%/.net/<app>/<bundle-id>/`）を使う。
 - このcacheはアプリ配置専用であり、input/final/partial workbookの保存先にしない。
+- `setting.txt`も抽出cacheではなくOSのLocalApplicationData配下へ分離する。設定復元をruntime検証やCLI credential復元の代わりにしない。
 - CLI credential storeはCLI/OS管理の境界とし、Appはcredentialを収集/保存/削除しない。
 - runtime cacheとCLI credential storeを混同せず、失敗時メッセージも境界を分ける。
 
@@ -724,8 +768,8 @@ checkpointとRun sheetへ次を保存する。
 
 - App限定single-file publish profile（`WindowsSingleFile.pubxml`）を使用し、`win-x64`/self-contained/`PublishSingleFile=true`/`IncludeNativeLibrariesForSelfExtract=true`/`IncludeAllContentForSelfExtract=true`を固定する。
 - `IncludeAllContentForSelfExtract`は非推奨互換モードであることを明示し、固定構成での適合確認に限定して採用する。
-- 公開payloadは、.NET runtime/Avalonia/Open XML/Copilot SDK/固定CLI/runtime manifestに加え、明示allowlist 17ファイル（README・LICENSE・docs 7件・images README + 7画像）だけを同梱する。
-- source、test、sample、symbol、secret、0-byte、root外linkをpackageへ含めない。
+- 公開payloadは、.NET runtime/Avalonia/Open XML/Copilot SDK/固定CLI/runtime manifestに加え、明示allowlist 20ファイル（公開文書11件＝root README・docs 9件・images README、8画像、LICENSE）を同梱する。T37／T38でZIP・MSIX・EXEの作成側／検証側をこの同一集合へ同期済み。
+- source、test、sample、setting.txt、利用者workbook、symbol、secret、0-byte、root外linkをpackageへ含めない。
 - package-installed appが外部.NET、Office、別Copilot CLIへfallbackしないことを検証する。
 
 ### 13.2 Windows
@@ -799,6 +843,8 @@ checkpointとRun sheetへ次を保存する。
 - similarity payload: current row primary + same question reference。
 - reference payload: question textのみ。
 - output／partialは入力全体、definition、AI結果を含み、入力と同等以上に機密。
+- `setting.txt`には定義の明示保存時だけ、header由来の設問文・適用済みPrompt・貼付内容・sheet名・明示出力pathが平文で含まれ得る。暗号化containerではなく、読込や主列変更だけで自動書込する意味でもない。
+- 設定へ入力xlsxのpath／bytes、回答行の自動収集、AI結果／reason／evidence／reference、run／checkpoint、credential／login／CLI hash、未適用Prompt一覧・本文、Control／選択ID／ページ／履歴／警告承認を保存しない。実設定内容を公開物・画像・logへ含めない。
 - application logはoperation kind、safe IDs、counts、status、timingだけ。
 - file path、answer、Prompt、reference、reason、evidence、credentialをlogへ渡さない。
 - tempとpartialはtarget directoryの既存OS access controlを継承し、より広いpermissionへ変更しない。
@@ -822,7 +868,14 @@ checkpointとRun sheetへ次を保存する。
 - 同梱CLI欠落/不一致: `COPILOT_CLI_UNAVAILABLE`
 - runtime確認失敗: `COPILOT_RUNTIME_FAILED`
 - model未選択/未列挙: `MODEL_SELECTION_REQUIRED` / `MODEL_REQUIRED`
+- 固定`auto`未列挙: Execution preflightの`AUTO_MODEL_UNAVAILABLE`。通常modelとは別に開始を拒否する
 - login終了未確認やcleanup失敗は、login status文言で再確認要求を出し、自動run開始を抑止する。
+
+### Settings（run statusとは独立）
+
+- `SettingsLoadStatus`: `Loaded` / `Missing` / `JsonInvalid` / `UnsupportedVersion` / `ReadFailed`
+- `SettingsSaveStatus`: `Saved` / `InvalidSettings` / `WriteFailed`
+- VMは未読込／読込中、未保存、保存中、保存済み、保存失敗・取消、明示適用の状態を分ける。エラーは安全な理由を表示し、既存設定や現在draftを自動修復・破棄しない。
 
 ### Checkpoint / output
 
@@ -860,17 +913,16 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 - Inputのprimary column ComboBox操作後に、同じQuestion cardの可視QuestionText TextBoxがraw header値へ更新
 - 手編集後のprimary再選択による上書きと、primary/supporting重複の同時除去
 - root points／equalize／validation
-- special editor
-- imported Prompt order／reuse／explicit apply／no AI send
+- 設定5カテゴリの通常／固有editor、主画面の現在値を読取専用で示す重複編集の防止
+- 設定内のimported Prompt order／reuse／explicit apply／no auth・login・AI send
 - output／partial path、new/resume
 - stage/row progress、cancel、completion、cleanup warning
 - keyboard、focus、200% scroll
-- Input mapping paneの幅がavailable widthだけで決まり、workbook読込前後で不変
-- 狭い幅でInput mapping paneが縦積みへreflowし、horizontal overflowが発生しない
-- Input mapping paneがcontainer幅879／880／881で、`min-width:880`の境界どおり縦積み／横並びへ切り替わる
-- 1024×720 shellと760×600 standaloneの全stepでhorizontal overflowがなく、必要なvertical scrollbarが可視になり最下部へ到達できる
-- 長い日本語名／pathが親幅を拡張せずwrapされ、530結果行でもoverride editorを全件realizeしない
-- 420×220の起動エラー画面とResults内のformula／criterion listで、vertical scrollbar表示と最下部到達を検証する
+- 1024×720／1180×800 shellの実ClientSize・警告／固定操作・本文完全包含と外側scroll不要を確認し、760×600 standalone／scale 2の例外到達と区別
+- Input／Design／Resultsの実viewportに応じたページ容量増減、全件／末尾到達、空一覧、ID保持、構造変更時の補正とvirtualization
+- 長い日本語名・path・設問文・Promptの局所全文到達、530行でも単一criterion editor、420×220の起動エラーのscroll回帰
+- 実shellでのInput／Design／Settings交互編集・保存、同カテゴリopen、未確定text、内部tab、設定終了focusとAutomation ID一意性
+- 現在run固定／全画面停止／設定中完了の非強制遷移、前回結果保持、ページ外overrideエラー移動、元行番号の不正text・Enter回帰
 
 ### 16.4 E2E
 
@@ -884,11 +936,21 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 ### 16.5 Delivery
 
 - Windows legacy ZIP layout/hash/clean launch regression
-- Windows single-file publish/package/layout/identity/allowlist 17ファイル検証
+- Windows single-file publish/package/layout/identity/allowlist 20ファイル検証
 - development MSIX manifest/version/layout、unpack、block map、bundled CLI、sidecar、policy negative、cleanup
 - macOS RID別bundle/sign/notary source foundationのstatic contractと未実測artifact非公開
 - public EXE + ZIPの4 asset再download照合、candidate拘束matrix v2、secret isolation
-- clean-host CH-01〜06と本人login実測は別証跡（現時点`NOT_RUN`）
+- clean-host CH-01〜06と本人login実測は別証跡（現時点`NOT_RUN_EXTERNAL_PREREQUISITE`）
+
+### 16.6 UI／Settingsの直接検証範囲
+
+- `ApplicationSettingsTests`／`SettingsFileStoreTests`は設定の往復・strict schema・real filesystem拒否・旧bytes保持・temp cleanupを扱う。実利用者folderを使わず、一時absolute pathを注入する。
+- `SettingsCompositionTests`はproduction factoryのpath解決と初期化接続、既定constructorの設定I/Oなし、明示編集優先、入力Loaded処理との分離を扱う。`SettingsViewModelTests`／`WorkflowStateTests`は最新editor同期、保存／適用、実shell往復とrun固定を扱う。
+- `SettingsWorkflowSystemTests`の7ケースは4行の合成workbookと実store／reader／durable orchestrator／checkpoint／writer／validator／atomic commitを使う。指定／未指定出力先の復元、zero／blank、run snapshotに従う別名override出力、取消・新VMでのresume、適用失敗の無変更、cached score改変のcommit拒否を検証する。
+- T27ではtest専用run adapterがAI runnerだけをfakeへ置換し、RunSummaryやfile成功receiptを捏造しない。認証／model／runtime identity・時刻も合成で、設定・遷移は呼出し0、明示確認／実行後はfakeの呼出しを検査する。実CLI・本人login・実AIは実施していない。
+- T01〜T38の親担当レビューと対象件数は[現在状態](implementation-status.md)のF02節を参照する。T34のsource／既存証跡読取・文書編集のみという記録は0.8.4の履歴。T36は21/21、T37は実ZIP＋MSIX静的契約9/9、T38はcontract 114/114と実EXE P06 7/7・P07 PASS_DEVELOPMENT、T39は自動回帰1892/1892（Core 190＋App 1702、skip 0）とMSIX PASS_MECHANISMで、いずれも0.8.4の範囲である。
+- T39初回の1失敗は設定済みExecution単体＋未読込Inputのfixtureを、合成Excelの実読込→通常ナビゲーションへ直し、126/126・独立レビュー指摘0後の全体再実行で成功した。期待を緩めず、初回失敗を保持する。追加nativeは3試行で停止し、最新`artifacts/test/ui-settings/t39/native-final-attempt.json`はCONTROL_ID_PREDICATE_NOT_UNIQUEでFAIL。120 DPI・実client 1475×1000 pixel＝1180×800 DIP、入力読込・入力／EXE不変・実利用者設定非作成の部分観測だけで、4画面・5カテゴリ・1024×720・実keyboardは未完了。
+- T26 headlessとT27 local real-fileをnative成功へ拡張しない。Narrator・本人walkthrough4項目・隔離利用者native保存はNOT_RUN_EXTERNAL_PREREQUISITE。P06の未実施disk-full／directory ACL／抽出中断／EXE・ZIP間checkpoint再開も残す。F02の文書編集自体はbuild／test／実設定・secret読書／本人login／実AI／実学生data／公開操作を行わない。
 
 ## 17. File-level implementation map
 
@@ -921,17 +983,30 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 | P-04 | platform matrix / protected release | workflow contract and release evidence tests |
 | D-01..05 | README/docs/dev/docs/images | documentation/screenshot tests |
 
+v4.6のUIプランT番号に対応する追加・更新箇所（上表の既存業務taskとは別）:
+
+| Task | App内の所有先 | Direct tests |
+|---|---|---|
+| T02〜T04、T10 | `Settings/ApplicationSettings.cs`、`Settings/SettingsFileStore.cs`、Inputの明示適用、`SettingsViewModel.cs` | ApplicationSettings／SettingsFileStore／SavedDefinitionApplication／SettingsViewModel tests |
+| T05〜T09 | Input／Designの同一VM・子editorとページ、Executionの希望値と固定request、Resultsの元criterion／ページ／修正版 | DesignState／InputPresentation／DesignPresentation／ExecutionSettings／ResultsPresentation tests |
+| T13〜T17 | Mapping／Evaluator／SpecialEvaluation／ImportedPromptSettingsView、SettingsView | 各Settings View tests |
+| T18〜T23 | 4主View、MainWindow View／VM、WorkflowNavigator、ServiceRegistrationとProgramのproduction接続 | 各View／MainWindow／MainWindowSettings／SettingsComposition tests |
+| T24〜T27 | 既存App境界の結合・headless・実file検証（新production projectなし） | WorkflowState／PrimaryJourneyAccessibility／EthicsWarning／CopilotLoginCommand／ResponsiveLayout／CompactWorkflowLayout／SettingsWorkflowSystem tests |
+
 ## 18. Definition of done
 
-- 要求v4.5のAC-001〜034がdirect deterministicまたは適切なmechanism/candidate-bound evidenceへ接続される。
+以下は完了条件であり、全条件を現在達成したという状態表ではない。
+
+- 要求v4.6のAC-001〜037がdirect deterministicまたは適切なmechanism/candidate-bound evidenceへ接続される。
 - 各implementation taskでtarget tests、Release build、diff checkが成功する。
 - 各taskの敵対的reviewで再現したfindingを修正し、同じ観点のfollow-upで0件を確認する。
 - full required testsが成功する。
 - candidate段階でEXE/ZIP 4 assetと対応evidenceが整合し、development MSIXはnon-public recordのみで扱う。
 - protected publishでcandidate run・受領clean-host記録・再download 4 asset照合・v2 final matrix確定が成功する。
 - 受領human証跡は実行事実の自動証明ではないことを維持する。
-- `0.8.4` single-file EXE candidateは未公開で、公開済み`v0.8.1` ZIPとの境界を崩さない。
-- clean-host CH-01〜06と本人login実測が`NOT_RUN`の間は、新EXE公開完了を主張しない。
+- `0.8.5` single-file EXE candidateは未公開で、公開済み`v0.8.1` ZIPとの境界を崩さない。0.8.3 baseline・0.8.4のR03／V01・T28画像生成・T36〜T39の証跡はそれぞれの履歴として保持する。
+- 利用者不在時の自律続行指示によりT39をBLOCKEDのままF01／F02を進める。F01はREVIEWED、親担当によるPATCH `0.8.4` → `0.8.5`は反映済みだが、0.8.5最終版の再検証結果は実行記録の最新F02欄で確認する。headless・局所試験・0.8.4の自動回帰成功だけでnative／本人walkthrough、G4・全タスクDONEを付与しない。
+- clean-host CH-01〜06と本人login実測が`NOT_RUN_EXTERNAL_PREREQUISITE`の間は、新EXE公開完了を主張しない。
 - macOS source foundationのstatic contractが成功し、production artifactを公開しない。
 - Linux、Windows Arm64、macOS 13以前、未実測installer／signing／notarizationを対応済みと記録しない。
 - 実在学生本文、Prompt、reference、AI reason/evidenceをlog、test artifact、review recordへ追加しない。

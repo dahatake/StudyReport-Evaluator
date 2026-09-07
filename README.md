@@ -9,19 +9,18 @@ AIが作る値は確認対象です。最終的な評点と利用判断は、授
 
 ## できること
 
-- native pickerまたはfull pathから標準`.xlsx`をread-onlyで読み込む
-- 質問、主回答列、補助列、Knowledge／Custom evaluator、固有評価を設定する
-- Base、Question、Specialの絶対配点とSimilarity penalty weightを設定する
-- QuestionごとのReference、通常評価、固有評価、Similarityを実行する
-- Reference完了ごと・student row完了ごとに`.partial.xlsx`へcheckpointする
-- finalを自動作成し、必要ならcriterion override反映版を別名で出力する
+- 標準`.xlsx`をread-onlyで読み込み、設問・回答列・評価方法・配点を設定する
+- GitHub Copilotで参照回答、通常評価、固有評価、類似度を求める
+- 参照回答・回答行の完了ごとに`.partial.xlsx`へ保存し、中断後に再開する
+- 完成版を自動作成し、必要なら評価項目の修正値（override）を別名workbookへ出力する
+- 未公開候補では、共通設定と任意の採点定義1件を明示保存して再利用する
 
 ## 対応環境
 
 | 項目 | 対応内容 |
 |---|---|
 | OS / architecture | Windows 11 x64 |
-| 配布 | .NET 10 self-contained。公開`v0.8.1`はunsigned ZIP、未公開`0.8.4`候補ではunsigned単一EXEを追加。各形式にSHA-256 sidecar |
+| 配布 | .NET 10 self-contained。公開`v0.8.1`はunsigned ZIP、未公開`0.8.5`候補ではunsigned単一EXEを追加。各形式にSHA-256 sidecar |
 | 入力 | 標準Office Open XML `.xlsx` 1file |
 | AI runtime | 配布物へ同梱したGitHub Copilot CLI。PATH上の別CLIへfallbackしません |
 | AI login | 利用者本人のGitHub Copilot対話login。GUI起動とは別条件です |
@@ -34,17 +33,15 @@ AIが作る値は確認対象です。最終的な評点と利用判断は、授
 現在の公開版は`0.8.1`です。[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases)で現在取得できる配布物は、`v0.8.1`の`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`です。**この公開版には単一EXE配布も「GitHubにログイン」buttonもありません。**
 
 > [!IMPORTANT]
-> **現在の作業ツリーの製品候補は`0.8.4`（UNRELEASED・未公開）です。** `0.8.3`時点の単一EXE publish/packageとP06の実EXE試験7件は開発環境で成功し、独立レビューも指摘0件でした。P07は7件・9観測から`PASS_DEVELOPMENT`の証跡を生成済みですが、版と同梱文書の変更後に最終再検証が必要です。ログインUIの確認は自動試験の範囲で、**clean-host試験と本人loginは`NOT_RUN`**です。追加ソフト未導入のOS-only環境での動作や実認証、新EXEの公開完了を示すものではありません。
->
-> README等の同梱文書や製品版が変わればEXEのbytesも変わるため、公開判定には最終EXEの再package・再検証が必要です。
+> **製品候補は`0.8.5`（UNRELEASED・未公開）です。** 以下の新しい画面配置・設定保存・login buttonは候補版向けで、公開`0.8.1`の機能ではありません。版の更新は最終配布物の検証や公開の完了を意味しません。**追加ソフト未導入のOS-only環境でのclean-host試験と本人loginは未実施**です。
 
 ### 単一EXEから起動する（未公開候補・今後の主導線）
 
-今後の主配布名は`StudyReportEvaluator-win-x64.exe`と`StudyReportEvaluator-win-x64.exe.sha256`です。現時点ではソース側で作成した未公開候補であり、公開条件を満たす最終成果物の公開後に主導線となります。未公開のdownload URLは案内しません。
+候補版の配布名は`StudyReportEvaluator-win-x64.exe`と`StudyReportEvaluator-win-x64.exe.sha256`です。公開条件を満たす最終成果物の公開後に主導線となります。未公開のdownload URLは案内しません。
 
 目標とする起動操作は、**取得済みの`StudyReportEvaluator-win-x64.exe`をダブルクリック → 入力画面**です。ダブルクリックを1起動gestureと数え、download、任意の手動hash比較、Windowsの警告への操作、本人loginは含めません。
 
-- 標準userがofflineでGUI、Excel読込、mapping、採点設計を利用できることを要求しています。**clean-hostでの実証は未完了**です。
+- 標準userがofflineでGUI、Excel読込、mapping、採点設計を利用する設計です。ただし、**clean-hostでの実証は未完了**です。
 - GUI起動に.NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI（`gh`）、別Copilot CLI、Microsoft Excel／Office／LibreOffice、IDEの導入を要求しないself-contained設計です。
 - 手動展開、setup script、terminalへのcommand入力、管理者昇格、repository、隣接DLL／manifest、既存CLI cache・認証情報、sidecarをGUI起動の前提にしません。
 - GUI起動時にloginやAI評価は自動開始しません。AIのnetwork・account・model・組織policy上の許可は別条件です。
@@ -64,11 +61,7 @@ EXE／ZIPそれぞれのsidecar公開と、CI・公開判定での最終配布by
 
 確認する場合は、配布fileのSHA-256が、同じrelease／候補のsidecarの先頭64文字と完全一致することを確かめます。不一致なら実行せず、正式配布元からの再取得を確認してください。同じ配布元のhash一致だけでは、発行者の真正性やSmartScreen reputationは保証されません。
 
-PowerShell 7が既にある場合の公開ZIPのSHA-256確認例（任意）です。PowerShell 7の導入は必須ではなく、Windows 11標準の`certutil`を使う確認方法は[はじめに](docs/getting-started.md)を参照してください。手動比較を起動の必須操作にはしません。
-
-```powershell
-(Get-FileHash -Algorithm SHA256 .\StudyReportEvaluator-win-x64.zip).Hash
-```
+確認方法は[はじめに](docs/getting-started.md)を参照してください。既存のPowerShell 7やWindows 11標準の`certutil`を利用でき、確認のために追加ソフトを導入する必要はありません。
 
 ### Windowsの警告・実行拒否
 
@@ -80,56 +73,76 @@ PowerShell 7が既にある場合の公開ZIPのSHA-256確認例（任意）で�
 
 候補EXEの内容は.NET標準hostが、通常は標準userの一時領域`%TEMP%/.net/<app>/<bundle-id>/`へ展開します。展開先の書込権限と空き容量が必要です。cacheは終了後も残り、再利用され得ます。**1ファイル配布は「ディスク上も1ファイル」「痕跡なし」ではありません。** 独自の展開・cache管理UIや自動掃除は追加しません。
 
-cacheはアプリ配置用で、入力／final／partialやCLI credential storeとは別です。既定の結果保存先は入力fileに隣接する`result`であり、抽出cacheではありません。配布・展開・起動のために利用者workbookを移動・削除しません。結果の扱いは[出力と再開](#出力と再開)を参照してください。
+cacheはアプリ配置用で、入力／final／partial、利用者別設定、CLI credential storeとは別です。明示出力先が未指定の場合だけ、入力fileに隣接する`result`を使い、抽出cacheを結果保存先にはしません。配布・展開・起動のために利用者workbookを移動・削除しません。結果の扱いは[出力と再開](#出力と再開)を参照してください。
 
 ## 5分クイックスタート
 
-> **画面・追加操作の対象版:** 以下の画像と、利用者ガイドの設問text自動同期・固定表示の採点計算式・幅に応じて折り返す設問カードは、**現在の作業ツリーのUNRELEASED（未リリース）`0.8.4`候補**を対象にしています。本READMEの単一EXE起動例とlogin buttonの説明も同候補向けです。公開`0.8.1`でこれらの追加UI／動作を前提にしないでください。画像はsynthetic data／fake結果による説明用で、clean-hostや本人認証の証跡ではありません。リンク先の手順の対象版と更新状況は[ガイド](#ガイド)を参照してください。
+> **対象版:** 以下は**`0.8.5`（UNRELEASED・未公開）候補**の操作です。公開`0.8.1`で追加UIや設定保存を前提にしないでください。画像は合成データ・fake結果による説明用で、実認証・実保存・clean-host動作の証拠ではありません。生成時の製品版と来歴は[画像一覧](images/README.md)を参照してください。
+
+主画面は**入力 → 採点設計 → 実行 → 結果・出力**の4ステップです。詳細編集は同じウィンドウの**設定**へ移っています。設定は第5ステップではなく、**共通／入力詳細／通常評価／固有評価／読込Prompt**の5カテゴリです。
+
+設問・結果はコンパクトな一覧のページ切替や対象選択で全件へ到達でき、詳細は選択対象だけを表示します。全件の編集カードを同時に並べる方式ではありません。**設定から戻る**で元ステップへ戻り、同一起動中の編集・選択対象・表示ページを保持します。画面移動は保存やAI実行ではなく、「訪問済み」も準備完了・処理成功を意味しません。
 
 ### 1. 入力
 
-![標準xlsxをnative pickerまたはpathからread-onlyで読み込む入力画面の上部。synthetic dataを使用](images/01-input-workbook.png)
+![入力主画面。合成workbookの100回答行・2設問とコンパクト一覧。native pickerを開いた画像ではない](images/01-input-workbook.png)
 
-1. **ファイルを選択**でnative pickerを開くか、**ファイル path（標準 .xlsx）**へfull pathを入力します。
-2. **read-only で読込**を選びます。
-3. 回答sheet、質問文の行1/2、回答開始・終了行を確認します。
-4. 質問ごとの主回答列と補助列を確認・変更します。
+1. **ファイルを選択**でnative pickerを開くか、**ファイル path（標準 .xlsx）**へfull pathを入力し、**read-only で読込**を選びます。
+2. 回答sheet、質問文の行（1または2）、回答開始・終了行を確認します。
+3. ページ切替や**設問**欄から対象を選び、**有効／主回答列／設問文（必須）**を確認・編集します。
+4. 設問名・補助列・候補・追加／複製／並替え／削除は**入力詳細… → 設定の入力詳細**で編集します。
 
-mapping候補は確定値ではありません。workbookの見出しと授業設計に合わせてください。
+主回答列を選ぶと、質問文の行とその列が交差する**1セル**の値を設問文へ即座に反映します。選び直すと手入力も置き換わり、空セルなら設問文も空になります。質問文の行を変えた場合は**見出し行を再読込**してください。
 
-### 2. 定量化設計
+mapping候補は確定値ではありません。見出しと授業設計に合わせ、同じ設問の主回答列と補助列を重複させないでください。技術エラーは**問題箇所へ**などから対象を確認して修正します。
 
-- Base pointsは既定60、Special pointsは既定0です。
-- Question pointsは設問ごとの絶対配点です。
-- Similarity penalty weightは0〜1で、既定0.1です。
-- 通常評価はKnowledgeまたはCustom evaluatorを使います。
-- 学生Prompt等を別sourceで評価する場合は固有評価を追加します。
-- `Base + Special + enabled Question points = 100`になるよう設定します。
+### 2. 採点設計
 
-Custom Promptには許可されたplaceholderだけを使います。通常Custom evaluatorでは`{回答}`と`{評価項目}`、固有評価では`{回答}`が必須です。
+- **基礎配点**（Base、既定60）、**固有配点**（Special、既定0）、**類似度減点係数**（0〜1、既定0.1）を設定します。
+- 主画面で選択設問の**有効／配点**を編集し、通常評価・固有評価と計算式の概要を確認します。設問配点は絶対配点で、ページ切替だけでは編集中の設問を変更しません。
+- ページ外を含む**全enabled（有効）設問**について、`Base + Special + enabled Question points = 100`を**丸めず正確に**満たします。合計・過不足を確認し、手動配点の再配分は**設問配点を均等化**を選んだ場合だけ行います。
+- Knowledge／Custom、評価項目（criterion）のrange・weight・Promptの詳細は**設定 → 通常評価**へ、別sourceを扱う固有評価は**設定 → 固有評価**へ進みます。定義名・revision・丸め桁数は**共通**で編集します。
+
+Knowledgeの固定Promptは読取専用、Custom Promptは編集可能です。通常Customでは`{回答}`と`{評価項目}`、固有評価では`{回答}`が必須です。全文編集・合成値のプレビュー・読込Promptの適用は設定内で行い、AI評価は開始しません。詳しくは[設定ガイド](docs/settings.md)を参照してください。
 
 ### 3. 実行
 
-1. **Copilot 状態を確認**を選びます。
-	- 未認証の場合、**未公開`0.8.4`候補のみ**の**GitHubにログイン**を明示的に選ぶと、検証済みの同梱native CLIが認証用console／ブラウザーを開きます。本人のaccountでCLI／ブラウザー上の対話を完了してください。アプリへpassword、token、device codeを入力する必要はありません。
-	- 完了後は、既存の**Copilot 状態を確認**をもう一度選びます。取消・失敗後や再起動後も同じbuttonで再確認します。login processの起動・終了だけを認証成功とは扱いません。
-	- **公開`v0.8.1`にはlogin buttonがありません。** 従来どおり同梱CLIで本人loginを行い、既存の状態確認buttonで確認します。
-2. 表示されたmodelから通常評価用modelを選びます。ReferenceとSimilarityは利用者が選択せず、固定で`auto`を使います。
-3. Concurrencyを1〜3から選びます。
-4. 新規runでは出力directory、再開では`.partial.xlsx`のpathを確認します。
-5. 技術検証を通過したら**定量化を開始**を選びます。
+実行画面の**モデル・並列度・実効出力先は読取専用**です。編集は**変更 → 設定の共通**で行います。認証確認・login、新規／再開、開始・cancelは実行画面に残っています。
 
-AI処理には、利用可能なGitHub Copilot account、本人認証、network接続、利用可能model、組織policy上の許可が別途必要です。GUI表示やlogin完了だけでAI利用可能とは判断しません。起動引数、Prompt適用、状態確認からloginやAI評価を暗黙に開始せず、login後もmodelを自動変更したりAI評価を自動開始したりしません。
+1. **Copilot 状態を確認**を明示的に選びます。未認証なら、候補版の**GitHubにログイン**で同梱native CLIのconsole／ブラウザーを開き、本人が対話loginします。完了・取消・失敗後は同じ状態確認buttonで再確認してください。processの起動・終了だけを認証成功とは扱いません。
+2. **変更 → 共通**で、列挙された通常モデル、並列度（1〜3、既定1）、指定出力先を確認・変更します。保存希望modelが利用不可なら未選択のままで、別modelへfallbackしません。Reference／Similarityの固定`auto`は通常モデルと別に利用可否を確認し、未確認・利用不可のまま開始しません。
+3. **設定から戻る**で実効値と新規／checkpoint再開を確認します。再開する場合は既存の`.partial.xlsx`を指定します。
+4. 技術検証を通過したら**定量化を開始**を選びます。予約された出力pathの表示だけではfile作成・保存成功を意味しません。
+
+**公開`v0.8.1`にはlogin buttonがありません。** 同梱CLIで本人loginを行い、アプリの状態確認buttonで確認する手順は[はじめに](docs/getting-started.md)を参照してください。どちらの版でもアプリへpassword、PAT、token、device codeを入力しないでください。
+
+AI処理には、利用可能なGitHub Copilot account、本人認証、network接続、利用可能model、組織policy上の許可が別途必要です。GUI表示やlogin完了だけでAI利用可能とは判断しません。起動引数・Prompt適用・状態確認でloginやAI評価を暗黙に開始せず、login後もmodelを自動変更したりAI評価を自動開始したりしません。
 
 候補版の**ログインを取り消す**またはアプリ終了で終了するのは、このアプリが開始・所有した当該login CLI processだけです。ブラウザーや他のCLI、保存済みcredentialを終了・削除しません。loginの二重開始・評価中の開始を防ぎ、取消・失敗後もExcel読込、mapping、設計編集、checkpoint確認は利用できます。CLI欠落・不一致時は配布物の再取得／展開状態を確認し、PATH上の別CLI導入やhash検証の緩和で回避しません。
 
+**開始済みrunの入力・採点定義・モデル・並列度・出力条件と予約済みpathは固定**されます。実行中に編集する設定は次回用で、現在runを変更しません。他ステップ・設定でも下部の**進捗へ／停止**を利用できます。**cancel**後は新しいAI送信を始めず、最後に保存された完了行までのpartialを保持します。設定表示中に完了しても強制移動せず、**4 結果**から結果を確認できます。
+
 ### 4. 結果・出力
 
-![自動final path、row別配点・減点・Final scoreを確認する結果画面。fake scoreを使用](images/06-results-review.png)
+![結果一覧。fake runの100行とfake score。表示されたfinal pathは実workbook作成の証拠ではない](images/06-results-review.png)
 
-finalまたはpartial path、status、Question earned、Special earned、Similarity penalty、Final raw、Final scoreを確認します。criterionのAI raw、effective raw、normalized valueも確認できます。
+1. 一覧で**元の行／最終点／固有点／類似減点／状態／設問別得点**、上部でfinal／partialと警告を確認します。成功・回答空欄・取消・未処理／未確定・技術エラーを区別し、完了件数を成功件数とはみなしません。
+2. **前／次**のページ切替や**元の行番号 → 移動**で対象行を選び、**詳細・override**で設問・評価方法・criterionを選びます。選択した1 criterionのAI raw、range、status、overrideと、適用値・正規化・Final raw等の計算previewを確認できます。理由・根拠の本文は出力workbookで確認します。
+3. 編集可能な通常criterionへrange内の任意overrideを入力します。空欄に戻すと解除され、AI rawは保持します。**エラー … 件・次へ**でページ外を含む問題箇所へ移動して修正できます。固有評価・類似度のoverride欄はありません。
+4. **別名 workbook 出力**へ既存directory内の未使用の`.xlsx` pathを指定し、**検証して出力**を選びます。成功後の**保存済み修正版**とpathを確認してください。入力・既存final／partialは上書きしません。
 
-criterion overrideを使う場合、range内の値を入力して未使用の別名`.xlsx`へ任意出力します。既存finalを上書きしません。
+一覧／詳細やページを往復してもoverrideは保持します。**未保存の override あり**や出力先候補は保存完了ではなく、出力中に再編集した版は、先の出力が成功しても未保存のまま残り得ます。**設定を保存**では結果・overrideを保存しません。前回結果は次回設定から分離され、次回用の編集で自動再評価されません。
+
+## 設定の保存と再利用
+
+候補版では、共通設定と**任意の採点定義1件**を利用者別の`setting.txt`へ保存できます。通常の場所は`%LOCALAPPDATA%\StudyReportEvaluator\setting.txt`、内容は**UTF-8 JSON・`schemaVersion`は整数`1`**です。EXEや入力workbook、runtime cacheとは別の場所です。
+
+- **設定を保存**で明示保存します。画面移動・編集・終了では自動保存せず、初回は明示保存までfileを作りません。保存失敗時は旧fileと現在の編集を保持します。保存中の再編集は、その保存が成功しても未保存として残り得ます。
+- 起動時や**設定を再読込**で通常モデルの希望ID・並列度・指定出力先を復元します。希望IDの復元は認証済み・利用可能という判定ではありません。採点定義は保持するだけで自動適用しません。
+- Excel読込後、**設定 → 共通 → 保存定義 → 現在の入力に適用**を明示的に選びます。検証成功時だけ現在の入力・採点設計へ反映し、失敗・取消時は変更しません。実行中の一括適用はできません。読込・保存・適用から認証確認・login・AI評価は開始しません。
+- **指定出力先**は完全修飾の絶対path、または空欄（`outputDirectoryOverride: null`）です。保存した明示指定は再起動・入力変更後も保持します。`null`の場合だけ現在の入力に隣接する`result`を算出し、算出path自体は保存しません。入力未選択なら**入力後に決定**です。利用できない指定先から別pathへfallbackしません。
+
+保存範囲・再読込の注意は[設定ガイド](docs/settings.md)を参照してください。[画像一覧](images/README.md)の08は保存先未構成（NO STORE）の合成デモで、読込・保存が無効です。本番アプリは利用者別保存先を解決するため、画像は手動setupを求める手順ではありません。
 
 ## 点数の読み方
 
@@ -153,20 +166,23 @@ $$
 
 Final scoreはFinal rawを0〜100へ収めた表示用の値です。
 
-- 空の主回答: AI callなし、Question earnedとSimilarityは0相当
+- 主回答が空と確定した完了行: Normal／SimilarityのAI callなし、Question earnedとSimilarityは0相当
 - 非空回答の技術的AI失敗: 対象値はblank
+- 取消・未処理／未確定: 未確定値はblankで、0点とはしない
 - 必要な値がblank: Final raw / Final scoreもblank
 
-0とblankは意味が異なります。詳しくは[機能と点数](docs/features.md)を参照してください。
+0とblank（画面では**—**）は意味が異なります。詳しくは[機能と点数](docs/features.md)を参照してください。
 
 ## 出力と再開
 
-新規runの初期出力先は入力fileに隣接する`result` directoryです。単一EXEでも、この初期出力先をEXEの配置先や.NETの抽出cacheへ変更しません。
+新規runの出力先は**設定 → 共通**の指定値を使い、未指定（`null`）の場合だけ入力fileに隣接する`result`となります。EXE配置先や.NETの抽出cacheを既定先にはしません。
 
 - final: `eval-yyyyMMdd-HHmm[-NN].xlsx`
 - partial: `eval-yyyyMMdd-HHmm[-NN].partial.xlsx`
 
-既存final/partialがある場合は、共通の次suffixを使って上書きを避けます。cancelまたはprocess終了後は、Execution画面で**既存checkpointから再開**を選び、保存済みcomplete rowの次から再開できます。
+既存final/partialがある場合は、共通の次suffixを使って上書きを避けます。参照回答の完了ごと・回答行の完了ごとにcheckpointを保存します。cancelまたはprocess終了後は、実行画面で**checkpoint から再開**を選び、入力・定義・model・runtimeの照合後に保存済み参照回答と完了行を再利用します。処理途中の行は完了扱いにせず、最初の未完了行から続けます。再開時はcheckpoint内の予約pathを使い、新規run用の出力先で置き換えません。
+
+finalの保存成功後はpartialを削除します。partialの削除だけが失敗した場合は完成版を無効にせず、cleanup警告と残存pathを表示します。
 
 finalは入力workbookの全sheetを保持し、次を追加します。
 
@@ -179,33 +195,25 @@ finalは入力workbookの全sheetを保持し、次を追加します。
 
 ## データとprivacy
 
-workbook由来でAIへ送る値は、処理に必要なcurrent rowの選択済みprimary／supporting／special sourceだけです。処理に応じてQuestion text、Prompt、criterion metadata、Reference、closed schema metadataも送ります。他row、非選択列、workbook pathは通常payloadへ含めません。
+回答データとしてAIへ送るのは、処理に必要なcurrent rowの選択済みprimary／supporting／special sourceだけです。処理に応じてQuestion text、Prompt、criterion metadata、Reference、closed schema metadataも送ります。他row、非選択列、workbook pathは通常payloadへ含めません。
 
 application logは回答、Prompt、Reference、reason、evidence、credentialを受け取るfree-text surfaceを持ちません。
 
-本人認証とcredential保管は同梱CLI／ブラウザーに委譲します。アプリはpassword、PAT、token、device codeを入力・収集・解析・保存・log出力しません。runtime抽出cache、利用者workbook、CLI credential storeは別のものとして扱い、アプリがcacheの再帰削除やcredentialの削除・logoutを行うことはありません。
+**`setting.txt`は暗号化されていない平文です。** 回答行本文を自動収集して保存するものではありませんが、見出しセルから取り込んだ設問文や、設問・Prompt・評価基準へ貼り付けた学生回答・氏名・秘密情報は、定義の明示保存時に含まれ得ます。秘密情報を貼り付けず、実設定fileを共有・公開しないでください。入力xlsxのpath・bytes、AI結果、参照回答、override、checkpoint状態、認証状態、未適用Promptのfile一覧は設定の保存対象外です。
+
+本人認証とcredential保管は同梱CLI／ブラウザーに委譲します。アプリの認証処理はpassword、PAT、token、device codeを入力・収集・解析・保存・log出力しません。runtime抽出cache、利用者workbook、CLI credential storeは別のものとして扱い、アプリがcacheの再帰削除やcredentialの削除・logoutを行うことはありません。
 
 final/partialには入力全体、Prompt、Reference、AI結果が含まれ得ます。入力と同等以上に機密なfileとして扱ってください。詳しくは[データとprivacy](docs/privacy-and-data-handling.md)を参照してください。
 
 ## Promptファイルから起動する
 
-任意の高度な起動方法です。通常のGUI起動にcommand入力は不要です。次の単一EXE例は**現在の作業ツリーの`0.8.4`未公開候補**向けで、公開`v0.8.1`の配布名ではありません。
-
-```text
-StudyReportEvaluator-win-x64.exe --input <xlsx-path> --prompt <txt-path> [--prompt <txt-path> ...]
-```
-
-ZIP版の従来の起動名と引数は変わりません。公開`v0.8.1`のZIPでは次を使います。
-
-```text
-StudyReportEvaluator.App.exe --input <xlsx-path> --prompt <txt-path> [--prompt <txt-path> ...]
-```
+任意の高度な起動方法です。通常のGUI起動にcommand入力は不要です。未公開候補の`StudyReportEvaluator-win-x64.exe`と、公開`v0.8.1` ZIPの`StudyReportEvaluator.App.exe`は、次の起動引数を扱います。
 
 - `--input`は0または1回
 - `--prompt`は0回以上、指定順を維持
 - 相対pathは起動時のcwdが基準。EXE配置先や抽出cacheを基準に変更しません。日本語・空白を含むpathも扱います
 - Prompt fileはstrict UTF-8の`.txt`、1〜32,767文字
-- Imported Promptを選び、適用先を選んで**Promptを適用**した時だけtemplateへcopy
+- 候補版では**設定 → 読込Prompt**で原文と適用先を選び、**Promptを適用**した時だけCustom／固有評価のtemplateへcopy
 - 起動引数やPrompt適用ではloginもAI処理も自動開始しません。AI処理はExecution画面の明示操作まで開始しません。候補版のlogin buttonも別の明示操作が必要です
 
 詳しい例は[Promptファイルから起動](docs/prompt-launch.md)を参照してください。
@@ -216,23 +224,22 @@ StudyReportEvaluator.App.exe --input <xlsx-path> --prompt <txt-path> [--prompt <
 - installer、code signing、notarizationを提供しません。
 - development MSIXは非公開の開発用検証だけで、一般利用者向けinstallerではありません。
 - 自動更新・差分更新、online bootstrap、独自cache管理／自動掃除、常駐service、file associationは追加しません。更新時は正式に公開された配布物を利用者が取得します。
-- 保存済みfinal workbookのアプリへの再importと、definition profileだけの独立save/loadは提供しません。
+- 保存済みfinal workbookのアプリへの再importと、複数definition profileの管理・切替は提供しません。候補版の採点定義1件の明示保存・適用とは別です。
 - AI品質、教育的妥当性、公平性、法的適合性、組織policy適合性、不正行為を保証・判定しません。
 - 未実測の処理時間、token数、費用を保証しません。
 
 ## ガイド
 
-利用者ガイドは単一EXE候補・login導線・任意の手動hash比較へ同期しています。公開版と未公開候補を区別し、業務手順と画像は各ガイドの対象版を確認してください。
+公開版と未公開候補を区別し、各ガイドの対象版を確認してください。
 
 - [はじめに](docs/getting-started.md)
+- [設定の保存と適用](docs/settings.md)
 - [機能と点数](docs/features.md)
 - [Custom evaluator](docs/custom-evaluator-guide.md)
 - [Promptファイルから起動](docs/prompt-launch.md)
 - [データとprivacy](docs/privacy-and-data-handling.md)
 - [トラブルシューティング](docs/troubleshooting.md)
 
-開発・保守の手順は[開発者向けガイド（repository）](https://github.com/dahatake/StudyReport-Evaluator/blob/main/dev/README.md)を参照してください。開発用のSDKやPowerShellは一般利用者のGUI起動要件ではありません。
-
 ## ライセンス
 
-[MIT License](LICENSE)
+[MIT License](LICENSE)。同梱ソフトウェアのライセンスは[第三者通知](docs/third-party-notices.md)を参照してください。
