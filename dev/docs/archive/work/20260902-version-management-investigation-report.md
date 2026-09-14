@@ -701,8 +701,8 @@ GitHub generated release notesはmerged PR、contributors、full changelog link�
 | R23 | [`ADR-0013`](../../../../dev/docs/adr/0013-windows-only-public-release.md) | Windows 11 x64 / unsigned ZIP scope |
 | R24 | [`.gitignore`](../../../../.gitignore) | generated `artifacts/` evidence boundary |
 | R25 | [`App packages.lock.json`](../../../../src/StudyReportEvaluator.App/packages.lock.json) | requested range / resolved dependency / content hash |
-| R26 | [published `.deps.json`](../../../../artifacts/package/publish/win-x64/StudyReportEvaluator.App.deps.json) | local generated App/Core/runtime identity |
-| R27 | [published `.runtimeconfig.json`](../../../../artifacts/package/publish/win-x64/StudyReportEvaluator.App.runtimeconfig.json) | local generated included runtime |
+| R26 | published `.deps.json` (`artifacts/package/publish/win-x64/StudyReportEvaluator.App.deps.json`) (当時のローカル生成物。Git管理外) | local generated App/Core/runtime identity |
+| R27 | published `.runtimeconfig.json` (`artifacts/package/publish/win-x64/StudyReportEvaluator.App.runtimeconfig.json`) (当時のローカル生成物。Git管理外) | local generated included runtime |
 | R28 | [`LaunchOptions.cs`](../../../../src/StudyReportEvaluator.App/Launch/LaunchOptions.cs) | supported CLI options / unknown option behavior |
 | R29 | [`OutputPathPlanner.cs`](../../../../src/StudyReportEvaluator.App/Workbooks/Writing/OutputPathPlanner.cs) | output naming contract |
 | R30 | [`DurableQuantificationOrchestratorTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/Workflow/DurableQuantificationOrchestratorTests.cs) | checkpoint admission test coverage |
