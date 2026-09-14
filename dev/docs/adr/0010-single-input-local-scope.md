@@ -8,7 +8,7 @@
 | 状態 | **承認済み** |
 | 決定日 | 2026-08-31 |
 | 要求正本 | `docs/requirements-definition.md` v2.0 |
-| 実装計画 | `work/20260831-implementation-plan.md` v3.0 |
+| 実装計画 | `dev/docs/archive/work/20260831-implementation-plan.md` v3.0 |
 | 対象 | 初版実装開始gate、入力、認証、platform、評価結果 |
 | Supersedes | ADR-0001のv1.2 GATE-0適用、旧計画v2.1のEXT-03〜EXT-09必須依存 |
 

@@ -19,7 +19,7 @@
 
 | Decision | 採用値 | 根拠 |
 |---|---|---|
-| 製品版 | `1.1.0` candidate | 対応 platform / 配布形式の追加は [`dev/docs/version-management.md`](../dev/docs/version-management.md) §3.1 で MINOR |
+| 製品版 | `1.1.0` candidate | 対応 platform / 配布形式の追加は [`dev/docs/version-management.md`](../../../../dev/docs/version-management.md) §3.1 で MINOR |
 | 要求文書版 | `4.2` | 現行機能契約 v4.1 を維持する delivery / platform scope の後方互換追加として改版 |
 | Windows channel | GitHub Releases から direct MSIX | 現行 GitHub Release channelを維持し、計画の MSIX 第一候補を採用 |
 | Windows architecture | `win-x64` | 現行検証済み architecture を維持。Windows Arm64 は未実測のため対象外 |

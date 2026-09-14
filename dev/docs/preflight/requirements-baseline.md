@@ -8,7 +8,7 @@
 | Task | B-03 |
 | 状態 | **CURRENT BASELINE** |
 | Requirement | `docs/requirements-definition.md` v3.0 |
-| Plan | `work/20260831-implementation-plan.md` v4.0 |
+| Plan | `dev/docs/archive/work/20260831-implementation-plan.md` v4.0 |
 | Scope decision | `dev/docs/adr/0011-dynamic-quantification-excel-formulas.md` |
 | Sample profile | `dev/docs/preflight/sample-workbook-profile.md` |
 | Requirement/plan commit | `adc6ad12a3c80b4a92c9453d8b7a58e2daeb346f` |
@@ -30,6 +30,8 @@
 ADR-0011はこの要求を現行scopeとして承認し、ADR-0010の固定候補点・必須人手確認境界をsupersedeした。
 
 ## Artifact identity
+
+下表の旧 `work/` パスは記載commitのidentityとして保持する。[現在の保存先](../archive/work/20260831-implementation-plan.md)への移動は、当時のbytes・SHA-256を再定義しない。
 
 | Artifact | Bytes | SHA-256 | Content commit |
 |---|---:|---|---|

@@ -5,7 +5,7 @@
 | Task | B-07 |
 | 状態 | **CURRENT STRUCTURAL PROFILE** |
 | Requirement | `docs/requirements-definition.md` v4.3 |
-| Plan | `work/20260902-readme-end-user-release-plan.md` |
+| Plan | `dev/docs/archive/work/20260902-readme-end-user-release-plan.md` |
 | Scope decision | ADR-0012 / ADR-0013 |
 | Sample | `sample/SampleReport.xlsx` |
 | Verification date | 2026-09-04 |

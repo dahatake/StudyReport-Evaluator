@@ -4,14 +4,14 @@
 |---|---|
 | Current requirement | [requirements v4.6](../../docs/requirements-definition.md) |
 | Current decision | ADR-0012（機能）/ [ADR-0016](adr/0016-windows-one-action-startup.md)（Windows単一EXE主配布・ZIP代替・明示login・candidate拘束公開gate） |
-| UI / settings contract | [UI layout contract](ui-layout-contract.md) / [実装プランv2](../../work/20260907-ui-settings-redesign-plan-v2.md)と後続承認・実行引継ぎ（2026-09-07） |
+| UI / settings contract | [UI layout contract](ui-layout-contract.md) / [実装プランv2](archive/work/20260907-ui-settings-redesign-plan-v2.md)と後続承認・実行引継ぎ（2026-09-07） |
 | Detailed design | [`detailed-design.md`](detailed-design.md) |
 | Production projects | 2（Core / App） |
 | Target platform | Windows 11 x64。macOS source foundationは現版公開対象外 |
 
 本書はcomponent境界と実行data flowの正本である。型、sheet、formula、checkpoint encodingの詳細は[詳細設計書](detailed-design.md)と[Excel契約](excel-contract.md)を参照する。
 
-v4.6のUI／設定保存はT01〜T38の実装・対象検証・レビュー完了を反映する。製品版正本は親担当が`0.8.5`未公開候補（UNRELEASED）へ更新済み、F01はREVIEWED、公開済みは`v0.8.1` ZIPのままである。`0.8.4`のT36文書contract、T37実ZIP、T38実EXE、T39自動回帰／MSIX機構確認は記録済みだが、T39は追加native FAILと本人確認等の外部前提によりBLOCKED。F02の最終版再検証は本同期時点では親担当で未完了、以後は[実行記録](../../work/20260907-ui-settings-execution-record.md)の最新F02欄を参照する。日付・製品版・証跡範囲を分けた[現在状態](implementation-status.md)を正本とし、G4・全タスクDONE・公開PASSを付与しない。
+v4.6のUI／設定保存はT01〜T38の実装・対象検証・レビュー完了を反映する。製品版正本は親担当が`0.8.5`未公開候補（UNRELEASED）へ更新済み、F01はREVIEWED、公開済みは`v0.8.1` ZIPのままである。`0.8.4`のT36文書contract、T37実ZIP、T38実EXE、T39自動回帰／MSIX機構確認は記録済みだが、T39は追加native FAILと本人確認等の外部前提によりBLOCKED。F02の最終版再検証は本同期時点では親担当で未完了、以後は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄を参照する。日付・製品版・証跡範囲を分けた[現在状態](implementation-status.md)を正本とし、G4・全タスクDONE・公開PASSを付与しない。
 
 v4.5のdelivery追加では、実装済みの起動経路／deterministic公開contractと、未実行のcandidate workflow／clean-host／protected publishを分ける（§8・10）。新EXEの公開済み・OS-only受入完了を意味しない。
 

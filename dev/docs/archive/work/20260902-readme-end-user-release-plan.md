@@ -1,6 +1,6 @@
 # README・v1.0.0正式公開計画
 
-> **歴史資料:** この計画は完了済みの旧v1.0.0公開作業を記録したもので、現在の要求・製品版・受入状態を表しません。現在判断には[`dev/docs/implementation-status.md`](../dev/docs/implementation-status.md)と[`dev/docs/traceability.md`](../dev/docs/traceability.md)を使用します。
+> **歴史資料:** この計画は完了済みの旧v1.0.0公開作業を記録したもので、現在の要求・製品版・受入状態を表しません。現在判断には[`dev/docs/implementation-status.md`](../../../../dev/docs/implementation-status.md)と[`dev/docs/traceability.md`](../../../../dev/docs/traceability.md)を使用します。
 
 | 項目 | 内容 |
 |---|---|
@@ -12,7 +12,7 @@
 | 現在状態 | RELEASE_CANDIDATE_VALIDATION |
 | 公開ブロッカー | B-05: `v1.0.0` GitHub Release assetの実在確認 |
 
-この文書は2026-09-02に作成したREADME再構成計画を、2026-09-03のcanonical sample統合、SystemTest Prompt統合、CI追加、Excel compatibility修正後の実行状態へ更新したものです。旧詳細はGit履歴に保持し、現在判断には本書と[`dev/docs/implementation-status.md`](../dev/docs/implementation-status.md)を使用します。
+この文書は2026-09-02に作成したREADME再構成計画を、2026-09-03のcanonical sample統合、SystemTest Prompt統合、CI追加、Excel compatibility修正後の実行状態へ更新したものです。旧詳細はGit履歴に保持し、現在判断には本書と[`dev/docs/implementation-status.md`](../../../../dev/docs/implementation-status.md)を使用します。
 
 ## 1. 公開契約
 
@@ -87,7 +87,7 @@
 
 ### CI
 
-[`.github/workflows/ci.yml`](../.github/workflows/ci.yml)は次を実行します。
+[`.github/workflows/ci.yml`](../../../../.github/workflows/ci.yml)は次を実行します。
 
 - `main` push／pull request／manual dispatch
 - PowerShell Core 7+と.NET SDK 10.0.400
@@ -98,7 +98,7 @@
 
 ### Release
 
-[`.github/workflows/release.yml`](../.github/workflows/release.yml)は次をfail-closedで実行します。
+[`.github/workflows/release.yml`](../../../../.github/workflows/release.yml)は次をfail-closedで実行します。
 
 - manual dispatchで指定した既存annotated tagをcheckout
 - tag／HEAD／CHANGELOG／製品版／clean treeの一致検証
@@ -125,12 +125,12 @@ Live Copilot、canonical sample、Microsoft ExcelはGitHub-hosted runnerのrequi
 
 ## 8. 証跡正本
 
-- [`docs/requirements-definition.md`](../docs/requirements-definition.md)
-- [`SystemTest-prompt.md`](../SystemTest-prompt.md)
-- [`dev/docs/traceability.md`](../dev/docs/traceability.md)
-- [`dev/docs/readme-claim-ledger.md`](../dev/docs/readme-claim-ledger.md)
-- [`dev/docs/version-management.md`](../dev/docs/version-management.md)
-- [`tests/StudyReportEvaluator.App.Tests/E2E/SampleWorkbookStructuralTests.cs`](../tests/StudyReportEvaluator.App.Tests/E2E/SampleWorkbookStructuralTests.cs)
-- [`tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs`](../tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs)
-- [`tests/StudyReportEvaluator.App.Tests/E2E/ExternalSpreadsheetRecalculationSmokeTests.cs`](../tests/StudyReportEvaluator.App.Tests/E2E/ExternalSpreadsheetRecalculationSmokeTests.cs)
-- [`tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs`](../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs)
+- [`docs/requirements-definition.md`](../../../../docs/requirements-definition.md)
+- [`SystemTest-prompt.md`](../../../../SystemTest-prompt.md)
+- [`dev/docs/traceability.md`](../../../../dev/docs/traceability.md)
+- [`dev/docs/readme-claim-ledger.md`](../../../../dev/docs/readme-claim-ledger.md)
+- [`dev/docs/version-management.md`](../../../../dev/docs/version-management.md)
+- [`tests/StudyReportEvaluator.App.Tests/E2E/SampleWorkbookStructuralTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/E2E/SampleWorkbookStructuralTests.cs)
+- [`tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs)
+- [`tests/StudyReportEvaluator.App.Tests/E2E/ExternalSpreadsheetRecalculationSmokeTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/E2E/ExternalSpreadsheetRecalculationSmokeTests.cs)
+- [`tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs)

@@ -2,7 +2,7 @@
 
 ## 2026-09-07 — F02文書同期時点の現在状態
 
-現在の製品は**`0.8.5`未公開候補（UNRELEASED）**、要求はv4.6、公開済みは`v0.8.1`のunsigned ZIP／sidecarである。親担当が`Directory.Build.props`をPATCHし、F01のUnreleased追記はREVIEWED。以下は[親担当の実行記録](../../work/20260907-ui-settings-execution-record.md)と後続引継ぎに基づく既存結果の同期で、この文書編集では端末・build・test・package・native操作を実行していない。
+現在の製品は**`0.8.5`未公開候補（UNRELEASED）**、要求はv4.6、公開済みは`v0.8.1`のunsigned ZIP／sidecarである。親担当が`Directory.Build.props`をPATCHし、F01のUnreleased追記はREVIEWED。以下は[親担当の実行記録](archive/work/20260907-ui-settings-execution-record.md)と後続引継ぎに基づく既存結果の同期で、この文書編集では端末・build・test・package・native操作を実行していない。
 
 | 項目 | 状態・適用限界 |
 |---|---|
@@ -37,7 +37,7 @@ P06の7/7は開発hostの限定証跡であり、disk-full、directory ACL、抽
 
 以下のT34節の「現在」「未変更」「後続」は当時の`0.8.4`に限る。現行の版・進捗は上のF02節と実行記録を優先し、T34時点の未完了を現在の未実施根拠へ流用しない。
 
-本節はT34の設計文書同期時点を記録する。実装はAppのSettings／ViewModel／View／Shell／composition、要求はv4.6、作業範囲は[UI・設定保存プランv2](../../work/20260907-ui-settings-redesign-plan-v2.md)と[後続承認・実行記録](../../work/20260907-ui-settings-execution-record.md)に基づく。計画書の承認前の「未着手」や途中の実行記録を現在の状態と混同せず、**T01〜T27のREVIEWEDは今回の親担当の完了引継ぎ**を採用する。
+本節はT34の設計文書同期時点を記録する。実装はAppのSettings／ViewModel／View／Shell／composition、要求はv4.6、作業範囲は[UI・設定保存プランv2](archive/work/20260907-ui-settings-redesign-plan-v2.md)と[後続承認・実行記録](archive/work/20260907-ui-settings-execution-record.md)に基づく。計画書の承認前の「未着手」や途中の実行記録を現在の状態と混同せず、**T01〜T27のREVIEWEDは今回の親担当の完了引継ぎ**を採用する。
 
 | 項目 | 現在の状態・適用限界 |
 |---|---|
@@ -114,7 +114,7 @@ T27は実`InputWorkbookLoader`、`SettingsFileStore`、`DurableQuantificationOrc
 | Previous v4.3 full required gate | 696/696 PASS（Core 190/190、App 506/506、failed 0、skipped 0、2026-09-04 V2-01実行） |
 | Recorded v4.4 focused input validation | 46/46 PASS（InputViewTests 21、WorkbookMetadataReaderTests 11、ColumnMappingSuggesterTests 14。failed 0、skipped 0、2026-09-05実行） |
 | Audited v4.4 full required gate | source `20c8121`のbaseline: Core 190 + App deterministic 524 + sample構造 1 + Windows ZIP 3 = 718/718 PASS（App計528、failed 0、skipped 0、2026-09-05実行） |
-| Current review validation | [修正記録](../../work/20260905-adversarial-review.md)と`artifacts/test/adversarial-review/final/summary.json`を参照。対象source一致かつ全体`PASSED`・TRX検査成功時だけ合格。未生成／`RUNNING`／`FAILED`は未完了 |
+| Current review validation | [修正記録](archive/work/20260905-adversarial-review.md)と`artifacts/test/adversarial-review/final/summary.json`を参照。対象source一致かつ全体`PASSED`・TRX検査成功時だけ合格。未生成／`RUNNING`／`FAILED`は未完了 |
 | Baseline focused validation | locked restore、version self-test 15 assertions、DocumentationContractTests 14/14、WindowsInstallerPackageTests 6/6、MacOsPublishPackageTests 2/2、`git diff --check`が全てPASS（2026-09-04実行） |
 | Previous focused UI baseline | `MainWindowTests` 8/8 PASS（2026-09-02実行。current candidate full gateへ未算入） |
 | Previous bundled CLI baseline | `CopilotClientFactoryTests` 14/14 PASS（2026-09-02実行。current candidate full gateへ未算入） |
@@ -139,7 +139,7 @@ T27は実`InputWorkbookLoader`、`SettingsFileStore`、`DurableQuantificationOrc
 
 監査済みgateの集約記録は`artifacts/test/final-recovery-20c8121/phases.json`。718/718 PASSは`20c8121`に限定し、opt-in未指定で`NOT_RUN`としてreturnする経路やpolicy経路を含む。実際のLive AI、外部Excel再計算、RealData処理は`NOT_RUN`で、sample構造確認やfake/synthetic testとは区別する。focused／screenshot等の既存記録も各記録日時点のbaselineであり、今回reviewの修正を検証したものではない。証拠の保存・適用限界は[Evidence integrity and storage](traceability.md#evidence-integrity-and-storage)を参照。
 
-公開済みdeliveryの履歴は[`20260904-publication-remediation-plan.md`](../../work/20260904-publication-remediation-plan.md)と[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に従い、`v0.8.1`のunsigned ZIP／sidecar 2件を維持する。現行v4.5 candidateは[ADR-0016](adr/0016-windows-one-action-startup.md)に従い、unsigned単一EXEを将来の主配布、ZIPを代替として実装した。単一EXEはfresh clean-host CH-01〜06とprotected publish完了まで未公開である。development MSIXはnon-public `PASS_MECHANISM`、macOS production deliveryは現版scope外のままである。
+公開済みdeliveryの履歴は[`20260904-publication-remediation-plan.md`](archive/work/20260904-publication-remediation-plan.md)と[ADR-0015](adr/0015-windows-macos-installer-delivery.md)に従い、`v0.8.1`のunsigned ZIP／sidecar 2件を維持する。現行v4.5 candidateは[ADR-0016](adr/0016-windows-one-action-startup.md)に従い、unsigned単一EXEを将来の主配布、ZIPを代替として実装した。単一EXEはfresh clean-host CH-01〜06とprotected publish完了まで未公開である。development MSIXはnon-public `PASS_MECHANISM`、macOS production deliveryは現版scope外のままである。
 
 2026-09-03のdelivery変更前working treeを再buildしたfull solution testは670件中670件成功した。ユーザーが配置した`sample/SampleReport.xlsx`だけをcanonical sampleとし、exact path、470,806 bytes、SHA-256 `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA`、read-only検査前後のidentity不変を確認した。opt-in technical E2Eはnetwork/live AIを使わず530行を完走した。これらは機能regressionの比較baselineであり、0.8.0のMSIX／macOS／signing／notarization／quarantine結果ではない。delivery変更後は全required regressionを再実行する。
 

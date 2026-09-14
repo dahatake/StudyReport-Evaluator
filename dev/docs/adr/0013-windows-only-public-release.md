@@ -51,7 +51,7 @@
 
 | 項目 | 値 |
 |---|---|
-| Source | 2026-09-02のREADME正式公開実装指示、および`work/20260902-readme-end-user-release-plan.md` B-02 |
+| Source | 2026-09-02のREADME正式公開実装指示、および`dev/docs/archive/work/20260902-readme-end-user-release-plan.md` B-02 |
 | Applied default | 実package・署名・runner証跡のあるplatformだけを正式対応とする分岐 |
 | Identity semantics | repositoryのrelease-scope決定であり、組織の法務・教育・security承認または電子署名ではない |
 

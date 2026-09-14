@@ -5,7 +5,7 @@
 | 状態 | **承認済み** |
 | 決定日 | 2026-09-01 |
 | 要求正本 | `docs/requirements-definition.md` v3.0 |
-| 実装計画 | `work/20260831-implementation-plan.md` v4.0 |
+| 実装計画 | `dev/docs/archive/work/20260831-implementation-plan.md` v4.0 |
 | 対象 | 定量化model、Prompt、score、Excel出力、warning、実装境界 |
 | Supersedes | ADR-0010の固定的preset／candidate-review評価境界とv2.0 GATE-0適用 |
 | Carries forward | 単一`.xlsx`入力、Windows local初版、既存Copilot CLI login、入力不変、最小capability |

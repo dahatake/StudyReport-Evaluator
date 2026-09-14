@@ -4,7 +4,7 @@
 |---|---|
 | 対象要求 | `docs/requirements-definition.md` v4.6 |
 | 設計決定 | ADR-0012（機能）/ ADR-0016（Windows単一EXE主配布・ZIP代替・明示login・candidate拘束公開gate） |
-| UI / 設定の契約 | [`ui-layout-contract.md`](ui-layout-contract.md) / [UI・設定保存プランv2](../../work/20260907-ui-settings-redesign-plan-v2.md)と後続承認 |
+| UI / 設定の契約 | [`ui-layout-contract.md`](ui-layout-contract.md) / [UI・設定保存プランv2](archive/work/20260907-ui-settings-redesign-plan-v2.md)と後続承認 |
 | 作成日 | 2026-09-02 |
 | 更新日 | 2026-09-07 |
 | 状態 | `0.8.5`未公開candidate（UNRELEASED、EXE主配布候補 + ZIP代替 + development MSIX非公開記録）。F01はREVIEWED、公開済みは`v0.8.1` ZIP |
@@ -12,7 +12,7 @@
 
 ## 1. 設計目標
 
-本設計はv4の業務・配布境界と、v4.6のUI／ローカル設定保存の実装を記述する。T01〜T38は対象検証・REVIEWED、T39は追加native FAILと本人確認等の外部前提によりBLOCKED。0.8.4の記録済み文書contract／実ZIP／実EXE／自動回帰／MSIX機構確認と、F02後の0.8.5最終再検証を分ける。本同期時点のF02再検証は親担当で未完了、以後は[実行記録](../../work/20260907-ui-settings-execution-record.md)の最新F02欄を参照する。件数・適用限界・履歴は[現在状態](implementation-status.md)へ集約し、全タスクDONEや公開PASSを主張しない。
+本設計はv4の業務・配布境界と、v4.6のUI／ローカル設定保存の実装を記述する。T01〜T38は対象検証・REVIEWED、T39は追加native FAILと本人確認等の外部前提によりBLOCKED。0.8.4の記録済み文書contract／実ZIP／実EXE／自動回帰／MSIX機構確認と、F02後の0.8.5最終再検証を分ける。本同期時点のF02再検証は親担当で未完了、以後は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄を参照する。件数・適用限界・履歴は[現在状態](implementation-status.md)へ集約し、全タスクDONEや公開PASSを主張しない。
 
 - base／question／specialの絶対配点
 - questionごとの参照回答と学生回答類似度

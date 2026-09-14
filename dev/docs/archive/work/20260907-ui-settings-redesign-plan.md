@@ -5,7 +5,7 @@
 | 作成日 | 2026-09-07 |
 | 状態 | **レビュー待ち・実装未着手** |
 | 調査基点 | `main` / `0cdc351`。調査開始時の `git status --short` は空 |
-| 要求の正本 | [`docs/requirements-definition.md`](../docs/requirements-definition.md) v4.5 |
+| 要求の正本 | [`docs/requirements-definition.md`](../../../../docs/requirements-definition.md) v4.5 |
 | 対象 | Windows 11 x64 / 既存AvaloniaアプリのUIとローカル設定保存 |
 | 今回の成果物 | この計画書のみ。製品コード、要求正本、利用者文書、画像、設定ファイルは変更しない |
 | 実装開始条件 | 要求所有者が本計画を確認し、**別途、作成・実装を指示すること** |
@@ -34,20 +34,20 @@
 
 | ID | 確認した事実 | 改善での扱い・出典 |
 |---|---|---|
-| C01 | 正本は4ステップ、動的な設問数、必要時の縦スクロール、200%表示、警告文の常時表示を要求する | スクロール方針は要求変更として明示承認する。[要求§2・11、AC-016/017、TR-17](../docs/requirements-definition.md) |
-| C02 | shellは初期1180×800、最小1024×720。警告以外にヘッダー、進捗説明、4つの72以上の高さのステップボタンを持つ | 余白・重複説明を整理する。現在のはみ出し不具合を実測したという主張ではない。[MainWindow.axaml](../src/StudyReportEvaluator.App/Views/MainWindow.axaml)、[Accessibility.axaml](../src/StudyReportEvaluator.App/Styles/Accessibility.axaml) |
-| C03 | 4工程の順序、前後移動、到達範囲への再訪は既にある。`GetState` のCompletedは現在位置より前かどうかで決まる | ナビゲーションは再利用。「訪問」と「入力有効／実行完了」を混同しない表示へ変更する。[WorkflowNavigator.cs](../src/StudyReportEvaluator.App/Navigation/WorkflowNavigator.cs) |
-| C04 | Designを離れるとdraftをInputへ同期する。Designへ入るとViewModelを再生成する。Executionは条件付きで再Configureする | 「戻れない」とは指摘しない。選択対象の維持、不要な再初期化、実行結果との区別を重点検証する。[MainWindowViewModel.cs / SynchronizeDraftsForTransition](../src/StudyReportEvaluator.App/ViewModels/MainWindowViewModel.cs) |
-| C05 | Inputにはファイル、sheet、質問行、回答範囲、候補一覧、質問別編集カードがある。主回答列変更時の設問text同期は実装済み | 同期処理・read-only読込を維持し、一覧をコンパクト化する。[InputView.axaml](../src/StudyReportEvaluator.App/Views/InputView.axaml)、[InputViewModel.cs / SetPrimaryColumn](../src/StudyReportEvaluator.App/ViewModels/InputViewModel.cs) |
-| C06 | Designには固定数式ガイド、配点合計、全設問カード、定義情報、通常評価・固有評価・Prompt編集がある | 新しい計算エンジンは不要。配点・評価内容の概要を残し、詳細編集を設定へ移す。[QuantificationDesignView.axaml](../src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml)、[同ViewModel](../src/StudyReportEvaluator.App/ViewModels/QuantificationDesignViewModel.cs) |
-| C07 | Executionで変更できるのはmodel、並列度、新規／再開、出力先／partial指定。`Configure` は出力先・再開状態等を初期化する | 設定値の再訪時保持を設計する。**タイムアウト入力欄は存在しないため追加しない。** [ExecutionView.axaml](../src/StudyReportEvaluator.App/Views/ExecutionView.axaml)、[ExecutionViewModel.cs / Configure](../src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs) |
-| C08 | Resultsには行別score、criterion override、別名出力が既にある。各リストは仮想化されている | 既存結果を一覧＋選択行の詳細へ再配置する。[ResultsOutputView.axaml](../src/StudyReportEvaluator.App/Views/ResultsOutputView.axaml)、[同ViewModel](../src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs) |
-| C09 | `ServiceRegistration` に設定ファイルの読込・保存の接続はない。利用者文書は独立したdefinition save/loadを非対応と明記する | `setting.txt` 保存は新規要求であり、文書の非対応記述を限定的に修正する。[ServiceRegistration.cs](../src/StudyReportEvaluator.App/Composition/ServiceRegistration.cs)、[はじめに](../docs/getting-started.md)、[README](../README.md) |
-| C10 | `CanonicalDefinitionSerializer` はSerializeとhash計算を提供するが、Deserializeは提供しない | 「既存の定義読込をそのまま使える」とはしない。設定用JSON読込はAppへ追加し、canonical hashをround-trip検証に利用する。[CanonicalDefinitionSerializer.cs](../src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs) |
-| C11 | 既存UIテストは1024×720 shell、760×600 standalone、縦スクロール到達、44以上の操作対象、仮想化を確認する構造 | スクロールを要求するテストを単に削除せず、「通常は不要」「例外時は到達可能」に分ける。[ResponsiveLayoutTests.cs](../tests/StudyReportEvaluator.App.Tests/UI/ResponsiveLayoutTests.cs)、[PrimaryJourneyAccessibilityTests.cs](../tests/StudyReportEvaluator.App.Tests/UI/PrimaryJourneyAccessibilityTests.cs) |
-| C12 | 文書画像は7枚、1440×1050、synthetic/fake状態で生成。ZIPと単一EXEは文書・画像を明示列挙している | 画像差替え・設定画像追加・ライセンス表示・配布リスト・contract testを連動させる。[DocumentationScreenshotTests.cs](../tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs)、[画像台帳](../images/README.md)、[ZIP packager](../scripts/package-windows.ps1)、[single-file profile](../src/StudyReportEvaluator.App/Properties/PublishProfiles/WindowsSingleFile.pubxml) |
+| C01 | 正本は4ステップ、動的な設問数、必要時の縦スクロール、200%表示、警告文の常時表示を要求する | スクロール方針は要求変更として明示承認する。[要求§2・11、AC-016/017、TR-17](../../../../docs/requirements-definition.md) |
+| C02 | shellは初期1180×800、最小1024×720。警告以外にヘッダー、進捗説明、4つの72以上の高さのステップボタンを持つ | 余白・重複説明を整理する。現在のはみ出し不具合を実測したという主張ではない。[MainWindow.axaml](../../../../src/StudyReportEvaluator.App/Views/MainWindow.axaml)、[Accessibility.axaml](../../../../src/StudyReportEvaluator.App/Styles/Accessibility.axaml) |
+| C03 | 4工程の順序、前後移動、到達範囲への再訪は既にある。`GetState` のCompletedは現在位置より前かどうかで決まる | ナビゲーションは再利用。「訪問」と「入力有効／実行完了」を混同しない表示へ変更する。[WorkflowNavigator.cs](../../../../src/StudyReportEvaluator.App/Navigation/WorkflowNavigator.cs) |
+| C04 | Designを離れるとdraftをInputへ同期する。Designへ入るとViewModelを再生成する。Executionは条件付きで再Configureする | 「戻れない」とは指摘しない。選択対象の維持、不要な再初期化、実行結果との区別を重点検証する。[MainWindowViewModel.cs / SynchronizeDraftsForTransition](../../../../src/StudyReportEvaluator.App/ViewModels/MainWindowViewModel.cs) |
+| C05 | Inputにはファイル、sheet、質問行、回答範囲、候補一覧、質問別編集カードがある。主回答列変更時の設問text同期は実装済み | 同期処理・read-only読込を維持し、一覧をコンパクト化する。[InputView.axaml](../../../../src/StudyReportEvaluator.App/Views/InputView.axaml)、[InputViewModel.cs / SetPrimaryColumn](../../../../src/StudyReportEvaluator.App/ViewModels/InputViewModel.cs) |
+| C06 | Designには固定数式ガイド、配点合計、全設問カード、定義情報、通常評価・固有評価・Prompt編集がある | 新しい計算エンジンは不要。配点・評価内容の概要を残し、詳細編集を設定へ移す。[QuantificationDesignView.axaml](../../../../src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml)、[同ViewModel](../../../../src/StudyReportEvaluator.App/ViewModels/QuantificationDesignViewModel.cs) |
+| C07 | Executionで変更できるのはmodel、並列度、新規／再開、出力先／partial指定。`Configure` は出力先・再開状態等を初期化する | 設定値の再訪時保持を設計する。**タイムアウト入力欄は存在しないため追加しない。** [ExecutionView.axaml](../../../../src/StudyReportEvaluator.App/Views/ExecutionView.axaml)、[ExecutionViewModel.cs / Configure](../../../../src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs) |
+| C08 | Resultsには行別score、criterion override、別名出力が既にある。各リストは仮想化されている | 既存結果を一覧＋選択行の詳細へ再配置する。[ResultsOutputView.axaml](../../../../src/StudyReportEvaluator.App/Views/ResultsOutputView.axaml)、[同ViewModel](../../../../src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs) |
+| C09 | `ServiceRegistration` に設定ファイルの読込・保存の接続はない。利用者文書は独立したdefinition save/loadを非対応と明記する | `setting.txt` 保存は新規要求であり、文書の非対応記述を限定的に修正する。[ServiceRegistration.cs](../../../../src/StudyReportEvaluator.App/Composition/ServiceRegistration.cs)、[はじめに](../../../../docs/getting-started.md)、[README](../../../../README.md) |
+| C10 | `CanonicalDefinitionSerializer` はSerializeとhash計算を提供するが、Deserializeは提供しない | 「既存の定義読込をそのまま使える」とはしない。設定用JSON読込はAppへ追加し、canonical hashをround-trip検証に利用する。[CanonicalDefinitionSerializer.cs](../../../../src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs) |
+| C11 | 既存UIテストは1024×720 shell、760×600 standalone、縦スクロール到達、44以上の操作対象、仮想化を確認する構造 | スクロールを要求するテストを単に削除せず、「通常は不要」「例外時は到達可能」に分ける。[ResponsiveLayoutTests.cs](../../../../tests/StudyReportEvaluator.App.Tests/UI/ResponsiveLayoutTests.cs)、[PrimaryJourneyAccessibilityTests.cs](../../../../tests/StudyReportEvaluator.App.Tests/UI/PrimaryJourneyAccessibilityTests.cs) |
+| C12 | 文書画像は7枚、1440×1050、synthetic/fake状態で生成。ZIPと単一EXEは文書・画像を明示列挙している | 画像差替え・設定画像追加・ライセンス表示・配布リスト・contract testを連動させる。[DocumentationScreenshotTests.cs](../../../../tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs)、[画像台帳](../../../../images/README.md)、[ZIP packager](../../../../scripts/package-windows.ps1)、[single-file profile](../../../../src/StudyReportEvaluator.App/Properties/PublishProfiles/WindowsSingleFile.pubxml) |
 
-既存の[アーキテクチャ](../dev/docs/architecture.md)に従い、CoreはUI／filesystemへ依存させず、production projectはCoreとAppの2つを維持する。
+既存の[アーキテクチャ](../../../../dev/docs/architecture.md)に従い、CoreはUI／filesystemへ依存させず、production projectはCoreとAppの2つを維持する。
 
 ## 3. 公開論文・ベストプラクティスの調査と選択
 
@@ -427,7 +427,7 @@ T28の画像は入力ファイルではなく生成物であるため、複数PN
 3. 4step＋設定の結合テスト、synthetic deterministic E2E。
 4. 既存Core／App required tests。今回触らない採点・formula・checkpoint・privacyの回帰を含む。
 5. 実view screenshotの2回一致、docs link／anchor／claim、package allowlist。
-6. 固定SDKでlocked restore → Release build → tests → package検証。コマンドは既存[CI](../.github/workflows/ci.yml)と[開発者ガイド](../dev/README.md)の手順を使う。新しいビルド基盤は作らない。
+6. 固定SDKでlocked restore → Release build → tests → package検証。コマンドは既存[CI](../../../../.github/workflows/ci.yml)と[開発者ガイド](../../../../dev/README.md)の手順を使う。新しいビルド基盤は作らない。
 7. native Windowsで主要画面・DPI・keyboard／Narrator・実保存を確認する。保存試験は隔離された利用者環境を使う。開発hostでの成功をclean-host公開証跡としない。
 
 実AI smoke、実学生data、本人ログイン、Office再計算は今回のUI検証に必須としない。既存のopt-inを勝手に有効化しない。実AIを使わずに確認可能な品質を先に完結させる。

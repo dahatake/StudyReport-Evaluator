@@ -7,7 +7,7 @@
 |---|---|
 | Gate | GATE-0 |
 | Requirement | `docs/requirements-definition.md` v3.0 |
-| Plan | `work/20260831-implementation-plan.md` v4.0 |
+| Plan | `dev/docs/archive/work/20260831-implementation-plan.md` v4.0 |
 | Scope decision | ADR-0011 |
 | Evaluation snapshot HEAD | `dfeb25408756c8626f1d2cab0995bed107167415` |
 | Previous gate result | requirement v2.0 / plan v3.0 PASS — **SUPERSEDED FOR CURRENT IMPLEMENTATION** |
@@ -34,6 +34,8 @@ All eight conditions pass。The independent read-only final review performed aft
 This decision applies only to requirement v3.0 / plan v4.0 / ADR-0011。It does not retroactively alter the historically correct v2.0 / v3.0 GATE-0 decision。
 
 ## Evidence identity
+
+下表の旧 `work/` パスは記載commitのidentityとして保持する。[現在の保存先](../archive/work/20260831-implementation-plan.md)への移動は、当時のbytes・SHA-256を再定義しない。
 
 | Evidence | Commit | Bytes | SHA-256 | Gate result |
 |---|---|---:|---|---|

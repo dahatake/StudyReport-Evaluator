@@ -75,6 +75,54 @@ EXE／ZIPそれぞれのsidecar公開と、CI・公開判定での最終配布by
 
 cacheはアプリ配置用で、入力／final／partial、利用者別設定、CLI credential storeとは別です。明示出力先が未指定の場合だけ、入力fileに隣接する`result`を使い、抽出cacheを結果保存先にはしません。配布・展開・起動のために利用者workbookを移動・削除しません。結果の扱いは[出力と再開](#出力と再開)を参照してください。
 
+## ローカルビルドから起動するクイックスタート
+
+このrepositoryを取得した端末で、配布物を待たずに現在のソース（`0.8.5`候補）をWindowsアプリとして起動する手順です。**一般利用者向けの入手経路ではありません。** ここで作る実行物はunsignedで、SHA-256 sidecarもGitHub Releasesの公開物もありません。配布物の入手は前節を参照してください。
+
+以下の前提はローカルビルド固有の条件で、配布物の起動条件ではありません。
+
+| 項目 | 内容 | 適用 | 出典 |
+|---|---|---|---|
+| OS | Windows 11以降（build 22000以上）のx64 OSとx64 process | B | [`scripts/publish-windows.ps1`](scripts/publish-windows.ps1)の`Assert-SupportedHost` |
+| .NET SDK | `10.0.400`と同系列の最新patch（`rollForward`は`latestPatch`、prereleaseは不可） | A・B | [`global.json`](global.json) |
+| PowerShell | PowerShell 7以上の`pwsh`。Windows PowerShell 5.1は非対応 | B | [`scripts/publish-windows.ps1`](scripts/publish-windows.ps1)の`#Requires -Version 7.0`／`#Requires -PSEdition Core` |
+| package取得 | [`NuGet.Config`](NuGet.Config)が指定する単一package sourceへ到達できること | A・B | [`NuGet.Config`](NuGet.Config) |
+| 同梱CLI取得 | `RuntimeIdentifier`指定時だけ、同梱するGitHub Copilot CLIを取得します | B | [`StudyReportEvaluator.App.csproj`](src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj)、[`scripts/publish-windows.ps1`](scripts/publish-windows.ps1) |
+
+Microsoft Excel、Office、LibreOfficeはA・Bどちらでも不要です。
+
+### A. GUIだけを最短で起動する（AI評価なし）
+
+repositoryのルートで次を実行します。
+
+```powershell
+dotnet run --project .\src\StudyReportEvaluator.App\StudyReportEvaluator.App.csproj
+```
+
+ビルド後に「StudyReport Evaluator」ウィンドウが開き、入力 → 採点設計 → 実行 → 結果・出力の4ステップを操作できます。
+
+**この方法はGitHub Copilot CLIを同梱しません。** `RuntimeIdentifier`を指定しないビルドでは`CopilotSkipCliDownload`が`true`となり（[`StudyReportEvaluator.App.csproj`](src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj)）、同梱manifest`copilot-runtime.json`を出力しません。manifestが無い場合、アプリは同梱CLIを解決できず、PATH上の別CLIへfallbackもしません（[`CopilotClientFactory.cs`](src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs)）。したがって実行画面の認証確認・login・AI評価は利用できず、Excel読込、mapping、採点設計、設定の操作までが対象です。
+
+この`bin`出力はself-containedではなく、起動端末に.NETが必要です。配布物と同じ前提ではありません。
+
+### B. 配布物と同じ構成で起動する（同梱CLIあり）
+
+AI評価まで確認する場合は、公開用と同じself-contained `win-x64`をローカルで作ります。
+
+```powershell
+pwsh.exe -NoLogo -NoProfile -File .\scripts\publish-windows.ps1
+```
+
+成功すると`artifacts\package\publish\win-x64`へ出力し、最後に出力先pathを表示します（[`scripts/publish-windows.ps1`](scripts/publish-windows.ps1)）。そのdirectoryの`StudyReportEvaluator.App.exe`を起動してください。self-containedのため、起動端末への.NET追加導入は不要です。
+
+出力には`copilot-runtime.json`と`runtimes\win-x64\native\copilot.exe`が含まれ、アプリはmanifestのRID・版・SHA-256を検証した同梱CLIだけを使います。AI処理には、利用可能なGitHub Copilot account、本人の対話login、network接続、利用可能model、組織policy上の許可が別途必要です。GUIが起動しただけでAI利用可能とは判断しません。
+
+### ローカルビルドの注意
+
+- `artifacts`配下の出力はgit管理外の作業成果で、公開配布物ではありません（[`.gitignore`](.gitignore)）。第三者への配布・公開に使わないでください。
+- unsignedのため、SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行拒否は配布物と同様に起こり得ます。保護機能の無効化、MOTW除去、execution policy変更、UAC回避は案内しません。
+- ローカルビルドの成功は、fresh Windowsのclean-host試験、本人login、公開判定の完了を意味しません。
+
 ## 5分クイックスタート
 
 > **対象版:** 以下は**`0.8.5`（UNRELEASED・未公開）候補**の操作です。公開`0.8.1`で追加UIや設定保存を前提にしないでください。画像は合成データ・fake結果による説明用で、実認証・実保存・clean-host動作の証拠ではありません。生成時の製品版と来歴は[画像一覧](images/README.md)を参照してください。

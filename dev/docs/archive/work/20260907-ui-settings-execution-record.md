@@ -67,7 +67,7 @@
 
 - 対象: 製品`0.8.5`（UNRELEASED・未公開）、要求v4.6。公開済み`v0.8.1`は変更していない。
 - 実行時間: 2026-09-08 00:00:54〜00:29:45 JST（UTC: 2026-09-07 15:00:54〜15:29:45）。計画承認日・画像生成日の2026-09-07とは区別する。
-- 集約正本: [F02 summary.json](../artifacts/test/ui-settings/f02/run-925e1f9cacdf420ea4ed23e9567e45eb/summary.json)、判定`PASS_SCOPED`。各TRXの相対pathとSHA-256を記録し、終了後に実fileのhashを再照合した。
+- 集約正本: [F02 summary.json](../../../../artifacts/test/ui-settings/f02/run-925e1f9cacdf420ea4ed23e9567e45eb/summary.json)、判定`PASS_SCOPED`。各TRXの相対pathとSHA-256を記録し、終了後に実fileのhashを再照合した。
 - locked restore、Release build、製品版verify、版管理toolの15 assertionsが成功。publish後のApp/Core DLLはAssemblyVersion／FileVersion `0.8.5.0`、ProductVersion `0.8.5`（SDK付与のcommit metadataあり）と一致。
 
 | 検証 | 最終結果 | 範囲 |
@@ -92,7 +92,7 @@
 - P07は実行時のdirty checkoutを固定して検証した開発証跡。本実行記録の追記後の全Git inventoryやclean-source公開資格を証明するものではない。最終配布bytesと公開文書・コードは事後変更しない。
 - 固定SDK／NuGet依存／lock、Core source、solution、CI／公開workflowはHEADとの差分なし。HEADは開始時と同じで、indexは空、実学生sampleは未追跡を維持。commit／push／tag／公開は行っていない。
 - 実利用者の`setting.txt`は検証前後とも不存在を確認。実利用者設定を作成・変更しない。画像8枚は0.8.4でのT28生成物を保持し、F02で再生成していない。
-- 0.8.4のEXE／MSIX証跡は[baseline-0.8.4](../artifacts/test/ui-settings/f02/baseline-0.8.4/)へbytes不変で退避し、旧結果を0.8.5の実物証拠へ転記していない。
+- 0.8.4のEXE／MSIX証跡は[baseline-0.8.4](../../../../artifacts/test/ui-settings/f02/baseline-0.8.4/)へbytes不変で退避し、旧結果を0.8.5の実物証拠へ転記していない。
 - 独立最終レビューは既存証跡と範囲の照合で追加指摘0。F02だけを`REVIEWED`とし、追加native FAIL、本人確認等の外部前提、T39 `BLOCKED`、G4未完了、公開未達を維持する。
 
 ## 未実施・公開境界

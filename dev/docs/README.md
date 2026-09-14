@@ -4,7 +4,7 @@
 
 現在のソース候補は**`0.8.5`（UNRELEASED・未公開）**、要求版はv4.6、公開済みは`v0.8.1`のunsigned ZIP／sidecarです。T01〜T38とF01はREVIEWED、T39は追加native FAILと本人確認等の外部前提によりBLOCKEDです。利用者不在時の自律続行指示によりF01／F02を進めますが、G4・全タスクDONE・公開PASSを付与しません。
 
-F02の最終版再検証は本同期時点では親担当で未完了です。以後は[実行記録](../../work/20260907-ui-settings-execution-record.md)の最新F02欄を参照してください。[実装状態](implementation-status.md)は、0.8.4のT36文書contract・T37実ZIP・T38実EXE・T39自動回帰／MSIX機構確認と、追加native FAIL／Narrator・本人walkthrough・隔離利用者保存の未実施を分けています。旧証跡を0.8.5最終artifactの成功へ流用しません。
+F02の最終版再検証は本同期時点では親担当で未完了です。以後は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄を参照してください。[実装状態](implementation-status.md)は、0.8.4のT36文書contract・T37実ZIP・T38実EXE・T39自動回帰／MSIX機構確認と、追加native FAIL／Narrator・本人walkthrough・隔離利用者保存の未実施を分けています。旧証跡を0.8.5最終artifactの成功へ流用しません。
 
 ## 現行正本
 
@@ -28,6 +28,8 @@ F02の最終版再検証は本同期時点では親担当で未完了です。�
 | [Screenshot manifest](../../images/README.md) | UI開発、QA、利用者支援 | 8枚の合成説明画像。T28の生成履歴は`0.8.4`・1440×1050・2回hash一致。現在のソース`0.8.5`での再生成やnative／実保存の証拠ではない |
 
 ## 履歴文書
+
+過去の計画・実行記録・証跡は[作業記録アーカイブ](archive/work/README.md)から参照できます。
 
 ADR-0012はADR-0011のv3評価契約をsupersedeし、入力不変、closed AI result、Excel formula ownership、2-project構成等をcarry forwardします。ADR-0013はcurrent public evidenceをWindows 11 x64初版へ限定した記録です。ADR-0014は製品SemVerとrelease identityを定義します。ADR-0015はv4.3でWindows ZIPをpublic artifact、development MSIXをnon-public mechanism、macOSをsource foundationとするdelivery境界を定義します。ADR-0016はv4.5でApp限定single-file EXEを将来の主配布、ZIPを代替とし、fresh clean-host CH-01〜06とprotected publishを公開条件に追加します。
 
@@ -92,7 +94,7 @@ flowchart LR
 
 `test-windows-singlefile.ps1`の`-DevelopmentOnly`での成功statusは`PASS_DEVELOPMENT`、clean sourceを要求する既定モードでは`PASS_REQUIRED`です。どちらもfresh Windows 11 x64、MOTW／Windows保護、本人loginのCH-01〜06を代替せず、新EXEの公開資格を単独では与えません。正確な状態は[実装状態](implementation-status.md)と[Traceability](traceability.md)を参照してください。
 
-2026-09-05の[敵対的レビューと修正記録](../../work/20260905-adversarial-review.md)の最終検証は、`artifacts/test/adversarial-review/final/summary.json`で対象commit、全体status、TRX件数・SHA-256、前後のsource不変を照合してください。これは当時の履歴で、F02の0.8.5再検証ではありません。記録がない／`RUNNING`／`FAILED`の場合は完了扱いにしません。
+2026-09-05の[敵対的レビューと修正記録](archive/work/20260905-adversarial-review.md)の最終検証は、`artifacts/test/adversarial-review/final/summary.json`で対象commit、全体status、TRX件数・SHA-256、前後のsource不変を照合してください。これは当時の履歴で、F02の0.8.5再検証ではありません。記録がない／`RUNNING`／`FAILED`の場合は完了扱いにしません。
 
 historical fileへ追加した先頭bannerはpost-gate navigation metadataです。本文内のbytes / SHA-256 / commit identityは、明記されたhistorical content commitのbytesを指し、banner追加後のworking-tree bytesを指しません。
 

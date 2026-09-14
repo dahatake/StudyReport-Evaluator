@@ -7,13 +7,13 @@
 | 対象 | StudyReport Evaluatorの製品版、assembly、checkpoint、配布候補、tag、release |
 | 手順正本 | [`version-management.md`](../version-management.md) |
 | 版操作tool | [`dev/version.ps1`](../../version.ps1) |
-| 調査 | [`20260902-version-management-investigation-report.md`](../../../work/20260902-version-management-investigation-report.md) |
+| 調査 | [`20260902-version-management-investigation-report.md`](../archive/work/20260902-version-management-investigation-report.md) |
 
 > 2026-09-04更新: 公開済み製品版・配布assetがない段階で、製品所有者の指示によりsource candidateを`0.8.0`へ再baselineした。公開済みidentityの変更ではなく、SemVerとrelease identityの管理原則は維持する。
 
 ## Context
 
-導入前のprojectには明示的な`Version`、`VersionPrefix`、`VersionSuffix`がなく、.NET SDKの既定値から実効`1.0.0`が生成されていた。assemblyとRun/checkpoint identityにはその値が流れる一方、製品版の正本、bump規則、tag/release手順はなかった。[調査証拠](../../../work/20260902-version-management-investigation-evidence.json)
+導入前のprojectには明示的な`Version`、`VersionPrefix`、`VersionSuffix`がなく、.NET SDKの既定値から実効`1.0.0`が生成されていた。assemblyとRun/checkpoint identityにはその値が流れる一方、製品版の正本、bump規則、tag/release手順はなかった。[調査証拠](../archive/work/20260902-version-management-investigation-evidence.json)
 
 要求文書版`4.1`、definition schema`4.0`、checkpoint schema`1`、Copilot runtime manifest schema`1`、dependency versionは異なる契約であり、製品版として相互に読み替えることはできない。
 

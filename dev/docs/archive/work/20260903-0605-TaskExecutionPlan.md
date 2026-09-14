@@ -29,19 +29,19 @@
 
 ### 1.2 Repository正本
 
-- **[S10] CI workflow** — [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)。`main` pushを契機にPowerShell/privacy、locked restore、version、Release build、sample非依存test、integrity、TRX uploadを実行する。
-- **[S11] Release workflow** — [`.github/workflows/release.yml`](../.github/workflows/release.yml)。manual dispatchの`tag`/`draft`、annotated tag・clean checkout・sample非追跡、locked restore/build/test、package、hash、artifact、GitHub Release作成を定義する。
-- **[S12] Version / changelog正本** — [`Directory.Build.props`](../Directory.Build.props)と[`CHANGELOG.md`](../CHANGELOG.md)。製品版は`1.0.0`、changelogは空の`[Unreleased]`と`[1.0.0] - 2026-09-03`を持つ。
-- **[S13] 利用者download導線** — [`README.md`](../README.md)。`v1.0.0` ZIPとSHA-256 sidecarの最終URL、およびhash確認手順を記載済み。
-- **[S14] 版管理・公開規約** — [`dev/docs/version-management.md`](../dev/docs/version-management.md)。remote tag後のfail-closed、新版による修正、tag/asset非差替え、version/tag/package/Release完了条件を定義する。
-- **[S15] Publish / package正本** — [`scripts/publish-windows.ps1`](../scripts/publish-windows.ps1)と[`scripts/package-windows.ps1`](../scripts/package-windows.ps1)。Windows 11 x64、PowerShell Core 7+、self-contained、safe layout、bundled CLI、cold-start probe、deterministic ZIP、sidecarを検査する。
-- **[S16] Direct tests** — [`WindowsPublishPackageTests.cs`](../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs)と[`DocumentationContractTests.cs`](../tests/StudyReportEvaluator.App.Tests/Content/DocumentationContractTests.cs)。package/extract/bundled runtime/cold launch/repackage、および14件の文書契約を定義する。
-- **[S17] Current implementation status** — [`dev/docs/implementation-status.md`](../dev/docs/implementation-status.md)。required 670/670、canonical technical E2E、package gate等を記録する一方、public release statusは`IMPLEMENTATION_IN_PROGRESS`、B-05は未完了としている。
-- **[S18] README claim ledger** — [`dev/docs/readme-claim-ledger.md`](../dev/docs/readme-claim-ledger.md)。C-026「正式release assetを実在URLからdownloadできる」は基準時点で`BLOCKED`。
-- **[S19] Traceability** — [`dev/docs/traceability.md`](../dev/docs/traceability.md)。current statusは`IMPLEMENTATION_IN_PROGRESS`、required AC/TRはpassing evidenceへ接続済み。
+- **[S10] CI workflow** — [`.github/workflows/ci.yml`](../../../../.github/workflows/ci.yml)。`main` pushを契機にPowerShell/privacy、locked restore、version、Release build、sample非依存test、integrity、TRX uploadを実行する。
+- **[S11] Release workflow** — [`.github/workflows/release.yml`](../../../../.github/workflows/release.yml)。manual dispatchの`tag`/`draft`、annotated tag・clean checkout・sample非追跡、locked restore/build/test、package、hash、artifact、GitHub Release作成を定義する。
+- **[S12] Version / changelog正本** — [`Directory.Build.props`](../../../../Directory.Build.props)と[`CHANGELOG.md`](../../../../CHANGELOG.md)。製品版は`1.0.0`、changelogは空の`[Unreleased]`と`[1.0.0] - 2026-09-03`を持つ。
+- **[S13] 利用者download導線** — [`README.md`](../../../../README.md)。`v1.0.0` ZIPとSHA-256 sidecarの最終URL、およびhash確認手順を記載済み。
+- **[S14] 版管理・公開規約** — [`dev/docs/version-management.md`](../../../../dev/docs/version-management.md)。remote tag後のfail-closed、新版による修正、tag/asset非差替え、version/tag/package/Release完了条件を定義する。
+- **[S15] Publish / package正本** — [`scripts/publish-windows.ps1`](../../../../scripts/publish-windows.ps1)と[`scripts/package-windows.ps1`](../../../../scripts/package-windows.ps1)。Windows 11 x64、PowerShell Core 7+、self-contained、safe layout、bundled CLI、cold-start probe、deterministic ZIP、sidecarを検査する。
+- **[S16] Direct tests** — [`WindowsPublishPackageTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs)と[`DocumentationContractTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/Content/DocumentationContractTests.cs)。package/extract/bundled runtime/cold launch/repackage、および14件の文書契約を定義する。
+- **[S17] Current implementation status** — [`dev/docs/implementation-status.md`](../../../../dev/docs/implementation-status.md)。required 670/670、canonical technical E2E、package gate等を記録する一方、public release statusは`IMPLEMENTATION_IN_PROGRESS`、B-05は未完了としている。
+- **[S18] README claim ledger** — [`dev/docs/readme-claim-ledger.md`](../../../../dev/docs/readme-claim-ledger.md)。C-026「正式release assetを実在URLからdownloadできる」は基準時点で`BLOCKED`。
+- **[S19] Traceability** — [`dev/docs/traceability.md`](../../../../dev/docs/traceability.md)。current statusは`IMPLEMENTATION_IN_PROGRESS`、required AC/TRはpassing evidenceへ接続済み。
 - **[S20] 直前のrelease計画** — [`work/20260902-readme-end-user-release-plan.md`](20260902-readme-end-user-release-plan.md)。B-05、remote release workflow、公開download再検証、文書closureを未完了としている。
-- **[S21] Toolchain pin** — [`global.json`](../global.json)と[`Directory.Build.props`](../Directory.Build.props)。.NET SDK 10.0.400 feature band、`net10.0`、C# 14、warnings as errors、locked restoreを要求する。
-- **[S22] Canonical sample / E2E契約** — [`docs/requirements-definition.md`](../docs/requirements-definition.md)、[`SampleWorkbookStructuralTests.cs`](../tests/StudyReportEvaluator.App.Tests/E2E/SampleWorkbookStructuralTests.cs)、[`RealDataSystemSmokeTests.cs`](../tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs)。private canonical sampleはexact path/size/hashで扱い、fallbackせず、追跡・package化しない。
+- **[S21] Toolchain pin** — [`global.json`](../../../../global.json)と[`Directory.Build.props`](../../../../Directory.Build.props)。.NET SDK 10.0.400 feature band、`net10.0`、C# 14、warnings as errors、locked restoreを要求する。
+- **[S22] Canonical sample / E2E契約** — [`docs/requirements-definition.md`](../../../../docs/requirements-definition.md)、[`SampleWorkbookStructuralTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/E2E/SampleWorkbookStructuralTests.cs)、[`RealDataSystemSmokeTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs)。private canonical sampleはexact path/size/hashで扱い、fallbackせず、追跡・package化しない。
 
 ### 1.3 外部仕様
 
@@ -344,14 +344,14 @@ R-07で取得した実測値だけを使う。`RELEASE_RUN_ID`、Release URL/ID�
 
 ### 必須変更
 
-1. [`dev/docs/readme-claim-ledger.md`](../dev/docs/readme-claim-ledger.md)
+1. [`dev/docs/readme-claim-ledger.md`](../../../../dev/docs/readme-claim-ledger.md)
    - C-026を`BLOCKED`から`VERIFIED`へ変更。
    - public Release URL、asset URL、公開ZIPの実測bytes/SHA-256、R-07結果、確認日を記録。[S18]
-2. [`dev/docs/implementation-status.md`](../dev/docs/implementation-status.md)
+2. [`dev/docs/implementation-status.md`](../../../../dev/docs/implementation-status.md)
    - `Public release status`を`RELEASED — v1.0.0`へ変更。
    - source baselineをannotated tag targetへ固定。
    - B-05をclosedとし、CI/release run URL、public hash、cold launch結果を記録。[S17]
-3. [`dev/docs/traceability.md`](../dev/docs/traceability.md)
+3. [`dev/docs/traceability.md`](../../../../dev/docs/traceability.md)
    - current statusをreleasedへ変更。
    - current validationへpublic immutable Release/asset verificationを追加。[S19]
 4. [`work/20260902-readme-end-user-release-plan.md`](20260902-readme-end-user-release-plan.md)
@@ -361,7 +361,7 @@ R-07で取得した実測値だけを使う。`RELEASE_RUN_ID`、Release URL/ID�
 
 ### 条件付き変更
 
-- [`README.md`](../README.md)のURLが実在asset URLと完全一致するため、通常は変更不要。相違が実測された場合だけ修正する。[S13]
+- [`README.md`](../../../../README.md)のURLが実在asset URLと完全一致するため、通常は変更不要。相違が実測された場合だけ修正する。[S13]
 - `CHANGELOG.md`の`[1.0.0]`内容は公開tagの一部なので変更しない。追加の利用者影響が必要なら`[Unreleased]`へ記録し、公開済みsection/assetを変更しない。[S12][S14]
 - `dev/docs/version-management.md`の「2026-09-02時点0件」は日付付きhistorical observationなので、事実を消さない。[S14]
 

@@ -7,7 +7,7 @@
 |---|---|
 | 状態 | **CURRENT NORMATIVE PATH MAP** |
 | Requirement | `docs/requirements-definition.md` v3.0 |
-| Plan | `work/20260831-implementation-plan.md` v4.0 |
+| Plan | `dev/docs/archive/work/20260831-implementation-plan.md` v4.0 |
 | Scope decision | ADR-0011 |
 | Initial target | Windows 11 x64 |
 | Production projects | 2 |
@@ -30,6 +30,8 @@ No production or production-test path may be created before the current GATE-0 p
 No `Application/`、`Infrastructure/`、`Platform/`、`Workbooks/`、`Desktop/`、separate `E2E.Tests/` project alias exists in plan v4.0。
 
 ## Phase 0 — Baseline
+
+下表の旧 `work/` パスは当時のexact path ownershipとして保持する。計画書の[現在の保存先](../archive/work/20260831-implementation-plan.md)は移動後の参照用であり、当時の所有パスを変更しない。
 
 | Task | Exact files |
 |---|---|

@@ -5,9 +5,9 @@
 | Requirement | `docs/requirements-definition.md` v4.6 / 2026-09-07（AC-016／017の到達契約、追加AC-035〜037／TR-34〜36。既存AC-029〜034／TR-30〜33のdelivery境界を維持） |
 | Decision | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence）/ ADR-0016（Windows単一EXE 1操作起動） |
 | Detailed design | `dev/docs/detailed-design.md` |
-| Plan | [UI・設定保存プランv2](../../work/20260907-ui-settings-redesign-plan-v2.md)。要求所有者の2026-09-07のD01〜D20デフォルト採用・全実装承認を優先 |
+| Plan | [UI・設定保存プランv2](archive/work/20260907-ui-settings-redesign-plan-v2.md)。要求所有者の2026-09-07のD01〜D20デフォルト採用・全実装承認を優先 |
 | UI/settings contract | [ui-layout-contract.md](ui-layout-contract.md)。T01の未実装記録は履歴。実在するstore／VM／Viewと局所試験を下記のVERIFIED_SCOPEDへ接続し、native／本人／最終packageは別判定 |
-| Previous delivery plan | `work/20260904-publication-remediation-plan.md` |
+| Previous delivery plan | `dev/docs/archive/work/20260904-publication-remediation-plan.md` |
 | Previous validation | delivery変更前 Release build warning/error 0、full 670/670 PASS（Core 190 / App 480）。現在の0.8.0 delivery evidenceへ流用しない |
 | Recorded focused validation | 2026-09-05: InputViewTests 21、WorkbookMetadataReaderTests 11、ColumnMappingSuggesterTests 14、計46/46 PASS。DocumentationContractTests 14/14 PASS |
 | Audited full required validation | 2026-09-05、source `20c8121`のbaseline: Core 190 + App deterministic 524 + sample構造 1 + Windows ZIP 3 = 718/718 PASS（App計528、failed 0、skipped 0）。opt-inの未実行経路を含む |
@@ -15,7 +15,7 @@
 
 この表の`PLANNED`は未実装をPASSと称しない。task完了後にproduction symbol、direct test、gate identityへ更新する。旧v3 traceabilityはGit履歴とADR-0011に保持する。
 
-2026-09-07のD17上書き「全タスク完了後だけUnreleased追記 → 製品PATCH `0.8.4` → `0.8.5`」と、T01で製品版・CHANGELOG・元プラン・履歴evidenceを変更しない方針は履歴として保持する。さらに後続の利用者不在時の自律続行指示により、T39をBLOCKEDのままF01／F02を進める。F01はREVIEWED、親担当の版正本PATCHは反映済み。G4・全タスクDONE・公開PASSを意味せず、最終`0.8.5`の判定は[実行記録](../../work/20260907-ui-settings-execution-record.md)の最新F02欄へ接続する。
+2026-09-07のD17上書き「全タスク完了後だけUnreleased追記 → 製品PATCH `0.8.4` → `0.8.5`」と、T01で製品版・CHANGELOG・元プラン・履歴evidenceを変更しない方針は履歴として保持する。さらに後続の利用者不在時の自律続行指示により、T39をBLOCKEDのままF01／F02を進める。F01はREVIEWED、親担当の版正本PATCHは反映済み。G4・全タスクDONE・公開PASSを意味せず、最終`0.8.5`の判定は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄へ接続する。
 
 ## Evidence integrity and storage
 
@@ -30,11 +30,11 @@
 
 今回reviewの文書修正およびその後のcode/UI変更はこのbaselineの検証対象外であり、変更後のsourceで再検証が必要。既存gateやPNGを、新しい変更の検証済み証拠として扱わない。
 
-今回の[修正記録](../../work/20260905-adversarial-review.md)に対応する最終実行の正本は`artifacts/test/adversarial-review/final/summary.json`。`sourceCommit`一致、前後clean、全体`PASSED`、各TRXの件数／outcome／assembly／SHA-256が揃う場合だけ、そのsourceの完了と判定する。記録なし、`RUNNING`、`FAILED`は合格ではない。再実行で前回記録を上書きせず、別run directoryへ保存する。
+今回の[修正記録](archive/work/20260905-adversarial-review.md)に対応する最終実行の正本は`artifacts/test/adversarial-review/final/summary.json`。`sourceCommit`一致、前後clean、全体`PASSED`、各TRXの件数／outcome／assembly／SHA-256が揃う場合だけ、そのsourceの完了と判定する。記録なし、`RUNNING`、`FAILED`は合格ではない。再実行で前回記録を上書きせず、別run directoryへ保存する。
 
 ### 2026-09-07 UI/settings scoped evidence（0.8.4記録）
 
-出典は[親担当の実行記録](../../work/20260907-ui-settings-execution-record.md)と要求所有者の後続引継ぎ、実装source、対応test source、以下の既存TRXである。T01〜T35はREVIEWEDだった履歴を維持し、後続T36〜T38も親担当の実装・対象検証・敵対的レビュー・必要修正確認を完了している。T39の自動回帰成功と追加native FAIL／人手未実施を分離する。以下は製品`0.8.4`の記録で、F02後の`0.8.5`文書・最終artifactの再検証結果ではない。元プランの未承認・G0未通過表記とT01の未実装表記を現在の指示・状態へ戻さない。
+出典は[親担当の実行記録](archive/work/20260907-ui-settings-execution-record.md)と要求所有者の後続引継ぎ、実装source、対応test source、以下の既存TRXである。T01〜T35はREVIEWEDだった履歴を維持し、後続T36〜T38も親担当の実装・対象検証・敵対的レビュー・必要修正確認を完了している。T39の自動回帰成功と追加native FAIL／人手未実施を分離する。以下は製品`0.8.4`の記録で、F02後の`0.8.5`文書・最終artifactの再検証結果ではない。元プランの未承認・G0未通過表記とT01の未実装表記を現在の指示・状態へ戻さない。
 
 | 対象集合 | 記録済み結果 | ローカル証跡と限界 |
 |---|---|---|

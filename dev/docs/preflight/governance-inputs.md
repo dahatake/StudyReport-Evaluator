@@ -8,7 +8,7 @@
 | Task | G-13 |
 | 状態 | **BLOCKED — EXT-04未提供、EXT-06適用可否未提供** |
 | Requirement | AC-006、NFR-PRI-001/002、第14.3節、第17節4/6 |
-| Plan | `work/20260831-implementation-plan.md` v2.1 G-13 |
+| Plan | `dev/docs/archive/work/20260831-implementation-plan.md` v2.1 G-13 |
 | Storage rule | external artifactの本文・承認文・署名値・個人名を保存せず、検証metadataだけを記録 |
 | 記録日 | 2026-08-31 |
 

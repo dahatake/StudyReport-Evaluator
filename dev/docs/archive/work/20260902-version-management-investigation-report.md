@@ -1,7 +1,7 @@
 # StudyReport Evaluator バージョン管理 詳細調査レポート
 
 > [!NOTE]
-> **IMPLEMENTED AFTER THIS INVESTIGATION:** 本文は版管理導入前の調査snapshotです。現在の手順正本は[`dev/docs/version-management.md`](../dev/docs/version-management.md)、decisionは[ADR-0014](../dev/docs/adr/0014-product-versioning.md)、toolは[`dev/version.ps1`](../dev/version.ps1)です。
+> **IMPLEMENTED AFTER THIS INVESTIGATION:** 本文は版管理導入前の調査snapshotです。現在の手順正本は[`dev/docs/version-management.md`](../../../../dev/docs/version-management.md)、decisionは[ADR-0014](../../../../dev/docs/adr/0014-product-versioning.md)、toolは[`dev/version.ps1`](../../../../dev/version.ps1)です。
 
 | 項目 | 内容 |
 |---|---|
@@ -676,36 +676,36 @@ GitHub generated release notesはmerged PR、contributors、full changelog link�
 | ID | 出典 | 用途 |
 |---|---|---|
 | L01 | [調査実測JSON](20260902-version-management-investigation-evidence.json) | Git/MSBuild/binary/runtime/API実測と制限 |
-| R01 | [`Directory.Build.props`](../Directory.Build.props) | 共通build設定、version未指定、deterministic、lock |
-| R02 | [`Directory.Packages.props`](../Directory.Packages.props) | central dependency versions |
-| R03 | [`global.json`](../global.json) | SDK 10.0.400 / latestPatch |
-| R04 | [`StudyReportEvaluator.App.csproj`](../src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj) | App、Copilot manifest生成、version未指定 |
-| R05 | [`StudyReportEvaluator.Core.csproj`](../src/StudyReportEvaluator.Core/StudyReportEvaluator.Core.csproj) | Core、version未指定 |
-| R06 | [`ExecutionViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs) | checkpoint ApplicationIdentity生成 |
-| R07 | [`ResultsOutputViewModel.cs`](../src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs) | manual output ApplicationIdentity生成 |
-| R08 | [`RunSheetWriter.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/RunSheetWriter.cs) | `Quantification_Run` identity field |
-| R09 | [`CheckpointEnvelope.cs`](../src/StudyReportEvaluator.App/Workbooks/Checkpoint/CheckpointEnvelope.cs) | checkpoint schema/identity |
-| R10 | [`CheckpointPayloadCodec.cs`](../src/StudyReportEvaluator.App/Workbooks/Checkpoint/CheckpointPayloadCodec.cs) | exact schema、unknown member、definition validation |
-| R11 | [`DurableQuantificationOrchestrator.cs`](../src/StudyReportEvaluator.App/Workflow/DurableQuantificationOrchestrator.cs) | resume compatibility / application major比較 |
-| R12 | [`CanonicalDefinitionSerializer.cs`](../src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs) | definition schema `4.0` |
-| R13 | [`BuiltInPromptTemplates.cs`](../src/StudyReportEvaluator.Core/Prompting/BuiltInPromptTemplates.cs) | `knowledge-v1` |
-| R14 | [`publish-windows.ps1`](../scripts/publish-windows.ps1) | publish、SDK/CLI/runtime/layout validation |
-| R15 | [`package-windows.ps1`](../scripts/package-windows.ps1) | ZIP/root/sidecar/notes/reproducible packaging |
-| R16 | [`WindowsPublishPackageTests.cs`](../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs) | publish/package/repackage contract |
-| R17 | [`PackageLockTests.cs`](../tests/StudyReportEvaluator.App.Tests/SupplyChain/PackageLockTests.cs) | central version/lock assertions |
-| R18 | [`README.md`](../README.md) | current public package/version guidance |
-| R19 | [`docs/getting-started.md`](../docs/getting-started.md) | asset URL blockerとuser install flow |
-| R20 | [`docs/requirements-definition.md`](../docs/requirements-definition.md) | requirements 4.1 / public behavior / checkpoint / privacy |
-| R21 | [`dev/docs/excel-contract.md`](../dev/docs/excel-contract.md) | Excel/formula contract v4.0 |
-| R22 | [`dev/docs/implementation-status.md`](../dev/docs/implementation-status.md) | current release status/evidence boundary |
-| R23 | [`ADR-0013`](../dev/docs/adr/0013-windows-only-public-release.md) | Windows 11 x64 / unsigned ZIP scope |
-| R24 | [`.gitignore`](../.gitignore) | generated `artifacts/` evidence boundary |
-| R25 | [`App packages.lock.json`](../src/StudyReportEvaluator.App/packages.lock.json) | requested range / resolved dependency / content hash |
-| R26 | [published `.deps.json`](../artifacts/package/publish/win-x64/StudyReportEvaluator.App.deps.json) | local generated App/Core/runtime identity |
-| R27 | [published `.runtimeconfig.json`](../artifacts/package/publish/win-x64/StudyReportEvaluator.App.runtimeconfig.json) | local generated included runtime |
-| R28 | [`LaunchOptions.cs`](../src/StudyReportEvaluator.App/Launch/LaunchOptions.cs) | supported CLI options / unknown option behavior |
-| R29 | [`OutputPathPlanner.cs`](../src/StudyReportEvaluator.App/Workbooks/Writing/OutputPathPlanner.cs) | output naming contract |
-| R30 | [`DurableQuantificationOrchestratorTests.cs`](../tests/StudyReportEvaluator.App.Tests/Workflow/DurableQuantificationOrchestratorTests.cs) | checkpoint admission test coverage |
+| R01 | [`Directory.Build.props`](../../../../Directory.Build.props) | 共通build設定、version未指定、deterministic、lock |
+| R02 | [`Directory.Packages.props`](../../../../Directory.Packages.props) | central dependency versions |
+| R03 | [`global.json`](../../../../global.json) | SDK 10.0.400 / latestPatch |
+| R04 | [`StudyReportEvaluator.App.csproj`](../../../../src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj) | App、Copilot manifest生成、version未指定 |
+| R05 | [`StudyReportEvaluator.Core.csproj`](../../../../src/StudyReportEvaluator.Core/StudyReportEvaluator.Core.csproj) | Core、version未指定 |
+| R06 | [`ExecutionViewModel.cs`](../../../../src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs) | checkpoint ApplicationIdentity生成 |
+| R07 | [`ResultsOutputViewModel.cs`](../../../../src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs) | manual output ApplicationIdentity生成 |
+| R08 | [`RunSheetWriter.cs`](../../../../src/StudyReportEvaluator.App/Workbooks/Writing/RunSheetWriter.cs) | `Quantification_Run` identity field |
+| R09 | [`CheckpointEnvelope.cs`](../../../../src/StudyReportEvaluator.App/Workbooks/Checkpoint/CheckpointEnvelope.cs) | checkpoint schema/identity |
+| R10 | [`CheckpointPayloadCodec.cs`](../../../../src/StudyReportEvaluator.App/Workbooks/Checkpoint/CheckpointPayloadCodec.cs) | exact schema、unknown member、definition validation |
+| R11 | [`DurableQuantificationOrchestrator.cs`](../../../../src/StudyReportEvaluator.App/Workflow/DurableQuantificationOrchestrator.cs) | resume compatibility / application major比較 |
+| R12 | [`CanonicalDefinitionSerializer.cs`](../../../../src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs) | definition schema `4.0` |
+| R13 | [`BuiltInPromptTemplates.cs`](../../../../src/StudyReportEvaluator.Core/Prompting/BuiltInPromptTemplates.cs) | `knowledge-v1` |
+| R14 | [`publish-windows.ps1`](../../../../scripts/publish-windows.ps1) | publish、SDK/CLI/runtime/layout validation |
+| R15 | [`package-windows.ps1`](../../../../scripts/package-windows.ps1) | ZIP/root/sidecar/notes/reproducible packaging |
+| R16 | [`WindowsPublishPackageTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs) | publish/package/repackage contract |
+| R17 | [`PackageLockTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/SupplyChain/PackageLockTests.cs) | central version/lock assertions |
+| R18 | [`README.md`](../../../../README.md) | current public package/version guidance |
+| R19 | [`docs/getting-started.md`](../../../../docs/getting-started.md) | asset URL blockerとuser install flow |
+| R20 | [`docs/requirements-definition.md`](../../../../docs/requirements-definition.md) | requirements 4.1 / public behavior / checkpoint / privacy |
+| R21 | [`dev/docs/excel-contract.md`](../../../../dev/docs/excel-contract.md) | Excel/formula contract v4.0 |
+| R22 | [`dev/docs/implementation-status.md`](../../../../dev/docs/implementation-status.md) | current release status/evidence boundary |
+| R23 | [`ADR-0013`](../../../../dev/docs/adr/0013-windows-only-public-release.md) | Windows 11 x64 / unsigned ZIP scope |
+| R24 | [`.gitignore`](../../../../.gitignore) | generated `artifacts/` evidence boundary |
+| R25 | [`App packages.lock.json`](../../../../src/StudyReportEvaluator.App/packages.lock.json) | requested range / resolved dependency / content hash |
+| R26 | [published `.deps.json`](../../../../artifacts/package/publish/win-x64/StudyReportEvaluator.App.deps.json) | local generated App/Core/runtime identity |
+| R27 | [published `.runtimeconfig.json`](../../../../artifacts/package/publish/win-x64/StudyReportEvaluator.App.runtimeconfig.json) | local generated included runtime |
+| R28 | [`LaunchOptions.cs`](../../../../src/StudyReportEvaluator.App/Launch/LaunchOptions.cs) | supported CLI options / unknown option behavior |
+| R29 | [`OutputPathPlanner.cs`](../../../../src/StudyReportEvaluator.App/Workbooks/Writing/OutputPathPlanner.cs) | output naming contract |
+| R30 | [`DurableQuantificationOrchestratorTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/Workflow/DurableQuantificationOrchestratorTests.cs) | checkpoint admission test coverage |
 
 `R26` と `R27` はGit ignore対象のlocal generated artifactであるため、永続的sourceとしては[L01]にも実測値を転記した。[R24]
 

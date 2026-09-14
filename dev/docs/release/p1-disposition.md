@@ -9,7 +9,7 @@
 | 対象決定 | DEC-22 |
 | 対象要求 | FR-015、FR-028、FR-038、FR-058、FR-065、FR-076、FR-092、FR-106、NFR-PRI-006、NFR-ACC-005 |
 | 結論 | **全10件を`IMPLEMENT`。`DEFER` 0件** |
-| 基準 | `docs/requirements-definition.md` v1.2 第2節、`work/20260831-implementation-plan.md` v2.1 第19節 |
+| 基準 | `docs/requirements-definition.md` v1.2 第2節、`dev/docs/archive/work/20260831-implementation-plan.md` v2.1 第19節 |
 | 記録日 | 2026-08-31 |
 
 ## Decision semantics

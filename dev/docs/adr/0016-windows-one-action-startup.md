@@ -5,7 +5,7 @@
 | 状態 | **承認済み（設計決定）。実装進行中・新EXEの公開判定未完了** |
 | 決定日 | 2026-09-06 |
 | 要求正本 | [要求定義書 v4.5](../../../docs/requirements-definition.md) §3、11.3、12〜14、17〜22 |
-| タスク | [承認プラン](../../../work/20260906-0617-one-action-startup-plan.md) R02。後続承認と[実行上書き](../../../work/20260906-one-action-startup-execution.md)を優先 |
+| タスク | [承認プラン](../archive/work/20260906-0617-one-action-startup-plan.md) R02。後続承認と[実行上書き](../archive/work/20260906-one-action-startup-execution.md)を優先 |
 | 固定構成 | Windows 11 x64／`win-x64`、.NET SDK `10.0.400`／self-contained runtime `10.0.11`、Avalonia `12.1.1`、GitHub Copilot SDK `1.0.11`／native CLI `1.0.79` |
 | 製品版 | 現在 `0.8.4` candidate。最後のR03で`0.8.3`からPATCH済み。要求文書版とは別 |
 
@@ -84,7 +84,7 @@ CH-01〜06はすべて必須PASS。実AI評価`ADV-01`は本人の明示承認�
 
 ## Approval record / Version override
 
-[実行記録](../../../work/20260906-one-action-startup-execution.md)にある2026-09-06の承認・上書き文言を採録する。
+[実行記録](../archive/work/20260906-one-action-startup-execution.md)にある2026-09-06の承認・上書き文言を採録する。
 
 > 2026-09-06、要求所有者が `20260906-0617-one-action-startup-plan.md` のデフォルト案と全タスク実行を承認。
 

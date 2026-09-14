@@ -8,7 +8,7 @@
 | 状態 | **承認済み（G-01 完了）** |
 | 対象決定 | DEC-01 |
 | 要求正本 | `docs/requirements-definition.md` v1.2 第17節 |
-| 計画 | `work/20260831-implementation-plan.md` v2.0 `G-01` |
+| 計画 | `dev/docs/archive/work/20260831-implementation-plan.md` v2.0 `G-01` |
 | 記録日 | 2026-08-31 |
 | 決定 | **厳格 gate** |
 

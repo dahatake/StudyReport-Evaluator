@@ -9,7 +9,7 @@
 | 調査基準 HEAD | `1fdc9ab40c9e605fa6a49a131e232563d8b351e7` |
 | 調査時 branch | `main`（`origin/main`と同一HEAD） |
 | 調査時 worktree | 14 entries（tracked変更13、untracked 1）。本計画追加前の値 |
-| 要求正本 | 実在する [`docs/requirements-definition.md`](../docs/requirements-definition.md) v4.2 |
+| 要求正本 | 実在する [`docs/requirements-definition.md`](../../../../docs/requirements-definition.md) v4.2 |
 | 採用候補版 | `0.8.0` |
 | 計画状態 | **APPROVED — IN PROGRESS** |
 | 実行承認 | 2026-09-04の要求所有者指示「不明点はデフォルトのプランを採用」「全てのタスクを実行」 |
@@ -32,7 +32,7 @@
 
 §0.1を反映するため、以下をactive taskとし、本書後半のW3-01〜W3-08、production MSIXを前提とするR4/D5/V6記述は実行しない。
 
-1. 実在する[`docs/requirements-definition.md`](../docs/requirements-definition.md)をv4.3へ改版し、Windows public artifactをunsigned ZIP、development MSIXをnon-public `PASS_MECHANISM`とする。
+1. 実在する[`docs/requirements-definition.md`](../../../../docs/requirements-definition.md)をv4.3へ改版し、Windows public artifactをunsigned ZIP、development MSIXをnon-public `PASS_MECHANISM`とする。
 2. ADR-0015、architecture、detailed design、traceability、claim ledger、SystemTest、public docsをv4.3へ同期する。
 3. initial public release gateはWindows ZIPに`PASS_REQUIRED`、development MSIXに`PASS_MECHANISM`を要求する。development MSIXはRelease assetへ含めない。
 4. macOSはexact rowが`PASS_PRODUCTION`になった場合だけ将来のRelease asset/support claimへ追加する。未提供の外部入力をinitial Windows release blockerにしない。
@@ -96,17 +96,17 @@ S1-01〜03はB1-05/06直後に実行する。旧W3/R4/D5/V6 task IDはactive dep
 
 | ID | 重要度 | 確認済み事実 | 影響 | 出典 |
 |---|---:|---|---|---|
-| F-001 | P0 | clean checkoutでは`git status --porcelain`が空になり、`Get-Utf8Sha256Hex -Value ''`がparameter bindingで失敗する | 現行CIは必ずredのまま。MSIX本体生成後に証跡・sidecar作成が中断する | [S-10][S-11]、[`scripts/test-windows-msix-unsigned.ps1`](../scripts/test-windows-msix-unsigned.ps1) |
-| F-002 | P0 | worktreeは14 entriesのdirty状態 | release commit/tagの検証と安全な差分帰属ができない | [M-02]、[`dev/version.ps1`](../dev/version.ps1) |
-| F-003 | P0 | root `SystemTest-prompt.md`が削除扱いで、`tests/SystemTest-prompt.md`がuntracked。契約testはroot正本を読み、`tests/`配置を明示拒否する | 現在のworktreeでdocumentation contractが構造上成立しない | [M-03]、[`DocumentationContractTests.cs`](../tests/StudyReportEvaluator.App.Tests/Content/DocumentationContractTests.cs) |
-| F-004 | P0 | real-data technical evidenceは要求とPromptを`v4.1`として出力する | v4.2 evidence contractと不一致 | [`RealDataSystemSmokeTests.cs`](../tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs)、[S-01] |
-| F-005 | P0 | localの公開不存在・`0.8.0`訂正は未commitで、remote READMEには存在しない`v1.0.1` asset URLが残る | public READMEが404を案内し続ける | [S-07][S-08]、[`README.md`](../README.md) |
+| F-001 | P0 | clean checkoutでは`git status --porcelain`が空になり、`Get-Utf8Sha256Hex -Value ''`がparameter bindingで失敗する | 現行CIは必ずredのまま。MSIX本体生成後に証跡・sidecar作成が中断する | [S-10][S-11]、[`scripts/test-windows-msix-unsigned.ps1`](../../../../scripts/test-windows-msix-unsigned.ps1) |
+| F-002 | P0 | worktreeは14 entriesのdirty状態 | release commit/tagの検証と安全な差分帰属ができない | [M-02]、[`dev/version.ps1`](../../../../dev/version.ps1) |
+| F-003 | P0 | root `SystemTest-prompt.md`が削除扱いで、`tests/SystemTest-prompt.md`がuntracked。契約testはroot正本を読み、`tests/`配置を明示拒否する | 現在のworktreeでdocumentation contractが構造上成立しない | [M-03]、[`DocumentationContractTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/Content/DocumentationContractTests.cs) |
+| F-004 | P0 | real-data technical evidenceは要求とPromptを`v4.1`として出力する | v4.2 evidence contractと不一致 | [`RealDataSystemSmokeTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs)、[S-01] |
+| F-005 | P0 | localの公開不存在・`0.8.0`訂正は未commitで、remote READMEには存在しない`v1.0.1` asset URLが残る | public READMEが404を案内し続ける | [S-07][S-08]、[`README.md`](../../../../README.md) |
 
 ### 3.2 CI/release automationの問題
 
 | ID | 重要度 | 確認済み事実 | 影響 | 出典 |
 |---|---:|---|---|---|
-| F-006 | P1 | `dev/version.tests.ps1`は複数Git path回帰を持つが、CI/release workflowは実行しない | Release #1と同種の版tool回帰をworkflow前に検出できない | [`dev/version.tests.ps1`](../dev/version.tests.ps1)、[S-02][S-03][S-09] |
+| F-006 | P1 | `dev/version.tests.ps1`は複数Git path回帰を持つが、CI/release workflowは実行しない | Release #1と同種の版tool回帰をworkflow前に検出できない | [`dev/version.tests.ps1`](../../../../dev/version.tests.ps1)、[S-02][S-03][S-09] |
 | F-007 | P1 | test/evidence uploadが`if: always()`かつ`if-no-files-found: error`で、前段skip/failure時に二次エラーを追加する | 一次原因が見えにくくなる。Release #1とCI #3で実際に発生 | [S-09][S-10]、[S-02][S-03] |
 | F-008 | P1 | 両workflowが`actions/setup-dotnet@v4`を使用し、実runでNode 20 deprecation warningが出ている。公式の現行majorはv6 | 不要な警告と将来のrunner互換risk | [S-02][S-03][S-09][S-10][E-08] |
 | F-009 | P1 | release workflowはprerelease tagを受理するが`--prerelease`を付けない | prereleaseをstable Releaseとして作り得る | [S-03]、[E-03] |
@@ -118,9 +118,9 @@ S1-01〜03はB1-05/06直後に実行する。旧W3/R4/D5/V6 task IDはactive dep
 
 | ID | 重要度 | 確認済み事実 | 影響 | 出典 |
 |---|---:|---|---|---|
-| F-013 | P1 | unsigned MSIX driverが製品版`0.8.0`/`0.8.0.0`を複数箇所へhard-codeする | `Directory.Build.props`単一正本とdriftし、次回bumpで手動同期が必要 | [`scripts/test-windows-msix-unsigned.ps1`](../scripts/test-windows-msix-unsigned.ps1)、[S-05] §5〜6 |
-| F-014 | P0 | MSIX scriptは`SignedTest`と`UnsignedDevelopment`だけで、production output、trusted timestamp、public sidecar経路を持たない | `StudyReportEvaluator-win-x64.msix`をproduction contractで作れない | [`scripts/package-windows-msix.ps1`](../scripts/package-windows-msix.ps1)、[S-01] §13.2、[E-04][E-05] |
-| F-015 | P1 | macOS public contractは`StudyReportEvaluator-osx-<arch>.dmg`だが、notary scriptは`StudyReportEvaluator-<version>-<RID>.dmg`を生成する | workflow/docs/asset contractが一致しない | [S-01] §13.3、[S-04] §13.3、[`notarize-package-macos.sh`](../scripts/notarize-package-macos.sh) |
+| F-013 | P1 | unsigned MSIX driverが製品版`0.8.0`/`0.8.0.0`を複数箇所へhard-codeする | `Directory.Build.props`単一正本とdriftし、次回bumpで手動同期が必要 | [`scripts/test-windows-msix-unsigned.ps1`](../../../../scripts/test-windows-msix-unsigned.ps1)、[S-05] §5〜6 |
+| F-014 | P0 | MSIX scriptは`SignedTest`と`UnsignedDevelopment`だけで、production output、trusted timestamp、public sidecar経路を持たない | `StudyReportEvaluator-win-x64.msix`をproduction contractで作れない | [`scripts/package-windows-msix.ps1`](../../../../scripts/package-windows-msix.ps1)、[S-01] §13.2、[E-04][E-05] |
+| F-015 | P1 | macOS public contractは`StudyReportEvaluator-osx-<arch>.dmg`だが、notary scriptは`StudyReportEvaluator-<version>-<RID>.dmg`を生成する | workflow/docs/asset contractが一致しない | [S-01] §13.3、[S-04] §13.3、[`notarize-package-macos.sh`](../../../../scripts/notarize-package-macos.sh) |
 | F-016 | P0 | production logo PNG、`.icns`、Windows signing identity、Apple Developer ID/notary profile、native clean hostsがrepository/GitHub環境にない | production signing、notary、clean-machine acceptanceを開始できない | [M-04][M-05]、[S-01] §13.4 |
 | F-017 | P0 | platform release matrix/schema/validatorが存在しない | AC-028/TR-29の機械判定がない | [M-06]、[S-01] AC-028/TR-29 |
 
@@ -128,9 +128,9 @@ S1-01〜03はB1-05/06直後に実行する。旧W3/R4/D5/V6 task IDはactive dep
 
 | ID | 重要度 | 確認済み事実 | 影響 | 出典 |
 |---|---:|---|---|---|
-| F-018 | P1 | root READMEはlocalで公開物0件へ訂正中だが、`docs/README.md`と`docs/getting-started.md`は「配布されたZIP」を前提にする | 公開前状態の説明が文書間で分裂する | [`README.md`](../README.md)、[`docs/README.md`](../docs/README.md)、[`docs/getting-started.md`](../docs/getting-started.md) |
-| F-019 | P1 | `implementation-status.md`は`0.8.0`の過去test非流用を明記しつつ、transition表でZIPを`PASS_REQUIRED`とする | current candidateのstatus表現が自己矛盾する | [`implementation-status.md`](../dev/docs/implementation-status.md) |
-| F-020 | P1 | status文書はroot Prompt 21 scenario/TR-24の旧結果を記す一方、現行Prompt候補は25 scenario/TR-29 | current test contractと状態記録が不一致 | [`implementation-status.md`](../dev/docs/implementation-status.md)、[`readme-claim-ledger.md`](../dev/docs/readme-claim-ledger.md)、[`tests/SystemTest-prompt.md`](../tests/SystemTest-prompt.md) |
+| F-018 | P1 | root READMEはlocalで公開物0件へ訂正中だが、`docs/README.md`と`docs/getting-started.md`は「配布されたZIP」を前提にする | 公開前状態の説明が文書間で分裂する | [`README.md`](../../../../README.md)、[`docs/README.md`](../../../../docs/README.md)、[`docs/getting-started.md`](../../../../docs/getting-started.md) |
+| F-019 | P1 | `implementation-status.md`は`0.8.0`の過去test非流用を明記しつつ、transition表でZIPを`PASS_REQUIRED`とする | current candidateのstatus表現が自己矛盾する | [`implementation-status.md`](../../../../dev/docs/implementation-status.md) |
+| F-020 | P1 | status文書はroot Prompt 21 scenario/TR-24の旧結果を記す一方、現行Prompt候補は25 scenario/TR-29 | current test contractと状態記録が不一致 | [`implementation-status.md`](../../../../dev/docs/implementation-status.md)、[`readme-claim-ledger.md`](../../../../dev/docs/readme-claim-ledger.md)、[`tests/SystemTest-prompt.md`](../../../../tests/SystemTest-prompt.md) |
 | F-021 | P1 | 旧計画は`1.1.0`、dead `v1.0.1`修正、独自Windows Sandbox基盤をactive taskとして扱う | 現在の`0.8.0`差分と今回のYAGNI制約に不適合 | [`work/20260903-1655-TaskExecutionPlan.md`](20260903-1655-TaskExecutionPlan.md) |
 
 ## 4. 不明点、選択肢、採用デフォルト
@@ -851,14 +851,14 @@ flowchart TD
 
 ### Repository一次資料
 
-- **[S-01]** [`docs/requirements-definition.md`](../docs/requirements-definition.md) v4.2 — 特に§2.2、§13、§17、§18 AC-020〜028、§19 TR-19〜29。
-- **[S-02]** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)。
-- **[S-03]** [`.github/workflows/release.yml`](../.github/workflows/release.yml)。
-- **[S-04]** [`dev/docs/detailed-design.md`](../dev/docs/detailed-design.md) §13。
-- **[S-05]** [`dev/docs/version-management.md`](../dev/docs/version-management.md)。
-- **[S-06]** [`dev/docs/implementation-status.md`](../dev/docs/implementation-status.md)、[`traceability.md`](../dev/docs/traceability.md)、[`readme-claim-ledger.md`](../dev/docs/readme-claim-ledger.md)。
-- **[S-11]** [`scripts/test-windows-msix-unsigned.ps1`](../scripts/test-windows-msix-unsigned.ps1)。
-- **[S-12]** [`scripts/publish-windows.ps1`](../scripts/publish-windows.ps1)、[`package-windows.ps1`](../scripts/package-windows.ps1)、[`WindowsPublishPackageTests.cs`](../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs)。
+- **[S-01]** [`docs/requirements-definition.md`](../../../../docs/requirements-definition.md) v4.2 — 特に§2.2、§13、§17、§18 AC-020〜028、§19 TR-19〜29。
+- **[S-02]** [`.github/workflows/ci.yml`](../../../../.github/workflows/ci.yml)。
+- **[S-03]** [`.github/workflows/release.yml`](../../../../.github/workflows/release.yml)。
+- **[S-04]** [`dev/docs/detailed-design.md`](../../../../dev/docs/detailed-design.md) §13。
+- **[S-05]** [`dev/docs/version-management.md`](../../../../dev/docs/version-management.md)。
+- **[S-06]** [`dev/docs/implementation-status.md`](../../../../dev/docs/implementation-status.md)、[`traceability.md`](../../../../dev/docs/traceability.md)、[`readme-claim-ledger.md`](../../../../dev/docs/readme-claim-ledger.md)。
+- **[S-11]** [`scripts/test-windows-msix-unsigned.ps1`](../../../../scripts/test-windows-msix-unsigned.ps1)。
+- **[S-12]** [`scripts/publish-windows.ps1`](../../../../scripts/publish-windows.ps1)、[`package-windows.ps1`](../../../../scripts/package-windows.ps1)、[`WindowsPublishPackageTests.cs`](../../../../tests/StudyReportEvaluator.App.Tests/Packaging/WindowsPublishPackageTests.cs)。
 
 ### GitHub実測（2026-09-04調査）
 

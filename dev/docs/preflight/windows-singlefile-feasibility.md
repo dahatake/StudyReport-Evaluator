@@ -14,7 +14,7 @@
 
 ## 実施方法
 
-承認された[実装プラン](../../../work/20260906-0617-one-action-startup-plan.md)のS01を、`artifacts/test/singlefile-spike/source/` のdetached worktreeで実施した。通常source、canonical package locks、既存公開物は変更していない。
+承認された[実装プラン](../archive/work/20260906-0617-one-action-startup-plan.md)のS01を、`artifacts/test/singlefile-spike/source/` のdetached worktreeで実施した。通常source、canonical package locks、既存公開物は変更していない。
 
 - 既存Appへ一時profileを適用。self-contained、single-file、native/all-content self-extractを有効化し、trimming/ReadyToRun/圧縮は無効。
 - profileのproperty/content/一時検証targetは `MSBuildProjectName == StudyReportEvaluator.App` に限定した。
