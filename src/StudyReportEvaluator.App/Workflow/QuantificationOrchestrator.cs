@@ -103,9 +103,10 @@ public sealed record QuantificationRunRequest
 
     public required string ModelId { get; init; }
 
-    public int MaximumPromptTokens { get; init; }
+    /// null は SDK が当該 model の上限を公開していないことを表す。
+    public int? MaximumPromptTokens { get; init; }
 
-    public int MaximumContextWindowTokens { get; init; }
+    public int? MaximumContextWindowTokens { get; init; }
 
     public int MaxConcurrency { get; init; } = EvaluationSchedulerOptions.DefaultMaxConcurrency;
 
@@ -280,7 +281,7 @@ public sealed class QuantificationOrchestrator
     {
         ImmutableArray<ExecutionCapacityError>.Builder errors =
             ImmutableArray.CreateBuilder<ExecutionCapacityError>();
-        if (request.MaximumPromptTokens <= 0)
+        if (request.MaximumPromptTokens is int promptLimit && promptLimit <= 0)
         {
             errors.Add(new ExecutionCapacityError(
                 "MODEL_PROMPT_LIMIT_UNAVAILABLE",
@@ -288,11 +289,11 @@ public sealed class QuantificationOrchestrator
                 plan.Snapshot.Definition.Id,
                 plan.Snapshot.Definition.Name,
                 "MaximumPromptTokens",
-                request.MaximumPromptTokens.ToString(CultureInfo.InvariantCulture),
+                promptLimit.ToString(CultureInfo.InvariantCulture),
                 "positive SDK model limit"));
         }
 
-        if (request.MaximumContextWindowTokens <= 0)
+        if (request.MaximumContextWindowTokens is int contextLimit && contextLimit <= 0)
         {
             errors.Add(new ExecutionCapacityError(
                 "MODEL_CONTEXT_LIMIT_UNAVAILABLE",
@@ -300,7 +301,7 @@ public sealed class QuantificationOrchestrator
                 plan.Snapshot.Definition.Id,
                 plan.Snapshot.Definition.Name,
                 "MaximumContextWindowTokens",
-                request.MaximumContextWindowTokens.ToString(CultureInfo.InvariantCulture),
+                contextLimit.ToString(CultureInfo.InvariantCulture),
                 "positive SDK model limit"));
         }
 
@@ -335,8 +336,8 @@ public sealed class QuantificationOrchestrator
 
     private async Task ValidateRequestCapacityAsync(
         EvaluationPlan plan,
-        int maximumPromptTokens,
-        int maximumContextWindowTokens,
+        int? maximumPromptTokens,
+        int? maximumContextWindowTokens,
         CancellationToken cancellationToken)
     {
         ImmutableArray<ExecutionCapacityError>.Builder errors =

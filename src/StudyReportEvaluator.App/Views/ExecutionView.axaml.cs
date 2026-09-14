@@ -86,11 +86,13 @@ public sealed partial class ExecutionView : UserControl
         if (!attached || !ReferenceEquals(sender, owner)
             || (!string.IsNullOrEmpty(e.PropertyName)
                 && e.PropertyName is not (nameof(ExecutionViewModel.SelectedModelId)
+                    or nameof(ExecutionViewModel.SelectedModelLimitText)
                     or nameof(ExecutionViewModel.PreferredModelId)
                     or nameof(ExecutionViewModel.MaxConcurrency)
                     or nameof(ExecutionViewModel.HasCurrentRun)
                     or nameof(ExecutionViewModel.CurrentRunModelId)
                     or nameof(ExecutionViewModel.CurrentRunMaxConcurrency)
+                    or nameof(ExecutionViewModel.CurrentRunLimitText)
                     or nameof(ExecutionViewModel.IsRunning)
                     or nameof(ExecutionViewModel.IsAutoModelAvailable)
                     or nameof(ExecutionViewModel.OutputDirectoryOverride)
@@ -116,9 +118,9 @@ public sealed partial class ExecutionView : UserControl
 
     private void RefreshPresentation()
     {
-        string nextConditions = $"次回 {owner?.SelectedModelId ?? "未選択"} 並列{owner?.MaxConcurrency.ToString(CultureInfo.InvariantCulture) ?? "—"} · 希望: {owner?.PreferredModelId ?? "未指定"}";
+        string nextConditions = $"次回 {owner?.SelectedModelId ?? "未選択"} 並列{owner?.MaxConcurrency.ToString(CultureInfo.InvariantCulture) ?? "—"} · 希望: {owner?.PreferredModelId ?? "未指定"} · 上限: {owner?.SelectedModelLimitText ?? "未確認"}";
         this.FindControl<TextBox>("EffectiveModelTextBox")!.Text = owner is { HasCurrentRun: true } current
-            ? $"{(current.IsRunning ? "実行中" : "前回run")} {current.CurrentRunModelId} 並列{current.CurrentRunMaxConcurrency?.ToString(CultureInfo.InvariantCulture)} / {nextConditions}"
+            ? $"{(current.IsRunning ? "実行中" : "前回run")} {current.CurrentRunModelId} 並列{current.CurrentRunMaxConcurrency?.ToString(CultureInfo.InvariantCulture)} · 上限: {current.CurrentRunLimitText} / {nextConditions}"
             : nextConditions;
         string autoAvailability = owner?.IsAutoModelAvailable == true
             ? "利用可能"

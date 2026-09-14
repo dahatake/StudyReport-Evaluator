@@ -501,8 +501,8 @@ public sealed class DurableQuantificationOrchestrator
         QuantificationSnapshot snapshot,
         QuestionDefinition question,
         DateTimeOffset startedAtUtc,
-        int maximumPromptTokens,
-        int maximumContextWindowTokens,
+        int? maximumPromptTokens,
+        int? maximumContextWindowTokens,
         CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested)
@@ -1064,14 +1064,14 @@ public sealed class DurableQuantificationOrchestrator
     {
         ImmutableArray<ExecutionCapacityError>.Builder errors =
             ImmutableArray.CreateBuilder<ExecutionCapacityError>();
-        if (request.MaximumPromptTokens <= 0)
+        if (request.MaximumPromptTokens is int promptLimit && promptLimit <= 0)
         {
-            errors.Add(CapacityError(plan, "MODEL_PROMPT_LIMIT_UNAVAILABLE", "MaximumPromptTokens", request.MaximumPromptTokens, "positive SDK model limit"));
+            errors.Add(CapacityError(plan, "MODEL_PROMPT_LIMIT_UNAVAILABLE", "MaximumPromptTokens", promptLimit, "positive SDK model limit"));
         }
 
-        if (request.MaximumContextWindowTokens <= 0)
+        if (request.MaximumContextWindowTokens is int contextLimit && contextLimit <= 0)
         {
-            errors.Add(CapacityError(plan, "MODEL_CONTEXT_LIMIT_UNAVAILABLE", "MaximumContextWindowTokens", request.MaximumContextWindowTokens, "positive SDK model limit"));
+            errors.Add(CapacityError(plan, "MODEL_CONTEXT_LIMIT_UNAVAILABLE", "MaximumContextWindowTokens", contextLimit, "positive SDK model limit"));
         }
 
         long worstCaseAttempts;

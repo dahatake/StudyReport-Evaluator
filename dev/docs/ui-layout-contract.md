@@ -7,14 +7,14 @@
 | T01の範囲 | 最小実装契約を確定した履歴。T01時点の実測・build・testはNOT_RUN |
 | T26の範囲 | 親担当の2026-09-07実行TRXで、下記2ファイルの全27ケースがPassed（headless UI＋ページ計算）。通常2寸法・狭小scale 1／2の実測を§5へ反映。今回の文書更新では再実行なし |
 | T27の範囲 | 実設定保存／復元・実ファイル出力を扱うローカルE2Eが7/7 Passed（§5.3）。native UI・実認証／実AI・別process再起動の確認ではない |
-| T28／T36の範囲 | 0.8.4のT28は8画像1440×1050・2回hash一致・最小frame検証を含む216/216でREVIEWED。T36は文書／画像contract 21/21でREVIEWED。0.8.5での再生成・実保存・nativeの証拠ではない |
+| T28／T36の範囲 | 0.8.4のT28は8画像1440×1050・2回hash一致・最小frame検証を含む216/216でREVIEWED。T36は文書／画像contract 21/21でREVIEWED。0.8.6での再生成・実保存・nativeの証拠ではない |
 | 残る実測 | T39追加nativeは3試行後に停止し、最新CONTROL_ID_PREDICATE_NOT_UNIQUEでFAIL。120 DPI／1180×800 DIP等の部分観測のみ（§5.4）。Narrator・本人walkthrough4項目・隔離利用者native保存はNOT_RUN_EXTERNAL_PREREQUISITE |
 | 追跡 | AC-016／017／018／035〜037、TR-17／18／34〜36。[traceability](traceability.md)、[SystemTest](../../SystemTest-prompt.md) ST-UC-12／13／27〜29 |
-| 版と公開 | 製品正本は親担当が0.8.5未公開候補へPATCH済み、F01はREVIEWED、公開済みはv0.8.1 ZIP。D17の当初上書きとT01の版・CHANGELOG非変更は履歴。後続の自律続行指示でT39 BLOCKEDのままF01／F02を進めるが、全タスクDONE・署名・公開PASSにはしない |
+| 版と公開 | 製品正本は親担当が0.8.5未公開候補へPATCHし、その後のauto model対応で0.8.6へPATCH済み。F01はREVIEWED、公開済みはv0.8.1 ZIP。D17の当初上書きとT01の版・CHANGELOG非変更は履歴。後続の自律続行指示でT39 BLOCKEDのままF01／F02を進めるが、全タスクDONE・署名・公開PASSにはしない |
 
 本書は要求から実装へ渡す契約と、§5に明示した対象に限る検証記録である。全UI・全要件の動作合格、改善率、native実DPI・本人walkthroughの証跡へは拡張しない。元プランの承認待ち表記は履歴として保持し、要求正本§22の後続承認を優先する。
 
-T01〜T38はREVIEWED、T39はBLOCKED。F02の最終0.8.5再検証は本同期時点では親担当で未完了、以後は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄を参照する。以下の0.8.4での測定とT01の静的契約履歴を、新しい版の試験成功へ転記しない。
+T01〜T38はREVIEWED、T39はBLOCKED。F02の最終0.8.6再検証は本同期時点では親担当で未完了、以後は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄を参照する。以下の0.8.4での測定とT01の静的契約履歴を、新しい版の試験成功へ転記しない。
 
 ## 1. T01時点に静的に確認した基点（履歴）
 
@@ -34,7 +34,7 @@ T01〜T38はREVIEWED、T39はBLOCKED。F02の最終0.8.5再検証は本同期時
 |---|---|---|
 | 入力 | picker／path、読込、sheet／質問行1・2／回答範囲、対象設問、有効化、主回答列、設問text、必須エラー | 候補再適用、補助列、設問名、複製、並替え等 |
 | 採点設計 | base／special／similarity係数、設問Points、exact合計・過不足、均等配分、有効評価の概要、読込Prompt件数 | 定義名・revision・丸め、通常evaluator／criterion CRUD・range・weight、固有評価、Prompt本文・明示適用 |
-| 実行 | 本人login開始／取消／明示状態確認、実効modelとauto、実効出力先、新規／再開・partial、開始／停止、実progress・技術エラー | model変更、並列度、明示出力先、runtime診断。新timeout欄は作らない |
+| 実行 | 本人llogin開始／取消／明示状態確認、実効modelとその上限の既知／不明とauto、実効出力先、新規／再開・partial、開始／停止、実progress・技術エラー | model変更、並列度、明示出力先、runtime診断。新timeout欄は作らない |
 | 結果 | final／partial、完了／一部失敗／取消、件数、ページ一覧、元行の詳細・override・別名出力 | 結果とoverrideは設定へ移さない |
 
 設定のカテゴリは「共通」「入力詳細」「通常評価」「固有評価」「読込Prompt」の5つ。共通内の定義情報はDesign所有のままで、6カテゴリにしない。対象なしは理由を示し、カテゴリの位置を変えない。警告全文は設定を含むshellの独立領域で常時nonblocking表示する。
@@ -158,7 +158,7 @@ T23の`MainWindowSettingsTests`、既存Input／Design／ResultsのPresentation�
 
 ### 5.4 T28画像とT39追加nativeの境界（0.8.4）
 
-T28は通常8枚の1440×1050 pixel・2回hash一致と最小frame検証を含む関連216/216でREVIEWED。T36の`artifacts/test/ui-settings/t36/t36-current.trx`は公開文書11件・画像8枚のcontract 21/21でREVIEWED。生成日・版は0.8.4の履歴として保持し、現在のソース0.8.5で再生成・目視確認したとしない。
+T28は通常8枚の1440×1050 pixel・2回hash一致と最小frame検証を含む関連216/216でREVIEWED。T36の`artifacts/test/ui-settings/t36/t36-current.trx`は公開文書11件・画像8枚のcontract 21/21でREVIEWED。生成日・版は0.8.4の履歴として保持し、現在のソース0.8.6で再生成・目視確認したとしない。
 
 T39追加nativeの最新`artifacts/test/ui-settings/t39/native-final-attempt.json`はFAILで、failureCodeは`CONTROL_ID_PREDICATE_NOT_UNIQUE`。3試行後は再試行を停止する。120 DPI、実client 1475×1000 pixel＝1180×800 DIP、合成入力読込、正常終了、入力／EXE不変、実利用者setting.txtの開始前後不存在は確認したが、4画面・5カテゴリ・1024×720・実keyboardの追加検証は未完了。この観測はT26の通常／例外headless測定を置き換えず、全UIのnative成功を証明しない。
 

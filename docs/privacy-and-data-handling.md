@@ -2,7 +2,7 @@
 
 このガイドは、StudyReport Evaluatorが扱う情報と保存先を説明します。法的助言、組織承認、教育的妥当性の証明ではありません。
 
-> **対象版と確認範囲:** 単一EXE、「GitHubにログイン」button、`setting.txt`への設定保存・適用の説明は、現在のソースの`0.8.5`候補（**UNRELEASED・未公開**）向けです。公開`v0.8.1`はZIP配布で、単一EXE、login button、本頁の設定保存・適用機能はありません。**clean-host試験と本人loginは`NOT_RUN`**であり、OS-only環境での動作、実認証、新EXEの公開完了を示すものではありません。配布状況と起動・login手順は[README](../README.md)を確認してください。
+> **対象版と確認範囲:** 単一EXE、「GitHubにログイン」button、`setting.txt`への設定保存・適用の説明は、現在のソースの`0.8.6`候補（**UNRELEASED・未公開**）向けです。公開`v0.8.1`はZIP配布で、単一EXE、login button、本頁の設定保存・適用機能はありません。**clean-host試験と本人loginは`NOT_RUN`**であり、OS-only環境での動作、実認証、新EXEの公開完了を示すものではありません。配布状況は[README](../README.md)、候補版の起動・login手順は[はじめに](getting-started.md)を確認してください。
 >
 > 設定の説明は現行productionコードに基づきます。一時保存先の実設定fileとfake AI境界を使うdeterministic E2Eの成功は、native WindowsのUI／DPI／Narrator確認・本人walkthroughやrelease完了の証拠ではありません。版更新前の実EXE確認には実測がありますが、追加native確認は**NOT COMPLETE（FAIL）**です。Space／Narrator、本人walkthrough、隔離利用者環境のnative保存は`NOT_RUN`です。[確認範囲](getting-started.md#未公開候補の検証範囲)を参照し、部分的な観測を全native確認や公開の成功へ読み替えないでください。
 
@@ -23,7 +23,7 @@ flowchart LR
 
 GUI起動、Excel読込、mapping、採点設計は、本人loginやAI利用とは分離したoffline機能として設計しています。clean-hostでの実証は上記のとおり未完了です。GUI起動、Prompt適用、状態確認からloginやAI評価を暗黙に開始しません。
 
-上図の評価データ送信とは別に、CLI／ブラウザーによるGitHubとのOAuth認証にはnetwork接続が必要です。**Copilot 状態を確認**も認証状態と利用可能modelを要求するため、AI評価を開始しなくてもCLI／SDKがnetwork通信を行うことがあります。**「AI評価なし」は「network通信なし」ではありません。** AI利用には本人認証に加え、利用可能account・model、network接続、組織policy上の許可が必要です。
+上図の評価データ送信とは別に、CLI／ブラウザーによるGitHubとのOAuth認証にはnetwork接続が必要です。**Copilot 状態を確認**も認証状態と利用可能modelを要求するため、AI評価を開始しなくてもCLI／SDKがnetwork通信を行うことがあります。候補版ではlogin processの正常終了後と、model一覧キャッシュがある場合の起動時にも、この再確認を自動で行います。キャッシュなしの旧設定・初回起動は自動確認しません。**「AI評価なし」は「network通信なし」ではありません。** AI利用には本人認証に加え、利用可能account・model、network接続、組織policy上の許可が必要です。
 
 ## AIへ送る情報
 
@@ -78,7 +78,7 @@ EXE配置先や抽出cacheを既定の出力先にせず、配布・展開・起
 
 ### 保存する項目・しない項目
 
-設定fileの項目は次の5つです。
+設定fileの項目は次のとおりです。
 
 | JSON項目 | 保存する値 |
 |---|---|
@@ -87,6 +87,9 @@ EXE配置先や抽出cacheを既定の出力先にせず、配布・展開・起
 | `maxConcurrency` | 最大並列度1〜3、既定1 |
 | `outputDirectoryOverride` | 利用者が明示した絶対出力path、または未指定の`null`。自動算出した`result`は保存しない |
 | `definition` | 任意の採点定義1件、または`null`。複数profileや結果の保管庫ではない |
+| `cachedModels` | 任意の最後に取得成功したmodel一覧。要素は`id`、`maximumPromptTokens`、`maximumContextWindowTokens`（各上限は正の整数または`null`）。省略／`null`はキャッシュなし、空配列`[]`も有効 |
+
+設定schemaは`1`のままで、`cachedModels`のない旧設定も読み込めます。キャッシュはmodel metadataのみで、credential・account情報・login状態を含まず、現在の利用権限の証明でもありません。詳細な形式と旧実装での読込に関する注意は[設定ガイド](settings.md#保存場所と形式)を参照してください。
 
 採点定義はID・name・revision、sheet／質問文行／回答行範囲、base／special配点・類似度係数・丸め、設問のID・名前・質問文・主列／補助列・配点・enabled、通常evaluatorの種別・組込template版・Custom Prompt・criterion・range・weight、固有評価のID・source・Prompt等を含みます。共通画面の「採点定義名」「定義revision」「丸めの桁数」も、この定義の値です。
 
@@ -94,7 +97,7 @@ EXE配置先や抽出cacheを既定の出力先にせず、配布・展開・起
 
 - 入力xlsxのpath・bytes、回答行本文
 - AI結果・reason・evidence・参照回答、run／checkpoint状態・partial指定
-- 認証情報としてのcredential・login状態、CLI hash等のruntime診断
+- 認証情報としてのcredential・account情報・login状態、CLI hash等のruntime診断
 - Imported Promptの取込file一覧・未適用の本文・順序（定義へ明示適用したtemplateは定義の一部として保存）
 - 画面の選択対象・表示ページ・カテゴリ・操作履歴、Control／Command、warningの承認状態（定義内のIDは保存）
 
@@ -104,11 +107,12 @@ EXE配置先や抽出cacheを既定の出力先にせず、配布・展開・起
 
 ### 画面への反映とdisk保存は別
 
-- 起動時は設定を読み込みますが、fileなしなら既定値で続行し、最初の**設定を保存**までfileを作成しません。設定読込・主列変更・Prompt適用・画面遷移・**設定から戻る**・終了で自動保存しません。「戻る」は変更破棄でもありません。再起動後も使いたい変更は、終了前に明示保存してください。
+- 起動時は設定を読み込みますが、fileなしなら既定値で続行し、明示保存または認証・一覧取得成功後のキャッシュ自動保存で初めてfileを作成します。主列変更・Prompt適用・画面遷移・**設定から戻る**・終了で共通設定や採点定義を自動保存しません。「戻る」は変更破棄でもありません。再起動後も使いたい編集は、終了前に明示保存してください。
+- 認証・一覧取得に成功すると、保存済み設定を読み直して`cachedModels`だけを自動更新します。未保存の希望model・並列度・出力先・採点定義は保存しません。取得した全一覧をlocalで比較し、追加・削除・順序・上限値に変更がなければ書き直しません。破損・未対応schema・読込不能のfileは自動上書きせず、失敗は設定画面下部に表示し、次の状態確認成功時に再試行します。
 - **設定を保存**は共通設定とInput／Designの最新draftを対象にします。入力未読込なら、既に読み込んだ保存定義を保持したまま共通設定を保存します。定義やPrompt・配点・共通値が不正な場合は旧fileと編集内容を保持し、保存しません。
 - 保存開始時点の値を固定し、同じdirectoryの一意tempへ書込・flush・close後に旧fileを置き換えます。先に旧fileを削除・切り詰めません。保存開始を成功とは扱わず、開始後の再編集は成功後も未保存として残り得ます。失敗・置換前の取消では旧fileとdraftを保持します。
 - tempの後始末はその保存で作ったfileだけへのbest effortです。失敗時に残る一時fileにも設定本文が含まれ得るため、同じ機密情報として扱います。別processとのmerge・監視はなく、最後に成功した保存が優先します。電源断や任意network filesystemまでの耐久性は保証しません。
-- 認証状態・runtime情報は表示だけで保存しません。希望model IDと現在使えるmodelの選択も別です。明示的な**Copilot 状態を確認**で希望IDが候補に存在する場合だけ実効選択へ反映し、不在なら未選択・no fallbackです。確認失敗だけでは希望IDを消しません。希望ID未指定の初回確認で表示する従来の初期選択も、暗黙の希望IDとしては保存しません。参照回答／類似度の固定`auto`は別に利用可否を確認します。
+- 認証状態・runtime情報は表示だけで保存しません。希望model IDと現在使えるmodelの選択も別です。明示または自動の認証・一覧再確認に成功し、希望IDが候補に存在する場合だけ実効選択へ反映し、不在なら未選択・no fallbackです。確認失敗ではキャッシュと希望IDを保持しますが、実行用の認証・model選択を解除し、再認証確認の成功まで評価できません。希望ID未指定の初回確認で表示する従来の初期選択も、暗黙の希望IDとしては保存しません。参照回答／類似度の固定`auto`は別に利用可否を確認します。
 
 ### 保存定義の適用は別の明示操作
 
@@ -116,7 +120,7 @@ EXE配置先や抽出cacheを既定の出力先にせず、配布・展開・起
 
 失敗・取消では現在のmetadata・draft・Designと保存fileを変更しません。成功時は保存したID・順序・質問文・Prompt・配点を保持し、候補の作り直しや新しいheader値への暗黙置換をしません。その後に利用者が主回答列を変更すると、既存どおり交差セルの値へ質問文を更新します。Imported Prompt一覧・本文・順序は適用で変更・消去しません。
 
-run中の一括適用はできません。別Excelのsheet・列が存在しても授業内容の一致やcheckpoint再開可能性は保証せず、利用者の確認と既存の再開検証が必要です。設定の読込・保存・適用から、認証確認・login・AI評価を自動開始しません。
+run中の一括適用はできません。別Excelのsheet・列が存在しても授業内容の一致やcheckpoint再開可能性は保証せず、利用者の確認と既存の再開検証が必要です。認証・一覧の自動再確認は前述のキャッシュありの起動時とlogin正常終了後に限り、設定の明示再読込・保存・適用からは開始しません。login・AI評価も自動開始しません。
 
 障害時は[設定のトラブルシューティング](troubleshooting.md#設定を保存読み込めない未公開候補)を確認してください。詳細な操作は[設定ガイド](settings.md)を参照してください。
 
@@ -168,13 +172,13 @@ finalも入力を匿名化・縮小したfileではありません。入力の�
 
 ### loginの開始と再確認
 
-1. **未公開`0.8.5`候補のみ**、利用者が**GitHubにログイン**を選んだ場合に開始します。manifest、RID、SDK／CLI版、SHA-256を検証した同梱native CLIの絶対pathだけを使い、PATH上の別CLIへfallbackしません。
+1. **未公開`0.8.6`候補のみ**、利用者が**GitHubにログイン**を選んだ場合に開始します。manifest、RID、SDK／CLI版、SHA-256を検証した同梱native CLIの絶対pathだけを使い、PATH上の別CLIへfallbackしません。
 2. shell、PowerShell、`cmd /c`を介さず、固定引数`--no-auto-update`、`--log-level none`、`login --web-flow`で直接子processを起動します。token等を引数・標準入力へ渡さず、標準入力／標準出力／標準errorをredirectせず、CLIの出力もcapture・解析しません。本人の対話はCLI／ブラウザー上で完了します。
-3. 完了・取消・失敗後や再起動後は、既存の**Copilot 状態を確認**を利用者が選びます。processの開始・終了codeだけを認証成功とせず、login完了だけでmodelを自動選択したりAI評価を開始したりしません。
+3. login processの正常終了後は認証状態とmodel一覧を自動再確認します。取消・失敗後や再確認失敗時は、利用者が**Copilot 状態を確認**で再試行します。processの開始・終了codeだけを認証成功とせず、実効modelは再確認結果に従って反映します。AI評価は自動開始しません。
 
 loginの二重開始と評価中のlogin開始を防ぎます。login processの終了を確認できない場合は、新しいloginやAI処理を開始せず、旧処理の終了を確認してください。アプリの再起動や認証確認成功だけでは旧処理の終了を保証しません。確認不能なら[トラブルシューティング](troubleshooting.md#loginの失敗取消終了処理)に従って問い合わせてください。CLI欠落・不一致時は配布物の再取得／ZIPの再展開を確認し、PATH上の別CLI導入やhash検証の緩和で回避しません。
 
-公開`v0.8.1`にはlogin buttonがないため、同梱CLIで本人の対話loginを行い、既存の状態確認buttonで確認します。従来の対処は[トラブルシューティング](troubleshooting.md#copilotを利用できない)、候補版のlogin手順は[README](../README.md)を参照してください。
+公開`v0.8.1`にはlogin buttonがないため、同梱CLIで本人の対話loginを行い、既存の状態確認buttonで確認します。従来の対処は[トラブルシューティング](troubleshooting.md#copilotを利用できない)、候補版のlogin手順は[はじめに](getting-started.md#githubにログイン未公開086候補のみ)を参照してください。
 
 loginできない場合、新しいAI処理は開始できません。取消・失敗後もworkbook読込、mapping、設計編集、checkpoint確認は引き続き利用できます。
 

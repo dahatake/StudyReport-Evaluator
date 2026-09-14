@@ -32,6 +32,7 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
     };
 
     private readonly SettingsFileStore? store;
+    private readonly SemaphoreSlim persistenceGate = new(1, 1);
     private readonly CancellationTokenSource lifetimeCancellation = new();
     private readonly ViewModelCommand selectCategoryCommand;
     private readonly ViewModelCommand saveCommand;
@@ -78,6 +79,7 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
         Input.PropertyChanged += InputChanged;
         Design.PropertyChanged += DesignChanged;
         Execution.PropertyChanged += ExecutionChanged;
+        Execution.ModelCatalogRefreshed += PersistModelCatalogAsync;
         RefreshDirtyState();
     }
 
@@ -138,6 +140,8 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
     public Task? LastLoadTask { get; private set; }
 
     public Task? LastSaveTask { get; private set; }
+
+    public string ModelCatalogPersistenceText { get; private set; } = string.Empty;
 
     public Task<bool>? LastApplySavedDefinitionTask { get; private set; }
 
@@ -288,6 +292,7 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
         Input.PropertyChanged -= InputChanged;
         Design.PropertyChanged -= DesignChanged;
         Execution.PropertyChanged -= ExecutionChanged;
+        Execution.ModelCatalogRefreshed -= PersistModelCatalogAsync;
         CloseRequested = null;
         try
         {
@@ -310,12 +315,16 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
 
     private async Task LoadCoreAsync(CancellationToken cancellationToken)
     {
+        bool startup = !initialized;
+        bool gateHeld = false;
         loading = true;
         try
         {
             using CancellationTokenSource cancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken, lifetimeCancellation.Token);
             NotifyOperationState();
+            await persistenceGate.WaitAsync(cancellation.Token);
+            gateHeld = true;
             SettingsLoadResult result = await store!.LoadAsync(cancellation.Token);
             if (disposed)
             {
@@ -386,6 +395,7 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
         }
         finally
         {
+            if (gateHeld) persistenceGate.Release();
             loading = false;
             if (initialized)
             {
@@ -402,10 +412,22 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
                 NotifyOperationState();
             }
         }
+
+        // Only a previously fetched catalog opts startup into a metadata/auth check.
+        // Old settings and first launches remain passive until login or explicit check.
+        if (startup && initialized && !disposed && !cancellationToken.IsCancellationRequested
+            && Execution.CachedModels is not null
+            && Execution.AuthenticationState == ExecutionAuthenticationState.NotChecked)
+        {
+            using CancellationTokenSource cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, lifetimeCancellation.Token);
+            await Execution.CheckAuthenticationAsync(cancellation.Token);
+        }
     }
 
     private async Task SaveCoreAsync(CancellationToken cancellationToken)
     {
+        bool gateHeld = false;
         saving = true;
         try
         {
@@ -420,6 +442,10 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
             SaveStatus = null;
             persistenceMessage = null;
             NotifyOperationState();
+            await persistenceGate.WaitAsync(cancellation.Token);
+            gateHeld = true;
+            // Cache updates queued before this write must not be undone by the frozen draft.
+            frozen = frozen with { CachedModels = Execution.CachedModels };
             SettingsSaveResult result = await store!.SaveAsync(frozen, cancellation.Token);
             if (disposed)
             {
@@ -458,11 +484,65 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
         }
         finally
         {
+            if (gateHeld) persistenceGate.Release();
             saving = false;
             if (!disposed)
             {
                 RefreshDirtyState();
                 NotifyOperationState();
+            }
+        }
+    }
+
+    private async Task PersistModelCatalogAsync(CancellationToken cancellationToken)
+    {
+        if (disposed || store is null || Execution.CachedModels is null) return;
+        bool gateHeld = false;
+        try
+        {
+            using CancellationTokenSource cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, lifetimeCancellation.Token);
+            await persistenceGate.WaitAsync(cancellation.Token);
+            gateHeld = true;
+            // Read-modify-write persisted values, never the user's unsaved editor draft.
+            // Invalid/future/unreadable files must not be automatically repaired or replaced.
+            SettingsLoadResult loaded = await store.LoadAsync(cancellation.Token);
+            if (!loaded.IsSuccess || loaded.Settings is not { } baseline)
+            {
+                ModelCatalogPersistenceText = "モデル一覧を自動保存できません。既存の設定ファイルは保持しています。設定の読込状態を確認してください。";
+                return;
+            }
+
+            var catalog = Execution.CachedModels!.Value;
+            if (baseline.CachedModels is { } previous && previous.SequenceEqual(catalog))
+            {
+                ModelCatalogPersistenceText = "モデル一覧に変更はありません。保存済みの一覧を利用します。";
+                return;
+            }
+
+            SettingsSaveResult saved = await store.SaveAsync(baseline with { CachedModels = catalog }, cancellation.Token);
+            ModelCatalogPersistenceText = saved.IsSuccess
+                ? "モデル一覧の差分を自動保存しました。編集中の設定は保存していません。"
+                : "モデル一覧の自動保存に失敗しました。次の状態確認で再試行します。";
+            if (saved.IsSuccess && LoadStatus == SettingsLoadStatus.Missing)
+            {
+                LoadStatus = SettingsLoadStatus.Loaded;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            ModelCatalogPersistenceText = "モデル一覧の自動保存を取り消しました。次の状態確認で再試行します。";
+        }
+        catch
+        {
+            ModelCatalogPersistenceText = "モデル一覧の自動保存に失敗しました。既存の設定ファイルは保持しています。";
+        }
+        finally
+        {
+            if (gateHeld) persistenceGate.Release();
+            if (!disposed)
+            {
+                OnPropertiesChanged(nameof(ModelCatalogPersistenceText), nameof(LoadStatus), nameof(StatusText));
             }
         }
     }
@@ -620,6 +700,7 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
         OutputDirectoryOverride = Execution.OutputDirectoryOverride,
         Definition = !Input.HasLoadedWorkbook ? StoredDefinition
             : latestEditor == DefinitionEditor.Design ? Design.Draft : Input.DefinitionDraft,
+        CachedModels = Execution.CachedModels,
     };
 
     private void RefreshDirtyState()
@@ -667,7 +748,8 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
         {
             // Comparison only, not the file format or another draft store. The real store
             // exclusively owns schema/definition validation and atomic persistence.
-            return JsonSerializer.SerializeToUtf8Bytes(settings, ComparisonOptions);
+            // The automatic catalog is not an editable preference and does not dirty the draft.
+            return JsonSerializer.SerializeToUtf8Bytes(settings with { CachedModels = null }, ComparisonOptions);
         }
         catch (Exception exception) when (exception is JsonException or ArgumentException
             or InvalidOperationException or NotSupportedException)

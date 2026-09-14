@@ -94,7 +94,7 @@ public sealed class PrimaryJourneyAccessibilityTests
             Assert.Same(viewModel.StartCommand, start.Command);
             Assert.Same(viewModel.CancelCommand, cancel.Command);
             Assert.True(model.IsReadOnly);
-            Assert.Equal(FormattableString.Invariant($"次回 model-test 並列{viewModel.MaxConcurrency} · 希望: 未指定"), model.Text);
+            Assert.Equal(FormattableString.Invariant($"次回 model-test 並列{viewModel.MaxConcurrency} · 希望: 未指定 · 上限: 64,000 tokens"), model.Text);
             Assert.Equal(FormattableString.Invariant($"次回並列\n{viewModel.MaxConcurrency} 件"), concurrency.Text);
             Assert.True(outputDirectory.IsReadOnly);
             Assert.Equal(viewModel.OutputDirectory, outputDirectory.Text);

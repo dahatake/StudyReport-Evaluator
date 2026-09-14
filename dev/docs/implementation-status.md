@@ -2,18 +2,18 @@
 
 ## 2026-09-07 — F02文書同期時点の現在状態
 
-現在の製品は**`0.8.5`未公開候補（UNRELEASED）**、要求はv4.6、公開済みは`v0.8.1`のunsigned ZIP／sidecarである。親担当が`Directory.Build.props`をPATCHし、F01のUnreleased追記はREVIEWED。以下は[親担当の実行記録](archive/work/20260907-ui-settings-execution-record.md)と後続引継ぎに基づく既存結果の同期で、この文書編集では端末・build・test・package・native操作を実行していない。
+現在の製品は**`0.8.6`未公開候補（UNRELEASED）**、要求はv4.6、公開済みは`v0.8.1`のunsigned ZIP／sidecarである。親担当が`Directory.Build.props`をPATCHし、F01のUnreleased追記はREVIEWED。以下は[親担当の実行記録](archive/work/20260907-ui-settings-execution-record.md)と後続引継ぎに基づく既存結果の同期で、この文書編集では端末・build・test・package・native操作を実行していない。
 
 | 項目 | 状態・適用限界 |
 |---|---|
 | T01〜T38 | **REVIEWED**。実装・対象検証・敵対的レビュー・必要修正確認の範囲であり、全要件／全環境の受入完了ではない |
 | T39 | **BLOCKED**。`0.8.4`の自動回帰とMSIX機構確認は成功したが、追加native観測のFAILと本人・Narrator・隔離利用者保存の外部前提が残る |
-| F01／F02 | F01はREVIEWED、F02は版正本を`0.8.5`へ更新済み。本同期時点の最終版build／test／package再検証は親担当で未完了。以後の判定は実行記録の**最新F02欄**を参照し、この時点の保留を恒久状態にしない |
+| F01／F02 | F01はREVIEWED、F02は版正本を`0.8.5`へ更新済み。その後のauto model対応で`0.8.6`へPATCH済み。本同期時点の最終版build／test／package再検証は親担当で未完了。以後の判定は実行記録の**最新F02欄**を参照し、この時点の保留を恒久状態にしない |
 | 続行承認 | 利用者不在時の自律続行指示によりT39をBLOCKEDのままF01／F02を進める。G4・全タスクDONE・公開PASSを付与する承認ではない |
 | native／本人確認 | 追加nativeは3試行で停止。Narrator、本人walkthrough4項目、隔離利用者環境のnative保存は`NOT_RUN_EXTERNAL_PREREQUISITE` |
 | clean-host／公開 | CH-01〜06は`NOT_RUN_EXTERNAL_PREREQUISITE`、新EXEの公開gateは`BLOCKED_EXTERNAL`。candidate／protected publish・本人login・実AI・実学生data利用・公開操作の成功を主張しない |
 
-### 記録済みの0.8.4検証（F02後の0.8.5へ流用しない）
+### 記録済みの0.8.4検証（現行候補0.8.6へ流用しない）
 
 | 対象 | 記録済み結果 | 証跡・範囲 |
 |---|---|---|
@@ -21,7 +21,7 @@
 | T36 | 21/21・REVIEWED | `artifacts/test/ui-settings/t36/t36-current.trx`。公開文書11件・画像8枚、設定境界、対象版、local links／anchorsのcontract。変更後のF02文書の再検証ではない |
 | T37 | 9/9・REVIEWED | `artifacts/test/ui-settings/t37/t37.trx`。実ZIPのpublish／生成／再現性／展開起動とMSIX静的契約。MSIX実物の成功とは分離 |
 | T38 | contract 114/114、P06 7/7、P07 `PASS_DEVELOPMENT`・REVIEWED | `artifacts/test/ui-settings/t38/t38.trx`と同`native/`配下。P02／P05のEXE生成と20ファイルの同梱、CLI、標準展開、移動・再起動・同時起動・Prompt設定を開発hostで確認 |
-| T38／T39対象EXE | `0.8.4`、283,408,986 bytes | SHA-256 `4D80FA246EB64E6984B6D8B4A5EA37C1F62BCDD28C40F6D9A63F41522C89E507`。`0.8.5`のEXE identityではない |
+| T38／T39対象EXE | `0.8.4`、283,408,986 bytes | SHA-256 `4D80FA246EB64E6984B6D8B4A5EA37C1F62BCDD28C40F6D9A63F41522C89E507`。`0.8.6`のEXE identityではない |
 | T39自動回帰 | Core 190/190＋App 1702/1702＝1892/1892、failed／error／notExecuted 0 | `artifacts/test/ui-settings/t39/reviewed/`の2 TRX（2026-09-07、+09:00、App終了23:06:45）。CI同等の3クラス除外（実学生sample構造・別実行ZIP・P06）と生成済みP02 artifact検査opt-inの集合。無効化されたLive AI等を実行済みとしない |
 | T39 MSIX実物 | `PASS_MECHANISM`、256 entries、Identity Version `0.8.4.0` | `artifacts/test/ui-settings/f02/baseline-0.8.4/msix.evidence.json`。package／unpack／integrity／policy／cleanupのみ。install・署名・一般公開は未実施 |
 

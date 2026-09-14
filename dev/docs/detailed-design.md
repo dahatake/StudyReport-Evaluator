@@ -7,12 +7,12 @@
 | UI / 設定の契約 | [`ui-layout-contract.md`](ui-layout-contract.md) / [UI・設定保存プランv2](archive/work/20260907-ui-settings-redesign-plan-v2.md)と後続承認 |
 | 作成日 | 2026-09-02 |
 | 更新日 | 2026-09-07 |
-| 状態 | `0.8.5`未公開candidate（UNRELEASED、EXE主配布候補 + ZIP代替 + development MSIX非公開記録）。F01はREVIEWED、公開済みは`v0.8.1` ZIP |
+| 状態 | `0.8.6`未公開candidate（UNRELEASED、EXE主配布候補 + ZIP代替 + development MSIX非公開記録）。F01はREVIEWED、公開済みは`v0.8.1` ZIP |
 | Production topology | Core + App の2 projectを維持 |
 
 ## 1. 設計目標
 
-本設計はv4の業務・配布境界と、v4.6のUI／ローカル設定保存の実装を記述する。T01〜T38は対象検証・REVIEWED、T39は追加native FAILと本人確認等の外部前提によりBLOCKED。0.8.4の記録済み文書contract／実ZIP／実EXE／自動回帰／MSIX機構確認と、F02後の0.8.5最終再検証を分ける。本同期時点のF02再検証は親担当で未完了、以後は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄を参照する。件数・適用限界・履歴は[現在状態](implementation-status.md)へ集約し、全タスクDONEや公開PASSを主張しない。
+本設計はv4の業務・配布境界と、v4.6のUI／ローカル設定保存の実装を記述する。T01〜T38は対象検証・REVIEWED、T39は追加native FAILと本人確認等の外部前提によりBLOCKED。0.8.4の記録済み文書contract／実ZIP／実EXE／自動回帰／MSIX機構確認と、F02後の0.8.6最終再検証を分ける。本同期時点のF02再検証は親担当で未完了、以後は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄を参照する。件数・適用限界・履歴は[現在状態](implementation-status.md)へ集約し、全タスクDONEや公開PASSを主張しない。
 
 - base／question／specialの絶対配点
 - questionごとの参照回答と学生回答類似度
@@ -478,7 +478,7 @@ Checkpoint sheet:
 2. fileをread-onlyで開き、Checkpoint sheetとpayloadをclosed validateする。
 3. input pathをcheckpointから取得し、identityを再計算する。
 4. canonical definitionからsnapshotを復元し、hashを再計算する。
-5. normal model、`auto` availability、runtime identityを検証する。
+5. normal model、`auto` availability、runtime identityを検証する。model IDの一致はID文字列の一致であり、`auto`で同一の実routing先を保証しない。
 6. completed rowsをsource rangeとexpected IDsへ再validationする。
 7. 保存済みreferenceとcompleted rowsをseedとしてrunを続行する。
 
@@ -768,7 +768,7 @@ checkpointとRun sheetへ次を保存する。
 
 - App限定single-file publish profile（`WindowsSingleFile.pubxml`）を使用し、`win-x64`/self-contained/`PublishSingleFile=true`/`IncludeNativeLibrariesForSelfExtract=true`/`IncludeAllContentForSelfExtract=true`を固定する。
 - `IncludeAllContentForSelfExtract`は非推奨互換モードであることを明示し、固定構成での適合確認に限定して採用する。
-- 公開payloadは、.NET runtime/Avalonia/Open XML/Copilot SDK/固定CLI/runtime manifestに加え、明示allowlist 20ファイル（公開文書11件＝root README・docs 9件・images README、8画像、LICENSE）を同梱する。T37／T38でZIP・MSIX・EXEの作成側／検証側をこの同一集合へ同期済み。
+- 公開payloadは、.NET runtime/Avalonia/Open XML/Copilot SDK/固定CLI/runtime manifestに加え、明示allowlist 24ファイル（公開文書12件＝root README・docs 10件・images README、PNG 8件、architecture SVG 3件、LICENSE）を同梱する。T37／T38で同期した20件へ技術ガイドと3つのSVGを加え、ZIP・MSIX・EXEの作成側／検証側を同じ現行集合へ同期する。
 - source、test、sample、setting.txt、利用者workbook、symbol、secret、0-byte、root外linkをpackageへ含めない。
 - package-installed appが外部.NET、Office、別Copilot CLIへfallbackしないことを検証する。
 
@@ -1004,7 +1004,7 @@ v4.6のUIプランT番号に対応する追加・更新箇所（上表の既存�
 - candidate段階でEXE/ZIP 4 assetと対応evidenceが整合し、development MSIXはnon-public recordのみで扱う。
 - protected publishでcandidate run・受領clean-host記録・再download 4 asset照合・v2 final matrix確定が成功する。
 - 受領human証跡は実行事実の自動証明ではないことを維持する。
-- `0.8.5` single-file EXE candidateは未公開で、公開済み`v0.8.1` ZIPとの境界を崩さない。0.8.3 baseline・0.8.4のR03／V01・T28画像生成・T36〜T39の証跡はそれぞれの履歴として保持する。
+- `0.8.6` single-file EXE candidateは未公開で、公開済み`v0.8.1` ZIPとの境界を崩さない。0.8.3 baseline・0.8.4のR03／V01・T28画像生成・T36〜T39の証跡はそれぞれの履歴として保持する。
 - 利用者不在時の自律続行指示によりT39をBLOCKEDのままF01／F02を進める。F01はREVIEWED、親担当によるPATCH `0.8.4` → `0.8.5`は反映済みだが、0.8.5最終版の再検証結果は実行記録の最新F02欄で確認する。headless・局所試験・0.8.4の自動回帰成功だけでnative／本人walkthrough、G4・全タスクDONEを付与しない。
 - clean-host CH-01〜06と本人login実測が`NOT_RUN_EXTERNAL_PREREQUISITE`の間は、新EXE公開完了を主張しない。
 - macOS source foundationのstatic contractが成功し、production artifactを公開しない。

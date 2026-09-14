@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json.Serialization;
 using StudyReportEvaluator.Core.Domain;
 
@@ -31,6 +32,16 @@ public sealed record ApplicationSettings
     [JsonPropertyName("definition")]
     public QuantificationDefinition? Definition { get; init; }
 
+    /// <summary>Last fetched catalog for display only; never proof of authentication or permission.</summary>
+    [JsonPropertyName("cachedModels")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableArray<CachedCopilotModel>? CachedModels { get; init; }
+
     public override string ToString() =>
         $"{nameof(ApplicationSettings)} {{ Content = <redacted> }}";
+}
+
+public sealed record CachedCopilotModel(string Id, int? MaximumPromptTokens, int? MaximumContextWindowTokens)
+{
+    public override string ToString() => $"{nameof(CachedCopilotModel)} {{ Content = <redacted> }}";
 }

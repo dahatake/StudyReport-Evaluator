@@ -90,7 +90,7 @@
                           HorizontalAlignment="Stretch" MaxDropDownHeight="220" PlaceholderText="実行画面で状態を確認"
                           TabIndex="10" AutomationProperties.AutomationId="ExecutionModel"
                           AutomationProperties.Name="通常評価で使用するモデル"
-                          ToolTip.Tip="明示的な状態確認で利用可能になったモデルを選択します。ここでは認証やAI評価を開始しません。" />
+                          ToolTip.Tip="保存済み一覧を復元し、起動時とログイン後に更新します。認証未確認の一覧だけでは実行できません。ここでは認証やAI評価を開始しません。" />
                 <TextBlock Grid.Column="2" Text="並列度" Classes="settings-label" />
                 <ComboBox Grid.Column="3" ItemsSource="{Binding Execution.ConcurrencyOptions}"
                           SelectedItem="{Binding Execution.MaxConcurrency, Mode=TwoWay}"
@@ -187,7 +187,7 @@
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
                      AutomationProperties.AutomationId="SettingsAuthenticationStatus"
                      AutomationProperties.Name="認証状態・読取専用・保存対象外"
-                     ToolTip.Tip="最新の明示確認の状態です。確認とログインは実行画面で行います。" />
+                     ToolTip.Tip="起動時・ログイン後・手動確認の最新の状態です。再確認とログインは実行画面で行います。" />
             <TextBlock Grid.Row="2" Text="runtime情報（読取専用・保存対象外）" Classes="settings-label" />
             <TextBox Grid.Row="3" Text="{Binding Execution.RuntimeIdentityText, Mode=OneWay}"
                      IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalAlignment="Stretch" TabIndex="11"
@@ -260,6 +260,10 @@
         <TextBlock x:Name="SettingsStatus" Text="{Binding StatusText}" TextTrimming="CharacterEllipsis"
                     AutomationProperties.AutomationId="SettingsStatus" AutomationProperties.Name="{Binding StatusText}"
                     ToolTip.Tip="{Binding StatusText}" />
+        <TextBlock Text="{Binding ModelCatalogPersistenceText}" TextTrimming="CharacterEllipsis"
+             AutomationProperties.AutomationId="SettingsModelCatalogStatus"
+             AutomationProperties.Name="{Binding ModelCatalogPersistenceText}"
+             ToolTip.Tip="{Binding ModelCatalogPersistenceText}" />
         <TextBlock x:Name="SettingsDefinitionAvailability" IsVisible="False" TextTrimming="CharacterEllipsis"
                     Text="{Binding DefinitionAvailabilityText, FallbackValue='設定の編集元がありません。'}"
                     AutomationProperties.AutomationId="SettingsDefinitionAvailability"

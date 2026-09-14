@@ -438,12 +438,16 @@ $documentationRelativePaths = @(
     'docs\getting-started.md',
     'docs\features.md',
     'docs\custom-evaluator-guide.md',
+    'docs\technical-guid.md',
     'docs\prompt-launch.md',
     'docs\privacy-and-data-handling.md',
     'docs\troubleshooting.md',
     'docs\settings.md',
     'docs\third-party-notices.md',
     'images\README.md',
+    'images\architecture-overview.svg',
+    'images\technical-architecture.svg',
+    'images\evaluation-message-flow.svg',
     'images\01-input-workbook.png',
     'images\02-input-mapping.png',
     'images\03-design-knowledge.png',
@@ -469,9 +473,9 @@ foreach ($documentationFile in $documentationItems) {
     $normalized = $relative.Replace('\', '/')
     $extension = [System.IO.Path]::GetExtension($documentationFile.Name)
     $isLicense = $normalized -ceq 'LICENSE'
-    if ((-not $isLicense -and $extension -cne '.md' -and $extension -cne '.png') -or
+    if ((-not $isLicense -and $extension -cne '.md' -and $extension -cne '.png' -and $extension -cne '.svg') -or
         $documentationFile.Length -le 0) {
-        throw "Documentation package input must be LICENSE, Markdown, or PNG and nonempty: $normalized"
+        throw "Documentation package input must be LICENSE, Markdown, PNG, or SVG and nonempty: $normalized"
     }
 
     if ($fileMap.ContainsKey($normalized)) {

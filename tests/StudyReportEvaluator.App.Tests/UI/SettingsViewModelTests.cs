@@ -296,6 +296,13 @@ public sealed class SettingsViewModelTests
             // Only a confirmed selection can be explicitly cleared; an already-null
             // effective selection is binding feedback under Execution's existing contract.
             await harness.Execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+            // A successful explicit check now persists only the fetched catalog.
+            ApplicationSettings catalogSaved = await harness.ReadSettingsAsync();
+            Assert.Equal(saved.PreferredModelId, catalogSaved.PreferredModelId);
+            Assert.Equal(saved.MaxConcurrency, catalogSaved.MaxConcurrency);
+            AssertDefinition(saved.Definition!, catalogSaved.Definition);
+            Assert.NotNull(catalogSaved.CachedModels);
+            original = File.ReadAllBytes(harness.SettingsPath);
         }
 
         if (editModel) harness.Execution.SelectedModelId = "auto";

@@ -2,14 +2,26 @@
 
 このフォルダーは、StudyReport Evaluatorの操作説明に使う実際のAvalonia viewのPNGを保存します。
 
-> **対象版:** この画像一覧は**UNRELEASED（未リリース）の`0.8.5`候補**のUI説明用です。**8枚のPNGの生成時の製品版は`0.8.4`**で、公開`0.8.1`の画面を示すものではありません。公開版`0.8.1`は変更していません。設問text同期・固定表示の採点計算式・幅に応じたカード配置を`0.8.1`の機能として扱わないでください。既存PNGは生成後のcode/UI変更の検証証跡ではありません。
+> **対象版:** この画像一覧は**UNRELEASED（未リリース）の`0.8.6`候補**のUI説明用です。**8枚のPNGの生成時の製品版は`0.8.4`**で、公開`0.8.1`の画面を示すものではありません。公開版`0.8.1`は変更していません。設問text同期・固定表示の採点計算式・幅に応じたカード配置を`0.8.1`の機能として扱わないでください。既存PNGは生成後のcode/UI変更の検証証跡ではありません。
 
-F02は版metadataと文書表記の更新です。UI実装と既存8枚のPNG bytesは変更せず、PNGを再生成していません。`0.8.5`への表記更新だけを新たなUI検証と扱いません。
+F02は版metadataと文書表記の更新です。UI実装と既存８枚のPNG bytesは変更せず、PNGを再生成していません。`0.8.6`への表記更新だけを新たなUI検証と扱いません。
+
+## Architecture diagrams
+
+次のSVGは2026-09-15時点のproduction sourceと、公式のGitHub Copilot SDK／Avalonia／Open XML資料を照合して作成した論理図です。実行時に自動収集したtopology、性能測定、live認証・AI評価、GitHub内部構成の証跡ではありません。外部画像、script、remote fontを参照しない自己完結SVGです。
+
+| File | 対象読者 | 内容 |
+|---|---|---|
+| [`architecture-overview.svg`](architecture-overview.svg) | 利用者・非技術者 | 入力Excel、Windowsアプリ、同梱Copilot CLI、GitHub Copilot、結果Excelの関係 |
+| [`technical-architecture.svg`](technical-architecture.svg) | ソフトウェアエンジニア | App／Core project、UI、workflow、workbook、Copilot adapter、外部境界 |
+| [`evaluation-message-flow.svg`](evaluation-message-flow.svg) | ソフトウェアエンジニア | 明示login、状態確認、一時session、closed tool、checkpoint、final化の時系列 |
+
+図の実装根拠、変更時の同期箇所、公式資料は[技術ガイド](../docs/technical-guid.md)を参照してください。
 
 ## Provenance
 
 - 生成日: 2026-09-07（親T28での実際のPNG生成日。fixture内の固定日時や出力名の日付とは別）
-- 生成時の製品版: `0.8.4`（現在の`0.8.5`候補への版metadata更新前）
+- 生成時の製品版: `0.8.4`（現在の`0.8.6`候補への版metadata更新前）
 - renderer: Avalonia 12.1.1 Headless + Skia
 - size: 1440 × 1050 pixels、8枚
 - generator source: `tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs`（repositoryでのみ利用。配布ZIPにはsourceを含めない）

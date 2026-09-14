@@ -54,12 +54,16 @@ public sealed class WindowsPublishPackageTests
         "docs/getting-started.md",
         "docs/features.md",
         "docs/custom-evaluator-guide.md",
+        "docs/technical-guid.md",
         "docs/prompt-launch.md",
         "docs/privacy-and-data-handling.md",
         "docs/troubleshooting.md",
         "docs/settings.md",
         "docs/third-party-notices.md",
         "images/README.md",
+        "images/architecture-overview.svg",
+        "images/technical-architecture.svg",
+        "images/evaluation-message-flow.svg",
         "images/01-input-workbook.png",
         "images/02-input-mapping.png",
         "images/03-design-knowledge.png",
@@ -606,8 +610,8 @@ public sealed class WindowsPublishPackageTests
                 path.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
-        Assert.Equal(20, RequiredDocumentationFiles.Length);
-        Assert.Equal(20, documentationEntries.Length);
+        Assert.Equal(24, RequiredDocumentationFiles.Length);
+        Assert.Equal(24, documentationEntries.Length);
         Assert.Equal(
             RequiredDocumentationFiles.OrderBy(path => path, StringComparer.Ordinal).ToArray(),
             documentationEntries,

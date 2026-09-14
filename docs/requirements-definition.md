@@ -4,7 +4,7 @@
 |---|---|
 | 文書版 | 4.6 |
 | 基準日 | 2026-09-07 |
-| 状態 | 要求承認済み。UI・設定保存差分と記録済み文書contractはVERIFIED_SCOPED。T01〜T38はREVIEWED、T39は追加native FAIL・本人確認等の外部前提によりBLOCKED。製品0.8.5は未公開候補、F01はREVIEWED。F02最終再検証は本同期時点では親担当で未完了、以後は実行記録の最新F02欄を参照。CH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITE、公開gateは未達 |
+| 状態 | 要求承認済み。UI・設定保存差分と記録済み文書contractはVERIFIED_SCOPED。T01〜T38はREVIEWED、T39は追加native FAIL・本人確認等の外部前提によりBLOCKED。製品0.8.6は未公開候補、F01はREVIEWED。F02最終再検証は本同期時点では親担当で未完了、以後は実行記録の最新F02欄を参照。CH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITE、公開gateは未達 |
 | 入力 | Microsoft Forms または Google Forms から export した標準 `.xlsx` 1ファイル |
 | 出力 | 入力を変更せず作成する別の標準 `.xlsx` 1ファイル |
 | 対応環境 | Windows 11 x64。macOS、Linux、Windows Arm64は現版の正式公開対象外 |
@@ -270,9 +270,13 @@ $$
 ### 7.1 共通境界
 
 - GitHub Copilot SDK for .NETの固定versionを使う。
-- 通常評価のmodelは、SDKが実行時に列挙したmodelから利用者が選択する。
+- 通常評価のmodelは、SDKが実行時に列挙したmodelから利用者が選択する。`auto`を含む列挙された全modelを選択できる。
 - 参照回答生成と類似度評価にはmodel ID `auto`を使う。
 - `auto`が列挙されない場合はrunを開始せず、別modelへ黙ってfallbackしない。
+- SDKがmodelのprompt／context上限を公開しない場合がある。`auto`はrouterであり上限を公開しない。
+- 上限が不明なmodelでは、model相対のcontext budget検査を適用しない。上限不明を理由にrunを拒否せず、既定値を推定せず、別modelへfallbackしない。
+- 上限が不明でも、app-owned requestの絶対上限とretry込みattempt上限は常に適用する。
+- 実効modelの上限が既知か不明かを実行画面に明示する。
 - 1 attemptごとにrestricted sessionを使用し、app-owned structured result toolだけを公開する。
 - shell、filesystem、Web、GitHub write、MCP、ambient memoryを公開しない。
 - finite timeout、有限retry、cancel、session cleanupを必須とする。
@@ -488,6 +492,7 @@ run開始時、完成名に対応する次のfileを作る。
 - definition canonical snapshotとSHA-256
 - final/partial path
 - 通常評価model ID、参照／類似度model ID `auto`
+- 通常評価modelに`auto`を選んだ場合、記録されるのは`auto`であり、routerが実際に選んだmodelは記録されない。同じcheckpointから再開しても同一modelへroutingされる保証はない。
 - app、SDK、CLI runtime identity
 - 参照回答とstatus
 - 完了済みunitの定量値、reason、evidence、status、token usage
@@ -505,6 +510,8 @@ run開始時、完成名に対応する次のfileを作る。
 - reference/similarity model ID `auto`
 - app major schema compatibility
 - Copilot CLI runtime identity
+
+model IDの一致はID文字列の一致であり、`auto`の場合に同一の実modelへroutingされることを保証しない。
 
 不一致時は当該checkpointを変更せず、具体的なsafe errorを表示して再開しない。回答、Prompt、reason、evidence本文をerrorへ含めない。
 
@@ -533,7 +540,7 @@ run開始時、完成名に対応する次のfileを作る。
    - 読込Promptの件数と設定への入口
    - formula／capacity preflight
 3. **実行**
-   - Copilot loginの明示開始・取消・既存buttonでの状態再確認、通常modelの実効選択、`auto` availability
+   - Copilot loginの明示開始・取消・既存buttonでの状態再確認、通常modelの実効選択とその上限の既知／不明、`auto` availability
    - 実効output／partial pathと設定変更への入口
    - 参照生成、通常評価、固有評価、類似度、finalizationの段階表示
    - completed rows / total rows、in-flight、error、cancel
@@ -764,7 +771,8 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 - 回答行上限は20,000とする。
 - concurrencyは既定1、最大3とする。
 - Excel row、column、cell、formula、function argument上限をwrite前に検査する。
-- Promptとschemaのapp-owned request上限を測定し、model contextの安全marginをAI送信前に検査する。
+- Promptとschemaのapp-owned request上限を測定し、AI送信前に検査する。この検査はmodel上限の既知／不明にかかわらず常に適用する。
+- model contextの安全marginは、SDKが当該modelの上限を公開している場合だけAI送信前に検査する。上限不明のmodelでは検査せず、検査していないことを画面に明示する。
 - retry込みattempt上限を実行前に検査し、黙って切り詰めない。
 - checkpoint保存時間をprogressへ含める。
 - AI待機を除く531行workbookのread/write/final validation性能は、対応OSごとに実測値と環境を記録する。未実測platformの数値を保証しない。
@@ -779,6 +787,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | 質問文行とmetadataの不一致 | 現在のQuestionTextを保持し、以前の質問文行の値を反映せず、`HEADER_METADATA_MISMATCH`で再読込を要求 |
 | invalid definition / 配点不一致 | AI call前に具体的field error |
 | `auto` unavailable | AI call前に停止。別modelへfallbackしない |
+| 選択modelの上限がSDK未公開 | run前のmodel相対検査を行わず実行する。app-owned絶対上限とattempt上限は適用する。送信後のmodel上限超過は対象値blank、行ごとの技術status |
 | reference generation failure | reference / similarity / FinalRaw / FinalScore blank、技術status |
 | invalid AI response after retry | 対象値blank、FinalRaw / FinalScore blank、`AI_OUTPUT_INVALID` |
 | authentication unavailable | 新規AI callなし、`AUTH_REQUIRED` |
@@ -886,7 +895,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 
 **0.8.4での記録済み結果:** T35の対象文書試験は4/4成功・敵対的レビュー済み（`artifacts/test/ui-settings/t35/t35-reviewed.trx`、指摘0）。T36の文書・画像contract全体は別scopeで、独自の`artifacts/test/ui-settings/t36/t36-current.trx`が21/21成功・REVIEWED。T37は`artifacts/test/ui-settings/t37/t37.trx`の9/9（実ZIP＋MSIX静的契約）、T38は`artifacts/test/ui-settings/t38/t38.trx`の114/114とP06実EXE 7/7・P07 `PASS_DEVELOPMENT`。T39の自動回帰は`artifacts/test/ui-settings/t39/reviewed/`の2026-09-07の2 TRXでCore 190＋App 1702＝1892/1892、skip 0。初回1失敗→fixture修正→126/126・レビュー指摘0→全体再実行成功の履歴を保持する。MSIX実物は`artifacts/package/mechanism/StudyReportEvaluator-win-x64.unsigned.test.evidence.json`の`PASS_MECHANISM`（256 entries、0.8.4.0）で、install／公開の成功ではない。
 
-これらをF02後の`0.8.5`や全受入のPASSへ流用しない。追加nativeは3試行で停止し、最新`artifacts/test/ui-settings/t39/native-final-attempt.json`は`CONTROL_ID_PREDICATE_NOT_UNIQUE`でFAIL。120 DPI・1475×1000 pixel＝1180×800 DIP・合成入力読込・入力／EXE不変・実利用者設定非作成は部分観測であり、4画面・5カテゴリ・1024×720・実keyboardの成功ではない。Narrator／本人walkthrough4項目／隔離利用者でのnative保存とCH-01〜06は`NOT_RUN_EXTERNAL_PREREQUISITE`。以下は受入に必要な試験契約であり、要求承認・局所検証・過去evidenceを未実施範囲の成功へ拡張しない。
+これらをF02後の`0.8.6`や全受入のPASSへ流用しない。追加nativeは3試行で停止し、最新`artifacts/test/ui-settings/t39/native-final-attempt.json`は`CONTROL_ID_PREDICATE_NOT_UNIQUE`でFAIL。120 DPI・1475×1000 pixel＝1180×800 DIP・合成入力読込・入力／EXE不変・実利用者設定非作成は部分観測であり、4画面・5カテゴリ・1024×720・実keyboardの成功ではない。Narrator／本人walkthrough4項目／隔離利用者でのnative保存とCH-01〜06は`NOT_RUN_EXTERNAL_PREREQUISITE`。以下は受入に必要な試験契約であり、要求承認・局所検証・過去evidenceを未実施範囲の成功へ拡張しない。
 
 1. Microsoft Forms型、Google Forms型、question row 1/2の匿名化synthetic workbook test。各rowで主回答列変更後の設問textが同列の交差セル値へ一致すること、および質問文行変更後・metadata再読込前は旧行の値を反映せず`HEADER_METADATA_MISMATCH`で再読込を要求することを含む。
 2. sample identity、sheet、dimension、F〜K role suggestion、input不変test。
@@ -992,5 +1001,6 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | Delivery scope revision | 2026-09-04の要求所有者指示「開発用のMSIXでOKです」「外部ブロッカーの情報はないです」 |
 | Previous version / changelog override（履歴） | D-14／R03の予定MINOR更新を取り消す最新指示を優先し、実装・文書task完了後のR03でKeep a Changelog形式のUnreleasedへ概要・実装済み変更を追加して、製品版をPATCH `0.8.3` → `0.8.4`とした。R03後の最終artifact再検証を要求し、版変更だけを公開成功へ読み替えない。要求文書v4.5を製品版や公開版と混同しない |
 | Latest version / changelog override | UIプランD17の当初上書きは全タスク後のUnreleased追記 → PATCH `0.8.4` → `0.8.5`だった。さらに要求所有者の利用者不在時の自律続行指示により、T39をBLOCKEDのまま承認済みF01／F02を進める。F01はREVIEWED、親担当が製品版正本を0.8.5へ一度だけ更新済み。T01では製品版・CHANGELOGを変更しないという履歴は維持する。要求v4.6・製品版・公開版は独立し、最終bytes変更後の再検証・clean-host公開条件を省略しない |
-| Implementation / validation status | 要求承認済み。T01は要求・契約・追跡・要求版metadataの同期で、当時のUI／設定は未実装・試験NOT_RUNだった。T01〜T35はREVIEWEDだった履歴を維持し、現在は2026-09-07の[実行記録](../dev/docs/archive/work/20260907-ui-settings-execution-record.md)と後続引継ぎでT01〜T38がREVIEWED、T39はBLOCKED。実装と局所試験の対応はVERIFIED_SCOPED。T35の対象文書試験は4/4成功・敵対的レビュー済みで、別scopeのT36は自身のt36-current.trxで21/21成功。製品`0.8.5`は未公開候補、公開済みは`v0.8.1` ZIPのまま。0.8.4のT37実ZIP・T38実EXE・T39自動回帰／MSIX成功と追加native FAILを分離する。F02最終再検証は本同期時点では親担当で未完了、以後は実行記録の最新F02欄へ接続する。本人確認／隔離利用者保存／CH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITEで、G4・全タスク完了・新EXE公開は未達 |
+| Implementation / validation status | 要求承認済み。T01は要求・契約・追跡・要求版metadataの同期で、当時のUI／設定は未実装・試験NOT_RUNだった。T01〜T35はREVIEWEDだった履歴を維持し、現在は2026-09-07の[実行記録](../dev/docs/archive/work/20260907-ui-settings-execution-record.md)と後続引継ぎでT01〜T38がREVIEWED、T39はBLOCKED。実装と局所試験の対応はVERIFIED_SCOPED。T35の対象文書試験は4/4成功・敵対的レビュー済みで、別scopeのT36は自身のt36-current.trxで21/21成功。製品`0.8.6`は未公開候補、公開済みは`v0.8.1` ZIPのまま。0.8.4のT37実ZIP・T38実EXE・T39自動回帰／MSIX成功と追加native FAILを分離する。F02最終再検証は本同期時点では親担当で未完了、以後は実行記録の最新F02欄へ接続する。本人確認／隔離利用者保存／CH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITEで、G4・全タスク完了・新EXE公開は未達 |
+| Auto model selection source | 2026-09-15の要求所有者指示「`auto`を通常評価modelとして選択できるように必要なら要求定義から変更」。同梱CLIを実測し、`auto`はrouterでtoken上限を公開しないことを確認した上で§7.1・§10.3・§10.4・§11・§15・§16を改訂した。上限不明modelを拒否せず、model相対のcontext budget検査だけを適用外とし、既定値の推定と別modelへのfallbackは行わない。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Meaning | repository要求baselineの承認記録。実装完了・試験成功・release存在・tag／push／draft／公開操作の承認、組織の法務・教育・security承認または電子署名を意味しない |

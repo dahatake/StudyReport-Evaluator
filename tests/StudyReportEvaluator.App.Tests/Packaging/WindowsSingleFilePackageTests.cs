@@ -35,7 +35,9 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
         "README.md", "LICENSE", "docs/README.md", "docs/getting-started.md",
         "docs/features.md", "docs/custom-evaluator-guide.md", "docs/prompt-launch.md",
         "docs/privacy-and-data-handling.md", "docs/troubleshooting.md",
-        "docs/settings.md", "docs/third-party-notices.md", "images/README.md",
+        "docs/settings.md", "docs/third-party-notices.md", "docs/technical-guid.md", "images/README.md",
+        "images/architecture-overview.svg", "images/technical-architecture.svg",
+        "images/evaluation-message-flow.svg",
         "images/01-input-workbook.png", "images/02-input-mapping.png",
         "images/03-design-knowledge.png", "images/04-design-custom-prompt.png",
         "images/05-execution-auto.png", "images/06-results-review.png", "images/07-output-export.png",
@@ -440,9 +442,9 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
                 $expectedDocs = @({{string.Join(",", DocumentationFiles.Select(Quote))}})
                 $actualDocs = @(Get-SingleFileDocumentationPaths)
                 $actualDocSet = [Collections.Generic.HashSet[string]]::new([string[]]$actualDocs, [StringComparer]::Ordinal)
-                if ($expectedDocs.Count -ne 20 -or $actualDocs.Count -ne 20 -or $actualDocSet.Count -ne 20 -or
+                if ($expectedDocs.Count -ne 24 -or $actualDocs.Count -ne 24 -or $actualDocSet.Count -ne 24 -or
                     -not $actualDocSet.SetEquals([string[]]$expectedDocs)) {
-                    throw 'P01 public documentation allowlist must contain exactly the 20 approved paths without duplicates.'
+                    throw 'P01 public documentation allowlist must contain exactly the 24 approved paths without duplicates.'
                 }
                 foreach ($relative in $expectedDocs) {
                     if ($relative -cnotin $actualDocs -or

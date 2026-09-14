@@ -2,7 +2,7 @@
 
 このガイドでは、StudyReport Evaluatorの評価単位、配点、status、出力workbookを説明します。
 
-> **対象版:** このガイドの新しい画面配置、主回答列から設問textへの即時同期、設定の保存・明示適用は、**UNRELEASED（未リリース）の`0.8.5`候補**を対象とします。現在の公開版`v0.8.1`（ZIP）の機能・画面配置とは区別してください。候補版の公開完了を示すものではありません。
+> **対象版:** このガイドの新しい画面配置、主回答列から設問textへの即時同期、設定の保存・明示適用は、**UNRELEASED（未リリース）の`0.8.6`候補**を対象とします。現在の公開版`v0.8.1`（ZIP）の機能・画面配置とは区別してください。候補版の公開完了を示すものではありません。
 
 ## 画面で確認・変更する場所
 
@@ -61,6 +61,8 @@
 | Similarity | 同じrowの主回答と同じ設問の参照回答 | `auto` | 0〜1の類似度とreason |
 
 Referenceは1Questionにつき1runで1回生成し、同じrunの全rowで共有します。checkpointから再開すると保存済みReferenceを再利用します。
+
+NormalとSpecialの「利用者選択」には`auto`も選べます。`auto`はrouterのためSDKがtoken上限を公開せず、その場合はmodel相対の容量検査を行いません。実際にroutingされたmodelは記録されません。
 
 AIへBase points、Question earned、Special earned、Similarity penalty、Final score、合否を返させません。これらはapp previewとExcel formulaが計算します。
 

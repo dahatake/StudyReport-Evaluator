@@ -361,16 +361,17 @@ public sealed class ExecutionViewTests
     }
 
     [Fact]
-    public async Task Model_without_sdk_prompt_limit_is_visible_but_cannot_start()
+    public async Task Model_without_sdk_prompt_limit_is_selectable_and_starts_without_model_relative_preflight()
     {
         QuantificationDefinition definition = U04TestSupport.Definition(2, 2);
         WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
-        RecordingRunBoundary runner = new((_, _, _) => throw new InvalidOperationException("must not run"));
+        RunSummary summary = await U04TestSupport.CreateSummaryAsync(definition, metadata);
+        RecordingRunBoundary runner = new((_, _, _) => Task.FromResult(summary));
         ExecutionViewModel viewModel = new(
             new RecordingAuthenticationBoundary(
                 new ExecutionAuthenticationSnapshot(
                     ExecutionAuthenticationState.Available,
-                    [new CopilotModelAvailability("model-unknown", null, 128_000), U04TestSupport.Model("auto")],
+                    [U04TestSupport.AutoModel(), U04TestSupport.Model("model-known")],
                     U04TestSupport.RuntimeIdentity())),
             runner);
         viewModel.Configure(
@@ -380,14 +381,57 @@ public sealed class ExecutionViewTests
 
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(["model-unknown", "auto"], viewModel.AvailableModelIds);
+        Assert.Equal(["auto", "model-known"], viewModel.AvailableModelIds);
         Assert.True(viewModel.IsAutoModelAvailable);
-        Assert.Equal("model-unknown", viewModel.SelectedModelId);
-        Assert.Contains(
+        Assert.Equal("auto", viewModel.SelectedModelId);
+        Assert.Null(viewModel.SelectedModelPromptTokenLimit);
+        Assert.Equal("SDK未公開・事前検証なし", viewModel.SelectedModelLimitText);
+        Assert.DoesNotContain(
             viewModel.TechnicalErrors,
             error => error.Code == "MODEL_PROMPT_LIMIT_UNAVAILABLE");
-        Assert.False(viewModel.CanStart);
-        Assert.Equal(0, runner.CallCount);
+        Assert.True(viewModel.CanStart);
+
+        await viewModel.StartAsync(TestContext.Current.CancellationToken);
+
+        QuantificationRunRequest request = Assert.IsType<QuantificationRunRequest>(runner.LastRequest);
+        Assert.Equal("auto", request.ModelId);
+        Assert.Null(request.MaximumPromptTokens);
+        Assert.Null(request.MaximumContextWindowTokens);
+        Assert.Equal(1, runner.CallCount);
+        Assert.Equal("SDK未公開・事前検証なし", viewModel.CurrentRunLimitText);
+    }
+
+    [Fact]
+    public async Task Known_model_limit_is_surfaced_and_dispatched_as_positive_values()
+    {
+        QuantificationDefinition definition = U04TestSupport.Definition(2, 2);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RunSummary summary = await U04TestSupport.CreateSummaryAsync(definition, metadata);
+        RecordingRunBoundary runner = new((_, _, _) => Task.FromResult(summary));
+        ExecutionViewModel viewModel = new(
+            new RecordingAuthenticationBoundary(
+                new ExecutionAuthenticationSnapshot(
+                    ExecutionAuthenticationState.Available,
+                    [U04TestSupport.Model("model-known"), U04TestSupport.AutoModel()],
+                    U04TestSupport.RuntimeIdentity())),
+            runner);
+        viewModel.Configure(
+            definition,
+            metadata,
+            Path.Combine(Path.GetTempPath(), "PRIVATE-KNOWN-LIMIT-CANARY.xlsx"));
+
+        await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("model-known", viewModel.SelectedModelId);
+        Assert.Equal(64_000, viewModel.SelectedModelPromptTokenLimit);
+        Assert.Equal("64,000 tokens", viewModel.SelectedModelLimitText);
+
+        await viewModel.StartAsync(TestContext.Current.CancellationToken);
+
+        QuantificationRunRequest request = Assert.IsType<QuantificationRunRequest>(runner.LastRequest);
+        Assert.Equal(64_000, request.MaximumPromptTokens);
+        Assert.Equal(128_000, request.MaximumContextWindowTokens);
+        Assert.Equal("64,000 tokens", viewModel.CurrentRunLimitText);
     }
 
     [Fact]
@@ -558,7 +602,7 @@ public sealed class ExecutionViewTests
         Assert.Same(check, harness.Window.FocusManager?.GetFocusedElement());
         Assert.Contains("別のブラウザー", instructions.Text, StringComparison.Ordinal);
         Assert.Contains("パスワードやトークンを取得・保存しません", ToolTip.GetTip(login)?.ToString(), StringComparison.Ordinal);
-        Assert.Contains("完了後は「Copilot 状態を確認」", instructions.Text, StringComparison.Ordinal);
+        Assert.Equal("別のブラウザーで認証後、モデル一覧を自動更新・保存します。ログイン・定量化は自動で開始しません。", instructions.Text);
         Assert.Contains("自動で開始しません", instructions.Text, StringComparison.Ordinal);
         Assert.All(new[] { check, login, cancelLogin, start, cancelRun }, button =>
             Assert.False(string.IsNullOrWhiteSpace(ToolTip.GetTip(button)?.ToString())));
@@ -591,7 +635,7 @@ public sealed class ExecutionViewTests
     [AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Login_button_click_or_keyboard_requires_explicit_authentication_recheck(bool useKeyboard)
+    public async Task Login_button_click_or_keyboard_automatically_rechecks_authentication(bool useKeyboard)
     {
         using LoginViewHarness harness = new();
         ExecutionViewModel viewModel = harness.ViewModel;
@@ -622,7 +666,7 @@ public sealed class ExecutionViewTests
         Assert.False(check.IsEffectivelyEnabled);
         Assert.False(start.IsEffectivelyEnabled);
         Assert.Equal(ExecutionAuthenticationState.NotChecked, viewModel.AuthenticationState);
-        Assert.Empty(viewModel.AvailableModelIds);
+        Assert.Equal(["model-test", "auto"], viewModel.AvailableModelIds);
         Assert.Null(viewModel.SelectedModelId);
         AssertLoginStatus(harness);
         AssertValidationStatus(harness.View, viewModel, "ログイン中");
@@ -635,22 +679,21 @@ public sealed class ExecutionViewTests
         Assert.True(login.IsEffectivelyEnabled);
         Assert.True(check.IsEffectivelyEnabled);
         Assert.False(cancel.IsEffectivelyEnabled);
-        Assert.False(start.IsEffectivelyEnabled);
-        Assert.Equal(ExecutionAuthenticationState.NotChecked, viewModel.AuthenticationState);
-        Assert.False(viewModel.IsAuthenticationAvailable);
-        Assert.Empty(viewModel.AvailableModelIds);
-        Assert.Null(viewModel.SelectedModelId);
-        Assert.Contains("認証状態は未確認", viewModel.LoginStatusText, StringComparison.Ordinal);
-        Assert.Contains("Copilot 状態を確認", viewModel.LoginStatusText, StringComparison.Ordinal);
-        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.True(start.IsEffectivelyEnabled);
+        Assert.Equal(ExecutionAuthenticationState.Available, viewModel.AuthenticationState);
+        Assert.True(viewModel.IsAuthenticationAvailable);
+        Assert.Equal(["model-test", "auto"], viewModel.AvailableModelIds);
+        Assert.Equal("model-test", viewModel.SelectedModelId);
+        Assert.Contains("モデル一覧の更新が完了", viewModel.LoginStatusText, StringComparison.Ordinal);
+        Assert.Equal(2, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
         Assert.Null(viewModel.LastRunContext);
         AssertLoginStatus(harness);
-        AssertValidationStatus(harness.View, viewModel, "技術的な問題");
+        AssertValidationStatus(harness.View, viewModel, "run を開始できます");
 
         Activate(harness.Window, check, useKeyboard);
 
-        Assert.Equal(2, harness.Authentication.CallCount);
+        Assert.Equal(3, harness.Authentication.CallCount);
         Assert.Equal(ExecutionAuthenticationState.Available, viewModel.AuthenticationState);
         Assert.Equal("model-test", viewModel.SelectedModelId);
         Assert.True(start.IsEffectivelyEnabled);
@@ -709,8 +752,8 @@ public sealed class ExecutionViewTests
         Render();
 
         AssertLoginStatus(harness);
-        Assert.False(start.IsEffectivelyEnabled);
-        Assert.Equal(0, harness.Authentication.CallCount);
+        Assert.True(start.IsEffectivelyEnabled);
+        Assert.Equal(1, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
         Assert.Equal([false], cancelled.KillTreeArguments);
         Assert.Empty(harness.Process.KillTreeArguments);
@@ -873,7 +916,7 @@ public sealed class ExecutionViewTests
         Render();
         TextBox model = Required<TextBox>(harness.View, "EffectiveModelTextBox");
         TextBlock fixedAuto = Required<TextBlock>(harness.View, "FixedAutoModelStatus");
-        Assert.Equal("次回 未選択 並列3 · 希望: not-listed", model.Text);
+        Assert.Equal("次回 未選択 並列3 · 希望: not-listed · 上限: 未選択", model.Text);
         Assert.Equal("固定 auto\n未確認", fixedAuto.Text);
         Assert.Equal("次回並列\n3 件", Required<TextBlock>(harness.View, "ConcurrencySummary").Text);
         AssertNoAutomaticActivity(harness);
@@ -882,13 +925,13 @@ public sealed class ExecutionViewTests
         Render();
         Assert.Null(harness.ViewModel.SelectedModelId);
         Assert.Equal("not-listed", harness.ViewModel.PreferredModelId);
-        Assert.Equal("次回 未選択 並列3 · 希望: not-listed", model.Text);
+        Assert.Equal("次回 未選択 並列3 · 希望: not-listed · 上限: 未選択", model.Text);
         Assert.Equal(autoAvailable ? "固定 auto\n利用可能" : "固定 auto\n利用不可", fixedAuto.Text);
         Assert.False(Required<Button>(harness.View, "StartRunButton").IsEffectivelyEnabled);
 
         harness.ViewModel.SelectedModelId = "model-test"; // An explicit edit, not an availability fallback.
         Render();
-        Assert.Equal("次回 model-test 並列3 · 希望: model-test", model.Text);
+        Assert.Equal("次回 model-test 並列3 · 希望: model-test · 上限: 64,000 tokens", model.Text);
         Assert.Equal(autoAvailable, Required<Button>(harness.View, "StartRunButton").IsEffectivelyEnabled);
         Assert.True(model.IsReadOnly);
         Assert.Equal(TextWrapping.NoWrap, model.TextWrapping);
@@ -970,7 +1013,7 @@ public sealed class ExecutionViewTests
 
         Assert.False(main.IsSettingsOpen);
         Assert.Same(harness.View, harness.Window.Content);
-        Assert.Equal("次回 model-other 並列3 · 希望: model-other", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+        Assert.Equal("次回 model-other 並列3 · 希望: model-other · 上限: 64,000 tokens", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
         Assert.Equal("次回並列\n3 件", Required<TextBlock>(harness.View, "ConcurrencySummary").Text);
         Assert.Equal(explicitOutput, Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox").Text);
         Assert.Contains("明示指定", Required<TextBlock>(harness.View, "OutputDirectorySource").Text, StringComparison.Ordinal);
@@ -1072,7 +1115,7 @@ public sealed class ExecutionViewTests
         Button start = Required<Button>(harness.View, "StartRunButton");
         Assert.False(harness.ViewModel.HasCurrentRun);
         Assert.False(Required<TextBox>(harness.View, "CurrentRunOutputTextBox").IsEffectivelyVisible);
-        Assert.Equal("次回 model-a 並列1 · 希望: model-a", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+        Assert.Equal("次回 model-a 並列1 · 希望: model-a · 上限: 64,000 tokens", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
         TaskCompletionSource finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
         void ObserveRunFinished(object? sender, PropertyChangedEventArgs args)
         {
@@ -1092,7 +1135,7 @@ public sealed class ExecutionViewTests
             QuantificationRunRequest request = Assert.IsType<QuantificationRunRequest>(runner.LastRequest);
             QuantificationDefinition runDefinition = request.DraftDefinition;
             Assert.True(harness.ViewModel.HasCurrentRun);
-            Assert.Equal("実行中 model-a 並列1 / 次回 model-a 並列1 · 希望: model-a",
+            Assert.Equal("実行中 model-a 並列1 · 上限: 64,000 tokens / 次回 model-a 並列1 · 希望: model-a · 上限: 64,000 tokens",
                 Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
             AssertValidationStatus(harness.View, harness.ViewModel, "実行中");
 
@@ -1102,7 +1145,7 @@ public sealed class ExecutionViewTests
             });
             Render();
 
-            Assert.Equal("実行中 model-a 並列1 / 次回 model-b 並列3 · 希望: model-b",
+            Assert.Equal("実行中 model-a 並列1 · 上限: 64,000 tokens / 次回 model-b 並列3 · 希望: model-b · 上限: 64,000 tokens",
                 Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
             Assert.Equal("次回並列\n3 件", Required<TextBlock>(harness.View, "ConcurrencySummary").Text);
             Assert.Equal("model-a", harness.ViewModel.CurrentRunModelId);
@@ -1155,7 +1198,7 @@ public sealed class ExecutionViewTests
                 Assert.True(harness.ViewModel.IsCancelling);
                 Assert.False(cancel.IsEffectivelyEnabled);
                 AssertValidationStatus(harness.View, harness.ViewModel, "取消処理中");
-                Assert.Equal("実行中 model-a 並列1 / 次回 model-b 並列3 · 希望: model-b",
+                Assert.Equal("実行中 model-a 並列1 · 上限: 64,000 tokens / 次回 model-b 並列3 · 希望: model-b · 上限: 64,000 tokens",
                     Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
                 Assert.Equal("今回run 新規出力先: " + runOutput, currentOutput.Text);
             }
@@ -1187,7 +1230,7 @@ public sealed class ExecutionViewTests
         Assert.True(harness.ViewModel.HasCurrentRun);
         Assert.Equal("model-a", harness.ViewModel.CurrentRunModelId);
         Assert.Equal(1, harness.ViewModel.CurrentRunMaxConcurrency);
-        Assert.Equal("前回run model-a 並列1 / 次回 model-b 並列3 · 希望: model-b",
+        Assert.Equal("前回run model-a 並列1 · 上限: 64,000 tokens / 次回 model-b 並列3 · 希望: model-b · 上限: 64,000 tokens",
             Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
         Assert.Equal("前回run 新規出力先: " + runOutput, Required<TextBox>(harness.View, "CurrentRunOutputTextBox").Text);
         Assert.Equal(nextOutput, Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox").Text);
@@ -1373,7 +1416,7 @@ public sealed class ExecutionViewTests
         Render();
         Assert.Equal(0, ViewObserverCount(harness.ViewModel, harness.View));
         Assert.Equal(1, ViewObserverCount(next, harness.View));
-        Assert.Equal("次回 未選択 並列1 · 希望: new-owner", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+        Assert.Equal("次回 未選択 並列1 · 希望: new-owner · 上限: 未選択", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
         Assert.Same(next.CheckAuthenticationCommand, Required<Button>(harness.View, "CheckAuthenticationButton").Command);
         Assert.Same(next.StartCommand, Required<Button>(harness.View, "StartRunButton").Command);
         Assert.Same(next.LoginCommand, Required<Button>(harness.View, "StartCopilotLogin").Command);
@@ -1382,7 +1425,7 @@ public sealed class ExecutionViewTests
         Assert.Equal(0, authentication.CallCount);
         Assert.Equal(0, runner.CallCount);
         Assert.Null(next.LastLoginTask);
-        Assert.Equal(0, harness.Authentication.CallCount);
+        Assert.Equal(1, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
         Assert.Equal(1, harness.FactoryCallCount);
 
@@ -1744,7 +1787,12 @@ internal static class U04TestSupport
             "1.0.11");
 
     internal static CopilotModelAvailability Model(string id) =>
-        new(id, maximumPromptTokens: 64_000, maximumContextWindowTokens: 128_000);
+        string.Equals(id, "auto", StringComparison.Ordinal)
+            ? AutoModel()
+            : new(id, maximumPromptTokens: 64_000, maximumContextWindowTokens: 128_000);
+
+    /// 実 CLI 1.0.79 は auto を max_prompt_tokens=null / max_context_window_tokens=0 で返す。
+    internal static CopilotModelAvailability AutoModel() => new("auto", null, 0);
 
     internal static ExecutionRunContext Context(RunSummary summary, string? inputPath = null) =>
         new(

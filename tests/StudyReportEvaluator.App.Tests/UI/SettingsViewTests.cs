@@ -250,6 +250,19 @@ public sealed class SettingsViewTests
         Render();
         Assert.Null(model.SelectedItem);
         Assert.Equal("not-available", harness.Execution.PreferredModelId);
+        ApplicationSettings automaticallySaved = await harness.ReadSettingsAsync();
+        Assert.Equal("not-available", automaticallySaved.PreferredModelId);
+        Assert.Equal(1, automaticallySaved.MaxConcurrency);
+        Assert.Null(automaticallySaved.OutputDirectoryOverride);
+        Assert.Null(automaticallySaved.Definition); // Loaded input draft is not automatically persisted.
+        CachedCopilotModel[] expectedModels =
+        [
+            new("model-test", 64_000, 128_000),
+            new("model-other", 64_000, 128_000),
+            new("auto", null, null),
+        ];
+        Assert.NotNull(automaticallySaved.CachedModels);
+        Assert.Equal(expectedModels, automaticallySaved.CachedModels.Value.ToArray());
         model.SetCurrentValue(ComboBox.SelectedItemProperty, "model-other");
         Render();
         Assert.Equal("model-other", harness.Execution.SelectedModelId);
@@ -284,9 +297,41 @@ public sealed class SettingsViewTests
         ApplicationSettings saved = await harness.ReadSettingsAsync();
         Assert.Equal("model-other", saved.PreferredModelId);
         Assert.Null(saved.OutputDirectoryOverride);
+        Assert.NotNull(saved.CachedModels);
+        Assert.Equal(expectedModels, saved.CachedModels.Value.ToArray());
         using JsonDocument json = JsonDocument.Parse(File.ReadAllBytes(harness.SettingsPath));
-        Assert.Equal(new[] { "definition", "maxConcurrency", "outputDirectoryOverride", "preferredModelId", "schemaVersion" },
+        Assert.Equal(new[] { "cachedModels", "definition", "maxConcurrency", "outputDirectoryOverride", "preferredModelId", "schemaVersion" },
             json.RootElement.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
+        JsonElement[] cachedModels = json.RootElement.GetProperty("cachedModels").EnumerateArray().ToArray();
+        Assert.Equal(expectedModels.Length, cachedModels.Length);
+        for (int index = 0; index < expectedModels.Length; index++)
+        {
+            JsonElement cachedModel = cachedModels[index];
+            // Closed metadata fields also exclude credential/account/authentication/runtime data.
+            Assert.Equal(new[] { "id", "maximumContextWindowTokens", "maximumPromptTokens" },
+                cachedModel.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
+            Assert.Equal(expectedModels[index].Id, cachedModel.GetProperty("id").GetString());
+            foreach ((string name, int? expected) in new[]
+                     {
+                         ("maximumPromptTokens", expectedModels[index].MaximumPromptTokens),
+                         ("maximumContextWindowTokens", expectedModels[index].MaximumContextWindowTokens),
+                     })
+            {
+                if (expected is { } limit)
+                {
+                    Assert.Equal(limit, cachedModel.GetProperty(name).GetInt32());
+                }
+                else
+                {
+                    Assert.Equal(JsonValueKind.Null, cachedModel.GetProperty(name).ValueKind);
+                }
+            }
+        }
+
+        Assert.False(string.IsNullOrWhiteSpace(runtime.Text));
+        Assert.False(string.IsNullOrWhiteSpace(authentication.Text));
+        Assert.DoesNotContain(runtime.Text!, json.RootElement.GetRawText(), StringComparison.Ordinal);
+        Assert.DoesNotContain(authentication.Text!, json.RootElement.GetRawText(), StringComparison.Ordinal);
         Assert.False(Directory.Exists(Path.Combine(harness.Root, "result")));
         Assert.False(Directory.Exists(harness.OutputPath));
         AssertPassive(harness, authenticationChecks: 1);

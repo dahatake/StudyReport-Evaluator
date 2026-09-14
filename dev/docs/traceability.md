@@ -11,11 +11,11 @@
 | Previous validation | delivery変更前 Release build warning/error 0、full 670/670 PASS（Core 190 / App 480）。現在の0.8.0 delivery evidenceへ流用しない |
 | Recorded focused validation | 2026-09-05: InputViewTests 21、WorkbookMetadataReaderTests 11、ColumnMappingSuggesterTests 14、計46/46 PASS。DocumentationContractTests 14/14 PASS |
 | Audited full required validation | 2026-09-05、source `20c8121`のbaseline: Core 190 + App deterministic 524 + sample構造 1 + Windows ZIP 3 = 718/718 PASS（App計528、failed 0、skipped 0）。opt-inの未実行経路を含む |
-| Current status | UI／設定保存・復元差分と記録済み文書／実EXEの限定範囲はVERIFIED_SCOPED。T01〜T38はREVIEWED、T39は追加native FAIL・本人確認等の外部前提によりBLOCKED。製品は`0.8.5`未公開候補（UNRELEASED）、F01はREVIEWED、公開済みは`v0.8.1` ZIP。F02最終再検証は本同期時点では親担当で未完了、以後は実行記録の最新F02欄を参照。T36〜T39の記録済み成功は0.8.4に限定し、CH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITE、公開gateは未達。`20c8121`のv4.4／`0.8.3` baselineとR03／V01は別の履歴。 |
+| Current status | UI／設定保存・復元差分と記録済み文書／実EXEの限定範囲はVERIFIED_SCOPED。T01〜T38はREVIEWED、T39は追加native FAIL・本人確認等の外部前提によりBLOCKED。製品は`0.8.6`未公開候補（UNRELEASED）、F01はREVIEWED、公開済みは`v0.8.1` ZIP。F02最終再検証は本同期時点では親担当で未完了、以後は実行記録の最新F02欄を参照。T36〜T39の記録済み成功は0.8.4に限定し、CH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITE、公開gateは未達。`20c8121`のv4.4／`0.8.3` baselineとR03／V01は別の履歴。 |
 
 この表の`PLANNED`は未実装をPASSと称しない。task完了後にproduction symbol、direct test、gate identityへ更新する。旧v3 traceabilityはGit履歴とADR-0011に保持する。
 
-2026-09-07のD17上書き「全タスク完了後だけUnreleased追記 → 製品PATCH `0.8.4` → `0.8.5`」と、T01で製品版・CHANGELOG・元プラン・履歴evidenceを変更しない方針は履歴として保持する。さらに後続の利用者不在時の自律続行指示により、T39をBLOCKEDのままF01／F02を進める。F01はREVIEWED、親担当の版正本PATCHは反映済み。G4・全タスクDONE・公開PASSを意味せず、最終`0.8.5`の判定は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄へ接続する。
+2026-09-07のD17上書き「全タスク完了後だけUnreleased追記 → 製品PATCH `0.8.4` → `0.8.5`」と、T01で製品版・CHANGELOG・元プラン・履歴evidenceを変更しない方針は履歴として保持する。さらに後続の利用者不在時の自律続行指示により、T39をBLOCKEDのままF01／F02を進める。F01はREVIEWED、親担当の版正本PATCHは反映済み。G4・全タスクDONE・公開PASSを意味せず、最終`0.8.6`の判定は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄へ接続する。
 
 ## Evidence integrity and storage
 
@@ -34,7 +34,7 @@
 
 ### 2026-09-07 UI/settings scoped evidence（0.8.4記録）
 
-出典は[親担当の実行記録](archive/work/20260907-ui-settings-execution-record.md)と要求所有者の後続引継ぎ、実装source、対応test source、以下の既存TRXである。T01〜T35はREVIEWEDだった履歴を維持し、後続T36〜T38も親担当の実装・対象検証・敵対的レビュー・必要修正確認を完了している。T39の自動回帰成功と追加native FAIL／人手未実施を分離する。以下は製品`0.8.4`の記録で、F02後の`0.8.5`文書・最終artifactの再検証結果ではない。元プランの未承認・G0未通過表記とT01の未実装表記を現在の指示・状態へ戻さない。
+出典は[親担当の実行記録](archive/work/20260907-ui-settings-execution-record.md)と要求所有者の後続引継ぎ、実装source、対応test source、以下の既存TRXである。T01〜T35はREVIEWEDだった履歴を維持し、後続T36〜T38も親担当の実装・対象検証・敵対的レビュー・必要修正確認を完了している。T39の自動回帰成功と追加native FAIL／人手未実施を分離する。以下は製品`0.8.4`の記録で、F02後の`0.8.6`文書・最終artifactの再検証結果ではない。元プランの未承認・G0未通過表記とT01の未実装表記を現在の指示・状態へ戻さない。
 
 | 対象集合 | 記録済み結果 | ローカル証跡と限界 |
 |---|---|---|
@@ -58,7 +58,7 @@ T26は実Avalonia Viewのheadless測定とページ計算に限定する。通�
 
 T27は4合成回答行、6メソッド・7ケースのVM→実filesystem E2Eで、実reader／durable orchestrator／checkpoint／writer／validator／atomic commitを使う。認証・model／runtime identity・AI応答・時刻は合成。新store／VM／orchestrator instanceによる復元・再開であり、別process再起動・native UI・本人loginの証拠ではない。
 
-T28は親担当記録に8枚の通常画像1440×1050、全8枚の2回hash一致、最小1024×720の実frame検証がある。`DocumentationScreenshotTests`のsynthetic／fake状態による説明画像で、設定保存・workbook作成・native画面の実証ではない。T35は画像bytesの読込・目視・再生成を行っていない。`ui-layout-contract.md`の画像欄はこの0.8.4生成履歴へ同期し、F02後の0.8.5で再生成したことにはしない。
+T28は親担当記録に8枚の通常画像1440×1050、全8枚の2回hash一致、最小1024×720の実frame検証がある。`DocumentationScreenshotTests`のsynthetic／fake状態による説明画像で、設定保存・workbook作成・native画面の実証ではない。T35は画像bytesの読込・目視・再生成を行っていない。`ui-layout-contract.md`の画像欄はこの0.8.4生成履歴へ同期し、F02後の0.8.6で再生成したことにはしない。
 
 **T35の対象文書試験は4/4成功・敵対的レビュー済み（指摘0）。** T36の文書・画像contract全体は別scopeで、その21/21をAC-022／TR-22の`VERIFIED_SCOPED`へ接続する。T38のP06 7/7もAC-032／TR-31の限定範囲に接続するが、disk-full／directory ACL／抽出中断／EXE・ZIP間checkpoint再開の未実施を埋めず、全faultの`PASS_REQUIRED`にはしない。
 
@@ -90,7 +90,7 @@ AC-028／TR-29では、公開済み`v0.8.1`のdraft asset／matrix hash照合・
 
 AC-029〜034／TR-30〜33は、deterministic test・開発host観測（P07）・fresh Windows clean-host本人実測（V02）・protected publish contract（C05/C06）を分離して判定する。既存PASS（ZIP経路、fake認証、開発host観測）をfresh OS/MOTW/本人loginの新経路PASSへ転記しない。
 
-UI／設定の追加AC-035〜037・TR-34〜36と直接影響するAC-013／016／017／018・TR-17／18は、以下の実在するproduction symbolとdirect testsへ接続した`VERIFIED_SCOPED`とする。T01時点の予定ownerを実在確認済みの試験ownerへ更新したが、従来のpath／UI／PromptのPASSを新機能へ転記したものではない。AC-022／TR-22は0.8.4のT36文書contract 21/21、AC-032／TR-31は同T38のP06 7/7に限り`VERIFIED_SCOPED`。F02後の0.8.5最終再検証とは分離し、通常／例外layout、deterministic設定E2E、追加native FAIL、Narrator／本人walkthrough、公開claimを別々に判定する。
+UI／設定の追加AC-035〜037・TR-34〜36と直接影響するAC-013／016／017／018・TR-17／18は、以下の実在するproduction symbolとdirect testsへ接続した`VERIFIED_SCOPED`とする。T01時点の予定ownerを実在確認済みの試験ownerへ更新したが、従来のpath／UI／PromptのPASSを新機能へ転記したものではない。AC-022／TR-22は0.8.4のT36文書contract 21/21、AC-032／TR-31は同T38のP06 7/7に限り`VERIFIED_SCOPED`。F02後の0.8.6最終再検証とは分離し、通常／例外layout、deterministic設定E2E、追加native FAIL、Narrator／本人walkthrough、公開claimを別々に判定する。
 
 ## One-action startup owner split（D03）
 
@@ -145,7 +145,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | AC-019 | selected same-row payload and no-content logs | C-05/A-02..04/W-01 | capability/logger/canary tests | PASS_REQUIRED |
 | AC-020 | Windows legacy self-contained ZIP regression | P-01 | packaging/launch smoke | PASS_REQUIRED |
 | AC-021 | unverified platform/installer/signing claim exclusion | P-01..04/D-01..05 | documentation/package contract | PASS_REQUIRED |
-| AC-022 | user/dev docs、UI/settings契約、current delivery evidence | D-01..05 + T01/T28〜36/F02 | TR-22／ST-UC-16。DocumentationContractTestsのT36は`artifacts/test/ui-settings/t36/t36-current.trx`で21/21・REVIEWED（0.8.4、公開文書11件／8画像contract）。T35の4/4とは別scope。F02の0.8.5文書再検証は実行記録の最新欄で別判定 | VERIFIED_SCOPED |
+| AC-022 | user/dev docs、UI/settings契約、current delivery evidence | D-01..05 + T01/T28〜36/F02 | TR-22／ST-UC-16。DocumentationContractTestsのT36は`artifacts/test/ui-settings/t36/t36-current.trx`で21/21・REVIEWED（0.8.4、公開文書11件／8画像contract）。T35の4/4とは別scope。F02の0.8.6文書再検証は実行記録の最新欄で別判定 | VERIFIED_SCOPED |
 | AC-023 | non-public unsigned Windows development MSIX mechanism | P-02 | manifest/package/unpack/hash/policy/cleanup | PASS_MECHANISM |
 | AC-024 | macOS source foundationを非公開で保持（source-only） | P-03 | macOS static source contract | PASS_REQUIRED |
 | AC-025 | macOS future production order contract（source-only） | P-03 | sign/notary source contract | PASS_REQUIRED |
@@ -155,7 +155,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | AC-029 | fresh Windows 11 x64標準user、取得済みEXE1個からoffline入力画面（1起動gesture）。警告/拒否/操作数は別記し、無警告保証しない | V-02 | deterministic: `WindowsSingleFilePackageTests.Single_file_cold_and_warm_start_validate_payload_and_show_input`（開発host）/ protected boundary: `ReleaseMatrixContractTests.V2_rejects_broken_schema_or_semantic_closure`（`os-build`等）/ human required: CH-01, CH-02, CH-05 | NOT_RUN_EXTERNAL_PREREQUISITE |
 | AC-030 | App限定single-file profile、依存/CLI/manifest/docs allowlist同梱、PATH/SDK非依存、2 production project維持 | P-01/P-02 | `WindowsSingleFileProfileTests.*`（4件）+ `WindowsSingleFilePublishTests.Single_file_publish_script_parses_and_preserves_the_default_folder_flow` / `Publish_mode_uses_the_full_app_profile_only_when_opted_in` / `Extracted_bundle_layout_reuses_integrity_checks_without_requiring_static_host_files` + `WindowsSingleFileArtifactTests.Copy_unit_preserves_exact_bytes_generates_exact_hash_and_repackages_without_touching_workbooks` | PASS_REQUIRED |
 | AC-031 | EXE/ZIPでcwd・日本語/空白path・相対`--input`・複数`--prompt`・invalid入力・明示適用・no-auto-run維持 | P-06/L-01/U-02 | `WindowsSingleFilePackageTests.Single_file_relative_input_and_two_prompts_are_observed_in_GUI_order` + `WindowsSingleFilePackageTests.Single_file_two_instances_share_cache_and_close_independently`（cwd/同時起動）+ Launch options既存required regressions（TR-18） | PASS_REQUIRED |
-| AC-032 | 初回/再起動/同時起動/cache欠落/抽出障害でdata保護、setting.txt分離、明示出力先復元／null時result、同版EXE/ZIP再開条件維持 | P-06/W-02 + T06/T27/T28/T38 | WindowsSingleFilePackageTestsのT38/P06実EXE 7/7・P07 PASS_DEVELOPMENT（0.8.4、`artifacts/test/ui-settings/t38/native/`）。cache欠落復元、移動、file-valued抽出先、truncated bundleとdata保護を限定確認。disk-full／directory ACL／抽出中断／EXE・ZIP間checkpoint再開は未実施で、全faultのPASS_REQUIREDではない。設定復元はTR-34／ST-UC-27の新instance実file E2E、native保存・F02最終0.8.5とは分離 | VERIFIED_SCOPED |
+| AC-032 | 初回/再起動/同時起動/cache欠落/抽出障害でdata保護、setting.txt分離、明示出力先復元／null時result、同版EXE/ZIP再開条件維持 | P-06/W-02 + T06/T27/T28/T38 | WindowsSingleFilePackageTestsのT38/P06実EXE 7/7・P07 PASS_DEVELOPMENT（0.8.4、`artifacts/test/ui-settings/t38/native/`）。cache欠落復元、移動、file-valued抽出先、truncated bundleとdata保護を限定確認。disk-full／directory ACL／抽出中断／EXE・ZIP間checkpoint再開は未実施で、全faultのPASS_REQUIREDではない。設定復元はTR-34／ST-UC-27の新instance実file E2E、native保存・F02最終0.8.6とは分離 | VERIFIED_SCOPED |
 | AC-033 | button起点の同梱CLI login開始、shell非使用、token非収集、排他/取消/失敗後継続、所有process限定終了、既存button再確認、自動AI実行なし | A-01/A-02/A-03/V-02 | deterministic: `BundledCopilotLoginServiceTests.Login_uses_only_the_explicit_path_fixed_arguments_and_unredirected_console` / `Cancellation_stops_only_owned_login_and_allows_retry_even_when_wait_ignores_token` / `Dispose_stops_owned_process_synchronously_without_touching_another_service` + `CopilotLoginCommandTests.Login_invalidates_old_identity_and_exit_zero_requires_explicit_authentication_check` / `Cancel_command_stops_only_owned_login_once_and_retry_remains_explicit` / `Run_and_run_cancellation_exclude_login_and_login_preserves_completed_run_state`; human required: CH-06本人login | NOT_RUN_EXTERNAL_PREREQUISITE |
 | AC-034 | candidate/source/version/hash拘束、CH-01..06必須、metadata限定JSON、MSIX本体非公開、public 4 assets再download照合、欠落/FAIL/NOT_RUN拒否 | C-01/C-02/C-05/C-06/V-02 | `ReleaseMatrixBuilderTests.Final_generation_projects_exact_rows_and_passes_C02_without_the_MSIX_binary` + `Final_rejects_required_clean_host_non_pass_and_preserves_prior_candidate_output` + `ReleaseMatrixContractTests.V2_rejects_broken_schema_or_semantic_closure`（`ch06-*`拒否、`missing-clean-host`拒否）+ `ReleaseWorkflowContractTests.Publish_workflow_*`（protected publish contract） | NOT_RUN_EXTERNAL_PREREQUISITE |
 | AC-035 | 共通＋定義1件の明示atomic保存、schema／IO失敗保持、header／貼付内容平文、明示出力先復元・null時だけresult | T02/T03/T06/T10/T23/T27、最新修正T28 | TR-34／ST-UC-27。ApplicationSettingsTests／SettingsFileStoreTests／SettingsViewModelTests／SettingsCompositionTests／ExecutionSettingsTests／MainWindowTests／SettingsWorkflowSystemTests。一時pathの実IOと新instance復元のみ | VERIFIED_SCOPED |
@@ -187,7 +187,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | TR-19 | Windows publish/package/bundled CLI/clean launch | P-01 | PASS_REQUIRED |
 | TR-20 | unsigned ZIP/hash/safe layout/reproducibility | P-01 | PASS_REQUIRED |
 | TR-21 | unsupported platform/installer/signing claim exclusion | P-01/D-01..05 | PASS_REQUIRED |
-| TR-22 | docs／UI設定契約／screenshots | T01/T28〜36/F02／ST-UC-16。T28の8枚生成・2回一致は0.8.4の記録。DocumentationContractTestsのT36は`artifacts/test/ui-settings/t36/t36-current.trx`で21/21・REVIEWED（公開文書11件／8画像contract）。T35対象4/4とは別scope。F02後の0.8.5文書再検証は実行記録の最新欄で別判定 | VERIFIED_SCOPED |
+| TR-22 | docs／UI設定契約／screenshots | T01/T28〜36/F02／ST-UC-16。T28の8枚生成・2回一致は0.8.4の記録。DocumentationContractTestsのT36は`artifacts/test/ui-settings/t36/t36-current.trx`で21/21・REVIEWED（公開文書11件／8画像contract）。T35対象4/4とは別scope。F02後の0.8.6文書再検証は実行記録の最新欄で別判定 | VERIFIED_SCOPED |
 | TR-23 | fixed-seed new/resume E2E | E-01/E-02 | PASS_REQUIRED |
 | TR-24 | optional live/recalculation | E-03 advisory（2026-09-02〜03の履歴はMIXED_ADVISORY） | NOT_RUN |
 | TR-25 | non-public unsigned Windows development MSIX mechanism | P-02 | PASS_MECHANISM |
@@ -196,7 +196,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | TR-28 | Windows ZIP launch/input不変 + MSIX package exclusion | P-01/P-02 | PASS_REQUIRED |
 | TR-29 | publish matrix/secret/public re-download | P-04 | PASS_REQUIRED |
 | TR-30 | App限定single-file profile/lock/publishと最終EXE package integrity（AC-029/030） | deterministic package tests（`WindowsSingleFileProfileTests.*`、`WindowsSingleFilePublishTests.*`、`WindowsSingleFileArtifactTests.*`） | PASS_REQUIRED |
-| TR-31 | 実EXEの再起動/同時起動/cache欠落復元/移動/cwd/日本語path/data保護、未実施faultをPASS扱いしない（AC-031/032） | WindowsSingleFilePackageTestsのT38/P06 7/7、P07 PASS_DEVELOPMENT（0.8.4、`artifacts/test/ui-settings/t38/native/`）。disk-full／directory ACL／抽出中断／EXE・ZIP間checkpoint再開は未実施で、全faultのPASS_REQUIREDではない。fresh OS・本人login・native保存・F02最終0.8.5を成功扱いにしない | VERIFIED_SCOPED |
+| TR-31 | 実EXEの再起動/同時起動/cache欠落復元/移動/cwd/日本語path/data保護、未実施faultをPASS扱いしない（AC-031/032） | WindowsSingleFilePackageTestsのT38/P06 7/7、P07 PASS_DEVELOPMENT（0.8.4、`artifacts/test/ui-settings/t38/native/`）。disk-full／directory ACL／抽出中断／EXE・ZIP間checkpoint再開は未実施で、全faultのPASS_REQUIREDではない。fresh OS・本人login・native保存・F02最終0.8.6を成功扱いにしない | VERIFIED_SCOPED |
 | TR-32 | login service/UI deterministic contract。本人login実測はCH-06で分離（AC-033） | deterministic UI/fake tests（`BundledCopilotLoginServiceTests.*`、`CopilotLoginCommandTests.*`） | NOT_RUN_EXTERNAL_PREREQUISITE |
 | TR-33 | exact candidate EXE × CH-01..06 × matrix v2/public境界（AC-028/029/034） | C05/C06 protected workflow contracts（`ReleaseWorkflowContractTests.*`、`ReleaseMatrixContractTests.*`、`ReleaseMatrixBuilderTests.*`）+ V02 human clean-host evidence | NOT_RUN_EXTERNAL_PREREQUISITE |
 | TR-34 | 設定明示保存・再読込、平文／非保存境界、schema・実IO拒否、旧bytes保持、明示出力先復元／null（AC-035） | ApplicationSettingsTests／SettingsFileStoreTests／SettingsViewModelTests／SettingsCompositionTests／ExecutionSettingsTests／MainWindowTests／SettingsWorkflowSystemTests、ST-UC-27。一時absolute pathの実IO。別process・nativeは未測定 | VERIFIED_SCOPED |
@@ -212,6 +212,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | Allocation exact 100 | C-02/X-02/X-03 | mismatch run blocked and formula blank | PASS_REQUIRED |
 | Reference once/question/run | A-02/W-02 | no duplicate across resume | PASS_REQUIRED |
 | `auto` no fallback | A-01/A-02/A-04 | auto absent causes preflight error | PASS_REQUIRED |
+| Unpublished model limit | A-01/A-04 | null SDK limit starts the run, skips only the model-relative budget, and keeps the app-owned scalar ceiling | PASS_REQUIRED |
 | Closed AI tools | A-02..04 | unknown/missing/duplicate/range/evidence rejected | PASS_REQUIRED |
 | Selected same row only | C-05/A-02..04 | other row/column/path absent | PASS_REQUIRED |
 | No content logs | all runtime | canary text absent | PASS_REQUIRED |
@@ -241,7 +242,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 ## Final gate prerequisites
 
 1. AC-001〜037が`PASS_REQUIRED`、`PASS_MECHANISM`、`PASS_PRODUCTION`または正確な限定検証／未実施／block statusへ更新済み。`VERIFIED_SCOPED`は限定範囲だけで、NOT_RUNの残る受入条件を満たしたことにしない。
-2. TR-01〜36がrequired evidenceまたは正確な限定検証／未実施／external statusへ接続済み。0.8.4の設定・T36文書・T38実EXEの限定成功と、T39追加native FAIL／本人未実施、F02後の0.8.5最終再検証を分ける。
+2. TR-01〜36がrequired evidenceまたは正確な限定検証／未実施／external statusへ接続済み。0.8.4の設定・T36文書・T38実EXEの限定成功と、T39追加native FAIL／本人未実施、F02後の0.8.6最終再検証を分ける。
 3. 全required test、Release build、package testがPASS。
 4. sample input identity不変。
 5. unresolved reproducible blocker/high finding 0。
@@ -249,5 +250,5 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 7. development MSIXのpackage/unpack/hash/policy/cleanupが`PASS_MECHANISM`で、install/launchはrequiredでなく未実行、release assetと一般利用者手順から除外されている。
 8. macOS、Linux、Windows Arm64、production-signed MSIX、未実測artifactを対応済みと表示していない。
 9. optional live Copilot／spreadsheet recalculationをrequired evidenceへ算入しない。
-10. docsとscreenshotsがcurrent UI、公開`v0.8.1` ZIPと未公開`0.8.5`候補の境界、実在assetへ同期する。0.8.4のT28画像生成／T36文書contractの記録を保持し、F02最終版の再検証結果は実行記録の最新欄で確認する。
+10. docsとscreenshotsがcurrent UI、公開`v0.8.1` ZIPと未公開`0.8.6`候補の境界、実在assetへ同期する。0.8.4のT28画像生成／T36文書contractの記録を保持し、F02最終版の再検証結果は実行記録の最新欄で確認する。
 11. 公開済みpublic releaseは`v0.8.1` ZIPのままであり、新しい単一EXEはCH-01..06とprotected publish完了まで未公開を維持する。

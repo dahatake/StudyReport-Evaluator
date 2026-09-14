@@ -4,12 +4,12 @@ StudyReport Evaluatorは、標準`.xlsx`の回答をGitHub Copilotで定量化�
 
 現在の公開版は`0.8.1`です。[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases)で取得できる配布物は、`v0.8.1`の`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`です。
 
-今後の主導線は単一EXEの`StudyReportEvaluator-win-x64.exe`と対応するSHA-256 sidecarで、ZIPは代替として維持します。ただし、**現在は作業ツリーの`0.8.5`未公開候補**です。単一EXEはまだ公開されておらず、**clean-host試験と本人loginは`NOT_RUN`**です。
+今後の主導線は単一EXEの`StudyReportEvaluator-win-x64.exe`と対応するSHA-256 sidecarで、ZIPは代替として維持します。ただし、**現在は作業ツリーの`0.8.6`未公開候補**です。単一EXEはまだ公開されておらず、**clean-host試験と本人loginは`NOT_RUN`**です。
 
 > [!WARNING]
 > 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません
 
-**対象版の注意:** 4ステップの簡素化、全設問へのコンパクト一覧・ページ切替、設定5カテゴリ、明示保存・適用の説明は**UNRELEASED（未リリース）の`0.8.5`候補**向けです。公開`0.8.1`にはこれらの新UI・設定保存を追加していません。要求文書は**v4.6**で、製品版とは別です。
+**対象版の注意:** 4ステップの簡素化、全設問へのコンパクト一覧・ページ切替、設定5カテゴリ、明示保存・適用の説明は**UNRELEASED（未リリース）の`0.8.6`候補**向けです。公開`0.8.1`にはこれらの新UI・設定保存を追加していません。要求文書は**v4.6**で、製品版とは別です。
 
 操作説明の画像は**8枚（01〜08）**で、synthetic／fake状態です。実認証・実結果出力・設定保存・native表示の成功証拠ではありません。製品`0.8.4`の時点で生成したPNGを維持しており、版表記の更新は新たなUI検証を意味しません。既存の検証履歴と未完了の確認範囲は[はじめに](getting-started.md#未公開候補の検証範囲)を参照してください。
 
@@ -27,6 +27,7 @@ StudyReport Evaluatorは、標準`.xlsx`の回答をGitHub Copilotで定量化�
 | Promptファイルで準備する人 | [Promptファイルから起動](prompt-launch.md) | `--input`、複数`--prompt`、明示適用 |
 | 情報管理・運用担当 | [データとprivacy](privacy-and-data-handling.md) | AIへ送る情報、log、final/partialの機密性 |
 | 問題を解決したい人 | [トラブルシューティング](troubleshooting.md) | 入力、設計、Copilot、checkpoint、出力 |
+| 保守・拡張するソフトウェアエンジニア | [技術ガイド](technical-guid.md) | Architecture図、Core／App境界、Copilot SDK／CLI、Excel、カスタマイズとtest |
 | 画面を確認したい人 | [画面一覧](../images/README.md) | synthetic／fake画面8枚の生成時点・対象版と各画像の限界 |
 
 ## 対応範囲
@@ -45,7 +46,7 @@ SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行�
 
 development MSIXは検証専用で、一般配布しません。
 
-**「GitHubにログイン」は未公開`0.8.5`候補のみ**です。明示操作で検証済み同梱native CLIのconsole／ブラウザーへ本人認証を委譲します。**公開`v0.8.1`にはこのbuttonがなく、従来の同梱CLIで本人login**を行います。どちらも完了後は既存の「Copilot 状態を確認」で再確認します。
+**「GitHubにログイン」は未公開`0.8.6`候補のみ**です。明示操作で検証済み同梱native CLIのconsole／ブラウザーへ本人認証を委譲します。**公開`v0.8.1`にはこのbuttonがなく、従来の同梱CLIで本人login**を行います。どちらも完了後は既存の「Copilot 状態を確認」で再確認します。
 
 AI処理には、本人loginに加え、利用可能なGitHub Copilot account／model、network接続、組織policy上の許可が別途必要です。GUI起動や状態確認からlogin・AI評価を自動開始しません。アプリの認証処理はPAT、password、client secret、token、device codeを入力・収集・保存・log出力しません。未認証でもアプリ起動、workbook読込、mapping、設計編集は利用できますが、新しいAI処理は開始できません。
 

@@ -15,12 +15,22 @@ AIが作る値は確認対象です。最終的な評点と利用判断は、授
 - 完成版を自動作成し、必要なら評価項目の修正値（override）を別名workbookへ出力する
 - 未公開候補では、共通設定と任意の採点定義1件を明示保存して再利用する
 
+## Architecture
+
+![利用者、入力Excel、StudyReport Evaluator、同梱GitHub Copilot CLI、GitHub Copilotサービス、結果Excelの関係](images/architecture-overview.svg)
+
+StudyReport EvaluatorはAI modelを内蔵していません。Windowsアプリ内のGitHub Copilot SDKが、配布物に同梱され版とSHA-256を検証したGitHub Copilot CLIを起動し、CLIがGitHub Copilotサービスとの通信を担当します。アプリは入力Excelのread-only読込、採点条件、AIへ渡す範囲、結果検証、checkpoint、別Excelへの出力を管理します。
+
+AI処理ごとに一時sessionを作り、その処理専用の結果提出toolだけを公開します。shell、filesystem、Web、GitHub write、MCP toolは評価sessionへ公開しません。認証・model確認・AI評価にはnetworkが必要ですが、Excel読込と採点設計はAI処理を開始せずローカルで行えます。
+
+Component図、認証から出力までのmessage flow、変更時に同期すべき実装とtestは[ソフトウェアエンジニア向け技術ガイド](docs/technical-guid.md)を参照してください。
+
 ## 対応環境
 
 | 項目 | 対応内容 |
 |---|---|
 | OS / architecture | Windows 11 x64 |
-| 配布 | .NET 10 self-contained。公開`v0.8.1`はunsigned ZIP、未公開`0.8.5`候補ではunsigned単一EXEを追加。各形式にSHA-256 sidecar |
+| 配布 | .NET 10 self-contained。公開`v0.8.1`はunsigned ZIP、未公開`0.8.6`候補ではunsigned単一EXEを追加。各形式にSHA-256 sidecar |
 | 入力 | 標準Office Open XML `.xlsx` 1file |
 | AI runtime | 配布物へ同梱したGitHub Copilot CLI。PATH上の別CLIへfallbackしません |
 | AI login | 利用者本人のGitHub Copilot対話login。GUI起動とは別条件です |
@@ -33,7 +43,7 @@ AIが作る値は確認対象です。最終的な評点と利用判断は、授
 現在の公開版は`0.8.1`です。[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases)で現在取得できる配布物は、`v0.8.1`の`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`です。**この公開版には単一EXE配布も「GitHubにログイン」buttonもありません。**
 
 > [!IMPORTANT]
-> **製品候補は`0.8.5`（UNRELEASED・未公開）です。** 以下の新しい画面配置・設定保存・login buttonは候補版向けで、公開`0.8.1`の機能ではありません。版の更新は最終配布物の検証や公開の完了を意味しません。**追加ソフト未導入のOS-only環境でのclean-host試験と本人loginは未実施**です。
+> **製品候補は`0.8.6`（UNRELEASED・未公開）です。** 以下の新しい画面配置・設定保存・login buttonは候補版向けで、公開`0.8.1`の機能ではありません。版の更新は最終配布物の検証や公開の完了を意味しません。**追加ソフト未導入のOS-only環境でのclean-host試験と本人loginは未実施**です。
 
 ### 単一EXEから起動する（未公開候補・今後の主導線）
 
@@ -77,7 +87,7 @@ cacheはアプリ配置用で、入力／final／partial、利用者別設定、
 
 ## ローカルビルドから起動するクイックスタート
 
-このrepositoryを取得した端末で、配布物を待たずに現在のソース（`0.8.5`候補）をWindowsアプリとして起動する手順です。**一般利用者向けの入手経路ではありません。** ここで作る実行物はunsignedで、SHA-256 sidecarもGitHub Releasesの公開物もありません。配布物の入手は前節を参照してください。
+このrepositoryを取得した端末で、配布物を待たずに現在のソース（`0.8.6`候補）をWindowsアプリとして起動する手順です。**一般利用者向けの入手経路ではありません。** ここで作る実行物はunsignedで、SHA-256 sidecarもGitHub Releasesの公開物もありません。配布物の入手は前節を参照してください。
 
 以下の前提はローカルビルド固有の条件で、配布物の起動条件ではありません。
 
@@ -125,7 +135,7 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\publish-windows.ps1
 
 ## 5分クイックスタート
 
-> **対象版:** 以下は**`0.8.5`（UNRELEASED・未公開）候補**の操作です。公開`0.8.1`で追加UIや設定保存を前提にしないでください。画像は合成データ・fake結果による説明用で、実認証・実保存・clean-host動作の証拠ではありません。生成時の製品版と来歴は[画像一覧](images/README.md)を参照してください。
+> **対象版:** 以下は**`0.8.6`（UNRELEASED・未公開）候補**の操作です。公開`0.8.1`で追加UIや設定保存を前提にしないでください。画像は合成データ・fake結果による説明用で、実認証・実保存・clean-host動作の証拠ではありません。生成時の製品版と来歴は[画像一覧](images/README.md)を参照してください。
 
 主画面は**入力 → 採点設計 → 実行 → 結果・出力**の4ステップです。詳細編集は同じウィンドウの**設定**へ移っています。設定は第5ステップではなく、**共通／入力詳細／通常評価／固有評価／読込Prompt**の5カテゴリです。
 
@@ -284,6 +294,7 @@ final/partialには入力全体、Prompt、Reference、AI結果が含まれ得�
 - [設定の保存と適用](docs/settings.md)
 - [機能と点数](docs/features.md)
 - [Custom evaluator](docs/custom-evaluator-guide.md)
+- [技術アーキテクチャとカスタマイズ](docs/technical-guid.md)
 - [Promptファイルから起動](docs/prompt-launch.md)
 - [データとprivacy](docs/privacy-and-data-handling.md)
 - [トラブルシューティング](docs/troubleshooting.md)

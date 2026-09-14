@@ -11,7 +11,7 @@
 
 本書はcomponent境界と実行data flowの正本である。型、sheet、formula、checkpoint encodingの詳細は[詳細設計書](detailed-design.md)と[Excel契約](excel-contract.md)を参照する。
 
-v4.6のUI／設定保存はT01〜T38の実装・対象検証・レビュー完了を反映する。製品版正本は親担当が`0.8.5`未公開候補（UNRELEASED）へ更新済み、F01はREVIEWED、公開済みは`v0.8.1` ZIPのままである。`0.8.4`のT36文書contract、T37実ZIP、T38実EXE、T39自動回帰／MSIX機構確認は記録済みだが、T39は追加native FAILと本人確認等の外部前提によりBLOCKED。F02の最終版再検証は本同期時点では親担当で未完了、以後は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄を参照する。日付・製品版・証跡範囲を分けた[現在状態](implementation-status.md)を正本とし、G4・全タスクDONE・公開PASSを付与しない。
+v4.6のUI／設定保存はT01〜T38の実装・対象検証・レビュー完了を反映する。製品版正本は親担当が`0.8.6`未公開候補（UNRELEASED）へ更新済み、F01はREVIEWED、公開済みは`v0.8.1` ZIPのままである。`0.8.4`のT36文書contract、T37実ZIP、T38実EXE、T39自動回帰／MSIX機構確認は記録済みだが、T39は追加native FAILと本人確認等の外部前提によりBLOCKED。F02の最終版再検証は本同期時点では親担当で未完了、以後は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄を参照する。日付・製品版・証跡範囲を分けた[現在状態](implementation-status.md)を正本とし、G4・全タスクDONE・公開PASSを付与しない。
 
 v4.5のdelivery追加では、実装済みの起動経路／deterministic公開contractと、未実行のcandidate workflow／clean-host／protected publishを分ける（§8・10）。新EXEの公開済み・OS-only受入完了を意味しない。
 
@@ -204,7 +204,7 @@ checkpointとoutputはinput全体、Prompt、reference、AI resultを含むた�
 
 ADR-0016はADR-0013／0015のZIP-only主配布と必須の手動hash確認を限定的にsupersedeする。旧ADRとmatrix v1は履歴として保持し、過去ZIPのPASSを新EXEへ転記しない。以下のEXE主配布は承認済みの公開目標であり、現時点の公開済み機能とは表示しない。
 
-本節のv4.5 delivery契約をv4.6でも継承する。文書同梱リストはT37／T38で同期し、`0.8.4`のZIP／EXE／MSIX実物は各対象範囲で検証済みである。UI／同梱文書やF02の製品版変更後は最終artifactを再生成・再検証する必要があり、この`0.8.4`や過去clean-hostの証跡を`0.8.5`の新しいbytesへ流用しない。
+本節のv4.5 delivery契約をv4.6でも継承する。文書同梱リストはT37／T38で同期し、`0.8.4`のZIP／EXE／MSIX実物は各対象範囲で検証済みである。UI／同梱文書やF02の製品版変更後は最終artifactを再生成・再検証する必要があり、この`0.8.4`や過去clean-hostの証跡を`0.8.6`の新しいbytesへ流用しない。
 
 ### 8.1 App限定publishとpackage
 
@@ -212,8 +212,8 @@ ADR-0016はADR-0013／0015のZIP-only主配布と必須の手動hash確認を限
 - `src/StudyReportEvaluator.App/Properties/PublishProfiles/WindowsSingleFile.pubxml`はAppだけへ適用する。`scripts/publish-windows.ps1`の`-SingleFile`でrestore／publishに同じprofileを渡し、`win-x64`、self-contained、`PublishSingleFile=true`、`IncludeNativeLibrariesForSelfExtract=true`、`IncludeAllContentForSelfExtract=true`を揃える。trimming、ReadyToRun、圧縮は無効、symbolsは非配布とする。
 - `IncludeAllContentForSelfExtract`はMicrosoftが**非推奨**とする.NET Core 3.1互換モードであり、将来削除される可能性がある。S01/G1で固定構成の開発host適合を確認した条件付き採用であって、推奨方式・将来互換性・clean-host成功の保証ではない。
 - single-file出力は`artifacts/package/publish/win-x64-singlefile/`へ分離する。引数なしのfolder publish／既存ZIP、Core、solution全体、macOSへsingle-file条件を適用しない。App専用`packages.win-x64-singlefile.lock.json`で実在するbuild-onlyの`Microsoft.NET.ILLink.Tasks`差分だけを固定し、Core専用lockやproduction依存を増やさず、analyzer・lock・integrity検証を無効化しない。
-- .NET/native依存、固定CLI、`copilot-runtime.json`と、既存ZIPと同じ**20 fileの明示allowlist**（公開文書11件＝root README・利用者docs 9件・images README、8画像、LICENSE）をbundle前に含める。T37／T38で設定guide・third-party notices・設定画像を含む集合へ同期済み。repository全体のglobや後付けcopyで代用せず、sample、input／final／partial、setting.txt、work、tests、secretを含めない。
-- P02は標準hostによる抽出後のlayout、runtime／SDK／CLI identity、20 fileの一致を検証する。`scripts/package-windows-singlefile.ps1`（P05）は検証済みpublish入力をread-onlyで扱い、最終名`StudyReportEvaluator-win-x64.exe`へのbyte-copyと、そのbytesに一致する`StudyReportEvaluator-win-x64.exe.sha256`を作る。P05自体はpublish・起動・抽出を行わず、PE／版検査だけで任意EXEのself-contained bundleを証明したとはしない。実EXEの起動検証はP06／P07と分離する。
+- .NET/native依存、固定CLI、`copilot-runtime.json`と、既存ZIPと同じ**24 fileの明示allowlist**（公開文書12件＝root README・利用者docs 10件・images README、PNG 8件、architecture SVG 3件、LICENSE）をbundle前に含める。T37／T38で同期した20件へ、技術ガイドと3つのSVGを追加した現行集合である。repository全体のglobや後付けcopyで代用せず、sample、input／final／partial、setting.txt、work、tests、secretを含めない。
+- P02は標準hostによる抽出後のlayout、runtime／SDK／CLI identity、24 fileの一致を検証する。`scripts/package-windows-singlefile.ps1`（P05）は検証済みpublish入力をread-onlyで扱い、最終名`StudyReportEvaluator-win-x64.exe`へのbyte-copyと、そのbytesに一致する`StudyReportEvaluator-win-x64.exe.sha256`を作る。P05自体はpublish・起動・抽出を行わず、PE／版検査だけで任意EXEのself-contained bundleを証明したとはしない。実EXEの起動検証はP06／P07と分離する。
 - 代替は既存の`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`。新規candidateのEXE／ZIPは同じsource commit・製品版・SDK／CLI版から作る。sidecar公開とCI／公開gateのexact hash検証は必須、利用者の手動比較は任意推奨であり、sidecarはEXE起動のdependencyではない。
 
 ### 8.2 標準抽出と既存起動契約
@@ -321,6 +321,6 @@ P06／P07で未実測のnetwork隔離、本人認証、disk-full、抽出中断�
 
 T01〜T38の`REVIEWED`、T39の`BLOCKED`と対象試験件数は[現在状態](implementation-status.md)に集約する。T26のheadless測定とT27の実file E2Eを維持する。T27の7ケースは実reader・durable orchestrator・checkpoint・4 sheet writer・validator・atomic commitを通し、認証／model／runtime identityとAI応答をfakeに置き換えている。設定・遷移では呼出し0、明示確認／実行後のfake呼出しを区別する。
 
-`0.8.4`ではT36が21/21、T37が実ZIP＋MSIX静的契約9/9、T38がcontract 114/114とP06 7/7・P07 `PASS_DEVELOPMENT`、T39が自動回帰1892/1892（Core 190＋App 1702、skip 0）とMSIX `PASS_MECHANISM`。これらを合算してfull gateを作らず、`0.8.5`の最終artifactや未実施faultの成功へ拡張しない。
+`0.8.4`ではT36が21/21、T37が実ZIP＋MSIX静的契約9/9、T38がcontract 114/114とP06 7/7・P07 `PASS_DEVELOPMENT`、T39が自動回帰1892/1892（Core 190＋App 1702、skip 0）とMSIX `PASS_MECHANISM`。これらを合算してfull gateを作らず、`0.8.6`の最終artifactや未実施faultの成功へ拡張しない。
 
 T39の追加nativeは3試行後に停止し、最新`artifacts/test/ui-settings/t39/native-final-attempt.json`は`CONTROL_ID_PREDICATE_NOT_UNIQUE`でFAIL。120 DPI・実client 1475×1000 pixel＝1180×800 DIP、合成入力読込、入力／EXE不変・実利用者設定非作成は確認したが、4画面・5カテゴリ・1024×720・実keyboardは未検証。Narrator、本人walkthrough4項目、隔離利用者のnative保存とCH-01〜06は`NOT_RUN_EXTERNAL_PREREQUISITE`であり、headlessやP06によって成功にしない。利用者不在時のF01／F02続行はこの未達・公開境界を解除しない。

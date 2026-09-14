@@ -113,7 +113,7 @@ public sealed class CopilotLoginCommandTests
     }
 
     [AvaloniaFact]
-    public async Task Execution_login_stays_explicit_and_completion_in_settings_never_navigates_checks_auth_or_starts_AI()
+    public async Task Execution_login_stays_explicit_and_completion_refreshes_auth_without_navigation_or_AI()
     {
         using LoginHarness harness = new();
         QuantificationDefinition definition = U04TestSupport.Definition(2, 2);
@@ -205,13 +205,13 @@ public sealed class CopilotLoginCommandTests
             Assert.Equal(WorkflowStep.Execution, shell.CurrentStep);
             Assert.Same(settings, CurrentView(window));
             Assert.False(harness.ViewModel.IsLoggingIn);
-            Assert.Equal(ExecutionAuthenticationState.NotChecked, harness.ViewModel.AuthenticationState);
-            Assert.False(harness.ViewModel.CanStart);
+            Assert.Equal(ExecutionAuthenticationState.Available, harness.ViewModel.AuthenticationState);
+            Assert.True(harness.ViewModel.CanStart);
             Assert.Equal(1, harness.Resolver.CallCount);
             Assert.Equal(1, harness.FactoryCallCount);
             Assert.Equal(1, harness.Process.StartCount);
             Assert.Empty(harness.Process.KillTreeArguments); // Detaching the view did not cancel its owned login.
-            Assert.Equal(0, harness.Authentication.CallCount);
+            Assert.Equal(1, harness.Authentication.CallCount);
             Assert.Equal(0, harness.Runner.CallCount);
 
             Activate(window, Required<Button>(settings, "SettingsRequestClose"));
@@ -219,9 +219,9 @@ public sealed class CopilotLoginCommandTests
             Assert.Same(change, window.FocusManager?.GetFocusedElement());
             Assert.Same(loginButton, Required<Button>(execution, "StartCopilotLogin"));
             Assert.True(check.IsEffectivelyEnabled);
-            Assert.Contains("認証状態は未確認", Required<TextBlock>(execution, "CopilotLoginStatus").Text, StringComparison.Ordinal);
-            Activate(window, check); // Only this explicit action may use the authentication boundary.
-            Assert.Equal(1, harness.Authentication.CallCount);
+            Assert.Contains("モデル一覧の更新が完了", Required<TextBlock>(execution, "CopilotLoginStatus").Text, StringComparison.Ordinal);
+            Activate(window, check); // Explicit refresh remains available after automatic confirmation.
+            Assert.Equal(2, harness.Authentication.CallCount);
             Assert.True(harness.ViewModel.IsAuthenticationAvailable);
             Assert.True(harness.ViewModel.CanStart);
             Assert.True(Required<Button>(execution, "StartRunButton").IsEffectivelyEnabled);
@@ -242,7 +242,7 @@ public sealed class CopilotLoginCommandTests
     }
 
     [Fact]
-    public async Task Login_invalidates_old_identity_and_exit_zero_requires_explicit_authentication_check()
+    public async Task Login_invalidates_old_identity_and_exit_zero_refreshes_without_model_fallback()
     {
         using LoginHarness harness = new();
         ExecutionViewModel viewModel = harness.ViewModel;
@@ -268,7 +268,7 @@ public sealed class CopilotLoginCommandTests
         Assert.Equal(ExecutionAuthenticationState.NotChecked, viewModel.AuthenticationState);
         Assert.False(viewModel.IsAuthenticationAvailable);
         Assert.False(viewModel.IsAutoModelAvailable);
-        Assert.Empty(viewModel.AvailableModelIds);
+        Assert.Equal(["model-a", "auto"], viewModel.AvailableModelIds);
         Assert.Null(viewModel.SelectedModelId);
         Assert.Equal("model-a", viewModel.PreferredModelId);
         Assert.NotEqual(previousIdentity, viewModel.RuntimeIdentityText);
@@ -289,20 +289,17 @@ public sealed class CopilotLoginCommandTests
         Assert.True(viewModel.CanCheckAuthentication);
         Assert.False(viewModel.CanCancelLogin);
         Assert.False(viewModel.CanStart);
-        Assert.False(viewModel.IsAuthenticationAvailable);
-        Assert.False(viewModel.IsAutoModelAvailable);
-        Assert.Empty(viewModel.AvailableModelIds);
+        Assert.True(viewModel.IsAuthenticationAvailable);
+        Assert.True(viewModel.IsAutoModelAvailable);
+        Assert.Equal(["model-b", "auto"], viewModel.AvailableModelIds);
         Assert.Null(viewModel.SelectedModelId);
         Assert.Equal("model-a", viewModel.PreferredModelId);
-        Assert.Contains("認証状態は未確認", viewModel.LoginStatusText, StringComparison.Ordinal);
-        Assert.Contains("Copilot 状態を確認", viewModel.LoginStatusText, StringComparison.Ordinal);
-        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Contains("モデル一覧の更新が完了", viewModel.LoginStatusText, StringComparison.Ordinal);
+        Assert.Equal(2, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
         Assert.Null(viewModel.LastRunContext);
 
-        // This explicit command restores authentication, not an unavailable model preference.
-        viewModel.CheckAuthenticationCommand.Execute(null);
-
+        // Automatic confirmation restores authentication, not an unavailable model preference.
         Assert.Equal(2, harness.Authentication.CallCount);
         Assert.True(viewModel.IsAuthenticationAvailable);
         Assert.True(viewModel.IsAutoModelAvailable);
@@ -327,6 +324,100 @@ public sealed class CopilotLoginCommandTests
         Assert.Equal(1, harness.FactoryCallCount);
         Assert.Same(login, viewModel.LastLoginTask);
         AssertSafe(viewModel);
+    }
+
+    [Theory]
+    [InlineData("success")]
+    [InlineData("failure")]
+    [InlineData("cancel")]
+    [InlineData("dispose")]
+    public async Task Successful_login_awaits_pending_model_check_and_rejects_late_cancelled_or_disposed_results(string outcome)
+    {
+        using LoginHarness harness = new(new FakeLoginProcess { ExitOnStart = 0 });
+        using CancellationTokenSource cancellation = new();
+        ExecutionViewModel viewModel = harness.ViewModel;
+        await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+        var previousCatalog = viewModel.CachedModels;
+        string[] previousIds = viewModel.AvailableModelIds.ToArray();
+        TaskCompletionSource<ExecutionAuthenticationSnapshot> pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken checkToken = default;
+        harness.Authentication.CheckOverride = token =>
+        {
+            checkToken = token;
+            entered.TrySetResult();
+            return pending.Task; // Ignore cancellation to exercise the late-result guard.
+        };
+        List<NotifyCollectionChangedAction> changes = [];
+        ((INotifyCollectionChanged)viewModel.AvailableModelIds).CollectionChanged += (_, args) => changes.Add(args.Action);
+        Task login = viewModel.LoginAsync(cancellation.Token);
+        int lateNotifications = 0;
+        try
+        {
+            await entered.Task.WaitAsync(TestWait, TestContext.Current.CancellationToken);
+            Assert.Same(login, viewModel.LastLoginTask);
+            Assert.False(login.IsCompleted);
+            Assert.False(viewModel.IsLoggingIn);
+            Assert.True(viewModel.IsCheckingAuthentication);
+            Assert.False(viewModel.IsAuthenticationAvailable);
+            Assert.False(viewModel.CanStart);
+            Assert.False(viewModel.CanLogin);
+            Assert.False(viewModel.CanCheckAuthentication);
+            Assert.Null(viewModel.SelectedModelId);
+            Assert.Equal(previousIds, viewModel.AvailableModelIds);
+            Assert.Empty(changes);
+            await viewModel.LoginAsync(TestContext.Current.CancellationToken);
+            await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+            await viewModel.StartAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(2, harness.Authentication.CallCount);
+            Assert.Equal(1, harness.FactoryCallCount);
+            if (outcome == "cancel") cancellation.Cancel();
+            if (outcome == "dispose")
+            {
+                viewModel.Dispose();
+                viewModel.PropertyChanged += (_, _) => lateNotifications++;
+            }
+
+            if (outcome is "cancel" or "dispose") Assert.True(checkToken.IsCancellationRequested);
+        }
+        finally
+        {
+            pending.TrySetResult(outcome == "failure"
+                ? new ExecutionAuthenticationSnapshot(ExecutionAuthenticationState.AuthRequired)
+                : AvailableSnapshot("model-after-login"));
+            await login.WaitAsync(TestWait, TestContext.Current.CancellationToken);
+        }
+
+        Assert.Equal(0, lateNotifications);
+        Assert.Equal(2, harness.Authentication.CallCount);
+        Assert.Equal(0, harness.Runner.CallCount);
+        Assert.Null(viewModel.LastRunContext);
+        Assert.DoesNotContain(NotifyCollectionChangedAction.Reset, changes);
+        if (outcome == "success")
+        {
+            Assert.True(viewModel.IsAuthenticationAvailable);
+            Assert.Equal(["model-after-login", "auto"], viewModel.AvailableModelIds);
+            // The old session selection is not silently replaced by a different model.
+            Assert.Null(viewModel.SelectedModelId);
+            Assert.False(viewModel.CanStart);
+            Assert.Contains("モデル一覧の更新が完了", viewModel.LoginStatusText, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.False(viewModel.IsAuthenticationAvailable);
+            Assert.False(viewModel.CanStart);
+            Assert.Null(viewModel.SelectedModelId);
+            Assert.Equal(previousIds, viewModel.AvailableModelIds);
+            Assert.Equal(previousCatalog, viewModel.CachedModels);
+            Assert.Empty(changes);
+            if (outcome == "failure")
+            {
+                Assert.Equal(ExecutionAuthenticationState.AuthRequired, viewModel.AuthenticationState);
+                Assert.Contains("モデル一覧を更新できません", viewModel.LoginStatusText, StringComparison.Ordinal);
+                Assert.True(viewModel.CanCheckAuthentication);
+            }
+            if (outcome == "cancel") Assert.Equal(ExecutionAuthenticationState.Cancelled, viewModel.AuthenticationState);
+        }
     }
 
     [Fact]
@@ -358,7 +449,7 @@ public sealed class CopilotLoginCommandTests
         Assert.Equal(1, harness.Process.StartCount);
         harness.Process.Complete(0);
         await first.WaitAsync(TestWait, TestContext.Current.CancellationToken);
-        Assert.Equal(0, harness.Authentication.CallCount);
+        Assert.Equal(1, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
     }
 
@@ -402,8 +493,8 @@ public sealed class CopilotLoginCommandTests
         Assert.Equal(2, harness.FactoryCallCount);
         Assert.Equal(1, harness.Process.StartCount);
         Assert.Empty(harness.Process.KillTreeArguments);
-        Assert.False(viewModel.IsAuthenticationAvailable);
-        Assert.Equal(0, harness.Authentication.CallCount);
+        Assert.True(viewModel.IsAuthenticationAvailable);
+        Assert.Equal(1, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
     }
 
@@ -433,7 +524,7 @@ public sealed class CopilotLoginCommandTests
 
         Assert.Equal(1, harness.FactoryCallCount);
         Assert.Equal(2, harness.Resolver.CallCount);
-        Assert.Equal(0, harness.Authentication.CallCount);
+        Assert.Equal(1, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
     }
 
@@ -515,10 +606,11 @@ public sealed class CopilotLoginCommandTests
         Assert.False(viewModel.IsCheckingAuthentication);
         Assert.True(viewModel.CanLogin);
         Assert.Equal(0, harness.FactoryCallCount);
+        harness.Authentication.CheckOverride = null;
         viewModel.LoginCommand.Execute(null);
         await LoginTask(viewModel).WaitAsync(TestWait, TestContext.Current.CancellationToken);
         Assert.Equal(1, harness.FactoryCallCount);
-        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Equal(2, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
     }
 
@@ -583,31 +675,30 @@ public sealed class CopilotLoginCommandTests
         Assert.Equal(outputMode, viewModel.OutputModeText);
         Assert.Equal(1, completions);
         Assert.Equal(1, runner.CallCount);
-        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Equal(2, harness.Authentication.CallCount);
         Assert.False(viewModel.CanStart);
     }
 
     [Fact]
-    public async Task Login_does_not_clear_existing_run_failure_or_rewrite_its_safe_message()
+    public async Task Login_refresh_clears_old_run_failure_without_starting_another_run()
     {
         using LoginHarness harness = new(new FakeLoginProcess { ExitOnStart = 0 });
         ExecutionViewModel viewModel = harness.ViewModel;
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
         await viewModel.StartAsync(TestContext.Current.CancellationToken);
-        ExecutionTechnicalError previous = Assert.Single(viewModel.TechnicalErrors, error => error.Code == "RUN_FAILED");
+        Assert.Single(viewModel.TechnicalErrors, error => error.Code == "RUN_FAILED");
         string status = viewModel.RunStatusText;
-        // Model-list bindings may clear the selected value during a collection reset.
+        // Binding feedback during differential updates must not erase the preference.
         ((INotifyCollectionChanged)viewModel.AvailableModelIds).CollectionChanged +=
             (_, _) => viewModel.SelectedModelId = null;
 
         await viewModel.LoginAsync(TestContext.Current.CancellationToken);
 
-        ExecutionTechnicalError retained = Assert.Single(viewModel.TechnicalErrors, error => error.Code == "RUN_FAILED");
-        Assert.Equal(previous.Message, retained.Message);
+        Assert.DoesNotContain(viewModel.TechnicalErrors, error => error.Code == "RUN_FAILED");
         Assert.Equal(status, viewModel.RunStatusText);
         Assert.Equal(1, harness.Runner.CallCount);
-        Assert.Equal(1, harness.Authentication.CallCount);
-        Assert.False(viewModel.CanStart);
+        Assert.Equal(2, harness.Authentication.CallCount);
+        Assert.True(viewModel.CanStart);
         AssertSafe(viewModel);
     }
 
@@ -643,7 +734,7 @@ public sealed class CopilotLoginCommandTests
         Assert.False(viewModel.CanStart);
         Assert.False(viewModel.CanCancelLogin);
         Assert.Equal(ExecutionAuthenticationState.NotChecked, viewModel.AuthenticationState);
-        Assert.Empty(viewModel.AvailableModelIds);
+        Assert.Equal(["model-before-login", "auto"], viewModel.AvailableModelIds);
         Assert.Null(viewModel.SelectedModelId);
         Assert.Equal(1, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
@@ -669,9 +760,9 @@ public sealed class CopilotLoginCommandTests
         await LoginTask(viewModel).WaitAsync(TestWait, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, harness.Process.StartCount);
-        Assert.Contains("認証状態は未確認", viewModel.LoginStatusText, StringComparison.Ordinal);
-        Assert.False(viewModel.IsAuthenticationAvailable);
-        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Contains("モデル一覧の更新が完了", viewModel.LoginStatusText, StringComparison.Ordinal);
+        Assert.True(viewModel.IsAuthenticationAvailable);
+        Assert.Equal(2, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
     }
 
@@ -723,7 +814,8 @@ public sealed class CopilotLoginCommandTests
         Assert.Equal(1, first.DisposeCount);
         Assert.Equal(1, retry.StartCount);
         Assert.True(viewModel.CanCheckAuthentication);
-        Assert.False(viewModel.CanStart);
+        Assert.True(viewModel.CanStart);
+        Assert.Equal(1, harness.Authentication.CallCount);
     }
 
     [Fact]
@@ -753,7 +845,8 @@ public sealed class CopilotLoginCommandTests
         harness.Process = new FakeLoginProcess { ExitOnStart = 0 };
         await harness.ViewModel.LoginAsync(TestContext.Current.CancellationToken);
         Assert.True(harness.ViewModel.CanCheckAuthentication);
-        Assert.False(harness.ViewModel.CanStart);
+        Assert.True(harness.ViewModel.CanStart);
+        Assert.Equal(1, harness.Authentication.CallCount);
     }
 
     [Fact]

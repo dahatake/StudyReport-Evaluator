@@ -429,6 +429,12 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
     public event EventHandler<ExecutionRunCompletedEventArgs>? RunCompleted;
 
+    internal event Func<CancellationToken, Task>? ModelCatalogRefreshed;
+
+    public ImmutableArray<CachedCopilotModel>? CachedModels { get; private set; }
+
+    private bool hasRefreshedModels;
+
     public ReadOnlyObservableCollection<string> AvailableModelIds { get; }
 
     public ReadOnlyObservableCollection<ExecutionTechnicalError> TechnicalErrors { get; }
@@ -461,6 +467,18 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     public bool IsAutoModelAvailable =>
         AuthenticationState == ExecutionAuthenticationState.Available
         && modelsById.ContainsKey("auto");
+
+    /// null は SDK が選択中 model の上限を公開していないことを表す。
+    public int? SelectedModelPromptTokenLimit =>
+        SelectedModelId is string id && modelsById.TryGetValue(id, out CopilotModelAvailability? model)
+            ? model.EffectivePromptTokenLimit
+            : null;
+
+    public string SelectedModelLimitText => SelectedModelId is null
+        ? "未選択"
+        : SelectedModelPromptTokenLimit is int limit
+            ? $"{limit.ToString("N0", CultureInfo.InvariantCulture)} tokens"
+            : "SDK未公開・事前検証なし";
 
     public string AuthenticationStatusText => AuthenticationState switch
     {
@@ -771,6 +789,12 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
     public int? CurrentRunMaxConcurrency => currentRunRequest?.MaxConcurrency;
 
+    public string? CurrentRunLimitText => currentRunRequest is null
+        ? null
+        : currentRunRequest.MaximumPromptTokens is int limit
+            ? $"{limit.ToString("N0", CultureInfo.InvariantCulture)} tokens"
+            : "SDK未公開・事前検証なし";
+
     public string CurrentRunOutputSummary
     {
         get
@@ -909,6 +933,19 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
         MaxConcurrency = settings.MaxConcurrency;
         OutputDirectoryOverride = settings.OutputDirectoryOverride;
+        if (!hasRefreshedModels && settings.CachedModels is { } cached)
+        {
+            CachedModels = cached;
+            updatingModelSelection = true;
+            try
+            {
+                SynchronizeModelIds(cached.Select(model => model.Id).ToArray());
+            }
+            finally
+            {
+                updatingModelSelection = false;
+            }
+        }
         // Definitions require the separate explicit Input/Design application boundary.
         // Restoring preferences never checks authentication, logs in, or starts a run.
     }
@@ -1067,6 +1104,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         CancellationToken token = operationCancellation.Token;
         loginCancellation = operationCancellation;
         IsLoggingIn = true;
+        bool refreshModels = false;
 
         try
         {
@@ -1075,7 +1113,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 return;
             }
 
-            // Login may switch accounts. Only a later explicit check can restore availability.
+            // Login may switch accounts. Only a fresh authentication check can restore availability.
             Interlocked.Increment(ref authenticationSequence);
             ClearAuthenticationModels();
             AuthenticationState = ExecutionAuthenticationState.NotChecked;
@@ -1099,6 +1137,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 LoginStatusText = loginExitUnconfirmed
                     ? LoginExitUnconfirmedMessage
                     : LoginResultMessage(result);
+                refreshModels = result.Status == CopilotLoginStatus.Completed && !loginExitUnconfirmed;
             }
         }
         catch
@@ -1119,6 +1158,17 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                     IsLoggingIn = false;
                     Revalidate();
                 }
+            }
+        }
+
+        if (refreshModels && !disposed && !token.IsCancellationRequested)
+        {
+            await CheckAuthenticationAsync(token);
+            if (!disposed)
+            {
+                LoginStatusText = IsAuthenticationAvailable
+                    ? "ログイン後の認証確認とモデル一覧の更新が完了しました。"
+                    : "ログイン処理は終了しましたが、モデル一覧を更新できませんでした。「Copilot 状態を確認」で再試行してください。";
             }
         }
     }
@@ -1179,12 +1229,20 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         {
             ExecutionAuthenticationSnapshot result = await authenticationBoundary
                 .CheckAsync(token);
+            token.ThrowIfCancellationRequested();
             if (sequence != Volatile.Read(ref authenticationSequence))
             {
                 return;
             }
 
             ApplyAuthentication(result);
+            if (result.State == ExecutionAuthenticationState.Available && ModelCatalogRefreshed is { } handlers)
+            {
+                foreach (Func<CancellationToken, Task> handler in handlers.GetInvocationList())
+                {
+                    await handler(token);
+                }
+            }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -1234,9 +1292,10 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             WorkbookMetadata = workbookMetadata,
             InputPath = runInputPath,
             ModelId = runModelId,
-            MaximumPromptTokens = runModel.EffectivePromptTokenLimit!.Value,
-            MaximumContextWindowTokens = runModel.MaximumContextWindowTokens
-                ?? runModel.EffectivePromptTokenLimit.Value,
+            MaximumPromptTokens = runModel.EffectivePromptTokenLimit,
+            MaximumContextWindowTokens = runModel.EffectivePromptTokenLimit is null
+                ? null
+                : runModel.MaximumContextWindowTokens ?? runModel.EffectivePromptTokenLimit,
             MaxConcurrency = MaxConcurrency,
             RuntimeIdentity = runRuntimeIdentity,
             OutputDirectory = IsResumeMode ? null : OutputDirectory,
@@ -1262,6 +1321,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             nameof(HasCurrentRun),
             nameof(CurrentRunModelId),
             nameof(CurrentRunMaxConcurrency),
+            nameof(CurrentRunLimitText),
             nameof(CurrentRunOutputSummary));
         Revalidate();
 
@@ -1380,7 +1440,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
     private static string LoginResultMessage(CopilotLoginResult result) => result.Status switch
     {
-        CopilotLoginStatus.Completed => "ログイン処理が終了しました。認証状態は未確認です。「Copilot 状態を確認」を押してください。",
+        CopilotLoginStatus.Completed => "ログイン処理が終了しました。認証状態とモデル一覧を更新します…",
         CopilotLoginStatus.CliUnavailable => BundledCliUnavailableMessage,
         CopilotLoginStatus.RuntimeFailed when result.ErrorCategory is CopilotLoginErrorCategory.ProcessWaitFailed
             or CopilotLoginErrorCategory.CleanupFailed => LoginExitUnconfirmedMessage,
@@ -1484,6 +1544,9 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             if (selectionChanged)
             {
                 OnPropertyChanged(nameof(SelectedModelId));
+                OnPropertiesChanged(
+                    nameof(SelectedModelPromptTokenLimit),
+                    nameof(SelectedModelLimitText));
             }
         }
         finally
@@ -1501,12 +1564,14 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         {
             runtimeIdentity = null;
             selectedModelId = null;
-            modelItems.Clear();
+            // Keep the last catalog visible, but discard all effective authorization/capacity.
             modelsById.Clear();
             OnPropertiesChanged(
                 nameof(AvailableModelIds),
                 nameof(IsAutoModelAvailable),
                 nameof(SelectedModelId),
+                nameof(SelectedModelPromptTokenLimit),
+                nameof(SelectedModelLimitText),
                 nameof(RuntimeIdentityText));
         }
         finally
@@ -1523,12 +1588,23 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             AuthenticationState = result.State;
             runtimeIdentity = result.RuntimeIdentity;
             selectedModelId = null;
-            modelItems.Clear();
             modelsById.Clear();
-            foreach (CopilotModelAvailability model in result.Models)
+            if (result.State == ExecutionAuthenticationState.Available)
             {
-                modelItems.Add(model.Id);
-                modelsById.Add(model.Id, model);
+                hasRefreshedModels = true;
+                SynchronizeModelIds(result.ModelIds);
+                foreach (CopilotModelAvailability model in result.Models)
+                {
+                    modelsById.Add(model.Id, model);
+                }
+
+                ImmutableArray<CachedCopilotModel> next = [.. result.Models.Select(model =>
+                    new CachedCopilotModel(model.Id, model.MaximumPromptTokens, model.MaximumContextWindowTokens))];
+                if (CachedModels is not { } previous || !previous.SequenceEqual(next))
+                {
+                    CachedModels = next;
+                    OnPropertyChanged(nameof(CachedModels));
+                }
             }
 
             if (result.State == ExecutionAuthenticationState.Available && !initialModelSelectionApplied)
@@ -1543,11 +1619,30 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 nameof(AvailableModelIds),
                 nameof(IsAutoModelAvailable),
                 nameof(SelectedModelId),
+                nameof(SelectedModelPromptTokenLimit),
+                nameof(SelectedModelLimitText),
                 nameof(RuntimeIdentityText));
         }
         finally
         {
             updatingModelSelection = false;
+        }
+    }
+
+    private void SynchronizeModelIds(IReadOnlyList<string> ids)
+    {
+        HashSet<string> desired = new(ids, StringComparer.Ordinal);
+        for (int index = modelItems.Count - 1; index >= 0; index--)
+        {
+            if (!desired.Contains(modelItems[index])) modelItems.RemoveAt(index);
+        }
+
+        for (int index = 0; index < ids.Count; index++)
+        {
+            if (index < modelItems.Count && modelItems[index] == ids[index]) continue;
+            int existing = modelItems.IndexOf(ids[index]);
+            if (existing >= 0) modelItems.Move(existing, index);
+            else modelItems.Insert(index, ids[index]);
         }
     }
 
@@ -1851,20 +1946,12 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                     "利用可能な model がありません。"));
                 break;
             case ExecutionAuthenticationState.Available when SelectedModelId is null
-                || !modelItems.Contains(SelectedModelId):
+                || !modelItems.Contains(SelectedModelId)
+                || !modelsById.ContainsKey(SelectedModelId):
                 AddError(errors, new ExecutionTechnicalError(
                     "MODEL_SELECTION_REQUIRED",
                     "Model",
                     "利用可能な model を選択してください。"));
-                break;
-            case ExecutionAuthenticationState.Available when !modelsById.TryGetValue(
-                    SelectedModelId,
-                    out CopilotModelAvailability? selectedModel)
-                || selectedModel.EffectivePromptTokenLimit is null:
-                AddError(errors, new ExecutionTechnicalError(
-                    "MODEL_PROMPT_LIMIT_UNAVAILABLE",
-                    "Model",
-                    "SDKからmodelのprompt上限を取得できないため、安全なrequest preflightを実行できません。"));
                 break;
             case ExecutionAuthenticationState.AuthRequired:
                 AddError(errors, new ExecutionTechnicalError(

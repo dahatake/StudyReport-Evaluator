@@ -261,6 +261,27 @@ public sealed class SettingsFileStore
 
         try
         {
+            if (settings.CachedModels is { } models)
+            {
+                if (models.IsDefault || models.Length > 512)
+                {
+                    return false;
+                }
+
+                HashSet<string> ids = new(StringComparer.Ordinal);
+                foreach (CachedCopilotModel? model in models)
+                {
+                    if (model is null || !ids.Add(model.Id)
+                        || model.MaximumPromptTokens is <= 0 || model.MaximumContextWindowTokens is <= 0)
+                    {
+                        return false;
+                    }
+
+                    EphemeralEvaluationRunner.ValidateModelId(model.Id);
+                    ValidateUtf8Text(model.Id);
+                }
+            }
+
             if (settings.PreferredModelId is string modelId)
             {
                 EphemeralEvaluationRunner.ValidateModelId(modelId);

@@ -554,9 +554,9 @@ public sealed class EvaluationScheduler
             return Cancelled(item, scorable: true, scorableKnown: true);
         }
 
-        if (maximumPromptTokens is int promptLimit
-            && maximumContextWindowTokens is int contextLimit
-            && !requestCapacityValidator.Validate(payload, promptLimit, contextLimit).IsValid)
+        // The model-relative budget is skipped inside the validator when the SDK publishes no
+        // limit, but the model-independent app-owned ceiling always applies.
+        if (!requestCapacityValidator.Validate(payload, maximumPromptTokens, maximumContextWindowTokens).IsValid)
         {
             return Failure(item, ResultsStatusCodes.AiOutputInvalid, scorable: true);
         }

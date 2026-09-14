@@ -22,6 +22,7 @@ public sealed class DocumentationContractTests
         "docs/settings.md",
         "docs/features.md",
         "docs/custom-evaluator-guide.md",
+        "docs/technical-guid.md",
         "docs/prompt-launch.md",
         "docs/privacy-and-data-handling.md",
         "docs/troubleshooting.md",
@@ -76,14 +77,14 @@ public sealed class DocumentationContractTests
     [Fact]
     public void Public_document_inventory_and_settings_notice_links_are_explicit()
     {
-        Assert.Equal(11, PublicDocumentPaths.Length);
-        Assert.Equal(11, PublicDocumentPaths.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(12, PublicDocumentPaths.Length);
+        Assert.Equal(12, PublicDocumentPaths.Distinct(StringComparer.Ordinal).Count());
         Assert.Equal(new[]
         {
             "README.md", "docs/README.md", "docs/getting-started.md", "docs/settings.md",
-            "docs/features.md", "docs/custom-evaluator-guide.md", "docs/prompt-launch.md",
-            "docs/privacy-and-data-handling.md", "docs/troubleshooting.md",
-            "docs/third-party-notices.md", "images/README.md",
+            "docs/features.md", "docs/custom-evaluator-guide.md", "docs/technical-guid.md",
+            "docs/prompt-launch.md", "docs/privacy-and-data-handling.md",
+            "docs/troubleshooting.md", "docs/third-party-notices.md", "images/README.md",
         }, PublicDocumentPaths);
 
         // Fixed entry points, not expectations collected from the links under test.
@@ -93,8 +94,10 @@ public sealed class DocumentationContractTests
                  {
                      ("README.md", "docs/settings.md"),
                      ("README.md", "docs/third-party-notices.md"),
+                     ("README.md", "docs/technical-guid.md"),
                      ("docs/README.md", "../README.md"),
                      ("docs/README.md", "settings.md"),
+                     ("docs/README.md", "technical-guid.md"),
                      ("docs/getting-started.md", "settings.md"),
                      ("docs/settings.md", "../images/08-settings.png"),
                  })
@@ -530,6 +533,7 @@ public sealed class DocumentationContractTests
         Assert.Null(defaults.PreferredModelId);
         Assert.Null(defaults.OutputDirectoryOverride);
         Assert.Null(defaults.Definition);
+        Assert.Null(defaults.CachedModels);
 
         // Independently fixed schema and meanings, as exercised by SettingsFileStoreTests.
         // Do not infer the allowed fields from ApplicationSettings or from the guide itself.
@@ -540,6 +544,7 @@ public sealed class DocumentationContractTests
             ("maxConcurrency", "1〜3、既定1"),
             ("outputDirectoryOverride", "明示した完全修飾の絶対出力path、または`null`。自動算出`result`は保存しない"),
             ("definition", "任意の採点定義**1件**、または`null`"),
+            ("cachedModels", "任意の最後に取得成功したmodel一覧。省略／`null`はキャッシュなし、空配列`[]`も有効"),
         ];
         Match formatSection = Regex.Match(
             guide,
@@ -565,9 +570,20 @@ public sealed class DocumentationContractTests
             @"%LOCALAPPDATA%\StudyReportEvaluator\setting.txt",
             "UTF-8 JSON、設定schemaは整数`1`",
             "BOMあり／なしを受け付けます",
-            "保存定義は保持するだけで自動適用しません。認証確認・login・AI評価も開始しません",
-            "最初の明示保存までfileを作りません",
-            "設定読込の完了前は、未読の保存定義を消さないため保存できません",
+            "保存定義は保持するだけで自動適用しません。login・AI評価も開始しません",
+            "認証・一覧の自動再確認は前述のキャッシュがある場合だけ",
+            "明示保存または認証・一覧取得成功後のキャッシュ自動保存で初めてfileを作ります",
+            "設定読込の完了前は、未読の保存定義を消さないため明示保存できません",
+            "編集した共通設定・採点定義の永続化には**設定を保存**が必要",
+            "保存済み設定を読み直して**`cachedModels`だけを置き換え**",
+            "未保存の希望model・並列度・出力先・採点定義は保存しません",
+            "`cachedModels`の各要素は`id`、`maximumPromptTokens`、`maximumContextWindowTokens`を持つobject",
+            "各上限値は正の整数または`null`（未取得）で、一覧は最大512件",
+            "保存時にキャッシュが`null`なら項目を省略します",
+            "**schemaは`1`のまま**で、項目のない旧設定も読み込めます",
+            "キャッシュにcredential・account情報・login状態は保存しません",
+            "一覧が表示されても、現在の認証確認に成功するまでは評価できません",
+            "自動保存は破損・未対応schema・読込不能の設定fileを上書きしません",
             "Excel未読込なら、読込済みの保存定義を消さずに共通値を保存します",
             "戻る・画面遷移・終了では自動保存しない",
             "保存中に再編集した現在draftは未保存のまま残り得る",
@@ -588,11 +604,24 @@ public sealed class DocumentationContractTests
             "入力xlsxのpath・bytes、学生の回答行本文",
             "AI結果、reason、evidence、参照回答、結果override",
             "run／checkpoint状態、新規／再開mode、partial指定",
-            "認証情報としてのcredential・login状態、CLI hash等のruntime診断",
+            "認証情報としてのcredential・account情報・login状態、CLI hash等のruntime診断（model一覧のキャッシュとは別）",
             "Imported Promptの取込file一覧・未適用本文・順序",
             "同schemaの未知項目・重複項目等を拒否",
             "その後に有効な設定を明示保存すると元fileを置き換えます",
             "複数profileの管理・切替と保存済みfinal workbookの再importは未対応");
+        AssertContainsAll(
+            Read("docs/privacy-and-data-handling.md"),
+            "**UTF-8 JSONの平文file**",
+            "設定schemaは`1`のままで、`cachedModels`のない旧設定も読み込めます",
+            "キャッシュはmodel metadataのみで、credential・account情報・login状態を含まず、現在の利用権限の証明でもありません",
+            "保存済み設定を読み直して`cachedModels`だけを自動更新します",
+            "未保存の希望model・並列度・出力先・採点定義は保存しません",
+            "終了で共通設定や採点定義を自動保存しません",
+            "認証状態・runtime情報は表示だけで保存しません",
+            "認証情報としてのcredential・account情報・login状態、CLI hash等のruntime診断",
+            "定義を明示保存すると、主回答列の選択で見出しセルから取り込んだ質問文も平文で保存されます",
+            "「回答行を自動収集しない」は「機密な本文が設定に絶対に含まれない」という保証ではありません",
+            "**「AI評価なし」は「network通信なし」ではありません。**");
         AssertContainsAll(
             Read("README.md"),
             "任意の採点定義1件",
@@ -697,7 +726,7 @@ public sealed class DocumentationContractTests
             .Select(Path.GetFileName).Order(StringComparer.Ordinal));
         Assert.Equal(expectedFiles, Regex.Matches(
                 manifest,
-                @"^\| \[`[^`]+`\]\((?<file>[^)]+)\) \|",
+            @"^\| \[`[^`]+`\]\((?<file>[^)]+\.png)\) \|",
                 RegexOptions.Multiline | RegexOptions.CultureInvariant)
             .Select(match => match.Groups["file"].Value));
 
@@ -741,23 +770,64 @@ public sealed class DocumentationContractTests
     }
 
     [Fact]
+    public void Architecture_diagrams_are_accessible_self_contained_svg_files()
+    {
+        string[] expectedFiles =
+        [
+            "architecture-overview.svg",
+            "evaluation-message-flow.svg",
+            "technical-architecture.svg",
+        ];
+        string imageDirectory = Resolve(FindRepositoryRoot(), "images");
+        Assert.Equal(expectedFiles, Directory.EnumerateFiles(imageDirectory, "*.svg")
+            .Select(Path.GetFileName).Order(StringComparer.Ordinal));
+
+        XNamespace svg = "http://www.w3.org/2000/svg";
+        foreach (string fileName in expectedFiles)
+        {
+            string path = Path.Combine(imageDirectory, fileName);
+            XElement root = Assert.IsType<XElement>(
+                XDocument.Load(path, LoadOptions.PreserveWhitespace).Root);
+            Assert.Equal(svg + "svg", root.Name);
+            Assert.False(string.IsNullOrWhiteSpace((string?)root.Attribute("viewBox")));
+            Assert.False(string.IsNullOrWhiteSpace(Assert.Single(root.Elements(svg + "title")).Value));
+            Assert.False(string.IsNullOrWhiteSpace(Assert.Single(root.Elements(svg + "desc")).Value));
+            Assert.DoesNotContain(root.Descendants(), element => element.Name.LocalName is
+                "script" or "foreignObject" or "image" or "use");
+            Assert.DoesNotContain(root.DescendantsAndSelf().Attributes(), attribute =>
+                attribute.Name.LocalName is "href" or "src");
+            Assert.Contains($"({fileName})", Read("images/README.md"), StringComparison.Ordinal);
+        }
+
+        Assert.Contains(
+            "(images/architecture-overview.svg)",
+            Read("README.md"),
+            StringComparison.Ordinal);
+        string guide = Read("docs/technical-guid.md");
+        foreach (string fileName in expectedFiles)
+        {
+            Assert.Contains($"(../images/{fileName})", guide, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void Unreleased_ui_and_screenshots_are_explicitly_distinguished_from_the_public_release()
     {
         // Literal current candidate expectations are deliberate: synchronized in F02,
         // not by reading a version back from the documents being checked. Public 0.8.1 is separate.
-        Assert.Contains("<VersionPrefix>0.8.5</VersionPrefix>", Read("Directory.Build.props"), StringComparison.Ordinal);
+        Assert.Contains("<VersionPrefix>0.8.6</VersionPrefix>", Read("Directory.Build.props"), StringComparison.Ordinal);
         foreach ((string path, string candidate, string published) in new[]
                  {
-                     ("README.md", "製品候補は`0.8.5`（UNRELEASED・未公開）", "現在の公開版は`0.8.1`です"),
-                     ("docs/README.md", "UNRELEASED（未リリース）の`0.8.5`候補", "現在の公開版は`0.8.1`です"),
-                     ("docs/getting-started.md", "現在のソース候補`0.8.5`（UNRELEASED・未公開）", "現在の公開版は`v0.8.1`です"),
-                     ("docs/settings.md", "現在のソース候補`0.8.5`", "公開`v0.8.1`はZIP配布で、本頁の設定保存・適用機能はありません"),
-                     ("docs/features.md", "UNRELEASED（未リリース）の`0.8.5`候補", "現在の公開版`v0.8.1`（ZIP）"),
-                     ("docs/custom-evaluator-guide.md", "UNRELEASED（未リリース）の`0.8.5`候補", "現在の公開版`v0.8.1`（ZIP）"),
-                     ("docs/prompt-launch.md", "未公開候補`0.8.5`（UNRELEASED・単一EXE）", "現在の公開版`v0.8.1`（ZIP）"),
-                     ("docs/privacy-and-data-handling.md", "現在のソースの`0.8.5`候補", "公開`v0.8.1`はZIP配布"),
-                     ("docs/troubleshooting.md", "UNRELEASED（未公開）の`0.8.5`候補", "公開`v0.8.1`はZIP配布"),
-                     ("images/README.md", "UNRELEASED（未リリース）の`0.8.5`候補", "公開`0.8.1`の画面を示すものではありません"),
+                     ("README.md", "製品候補は`0.8.6`（UNRELEASED・未公開）", "現在の公開版は`0.8.1`です"),
+                     ("docs/README.md", "UNRELEASED（未リリース）の`0.8.6`候補", "現在の公開版は`0.8.1`です"),
+                     ("docs/getting-started.md", "現在のソース候補`0.8.6`（UNRELEASED・未公開）", "現在の公開版は`v0.8.1`です"),
+                     ("docs/settings.md", "現在のソース候補`0.8.6`", "公開`v0.8.1`はZIP配布で、本頁の設定保存・適用機能はありません"),
+                     ("docs/features.md", "UNRELEASED（未リリース）の`0.8.6`候補", "現在の公開版`v0.8.1`（ZIP）"),
+                     ("docs/custom-evaluator-guide.md", "UNRELEASED（未リリース）の`0.8.6`候補", "現在の公開版`v0.8.1`（ZIP）"),
+                     ("docs/prompt-launch.md", "未公開候補`0.8.6`（UNRELEASED・単一EXE）", "現在の公開版`v0.8.1`（ZIP）"),
+                     ("docs/privacy-and-data-handling.md", "現在のソースの`0.8.6`候補", "公開`v0.8.1`はZIP配布"),
+                     ("docs/troubleshooting.md", "UNRELEASED（未公開）の`0.8.6`候補", "公開`v0.8.1`はZIP配布"),
+                     ("images/README.md", "UNRELEASED（未リリース）の`0.8.6`候補", "公開`0.8.1`の画面を示すものではありません"),
                  })
         {
             AssertContainsAll(Read(path), "UNRELEASED", candidate, published);
@@ -765,8 +835,8 @@ public sealed class DocumentationContractTests
 
         AssertContainsAll(Read("images/README.md"), "一時directoryへ描画", "2回生成の一致", "finally",
             "生成時の製品版: `0.8.4`", "PNGを再生成していません");
-        AssertContainsAll(Read("CHANGELOG.md"), "## [Unreleased]", "ソース候補`0.8.5`", "**未公開**");
-        Assert.DoesNotContain("## [0.8.5]", Read("CHANGELOG.md"), StringComparison.Ordinal);
+        AssertContainsAll(Read("CHANGELOG.md"), "## [Unreleased]", "ソース候補`0.8.6`", "**未公開**");
+        Assert.DoesNotContain("## [0.8.6]", Read("CHANGELOG.md"), StringComparison.Ordinal);
         AssertContainsAll(
             Read("docs/getting-started.md"),
             "確認のためだけにPowerShell等を導入する必要はありません",
@@ -993,7 +1063,7 @@ public sealed class DocumentationContractTests
             "T01時点の未実装・試験NOT_RUNは履歴",
             "T01〜T35はREVIEWED",
             "T35の対象文書試験は4/4成功・敵対的レビュー済み",
-            "製品`0.8.5`は未公開候補",
+            "製品`0.8.6`は未公開候補",
             "公開済みは`v0.8.1` ZIPのまま");
         // T35's four historical results are not T36's expanded document/image gate.
         // Check the evidence boundary without requiring T36 to remain pending forever.
@@ -1179,12 +1249,16 @@ public sealed class DocumentationContractTests
             "docs/getting-started.md",
             "docs/features.md",
             "docs/custom-evaluator-guide.md",
+            "docs/technical-guid.md",
             "docs/prompt-launch.md",
             "docs/privacy-and-data-handling.md",
             "docs/troubleshooting.md",
             "docs/settings.md",
             "docs/third-party-notices.md",
             "images/README.md",
+            "images/architecture-overview.svg",
+            "images/technical-architecture.svg",
+            "images/evaluation-message-flow.svg",
             "images/01-input-workbook.png",
             "images/02-input-mapping.png",
             "images/03-design-knowledge.png",
@@ -1194,14 +1268,16 @@ public sealed class DocumentationContractTests
             "images/07-output-export.png",
             "images/08-settings.png",
         ];
-        Assert.Equal(20, expected.Length);
-        Assert.Equal(20, expected.Distinct(StringComparer.OrdinalIgnoreCase).Count());
-        Assert.Equal(11, PublicDocumentPaths.Length);
+        Assert.Equal(24, expected.Length);
+        Assert.Equal(24, expected.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Equal(12, PublicDocumentPaths.Length);
         Assert.Equal(
             PublicDocumentPaths.Order(StringComparer.Ordinal),
             expected.Where(path => path.EndsWith(".md", StringComparison.Ordinal)).Order(StringComparer.Ordinal));
         Assert.Equal(8, expected.Count(path => path.StartsWith("images/", StringComparison.Ordinal)
             && path.EndsWith(".png", StringComparison.Ordinal)));
+        Assert.Equal(3, expected.Count(path => path.StartsWith("images/", StringComparison.Ordinal)
+            && path.EndsWith(".svg", StringComparison.Ordinal)));
 
         const RegexOptions options = RegexOptions.Multiline | RegexOptions.CultureInvariant;
         foreach ((string path, string declaration) in new[]
@@ -1239,7 +1315,7 @@ public sealed class DocumentationContractTests
             return link;
         }));
         Assert.Contains(
-            "Documentation package input must be LICENSE, Markdown, or PNG and nonempty",
+            "Documentation package input must be LICENSE, Markdown, PNG, or SVG and nonempty",
             Read("scripts/package-windows.ps1"), StringComparison.Ordinal);
 
         // Same-size substitutions must fail too: unknowns, duplicates, case drift,
@@ -1259,8 +1335,8 @@ public sealed class DocumentationContractTests
         void AssertPublicPaths(IEnumerable<string> paths)
         {
             string[] actual = paths.Select(path => path.Replace('\\', '/')).ToArray();
-            Assert.Equal(20, actual.Length);
-            Assert.Equal(20, actual.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.Equal(24, actual.Length);
+            Assert.Equal(24, actual.Distinct(StringComparer.OrdinalIgnoreCase).Count());
             Assert.DoesNotContain(actual, path => string.Equals(
                 Path.GetFileName(path), "setting.txt", StringComparison.OrdinalIgnoreCase));
             Assert.DoesNotContain(actual, path => path.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase));

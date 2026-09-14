@@ -67,6 +67,45 @@ public sealed class EvaluationRequestCapacityValidatorTests
     }
 
     [Fact]
+    public void Unpublished_sdk_limits_skip_the_model_budget_without_inventing_one()
+    {
+        EvaluationRequestCapacityValidator validator = new();
+        SafeEvaluationPayload payload = Payload("synthetic");
+
+        EvaluationRequestCapacityResult result = validator.Validate(
+            payload,
+            maximumPromptTokens: null,
+            maximumContextWindowTokens: null);
+
+        Assert.True(result.IsValid);
+        Assert.Null(result.ModelContextBudget);
+        Assert.True(result.AppOwnedRequestUtf8ByteCount > 0);
+        Assert.Contains("unknown", result.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Unpublished_sdk_limits_still_enforce_the_model_independent_scalar_ceiling()
+    {
+        string prompt = string.Concat(
+            Enumerable.Repeat("😀", EvaluationRequestCapacityValidator.MaximumRequestUnicodeScalars));
+
+        EvaluationRequestCapacityResult result = new EvaluationRequestCapacityValidator().Validate(
+            Payload(prompt),
+            maximumPromptTokens: null,
+            maximumContextWindowTokens: null);
+
+        EvaluationRequestCapacityError error = Assert.Single(
+            result.Errors,
+            item => item.Code == "REQUEST_SCALAR_LIMIT_EXCEEDED");
+        Assert.False(result.IsValid);
+        Assert.Null(result.ModelContextBudget);
+        Assert.Equal(EvaluationRequestCapacityValidator.MaximumRequestUnicodeScalars, error.Limit);
+        Assert.DoesNotContain(
+            result.Errors,
+            item => item.Code == "REQUEST_CONTEXT_BUDGET_EXCEEDED");
+    }
+
+    [Fact]
     public void Request_scalar_limit_counts_unicode_scalars_not_utf16_code_units()
     {
         string prompt = string.Concat(

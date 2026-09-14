@@ -57,8 +57,8 @@ public sealed class DurableEvaluationScheduler
         IReadOnlyDictionary<string, CheckpointReference> references,
         string modelId,
         int maxConcurrency,
-        int maximumPromptTokens = int.MaxValue,
-        int maximumContextWindowTokens = int.MaxValue,
+        int? maximumPromptTokens = null,
+        int? maximumContextWindowTokens = null,
         Action<int>? inFlightChanged = null,
         CancellationToken cancellationToken = default)
     {
@@ -239,8 +239,8 @@ public sealed class DurableEvaluationScheduler
         SpecialEvaluationDefinition special,
         EvaluationRowData row,
         string modelId,
-        int maximumPromptTokens,
-        int maximumContextWindowTokens,
+        int? maximumPromptTokens,
+        int? maximumContextWindowTokens,
         CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested)
@@ -335,8 +335,8 @@ public sealed class DurableEvaluationScheduler
         QuestionDefinition question,
         EvaluationRowData row,
         IReadOnlyDictionary<string, CheckpointReference> references,
-        int maximumPromptTokens,
-        int maximumContextWindowTokens,
+        int? maximumPromptTokens,
+        int? maximumContextWindowTokens,
         CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested)

@@ -466,7 +466,7 @@ public sealed class ExecutionSettingsTests
             Assert.Equal(ExecutionAuthenticationState.Checking, viewModel.AuthenticationState);
             Assert.False(viewModel.IsAuthenticationAvailable);
             Assert.False(viewModel.IsAutoModelAvailable);
-            Assert.Empty(viewModel.AvailableModelIds);
+            Assert.Equal(new[] { "model-a", "model-b", "auto" }, viewModel.AvailableModelIds);
             Assert.Equal("model-b", viewModel.PreferredModelId);
             Assert.Null(viewModel.SelectedModelId);
             Assert.False(viewModel.CanStart);
@@ -596,7 +596,7 @@ public sealed class ExecutionSettingsTests
             Assert.False(viewModel.IsAutoModelAvailable);
             Assert.Equal("model-b", viewModel.PreferredModelId);
             Assert.Null(viewModel.SelectedModelId);
-            Assert.Empty(viewModel.AvailableModelIds);
+            Assert.Equal(new[] { "model-a", "model-b", "auto" }, viewModel.AvailableModelIds);
             Assert.False(viewModel.CanStart);
         }
         finally
@@ -771,7 +771,7 @@ public sealed class ExecutionSettingsTests
     }
 
     [Fact]
-    public async Task Login_invalidates_only_effective_selection_and_preserves_preference_until_explicit_recheck()
+    public async Task Login_preserves_visible_catalog_and_preference_then_automatically_rechecks()
     {
         using SettingsHarness harness = new();
         harness.Configure();
@@ -801,7 +801,7 @@ public sealed class ExecutionSettingsTests
             Assert.All(autoNotifications, value => Assert.False(value));
             Assert.Equal("model-b", viewModel.PreferredModelId);
             Assert.Null(viewModel.SelectedModelId);
-            Assert.Empty(viewModel.AvailableModelIds);
+            Assert.Equal(new[] { "model-a", "model-b", "auto" }, viewModel.AvailableModelIds);
             Assert.False(viewModel.CanStart);
             Assert.False(viewModel.CanCheckAuthentication);
             Assert.True(viewModel.CanCancelLogin);
@@ -815,12 +815,12 @@ public sealed class ExecutionSettingsTests
         }
 
         Assert.False(viewModel.IsLoggingIn);
-        Assert.False(viewModel.IsAuthenticationAvailable);
-        Assert.False(viewModel.IsAutoModelAvailable);
-        Assert.All(autoNotifications, value => Assert.False(value));
+        Assert.True(viewModel.IsAuthenticationAvailable);
+        Assert.True(viewModel.IsAutoModelAvailable);
+        Assert.True(autoNotifications[^1]);
         Assert.Equal("model-b", viewModel.PreferredModelId);
-        Assert.Null(viewModel.SelectedModelId);
-        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Equal("model-b", viewModel.SelectedModelId);
+        Assert.Equal(2, harness.Authentication.CallCount);
         Assert.Equal(1, harness.Resolver.CallCount);
         Assert.Equal(1, harness.FactoryCallCount);
         Assert.Equal(1, harness.Process.StartCount);
@@ -839,29 +839,29 @@ public sealed class ExecutionSettingsTests
         Assert.Equal("model-b", viewModel.SelectedModelId);
         Assert.True(viewModel.IsAutoModelAvailable);
         Assert.True(viewModel.CanStart);
-        Assert.Equal(3, harness.Authentication.CallCount);
+        Assert.Equal(4, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
     }
 
     [Fact]
-    public async Task Restored_model_without_sdk_prompt_limit_remains_blocked_by_existing_preflight()
+    public async Task Restored_model_without_sdk_prompt_limit_starts_without_model_relative_preflight()
     {
         using SettingsHarness harness = new();
         harness.Configure();
         ExecutionViewModel viewModel = harness.ViewModel;
         harness.Authentication.Snapshot = new ExecutionAuthenticationSnapshot(
             ExecutionAuthenticationState.Available,
-            [new CopilotModelAvailability("model-b", null, 128_000), U04TestSupport.Model("auto")],
+            [new CopilotModelAvailability("model-b", null, 0), U04TestSupport.Model("auto")],
             U04TestSupport.RuntimeIdentity());
         viewModel.ApplySettings(new ApplicationSettings { PreferredModelId = "model-b" });
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("model-b", viewModel.SelectedModelId);
         Assert.Equal("model-b", viewModel.PreferredModelId);
-        Assert.Contains(viewModel.TechnicalErrors, error => error.Code == "MODEL_PROMPT_LIMIT_UNAVAILABLE");
-        Assert.False(viewModel.CanStart);
-        await viewModel.StartAsync(TestContext.Current.CancellationToken);
-        AssertNoLoginOrRun(harness);
+        Assert.Null(viewModel.SelectedModelPromptTokenLimit);
+        Assert.Equal("SDK未公開・事前検証なし", viewModel.SelectedModelLimitText);
+        Assert.DoesNotContain(viewModel.TechnicalErrors, error => error.Code == "MODEL_PROMPT_LIMIT_UNAVAILABLE");
+        Assert.True(viewModel.CanStart);
     }
 
     [Fact]
@@ -1252,7 +1252,7 @@ public sealed class ExecutionSettingsTests
     }
 
     [Fact]
-    public async Task Existing_run_preflight_error_survives_equivalent_configuration_settings_and_login()
+    public async Task Existing_run_preflight_error_survives_equivalent_settings_but_fresh_login_check_clears_it()
     {
         using SettingsHarness harness = new();
         harness.Configure();
@@ -1280,12 +1280,11 @@ public sealed class ExecutionSettingsTests
         await viewModel.LoginAsync(TestContext.Current.CancellationToken).WaitAsync(TestWait, TestContext.Current.CancellationToken);
 
         Assert.Equal("model-b", viewModel.PreferredModelId);
-        Assert.Null(viewModel.SelectedModelId);
-        Assert.False(viewModel.CanStart);
-        Assert.Equal(previous.Message, Assert.Single(viewModel.TechnicalErrors,
-            error => error.Code == previous.Code).Message);
+        Assert.Equal("model-b", viewModel.SelectedModelId);
+        Assert.True(viewModel.CanStart);
+        Assert.DoesNotContain(viewModel.TechnicalErrors, error => error.Code == previous.Code);
         Assert.Equal(1, harness.Runner.CallCount);
-        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Equal(2, harness.Authentication.CallCount);
         Assert.Equal(1, harness.FactoryCallCount);
     }
 

@@ -226,6 +226,18 @@ public sealed class CopilotAuthenticationServiceTests
         Assert.Contains("<redacted>", unknown.ToString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Router_auto_shape_from_the_bundled_cli_normalizes_to_unknown_limits()
+    {
+        // 実 CLI 1.0.79 の list models 応答は auto だけ max_prompt_tokens=null / max_context_window_tokens=0。
+        CopilotModelAvailability auto = new("auto", null, 0);
+
+        Assert.Equal("auto", auto.Id);
+        Assert.Null(auto.MaximumPromptTokens);
+        Assert.Null(auto.MaximumContextWindowTokens);
+        Assert.Null(auto.EffectivePromptTokenLimit);
+    }
+
     private static CopilotRuntimeIdentity CreateIdentity() =>
         new(
             Path.GetFullPath(typeof(CopilotAuthenticationServiceTests).Assembly.Location),

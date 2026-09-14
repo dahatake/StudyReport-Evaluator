@@ -329,6 +329,33 @@ public sealed class QuantificationOrchestratorTests
     }
 
     [Fact]
+    public async Task Unpublished_model_limits_pass_the_static_gate_and_reach_dispatch()
+    {
+        QuantificationDefinition definition = OneQuestionDefinition(2, 2);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        ScriptedInputSnapshots input = new(U01TestSupport.InputSnapshot(), unchanged: true);
+        ScriptedRowSource rows = new((request, _) =>
+            Task.FromResult(Row(request, $"answer-{request.SourceRowNumber}", "support")));
+        ScriptedRunner runner = new((payload, _, _) =>
+            Task.FromResult(EvaluationRunnerResult.Succeeded(
+                U01TestSupport.ValidResult(payload, _ => 4m))));
+        QuantificationRunRequest request = Request(definition, metadata) with
+        {
+            MaximumPromptTokens = null,
+            MaximumContextWindowTokens = null,
+        };
+
+        RunSummary summary = await new QuantificationOrchestrator(rows, runner, input).RunAsync(
+            request,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(QuantificationRunStatusCodes.Success, summary.StatusCode);
+        Assert.Equal(1, input.CaptureCount);
+        Assert.NotEmpty(rows.Requests);
+        Assert.NotEmpty(runner.Payloads);
+    }
+
+    [Fact]
     public async Task Cancelled_run_allows_partial_output_with_only_completed_AI_payloads_retained()
     {
         QuantificationDefinition definition = OneQuestionDefinition(2, 3);

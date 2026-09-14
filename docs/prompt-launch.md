@@ -6,7 +6,7 @@ StudyReport Evaluatorは、入力workbookと複数の評価Promptを起動時に
 
 ## 対象版と確認範囲
 
-- **未公開候補`0.8.5`（UNRELEASED・単一EXE）**: 配布名は`StudyReportEvaluator-win-x64.exe`です。以下の候補版の例は取得済みのEXEを使うもので、公開済みとは扱わず、未公開のdownload URLも案内しません。
+- **未公開候補`0.8.6`（UNRELEASED・単一EXE）**: 配布名は`StudyReportEvaluator-win-x64.exe`です。以下の候補版の例は取得済みのEXEを使うもので、公開済みとは扱わず、未公開のdownload URLも案内しません。
 - **現在の公開版`v0.8.1`（ZIP）**: `StudyReportEvaluator-win-x64.zip`を展開した`StudyReportEvaluator.App.exe`を使います。この起動名と引数は従来どおり維持します。
 
 以下の画面操作は、特記しない限り候補版の新UIです。Imported Promptsの本文・適用先は**設定 → 読込Prompt**、モデル・並列度・指定出力先の編集は**設定 → 共通**にあります。公開版の旧操作は後述の「公開 v0.8.1（ZIP）の旧画面」に分けています。
@@ -22,7 +22,7 @@ StudyReport Evaluatorは、入力workbookと複数の評価Promptを起動時に
 
 ## 起動option
 
-未公開`0.8.5`候補の単一EXE:
+未公開`0.8.6`候補の単一EXE:
 
 ```text
 StudyReportEvaluator-win-x64.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prompt "<txt-path>" ...]
@@ -64,7 +64,7 @@ StudyReportEvaluator.App.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prom
 
 既にPowerShell 7がある場合の任意の例です。通常のGUI起動のためにPowerShellを導入したり、terminalへcommandを入力したりする必要はありません。
 
-未公開`0.8.5`候補の単一EXE:
+未公開`0.8.6`候補の単一EXE:
 
 ```powershell
 & "C:\配布 アプリ\StudyReportEvaluator-win-x64.exe" --input "C:\授業 データ\回答.xlsx" --prompt "C:\授業 データ\評価 Prompt\内容 評価.txt" --prompt "C:\授業 データ\評価 Prompt\学生 Prompt.txt"
@@ -80,7 +80,7 @@ StudyReportEvaluator.App.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prom
 
 ## GitHub Copilotへ貼る起動依頼例
 
-`<...>`を実在pathへ置き換え、引用符を残します。アプリには取得済みの未公開`0.8.5`候補の単一EXE、または公開`v0.8.1`のZIPを展開したEXEのどちらか1つを指定します。
+`<...>`を実在pathへ置き換え、引用符を残します。アプリには取得済みの未公開`0.8.6`候補の単一EXE、または公開`v0.8.1`のZIPを展開したEXEのどちらか1つを指定します。
 
 ```text
 ローカルのStudyReport Evaluatorを、次の入力と評価Promptを事前入力して起動してください。

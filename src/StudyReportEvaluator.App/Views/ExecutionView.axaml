@@ -64,8 +64,8 @@
       <TextBox x:Name="EffectiveModelTextBox" Grid.Column="1" Classes="single-line"
                IsReadOnly="True" TabIndex="10"
                AutomationProperties.AutomationId="ExecutionEffectiveModel"
-               AutomationProperties.Name="実行中または前回と次回のモデル・並列度・読取専用"
-               ToolTip.Tip="実行中／前回runは開始時の固定値、次回は現在の設定の実効値です。希望IDが使えなくても別モデルへ自動変更しません。全文を選択・コピーできます。" />
+               AutomationProperties.Name="実行中または前回と次回のモデル・並列度・モデル上限・読取専用"
+               ToolTip.Tip="実行中／前回runは開始時の固定値、次回は現在の設定の実効値です。希望IDが使えなくても別モデルへ自動変更しません。上限が「SDK未公開」のモデル（autoなど）では、実行前のモデル相対の容量検証を行いません。全文を選択・コピーできます。" />
       <TextBlock x:Name="FixedAutoModelStatus" Grid.Column="2" Classes="label"
                  AutomationProperties.AutomationId="ExecutionFixedAutoModel"
                  AutomationProperties.Name="参照回答と類似度評価で固定使用するautoの利用可否" />
@@ -99,7 +99,7 @@
                       AutomationProperties.AutomationId="StartCopilotLogin"
                       AutomationProperties.Name="GitHubにログイン"
                       AutomationProperties.HelpText="同梱 Copilot CLI を起動し、別のブラウザーで認証します。このアプリはトークンを取得・保存しません。"
-                      ToolTip.Tip="同梱 CLI を直接起動し、別のブラウザーで認証します。このアプリはパスワードやトークンを取得・保存しません。完了後は「Copilot 状態を確認」を押してください。" />
+                      ToolTip.Tip="同梱 CLI を直接起動し、別のブラウザーで認証します。このアプリはパスワードやトークンを取得・保存しません。完了後に認証状態とモデル一覧を自動更新します。" />
               <Button x:Name="CancelCopilotLogin" Content="ログインを取り消す"
                       Command="{Binding CancelLoginCommand}" TabIndex="2"
                       AutomationProperties.AutomationId="CancelCopilotLogin"
@@ -111,9 +111,9 @@
             <TextBlock x:Name="CopilotLoginStatus" Text="{Binding LoginStatusText}" TextWrapping="Wrap"
                        AutomationProperties.AutomationId="CopilotLoginStatus"
                        AutomationProperties.Name="{Binding LoginStatusText}"
-                       AutomationProperties.HelpText="ログイン処理の状態だけを表示します。認証状態は「Copilot 状態を確認」で再確認してください。" />
+                       AutomationProperties.HelpText="ログインと完了後のモデル一覧更新の状態です。失敗時は「Copilot 状態を確認」で再試行できます。" />
             <TextBlock x:Name="CopilotLoginInstructions" Classes="muted" TextWrapping="Wrap"
-                       Text="別のブラウザーで認証し、完了後は「Copilot 状態を確認」。ログイン・定量化は自動で開始しません。" />
+                       Text="別のブラウザーで認証後、モデル一覧を自動更新・保存します。ログイン・定量化は自動で開始しません。" />
           </StackPanel>
         </ScrollViewer>
 

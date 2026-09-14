@@ -22,7 +22,7 @@ public sealed class EvaluationRequestCapacityResult
         long promptUtf8ByteCount,
         long schemaUtf8ByteCount,
         long appOwnedRequestUtf8ByteCount,
-        int modelContextBudget,
+        int? modelContextBudget,
         ImmutableArray<EvaluationRequestCapacityError> errors)
     {
         PromptUnicodeScalarCount = promptUnicodeScalarCount;
@@ -41,14 +41,15 @@ public sealed class EvaluationRequestCapacityResult
 
     public long AppOwnedRequestUtf8ByteCount { get; }
 
-    public int ModelContextBudget { get; }
+    /// null は SDK が当該 model の上限を公開しておらず、model 相対の予算検査を適用しなかったことを表す。
+    public int? ModelContextBudget { get; }
 
     public ImmutableArray<EvaluationRequestCapacityError> Errors { get; }
 
     public bool IsValid => Errors.IsEmpty;
 
     public override string ToString() =>
-        $"{nameof(EvaluationRequestCapacityResult)} {{ PromptUnicodeScalarCount = {PromptUnicodeScalarCount.ToString(CultureInfo.InvariantCulture)}, PromptUtf8ByteCount = {PromptUtf8ByteCount.ToString(CultureInfo.InvariantCulture)}, SchemaUtf8ByteCount = {SchemaUtf8ByteCount.ToString(CultureInfo.InvariantCulture)}, AppOwnedRequestUtf8ByteCount = {AppOwnedRequestUtf8ByteCount.ToString(CultureInfo.InvariantCulture)}, ModelContextBudget = {ModelContextBudget.ToString(CultureInfo.InvariantCulture)}, ErrorCount = {Errors.Length.ToString(CultureInfo.InvariantCulture)}, Content = <redacted> }}";
+        $"{nameof(EvaluationRequestCapacityResult)} {{ PromptUnicodeScalarCount = {PromptUnicodeScalarCount.ToString(CultureInfo.InvariantCulture)}, PromptUtf8ByteCount = {PromptUtf8ByteCount.ToString(CultureInfo.InvariantCulture)}, SchemaUtf8ByteCount = {SchemaUtf8ByteCount.ToString(CultureInfo.InvariantCulture)}, AppOwnedRequestUtf8ByteCount = {AppOwnedRequestUtf8ByteCount.ToString(CultureInfo.InvariantCulture)}, ModelContextBudget = {ModelContextBudget?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}, ErrorCount = {Errors.Length.ToString(CultureInfo.InvariantCulture)}, Content = <redacted> }}";
 }
 
 public sealed class EvaluationRequestCapacityValidator
@@ -62,8 +63,8 @@ public sealed class EvaluationRequestCapacityValidator
 
     public EvaluationRequestCapacityResult Validate(
         SafeEvaluationPayload payload,
-        int maximumPromptTokens,
-        int maximumContextWindowTokens)
+        int? maximumPromptTokens,
+        int? maximumContextWindowTokens)
     {
         ArgumentNullException.ThrowIfNull(payload);
         return ValidateCore(
@@ -77,8 +78,8 @@ public sealed class EvaluationRequestCapacityValidator
 
     public EvaluationRequestCapacityResult Validate(
         SafeReferenceAnswerPayload payload,
-        int maximumPromptTokens,
-        int maximumContextWindowTokens)
+        int? maximumPromptTokens,
+        int? maximumContextWindowTokens)
     {
         ArgumentNullException.ThrowIfNull(payload);
         return ValidateCore(
@@ -92,8 +93,8 @@ public sealed class EvaluationRequestCapacityValidator
 
     public EvaluationRequestCapacityResult Validate(
         SafeSpecialEvaluationPayload payload,
-        int maximumPromptTokens,
-        int maximumContextWindowTokens)
+        int? maximumPromptTokens,
+        int? maximumContextWindowTokens)
     {
         ArgumentNullException.ThrowIfNull(payload);
         return ValidateCore(
@@ -107,8 +108,8 @@ public sealed class EvaluationRequestCapacityValidator
 
     public EvaluationRequestCapacityResult Validate(
         SafeSimilarityPayload payload,
-        int maximumPromptTokens,
-        int maximumContextWindowTokens)
+        int? maximumPromptTokens,
+        int? maximumContextWindowTokens)
     {
         ArgumentNullException.ThrowIfNull(payload);
         return ValidateCore(
@@ -125,22 +126,29 @@ public sealed class EvaluationRequestCapacityValidator
         string schema,
         string toolName,
         string toolDescription,
-        int maximumPromptTokens,
-        int maximumContextWindowTokens)
+        int? maximumPromptTokens,
+        int? maximumContextWindowTokens)
     {
-        if (maximumPromptTokens <= 0)
+        if (maximumPromptTokens is <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(maximumPromptTokens));
         }
 
-        if (maximumContextWindowTokens <= 0)
+        if (maximumContextWindowTokens is <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(maximumContextWindowTokens));
         }
 
-        int effectiveLimit = Math.Min(maximumPromptTokens, maximumContextWindowTokens);
-    long promptScalars = CountUnicodeScalars(renderedPrompt);
-    long promptBytes = Encoding.UTF8.GetByteCount(renderedPrompt);
+        // null は SDK が当該 model の上限を公開していないことを表す。router の `auto` が該当する。
+        int? effectiveLimit = (maximumPromptTokens, maximumContextWindowTokens) switch
+        {
+            (int prompt, int context) => Math.Min(prompt, context),
+            (int prompt, null) => prompt,
+            (null, int context) => context,
+            _ => null,
+        };
+        long promptScalars = CountUnicodeScalars(renderedPrompt);
+        long promptBytes = Encoding.UTF8.GetByteCount(renderedPrompt);
         long schemaScalars = CountUnicodeScalars(schema);
         long schemaBytes = Encoding.UTF8.GetByteCount(schema);
         long toolContractScalars = checked(
@@ -151,10 +159,13 @@ public sealed class EvaluationRequestCapacityValidator
             + Encoding.UTF8.GetByteCount(toolDescription));
         long appOwnedScalars = checked(promptScalars + schemaScalars + toolContractScalars);
         long appOwnedBytes = checked(promptBytes + schemaBytes + toolContractBytes);
-        int modelContextBudget = checked((int)((long)effectiveLimit * ModelContextBudgetPercent / 100L));
+        int? modelContextBudget = effectiveLimit is int limit
+            ? checked((int)((long)limit * ModelContextBudgetPercent / 100L))
+            : null;
         ImmutableArray<EvaluationRequestCapacityError>.Builder errors =
             ImmutableArray.CreateBuilder<EvaluationRequestCapacityError>();
 
+        // The model-independent ceiling always applies, including when the SDK publishes no limit.
         if (appOwnedScalars > MaximumRequestUnicodeScalars)
         {
             errors.Add(new EvaluationRequestCapacityError(
@@ -168,13 +179,13 @@ public sealed class EvaluationRequestCapacityValidator
         // ephemeral session. UTF-8 bytes are an explicit conservative upper bound for
         // app-owned tokenization and leave 20% of the model budget for runtime context.
         // This dimension is never reported as measured model tokens.
-        if (appOwnedBytes > modelContextBudget)
+        if (modelContextBudget is int budget && appOwnedBytes > budget)
         {
             errors.Add(new EvaluationRequestCapacityError(
                 "REQUEST_CONTEXT_BUDGET_EXCEEDED",
                 "AppOwnedRequestUtf8Bytes",
                 appOwnedBytes,
-                modelContextBudget));
+                budget));
         }
 
         return new EvaluationRequestCapacityResult(
