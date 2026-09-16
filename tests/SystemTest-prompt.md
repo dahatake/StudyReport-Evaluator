@@ -66,12 +66,14 @@
 
 要求定義§4.4のcanonical sample契約は次のとおりであり、10人fixtureで置換しない。
 
-| 項目 | 固定値 |
+以下の12列の表とF〜K候補は旧sampleの履歴であり、現行sampleの期待値は本節末尾の2026-09-16採用追補を優先する。
+
+| 項目 | 契約／履歴測定値 |
 |---|---|
 | path | `sample/SampleReport.xlsx` |
 | bytes | `470,806` |
 | SHA-256 | `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA` |
-| package entries / relationships | 11 / 8 |
+| package entries / relationships（履歴） | 11 / 8（現行の固定gateではない） |
 | worksheet / dimension | 1件（nameはhashのみ記録） / `A1:L531` |
 | 初期候補 | F/I primary、G/J primary + student Prompt、H primary + supporting、K supporting、J→K support |
 | 初期target / 対象外 | F〜K / A〜E、L |
@@ -79,15 +81,23 @@
 fileが存在しない場合は期待値へ合わせて作成せず、当該scenarioを`BLOCKED`とする。F〜Kの役割はheader semantic由来の候補であり、固定mappingではない。
 sample契約はこのexact pathだけを使用し、`sample` directoryの他fileを列挙、fallback、代用しない。
 
+**2026-09-16 利用者明示承認:** canonical sampleの旧bytes・SHA-256・worksheet name hash・先頭128 bytes・11 entries／8 relationships一致は非ゲートとする。旧測定値は履歴として保持し、現在の測定値へ書き換えない。実ZIPの`Entries.Count`と`classification.PackagePartCount`の一致、metadataのpackage／relationship件数とclassificationの一致、正かつclassifierの安全上限内のrelationship件数、external relationships 0を必須とする。sheet／dimension・行列数・mapping候補と実行前後SHA-256／size／last-write UTC不変も引き続き必須。opt-in、privacy、実データのLive AI送信禁止は変更しない。10人synthetic fixture、CLI、配布物の固定identity検証は対象外。
+
+**2026-09-16のread-only観測:** 現在fileは469,976 bytes、13 entries／9 relationships（root 4〔classificationlabelsを含む〕、workbook 4、sheet1のtable 1）、external relationships 0で、classifierは`StandardXlsx`として受理した。13／9は固定gateではない。旧fileの元bytesがなく正確な差分・変更原因は証明できないため、旧fixtureの変更内容を断定しない。entry一覧は`dev/docs/preflight/sample-workbook-profile.md`を参照する。
+
+**2026-09-16 現行sample採用追補:** 利用者不在時の自律続行指示に基づき、production `WorkbookMetadataReader`＋`ColumnMappingSuggester`の測定済みprofileを採用する。出典は`TestResults/app-fixes-20260916/sample-profile/dahatake_DAHATAKE-OFFICE_2026-09-16_13_59_37_net10.0.trx`の標準出力。1 worksheet、`A1:J531`、531行／10列、header 1、data 2〜531、target D/E/F/G/H/I、対象外 A/B/C/J。D/GはPrimaryAnswer、E/HはPrimaryAnswer + StudentPromptPrimary、F/IはSupporting、suggested supportingはE→F・H→Iだけ（他候補は空）。本追補は§2.2／2.3／3の旧12列sample-only期待値を上書きし、12列syntheticと10人fixtureの固定契約・coverageは変更しない。構造assertのskip・任意化は行わない。出典testは旧期待値との不一致でFAILであり、測定記録を修正後test／E2EのPASSへ読み替えない。本追補でテスト・ビルドは実行していない。
+
 ### 2.3 Canonical SampleReportのtechnical E2E利用
 
-| 項目 | 固定baseline |
+以下は旧12列sampleの履歴表。現在のtechnical E2Eには§2.2の採用追補と§3.3を適用する。
+
+| 項目 | 構造baseline／履歴測定値 |
 |---|---|
 | logical path | `sample/SampleReport.xlsx` |
 | bytes | `470,806` |
 | local SHA-256 | `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA` |
-| identity binding | size、SHA-256、先頭128 bytesの一致 |
-| package entries | 11 |
+| historical identity comparison | size、SHA-256、先頭128 bytesの実比較は診断専用（非ゲート） |
+| package entries（履歴） | 11（固定gateではない。現行契約・観測は§2.2） |
 | worksheet / dimension | 1件 / `A1:L531` |
 | rows | header 1行 + data 530行 |
 | macro / external-link parts | 0 / 0 |
@@ -102,7 +112,7 @@ sample契約はこのexact pathだけを使用し、`sample` directoryの他file
 
 ### 3.1 設問／source mapping
 
-canonical `sample/SampleReport.xlsx`のrow 1 headerから得た現行の5 question definitionは次のとおりである。回答本文は抽出していない。
+canonical `sample/SampleReport.xlsx`のrow 1 headerから得た履歴baselineの5 question definitionは次のとおりである。回答本文は抽出していない。現在fileのmapping再検証完了を示すものではない。
 
 | Question | Primary | Supporting | Evaluator | Points |
 |---|---|---|---|---:|
@@ -122,9 +132,22 @@ Kは、設問(4)(5)に関連してPrompt作成時に工夫した点、観点、�
 | SpecialPoints | 0 | 要求定義§5.1、アプリの初期definition |
 | SimilarityPenaltyWeight | 0.1 | 要求定義§5.1、アプリの初期definition |
 | RoundingDigits | 1 | 要求定義§5.1、アプリの初期definition |
-| Question Points | 8 × 5 | 要求定義§6.2の`(100-60-0)/5`と現行mapping |
+| Question Points（旧sampleの履歴） | 8 × 5 | 要求定義§6.2の`(100-60-0)/5`と旧12列mapping |
 
 **これらの数値はExcel cellから抽出した値ではない。** Excelから抽出した5つのheader候補へ、要求とアプリの初期配分規則を適用した既定値である。
+
+### 3.3 現行sampleの既定値（2026-09-16追補）
+
+本番`InputViewModel.CreateSuggestedQuestions`はprimary候補だけを採用し、`CreateDefaultQuestion`は学生Prompt候補をCustomPromptに設定する。`QuantificationDefinition`のbase 60・special 0と`ScoringAllocationCalculator.Equalize`から次を導出する。旧5問表は履歴として残し、10人fixtureの5問・各8点は変更しない。
+
+| Question ordinal | Primary | Supporting | Evaluator | Points |
+|---|---|---|---|---:|
+| 1 | D | なし | KnowledgeCoverage | 10 |
+| 2 | E | F | CustomPrompt | 10 |
+| 3 | G | なし | KnowledgeCoverage | 10 |
+| 4 | H | I | CustomPrompt | 10 |
+
+Base 60、Special 0、SimilarityPenaltyWeight 0.1、RoundingDigits 1、allocation 100。normal planは530×4＝2,120件、references 4件、checkpoint update 4＋530＝534回を期待する。これは本番ロジック由来のoracleであり、今回のE2E実測成功ではない。
 
 ## 4. 使い方
 
@@ -176,7 +199,7 @@ Kは、設問(4)(5)に関連してPrompt作成時に工夫した点、観点、�
 
 ### 6.1 既存の局所検証と今回のscenario判定
 
-T01で追加したAC-035〜037／TR-34〜36／ST-UC-27〜29／C-045〜047は維持する。要求所有者の2026-09-07の後続承認を優先し、元プランの承認前表記は履歴として読む。現在の実装と直接testは[traceability](dev/docs/traceability.md)、親担当のT01〜T38 REVIEWED／T39 BLOCKEDとF02最終再検証は[実行記録](work/20260907-ui-settings-execution-record.md)の最新欄に接続する。以下は0.8.4の記録済み結果で、0.8.5やこのPromptの新規実行結果ではない。
+T01で追加したAC-035〜037／TR-34〜36／ST-UC-27〜29／C-045〜047は維持する。要求所有者の2026-09-07の後続承認を優先し、元プランの承認前表記は履歴として読む。現在の実装と直接testは[traceability](../dev/docs/traceability.md)、親担当のT01〜T38 REVIEWED／T39 BLOCKEDとF02最終再検証は[実行記録](../dev/docs/archive/work/20260907-ui-settings-execution-record.md)の最新欄に接続する。以下は0.8.4の記録済み結果で、0.8.5やこのPromptの新規実行結果ではない。
 
 | 既存対象集合 | 記録済み結果・出典 | 今回のPromptへの適用限界 |
 |---|---|---|
@@ -306,7 +329,7 @@ UIで未観測の内部候補はmetadata/mapping testの結果として報告し
 報告順: Test ID / External run ID・UTC開始終了 / commit・status hash・OS・architecture・PowerShell・.NET / fixture identity / 実行test / 期待 / 実測 / identity不変 / 非機密証跡 / Status / 差異と再現手順 / 未確認範囲。
 ```
 
-### ST-UC-02: Canonical SampleReport identityとF〜K role候補
+### ST-UC-02: Canonical SampleReport identityとD〜I role候補
 
 ```text
 あなたはStudyReport Evaluator v4.6のcanonical repository sampleシステムテスト担当者です。
@@ -322,21 +345,26 @@ Requirement: TR-02 / AC-003 / docs/requirements-definition.md §4.4
 4. `sample/SampleReport.xlsx`の存在を確認します。なければStatus=BLOCKED、code=`BLOCKED_CANONICAL_SAMPLE_MISSING`とし、存在すると偽りません。
 5. repository外にevidence directoryを作ります。
 
-存在する場合の期待identity:
-- bytes: 470,806
-- SHA-256: 73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA
-- package entries: 11
-- relationships: 8
-- worksheet/dimension: 1件（nameはSHA-256だけを記録） / A1:L531
+履歴identity（2026-09-16利用者明示承認により固定一致は非ゲート）:
+- historical bytes: 470,806
+- historical SHA-256: 73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA
+
+存在する場合の期待構造:
+- StandardXlsxとして受理され、read-onlyで取得した実ZIPのEntries.Countとclassification.PackagePartCountが一致する。
+- metadataのpackage／relationship件数がclassificationと一致し、relationship件数は正かつclassifierの安全上限内、external relationshipsは0。
+- 旧11 entries／8 relationshipsは履歴であり固定gateではない。2026-09-16の観測は469,976 bytes、13 entries／9 relationships、external 0、StandardXlsx受理であり、新たな固定gateやdimension・mappingのPASS証跡にしない。旧fileの元bytesがなく正確な差分は証明できない。
+- worksheet/dimension: 1件（nameはSHA-256だけを記録） / A1:J531
+- rows/columns: 531行／10列、data 530行（2026-09-16測定済みprofileを採用。旧12列は履歴）
 - initial source: single worksheet、question row 1、data rows 2〜531
 
 期待role候補:
-- A〜E/L: 初期対象外
-- F/I: primary候補
-- G/J: primary + student Prompt候補
-- H: primary + supporting候補
-- K: supporting候補、Jのinitial supporting候補
-- F〜Kはheader semanticから得た候補であり固定mappingではない。
+- A/B/C/J: 初期対象外
+- D/G: PrimaryAnswer候補
+- E/H: PrimaryAnswer + StudentPromptPrimary候補
+- F/I: Supporting候補
+- Eのinitial supportingはF、HはI。他候補のsuggested supportingは空。
+- targetはD/E/F/G/H/I。header semanticから得た候補であり固定mappingではない。
+- 測定出典はTestResults/app-fixes-20260916/sample-profile/dahatake_DAHATAKE-OFFICE_2026-09-16_13_59_37_net10.0.trxの標準出力。旧期待値との不一致でFAILだった実行を、今回のPASSへ代用しない。
 
 実行:
 1. 検査前のSHA-256、size、last-write UTCを取得します。
@@ -346,8 +374,9 @@ Requirement: TR-02 / AC-003 / docs/requirements-definition.md §4.4
 
 判定:
 - file不足はBLOCKEDでありFAILやPASSへ変換しない。
-- fileが存在し、identityまたは構造が1項目でも異なる場合はFAIL。
-- 全期待値と元本不変を今回確認した場合だけPASS。
+- 旧bytes・SHA-256・sheet name hash・11 entries／8 relationshipsとの不一致だけではFAIL／BLOCKEDにしない。旧測定値は履歴のまま保持し、一致を未確認のまま主張しない。
+- fileが存在し、構造・role候補が異なる場合、または実行前後のSHA-256・size・last-write UTCが異なる場合はFAIL。
+- 全期待構造・role候補と元本不変を今回確認した場合だけPASS。
 
 報告順: Test ID / UTC開始終了 / commit・環境 / file存在 / identity / package構造 / role候補 / input不変 / test実測 / 非機密証跡 / Status / 差異。sample本文とprivate pathは掲載しません。
 ```
@@ -406,7 +435,7 @@ Requirement: TR-04 / TR-05 / AC-004 / AC-005 / AC-006 / AC-008
 既定値の出典:
 - BasePoints=60、SpecialPoints=0、SimilarityPenaltyWeight=0.1、RoundingDigits=1は要求定義§5.1とアプリ初期definition。
 - Excel cellに埋め込まれた値ではない。
-- 添付header由来5問ではQuestion Pointsは各8で、60+0+5×8=100。
+- 旧sample／10人fixtureのheader由来5問ではQuestion Pointsは各8で、60+0+5×8=100。2026-09-16採用の現行sampleは4問・各10で、60+0+4×10=100。
 
 配分oracle:
 - enabled question 2件、Base 60、Special 0: 20、20。
@@ -1111,7 +1140,7 @@ Requirement: real-data technical E2E / AC-009〜AC-016 / AC-019
 
 正本:
 - `docs/requirements-definition.md` v4.6
-- `SystemTest-prompt.md` v4.6
+- `tests/SystemTest-prompt.md` v4.6
 - `docs/getting-started.md`
 - `docs/privacy-and-data-handling.md`
 - `tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs`
@@ -1120,18 +1149,21 @@ Requirement: real-data technical E2E / AC-009〜AC-016 / AC-019
 
 input baseline:
 - logical path `sample/SampleReport.xlsx`
-- size 470,806 bytes
-- local SHA-256 `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA`
-- identity bindingはsize、SHA-256、先頭128 bytesの一致。
-- Open XML entries 11、worksheet 1、dimension A1:L531、rows 531、macro 0、external-link 0。
-1項目でも異なる場合、inputを変更せず`BLOCKED_INPUT_IDENTITY_MISMATCH`とします。
+- historical size 470,806 bytes
+- historical SHA-256 `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA`
+- 2026-09-16利用者明示承認により、旧size、SHA-256、先頭128 bytesの一致は診断専用（非ゲート）。旧測定値を書き換えず、旧sample／attachmentと同一と未確認のまま主張しない。
+- Open XML entriesはread-onlyで取得した実ZIPのEntries.Countとclassification.PackagePartCountが一致し、metadataのpackage／relationship件数もclassificationと一致する。relationship件数は正かつclassifierの安全上限内、external relationships 0。
+- 旧11 entries／8 relationshipsは履歴であり固定gateではない。2026-09-16の観測は469,976 bytes、13 entries／9 relationships、external 0、StandardXlsx受理。新たな固定gateにせず、旧fileの元bytesがないため正確な差分・変更原因は断定しない。
+- worksheet 1、dimension A1:J531、rows 531、columns 10、macro 0、external-link 0を期待する。2026-09-16のproduction reader＋suggester測定（TestResults/app-fixes-20260916/sample-profile/dahatake_DAHATAKE-OFFICE_2026-09-16_13_59_37_net10.0.trx標準出力）を現行profileとして採用し、旧12列sample期待値だけを上書きする。出典testのFAILと今回E2Eの成否は分離する。
+canonical pathまたは必須構造が異なる場合、inputを変更せず`BLOCKED_INPUT_IDENTITY_MISMATCH`とします。履歴identity比較が不一致という理由だけではblockしません。実行前後のSHA-256、size、last-write UTC不変は必須です。
 
 initial definition baseline（header/cell本文は非表示）:
 - header row 1、data rows 2〜531、530 rows。
 - Base 60、Special 0、SimilarityPenaltyWeight 0.1、RoundingDigits 1。
-- question 5、primary F/G/H/I/J、Jだけsupporting K。
-- evaluator types KnowledgeCoverage、CustomPrompt、KnowledgeCoverage、KnowledgeCoverage、CustomPrompt。
-- points各8、allocation total 100。
+- question 4、primary D/E/G/H、2問目Eのsupporting F、4問目Hのsupporting I（1・3問目は空）。
+- target D/E/F/G/H/I、対象外 A/B/C/J。D/GはPrimaryAnswer、E/HはPrimaryAnswer + StudentPromptPrimary、F/IはSupporting。
+- evaluator types KnowledgeCoverage、CustomPrompt、KnowledgeCoverage、CustomPrompt。
+- points各10、allocation total 100。
 - special operationはSpecial=0のためdispatch 0。
 数値はworkbook cellではなく要求とアプリ初期definitionの既定値です。
 
@@ -1173,16 +1205,16 @@ opt-in忘れによるtest runner上の見かけPASSを、JSON freshnessなしで
 
 technical oracle:
 1. format=`StandardXlsx`、InputViewModel read-only load成功。
-2. dimension、row範囲、5 questions、mapping、evaluator、points、allocationがbaseline一致。
+2. dimension、row範囲、4 questions、mapping、evaluator、points、allocationがbaseline一致。
 3. startup parserが`--input`を受理し、in-process prefillをloadする。
 4. Release apphostがstartup probe中に生存し、controlled cleanupされる。
 5. probe前後でinput identityとinput隣接`result` stateが不変で、新規Copilot process signal 0。
 6. production row source、snapshot boundary、CheckpointStore、OutputPathPlanner、WorkbookDurableRunFinalizer、partial cleanerを通る。
 7. AI boundaryは`local-deterministic-midpoint-no-network-not-for-grading`でnetwork runnerを呼ばない。
-8. references 5、completed rows 530、planned normal evaluations 2,650。
-9. normal SUCCESS/EMPTYは今回JSONから記録し、合計2,650、failure 0、cancelled 0。
-10. reference calls 5。normal/similarity callsは今回SUCCESS件数と一致、special calls 0。
-11. checkpoint create 1、update 535（5 references + 530 rows）、load 0。
+8. references 4、completed rows 530、planned normal evaluations 2,120。
+9. normal SUCCESS/EMPTYは今回JSONから記録し、合計2,120、failure 0、cancelled 0。
+10. reference calls 4。normal/similarity callsは今回SUCCESS件数と一致、special calls 0。
+11. checkpoint create 1、update 534（4 references + 530 rows）、load 0。
 12. progressにPreparing、GeneratingReferences、SavingCheckpoint、EvaluatingRows、FinalizingWorkbook、Completedを含み、count単調増加、最後in-flight 0。
 13. finalization SUCCESS、success後partialなし、working/temp残存なし。
 14. finalは元1 + app-owned 4 = 5 sheets、Checkpointなし。
@@ -1194,13 +1226,14 @@ technical oracle:
 
 evidence整合性:
 - JSONのsource requirements=`docs/requirements-definition.md v4.6`、system_test_prompt=`SystemTest-prompt.md v4.6`。
+- `historical_sample_identity_gating=false`で、`sample_size_match`／`sample_sha256_match`／`sample_prefix_128_match`は実比較の診断値。これらのfalseをtechnical FAIL／BLOCKEDへ変換せず、trueへ書き換えない。今回inputのsize／SHA-256／last-write UTCと実行前後不変を別に検証する。
 - driver固定run IDは履歴の識別値のまま維持し、その版・日付を現在の要求版・実行日時と誤認せず、`NON_UNIQUE_DRIVER_RUN_ID`として今回のunique external run IDと区別する。
 - runtime CLI identityがtest value／zero hashであるため、bundled production CLI検証済みと報告しない。
 - JSON privacy flagだけを信用せず、input absolute path、user profile path、16文字以上のworkbook文字列が完全一致で混入していないことを値非表示で再確認する。
 - TRXを共有privacy artifactとして扱わない。
 
 manual UI scope:
-Desktop観測可能な場合だけRelease apphostを`--input`付きで起動し、exact warning、4 steps、Inputのsheet/dimension/row/5 mappings、Designの60/0/0.1/各8/total100、Execution controls、起動だけではResults遷移・AI実行・final/partial作成なしを本文非表示で確認します。`Copilot 状態を確認`と`定量化を開始`は押しません。観測不能なら`NOT_RUN_UI_AUTOMATION_UNAVAILABLE`でありPASSにしません。Full production AI E2Eは`NOT_RUN_POLICY_REAL_DATA`固定です。
+Desktop観測可能な場合だけRelease apphostを`--input`付きで起動し、exact warning、4 steps、Inputのsheet/dimension/row/4 mappings、Designの60/0/0.1/各10/total100、Execution controls、起動だけではResults遷移・AI実行・final/partial作成なしを本文非表示で確認します。`Copilot 状態を確認`と`定量化を開始`は押しません。観測不能なら`NOT_RUN_UI_AUTOMATION_UNAVAILABLE`でありPASSにしません。Full production AI E2Eは`NOT_RUN_POLICY_REAL_DATA`固定です。
 
 regression:
 targeted run後、上記5環境変数を同じprocessから必ず解除します。その後`dotnet test .\StudyReportEvaluator.slnx -c Release --no-restore --no-build`を1回実行し、今回のtotal/passed/failed/skipped/durationを記録します。環境変数を残したままreal-data testを再実行しません。

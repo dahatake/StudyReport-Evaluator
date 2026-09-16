@@ -152,6 +152,27 @@ public sealed class WindowsSingleFilePublishTests
             """, "Assert-NotReparsePoint", "Get-PublishModeArguments");
     }
 
+    [Fact]
+    public void Single_file_profile_pins_runtime_and_ILLink_only_for_the_App()
+    {
+        string path = Path.Combine(FindRepositoryRoot(), "src", "StudyReportEvaluator.App",
+            "Properties", "PublishProfiles", "WindowsSingleFile.pubxml");
+        XDocument profile = XDocument.Load(path);
+        const string appCondition = "'$(MSBuildProjectName)' == 'StudyReportEvaluator.App'";
+        XElement runtime = Assert.Single(profile.Descendants("RuntimeFrameworkVersion"));
+        Assert.Equal("10.0.11", runtime.Value);
+        Assert.Equal(appCondition, (string?)runtime.Parent!.Attribute("Condition"));
+        XElement pack = Assert.Single(profile.Descendants("KnownILLinkPack"));
+        Assert.Equal("Microsoft.NET.ILLink.Tasks", (string?)pack.Attribute("Update"));
+        Assert.Equal(appCondition, (string?)pack.Parent!.Attribute("Condition"));
+        Assert.Null(pack.Attribute("Condition")); // Item-level metadata conditions fail MSBuild evaluation.
+        XElement version = Assert.Single(pack.Elements("ILLinkPackVersion"));
+        Assert.Equal("10.0.11", version.Value);
+        Assert.Equal("'%(KnownILLinkPack.TargetFramework)' == 'net10.0'", (string?)version.Attribute("Condition"));
+        Assert.Equal("false", Assert.Single(profile.Descendants("PublishTrimmed")).Value);
+        Assert.Empty(profile.Descendants("PackageReference")); // Keep canonical App/Core locks untouched.
+    }
+
     [Theory]
     [InlineData("relative.pubxml")]
     [InlineData("")]

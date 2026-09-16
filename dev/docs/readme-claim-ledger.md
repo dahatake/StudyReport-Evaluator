@@ -6,7 +6,7 @@
 | 要求 | `docs/requirements-definition.md` v4.6 |
 | Decision | ADR-0012（機能）/ ADR-0015（delivery scope）/ ADR-0013（Windows ZIP public evidence）/ ADR-0016（Windows単一EXE 1操作起動） |
 | 更新日 | 2026-09-07 |
-| SystemTest正本 | `SystemTest-prompt.md` v4.6、ST-UC-01〜29、TR-01〜36 |
+| SystemTest正本 | `tests/SystemTest-prompt.md` v4.6、ST-UC-01〜29、TR-01〜36 |
 | Public release observation | 2026-09-04、`v0.8.1`とZIP／sidecarの2 assetを公開 |
 | Recorded focused evidence | v4.4 input regression 46/46、DocumentationContractTests 14/14（2026-09-05の既存記録） |
 | Audited evidence | source `20c8121c2474a13f409c0d7f0fde9d4c41f74698`の`0.8.3` baseline: full required regression 718/718 PASS（Core 190、App 528） |

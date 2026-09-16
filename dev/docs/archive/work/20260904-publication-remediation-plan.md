@@ -130,7 +130,7 @@ S1-01〜03はB1-05/06直後に実行する。旧W3/R4/D5/V6 task IDはactive dep
 |---|---:|---|---|---|
 | F-018 | P1 | root READMEはlocalで公開物0件へ訂正中だが、`docs/README.md`と`docs/getting-started.md`は「配布されたZIP」を前提にする | 公開前状態の説明が文書間で分裂する | [`README.md`](../../../../README.md)、[`docs/README.md`](../../../../docs/README.md)、[`docs/getting-started.md`](../../../../docs/getting-started.md) |
 | F-019 | P1 | `implementation-status.md`は`0.8.0`の過去test非流用を明記しつつ、transition表でZIPを`PASS_REQUIRED`とする | current candidateのstatus表現が自己矛盾する | [`implementation-status.md`](../../../../dev/docs/implementation-status.md) |
-| F-020 | P1 | status文書はroot Prompt 21 scenario/TR-24の旧結果を記す一方、現行Prompt候補は25 scenario/TR-29 | current test contractと状態記録が不一致 | [`implementation-status.md`](../../../../dev/docs/implementation-status.md)、[`readme-claim-ledger.md`](../../../../dev/docs/readme-claim-ledger.md)、`tests/SystemTest-prompt.md` (当時のパス。現行正本は [SystemTest-prompt.md](../../../../SystemTest-prompt.md)) |
+| F-020 | P1 | status文書はroot Prompt 21 scenario/TR-24の旧結果を記す一方、現行Prompt候補は25 scenario/TR-29 | current test contractと状態記録が不一致 | [`implementation-status.md`](../../../../dev/docs/implementation-status.md)、[`readme-claim-ledger.md`](../../../../dev/docs/readme-claim-ledger.md)、`tests/SystemTest-prompt.md` (当時のパス。現行正本は [SystemTest-prompt.md](../../../../tests/SystemTest-prompt.md)) |
 | F-021 | P1 | 旧計画は`1.1.0`、dead `v1.0.1`修正、独自Windows Sandbox基盤をactive taskとして扱う | 現在の`0.8.0`差分と今回のYAGNI制約に不適合 | [`work/20260903-1655-TaskExecutionPlan.md`](20260903-1655-TaskExecutionPlan.md) |
 
 ## 4. 不明点、選択肢、採用デフォルト

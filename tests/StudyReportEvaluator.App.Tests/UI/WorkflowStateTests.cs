@@ -13,6 +13,7 @@ using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Launch;
 using StudyReportEvaluator.App.Navigation;
 using StudyReportEvaluator.App.Settings;
+using StudyReportEvaluator.App.Tests.Settings;
 using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.App.ViewModels;
 using StudyReportEvaluator.App.Views;
@@ -31,6 +32,8 @@ public sealed class WorkflowStateTests
 {
     private static readonly CanonicalDefinitionSerializer Canonical = new();
     private static readonly TimeSpan BoundaryWait = TimeSpan.FromSeconds(10);
+    private static readonly CachedCopilotModel[] ExpectedCatalog =
+        [new("model-test", 64_000, 128_000), new("auto", null, null)];
 
     [AvaloniaTheory]
     [InlineData(SettingsCategory.Mapping)]
@@ -236,7 +239,8 @@ public sealed class WorkflowStateTests
         using WorkflowFixture fixture = await WorkflowFixture.CreateAsync();
         Next(fixture);
         Next(fixture);
-        await AuthenticateAsync(fixture);
+        Assert.False(File.Exists(fixture.Store.FilePath));
+        byte[] savedBytes = await AuthenticateAsync(fixture);
         SettingsView settings = Open(fixture, SettingsCategory.Common);
         Select(ById<ComboBox>(settings, "ExecutionModel"), "auto");
         Select(ById<ComboBox>(settings, "ExecutionConcurrency"), 2);
@@ -285,7 +289,8 @@ public sealed class WorkflowStateTests
         AssertDefinition(request.DraftDefinition, fixture.Input.DefinitionDraft);
         AssertDefinition(request.DraftDefinition, fixture.Design.Draft);
         Assert.Equal(1, fixture.Loader.CallCount);
-        Assert.False(File.Exists(fixture.Store.FilePath));
+        Assert.Equal(savedBytes, await File.ReadAllBytesAsync(fixture.Store.FilePath, TestContext.Current.CancellationToken));
+        Assert.Null(fixture.Shell.Settings.LastSaveTask); // Authentication created only cache + defaults.
         AssertPassive(fixture, authenticationChecks: 1, runs: 1);
     }
 
@@ -307,7 +312,7 @@ public sealed class WorkflowStateTests
         Assert.Equal(explicitOutput ? chosenOutput : null, saved.OutputDirectoryOverride);
         byte[] savedBytes = await File.ReadAllBytesAsync(fixture.Store.FilePath, TestContext.Current.CancellationToken);
         Close(fixture);
-        await AuthenticateAsync(fixture);
+        savedBytes = await AuthenticateAsync(fixture, savedBytes);
         ExecutionRunContext completed = await RunAsync(fixture);
         QuantificationRunRequest previous = fixture.Runner.LastRequest!;
         ResultsCriterionViewModel[] results = fixture.Results.Results.ToArray();
@@ -350,6 +355,7 @@ public sealed class WorkflowStateTests
         AssertDefinition(next, request.DraftDefinition);
         Assert.Equal(Canonical.ComputeSha256(next), newContext.Summary.DefinitionSha256);
         AssertDefinition(original, previous.DraftDefinition);
+        Assert.Equal(savedBytes, await File.ReadAllBytesAsync(fixture.Store.FilePath, TestContext.Current.CancellationToken));
         AssertPassive(fixture, authenticationChecks: 1, runs: 2);
     }
 
@@ -539,7 +545,7 @@ public sealed class WorkflowStateTests
         AssertPassive(fixture);
         Next(fixture);
         Next(fixture);
-        await AuthenticateAsync(fixture);
+        savedBytes = await AuthenticateAsync(fixture, savedBytes);
         ExecutionRunContext completed = await RunAsync(fixture);
         QuantificationRunRequest previous = fixture.Runner.LastRequest!;
         ResultsCriterionViewModel[] previousResults = fixture.Results.Results.ToArray();
@@ -719,13 +725,22 @@ public sealed class WorkflowStateTests
         return saved;
     }
 
-    private static async Task AuthenticateAsync(WorkflowFixture fixture)
+    private static async Task<byte[]> AuthenticateAsync(WorkflowFixture fixture, byte[]? savedBytes = null)
     {
+        byte[]? before = File.Exists(fixture.Store.FilePath)
+            ? await File.ReadAllBytesAsync(fixture.Store.FilePath, TestContext.Current.CancellationToken) : null;
+        if (savedBytes is not null) Assert.Equal(savedBytes, before);
+        int authenticationChecks = fixture.Authentication.CallCount;
+        int runs = fixture.Runner.CallCount;
         Assert.Same(fixture.Execution.CheckAuthenticationCommand,
             Required<Button>(Current<ExecutionView>(fixture), "CheckAuthenticationButton").Command);
         await fixture.Execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken)
             .WaitAsync(BoundaryWait, TestContext.Current.CancellationToken);
         Render();
+        Assert.Equal(ExecutionAuthenticationState.Available, fixture.Execution.AuthenticationState);
+        AssertPassive(fixture, authenticationChecks: authenticationChecks + 1, runs: runs);
+        return ModelCatalogPersistenceAssert.OnlyCatalogChanged(before,
+            await File.ReadAllBytesAsync(fixture.Store.FilePath, TestContext.Current.CancellationToken), ExpectedCatalog);
     }
 
     private static async Task<ExecutionRunContext> RunAsync(WorkflowFixture fixture)

@@ -39,12 +39,14 @@ public sealed partial class RealDataSystemSmokeTests
     private const string SourceStatusHashEnvironmentVariable =
         "STUDY_REPORT_EVALUATOR_SOURCE_STATUS_SHA256";
     private const string RunId = "SYSTEM-TEST-REALDATA-V4_5-20260906-D14";
-    private const string ExpectedSampleSha256 =
+    // Historical comparisons are diagnostic only (user-approved policy, 2026-09-16).
+    private const long HistoricalSampleSizeBytes = 470_806;
+    private const string HistoricalSampleSha256 =
         "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA";
     private const string LocalModelId =
         "local-deterministic-midpoint-no-network-not-for-grading";
-    // The canonical sample prefix is checked without exposing workbook content.
-    private const string ExpectedSamplePrefixHex =
+    // Compare the historical prefix without exposing current workbook content.
+    private const string HistoricalSamplePrefixHex =
         "504B030414000600080000002100A90F"
         + "68387F01000002050000130008025B43"
         + "6F6E74656E745F54797065735D2E786D"
@@ -88,10 +90,7 @@ public sealed partial class RealDataSystemSmokeTests
         {
             InputSnapshotService snapshots = new();
             InputSnapshot inputBefore = snapshots.Capture(inputPath);
-            FileInfo inputFile = new(inputPath);
-            Assert.Equal(470_806, inputFile.Length);
-            Assert.Equal(ExpectedSampleSha256, inputBefore.Sha256);
-            AssertSamplePrefix(inputPath);
+            bool historicalPrefixMatch = MatchesHistoricalSamplePrefix(inputPath);
 
             FileFormatClassificationResult classification = new FileFormatClassifier().Classify(inputPath);
             Assert.True(classification.IsAccepted);
@@ -104,9 +103,9 @@ public sealed partial class RealDataSystemSmokeTests
             Assert.Empty(input.ValidationErrors);
             WorkbookMetadata metadata = Assert.IsType<WorkbookMetadata>(input.Metadata);
             WorksheetMetadata sourceWorksheet = Assert.Single(metadata.Worksheets);
-            Assert.Equal("A1:L531", sourceWorksheet.DimensionReference);
+            Assert.Equal("A1:J531", sourceWorksheet.DimensionReference);
             Assert.Equal(531U, sourceWorksheet.RowCount);
-            Assert.Equal(12U, sourceWorksheet.ColumnCount);
+            Assert.Equal(10U, sourceWorksheet.ColumnCount);
             Assert.Equal(1, input.HeaderRow);
             Assert.Equal(2, input.FirstDataRow);
             Assert.Equal(531, input.LastDataRow);
@@ -116,18 +115,21 @@ public sealed partial class RealDataSystemSmokeTests
             Assert.Equal(0m, definition.SpecialPoints);
             Assert.Equal(0.1m, definition.SimilarityPenaltyWeight);
             Assert.Equal(1, definition.RoundingDigits);
-            Assert.Equal(5, definition.Questions.Length);
-            Assert.Equal(["F", "G", "H", "I", "J"],
+            // Current sample profile measured through the production reader/suggester on 2026-09-16.
+            Assert.Equal(4, definition.Questions.Length);
+            Assert.Equal(["D", "E", "G", "H"],
                 definition.Questions.Select(question => question.PrimarySourceColumn));
-            Assert.Equal([8m, 8m, 8m, 8m, 8m],
+            Assert.Equal([10m, 10m, 10m, 10m],
                 definition.Questions.Select(question => question.Points));
             Assert.Equal(
                 [EvaluatorType.KnowledgeCoverage, EvaluatorType.CustomPrompt,
-                    EvaluatorType.KnowledgeCoverage, EvaluatorType.KnowledgeCoverage,
-                    EvaluatorType.CustomPrompt],
+                    EvaluatorType.KnowledgeCoverage, EvaluatorType.CustomPrompt],
                 definition.Questions.Select(question => Assert.Single(question.Evaluators).Type));
             Assert.Empty(definition.Questions.SelectMany(question => question.SpecialEvaluations));
-            Assert.Equal(["K"], definition.Questions[4].SupportingSourceColumns);
+            Assert.Empty(definition.Questions[0].SupportingSourceColumns);
+            Assert.Equal(["F"], definition.Questions[1].SupportingSourceColumns);
+            Assert.Empty(definition.Questions[2].SupportingSourceColumns);
+            Assert.Equal(["I"], definition.Questions[3].SupportingSourceColumns);
 
             QuantificationDesignViewModel design = new(
                 definition,
@@ -212,22 +214,22 @@ public sealed partial class RealDataSystemSmokeTests
             Assert.False(summary.PartialCleanupFailed);
             Assert.Equal(AtomicOutputStatusCodes.Success, summary.FinalizationCode);
             Assert.Equal(530, summary.CompletedRows.Length);
-            Assert.Equal(5, summary.References.Length);
-            Assert.Equal(2_650, summary.PlannedEvaluationCount);
-            Assert.Equal(2_650, summary.CompletedEvaluationCount);
+            Assert.Equal(4, summary.References.Length);
+            Assert.Equal(2_120, summary.PlannedEvaluationCount);
+            Assert.Equal(2_120, summary.CompletedEvaluationCount);
             Assert.Equal(0, summary.FailureCount);
             Assert.Equal(0, summary.CancelledCount);
             Assert.Equal(summary.PlannedOperationCount, summary.CompletedOperationCount);
             Assert.Equal(0, summary.OperationFailureCount);
             Assert.Equal(0, summary.OperationCancelledCount);
-            Assert.Equal(5, references.CallCount);
+            Assert.Equal(4, references.CallCount);
             Assert.Equal(summary.SucceededCount, normal.CallCount);
             Assert.Equal(summary.SucceededCount, similarities.CallCount);
             Assert.Equal(0, specials.CallCount);
             Assert.Equal(530, rowSource.ReadCount);
             Assert.Equal(1, checkpoints.CreateCount);
-            // One update after each of 5 references and each of 530 completed rows.
-            Assert.Equal(535, checkpoints.UpdateCount);
+            // One update after each of 4 references and each of 530 completed rows.
+            Assert.Equal(534, checkpoints.UpdateCount);
             Assert.Equal(0, checkpoints.LoadCount);
             Assert.Equal(1, concurrency.MaximumObserved);
             Assert.True(summary.SucceededCount + summary.EmptyCount == summary.PlannedEvaluationCount);
@@ -307,9 +309,10 @@ public sealed partial class RealDataSystemSmokeTests
                 input = new
                 {
                     logical_name = "SampleReport.xlsx",
-                    sample_size_match = inputFile.Length == 470_806,
-                    sample_sha256_match = inputBefore.Sha256 == ExpectedSampleSha256,
-                    sample_prefix_128_match = true,
+                    historical_sample_identity_gating = false,
+                    sample_size_match = inputBefore.SizeBytes == HistoricalSampleSizeBytes,
+                    sample_sha256_match = inputBefore.Sha256 == HistoricalSampleSha256,
+                    sample_prefix_128_match = historicalPrefixMatch,
                     size_bytes = inputBefore.SizeBytes,
                     sha256 = inputBefore.Sha256,
                     last_write_time_utc = inputBefore.LastWriteTimeUtc,
@@ -458,7 +461,7 @@ public sealed partial class RealDataSystemSmokeTests
         await shell.InputViewModel.LoadLaunchInputIfRequestedAsync(cancellationToken);
         Assert.True(shell.InputViewModel.HasLoadedWorkbook);
         Assert.True(shell.InputViewModel.CanContinue);
-        Assert.Equal(5, shell.InputViewModel.Questions.Count);
+        Assert.Equal(4, shell.InputViewModel.Questions.Count);
 
         string resultDirectory = Path.Combine(
             Path.GetDirectoryName(inputPath)
@@ -835,13 +838,18 @@ public sealed partial class RealDataSystemSmokeTests
     private static string Column(string? reference) =>
         new((reference ?? string.Empty).TakeWhile(char.IsAsciiLetter).ToArray());
 
-    private static void AssertSamplePrefix(string path)
+    private static bool MatchesHistoricalSamplePrefix(string path)
     {
-        byte[] expected = Convert.FromHexString(ExpectedSamplePrefixHex);
+        byte[] expected = Convert.FromHexString(HistoricalSamplePrefixHex);
         byte[] actual = new byte[expected.Length];
         using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (stream.Length < expected.Length)
+        {
+            return false;
+        }
+
         stream.ReadExactly(actual);
-        Assert.Equal(expected, actual);
+        return actual.SequenceEqual(expected);
     }
 
     private static string RequiredAbsoluteFile(string variable)

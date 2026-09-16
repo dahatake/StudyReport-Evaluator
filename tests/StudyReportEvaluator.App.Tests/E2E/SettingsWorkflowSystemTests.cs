@@ -8,6 +8,7 @@ using DocumentFormat.OpenXml.Validation;
 using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Navigation;
 using StudyReportEvaluator.App.Settings;
+using StudyReportEvaluator.App.Tests.Settings;
 using StudyReportEvaluator.App.Tests.UI;
 using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.App.Tests.Workflow;
@@ -44,6 +45,8 @@ public sealed class SettingsWorkflowSystemTests
     private const string TestApplicationIdentity = "StudyReportEvaluator.App/T27-local";
     private static readonly DateTimeOffset FixedUtc = new(2026, 9, 7, 0, 0, 0, TimeSpan.Zero);
     private static readonly CanonicalDefinitionSerializer Canonical = new();
+    private static readonly CachedCopilotModel[] ExpectedCatalog =
+        [new(ModelId, 64_000, 128_000), new("auto", null, null)];
     private static CancellationToken TestToken => TestContext.Current.CancellationToken;
 
     [Theory]
@@ -88,7 +91,7 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Equal(settingsBytes, await File.ReadAllBytesAsync(settingsPath, TestToken));
         AssertPassive(session);
 
-        await AuthenticateAsync(session);
+        settingsBytes = await AuthenticateAsync(session, settingsBytes);
         RunSummary summary = await RunAsync(session);
         string finalPath = AssertSuccessfulFinal(session, replacement, summary);
         QuantificationRunRequest dispatched = Assert.Single(session.Boundary.Requests);
@@ -175,7 +178,7 @@ public sealed class SettingsWorkflowSystemTests
         string settingsPath = await SaveSettingsAsync(workbook);
         byte[] settingsBytes = await File.ReadAllBytesAsync(settingsPath, TestToken);
         using LocalSession session = await OpenAdmittedAsync(settingsPath, workbook);
-        await PrepareExecutionAsync(session);
+        settingsBytes = await PrepareExecutionAsync(session, settingsBytes);
         RunSummary summary = await RunAsync(session);
         string originalFinal = AssertSuccessfulFinal(session, workbook, summary);
         InputSnapshot finalBefore = new InputSnapshotService().Capture(originalFinal);
@@ -242,14 +245,19 @@ public sealed class SettingsWorkflowSystemTests
         RunSummary baseline;
         using (LocalSession uninterrupted = await OpenAdmittedAsync(settingsPath, workbook))
         {
-            await PrepareExecutionAsync(uninterrupted);
+            settingsBytes = await PrepareExecutionAsync(uninterrupted, settingsBytes);
             baseline = await RunAsync(uninterrupted);
             AssertSuccessfulFinal(uninterrupted, workbook, baseline);
+            Assert.Equal(settingsBytes, await File.ReadAllBytesAsync(settingsPath, TestToken));
         }
 
         CheckpointEnvelope saved;
-        using (LocalSession interrupted = await OpenAdmittedAsync(settingsPath, workbook))
+        using (LocalSession interrupted = await OpenAdmittedAsync(settingsPath, workbook, expectStartupAuthentication: true))
         {
+            // The baseline run cached the catalog. This new instance must check auth once
+            // at startup without dispatching AI; PrepareExecution performs one explicit recheck.
+            AssertPassive(interrupted, authenticationChecks: 1);
+            Assert.Equal(settingsBytes, await File.ReadAllBytesAsync(settingsPath, TestToken));
             bool stopped = false;
             interrupted.Ai.BeforeNormal = (payload, token) =>
             {
@@ -311,11 +319,15 @@ public sealed class SettingsWorkflowSystemTests
             Assert.Empty(new OpenXmlValidator().Validate(document, TestToken));
             Assert.Equal([SourceSheet, CheckpointStore.CheckpointSheetName], document.WorkbookPart!.Workbook!
                 .Descendants<Sheet>().Select(sheet => sheet.Name?.Value));
+            Assert.Equal(settingsBytes, await File.ReadAllBytesAsync(settingsPath, TestToken));
         }
 
         // New store, input reader, VMs and orchestrator. Completed rows are still read to
         // revalidate evidence; only their AI operations (and the saved reference) are skipped.
-        using LocalSession resumed = await OpenAdmittedAsync(settingsPath, workbook, new LocalAi { RejectReferenceCalls = true });
+        using LocalSession resumed = await OpenAdmittedAsync(settingsPath, workbook,
+            new LocalAi { RejectReferenceCalls = true }, expectStartupAuthentication: true);
+        AssertPassive(resumed, authenticationChecks: 1);
+        Assert.Equal(settingsBytes, await File.ReadAllBytesAsync(settingsPath, TestToken));
         await PrepareExecutionAsync(resumed);
         resumed.Execution.IsResumeMode = true;
         resumed.Execution.ResumePartialPath = saved.PartialPath;
@@ -379,7 +391,7 @@ public sealed class SettingsWorkflowSystemTests
 
         await LoadAndAdmitAsync(session, workbook);
         Assert.Null(session.Input.SavedDefinitionApplicationError);
-        await PrepareExecutionAsync(session);
+        settingsBytes = await PrepareExecutionAsync(session, settingsBytes);
         AssertSuccessfulFinal(session, workbook, await RunAsync(session));
         AssertUnchanged(workbook.Path, before);
         AssertUnchanged(incompatible.Path, incompatibleBefore);
@@ -513,8 +525,18 @@ public sealed class SettingsWorkflowSystemTests
         return path;
     }
 
-    private static async Task InitializeAsync(LocalSession session)
+    private static async Task InitializeAsync(LocalSession session, bool expectStartupAuthentication = false)
     {
+        byte[] settingsBytes = await File.ReadAllBytesAsync(session.Shell.Settings.FilePath, TestToken);
+        using (JsonDocument json = JsonDocument.Parse(settingsBytes))
+        {
+            Assert.Equal(expectStartupAuthentication,
+                json.RootElement.TryGetProperty("cachedModels", out JsonElement catalog)
+                    && catalog.ValueKind != JsonValueKind.Null);
+        }
+
+        session.StartupAuthenticationChecks = expectStartupAuthentication ? 1 : 0;
+        AssertPassive(session);
         QuantificationDefinition input = session.Input.DefinitionDraft;
         QuantificationDefinition design = session.Design.Draft;
         Assert.False(session.Shell.Settings.IsInitialized);
@@ -529,15 +551,38 @@ public sealed class SettingsWorkflowSystemTests
         AssertDefinition(Definition(), session.Shell.Settings.StoredDefinition!);
         Assert.Equal(ModelId, session.Execution.PreferredModelId);
         Assert.Equal(2, session.Execution.MaxConcurrency);
-        Assert.Null(session.Execution.SelectedModelId);
-        Assert.Equal(ExecutionAuthenticationState.NotChecked, session.Execution.AuthenticationState);
+        Assert.Equal(expectStartupAuthentication ? ModelId : null, session.Execution.SelectedModelId);
+        Assert.Equal(expectStartupAuthentication ? ExecutionAuthenticationState.Available : ExecutionAuthenticationState.NotChecked,
+            session.Execution.AuthenticationState);
+        if (expectStartupAuthentication)
+        {
+            ModelCatalogPersistenceAssert.OnlyCatalogChanged(settingsBytes,
+                await File.ReadAllBytesAsync(session.Shell.Settings.FilePath, TestToken), ExpectedCatalog);
+            Assert.Equal(ExpectedCatalog.Select(model => model.Id), session.Execution.AvailableModelIds);
+            Assert.True(session.Execution.IsAutoModelAvailable);
+        }
+        else
+        {
+            Assert.Null(session.Execution.CachedModels);
+            Assert.Empty(session.Execution.AvailableModelIds);
+        }
+
+        Assert.False(session.Execution.CanStart);
+        Assert.False(session.Execution.IsRunning);
+        Assert.Null(session.Execution.LastRunContext);
+        Assert.Null(session.Shell.Settings.LastSaveTask);
         Assert.False(session.Shell.Settings.HasUnsavedChanges);
         Assert.False(await session.Shell.Settings.ApplySavedDefinitionAsync(TestToken));
-        AssertPassive(session);
+        // Startup may refresh metadata, never log in, dispatch a run, or call any AI operation.
+        AssertPassive(session, authenticationChecks: session.StartupAuthenticationChecks);
+        await session.Shell.Settings.InitializeAsync(TestToken);
+        AssertPassive(session, authenticationChecks: session.StartupAuthenticationChecks);
+        Assert.Equal(settingsBytes, await File.ReadAllBytesAsync(session.Shell.Settings.FilePath, TestToken));
     }
 
     private static async Task LoadAndAdmitAsync(LocalSession session, X02TemporaryWorkbook workbook)
     {
+        byte[] settingsBytes = await File.ReadAllBytesAsync(session.Shell.Settings.FilePath, TestToken);
         uint requestedHeader = checked((uint)session.Input.HeaderRow);
         await session.Input.SetFilePathAsync(workbook.Path, TestToken);
         Assert.True(session.Input.HasLoadedWorkbook);
@@ -547,7 +592,7 @@ public sealed class SettingsWorkflowSystemTests
         var previousMetadata = session.Input.Metadata;
         session.Shell.OpenSettings(SettingsCategory.Common);
         Assert.True(session.Shell.Settings.CanApplySavedDefinition);
-        AssertPassive(session);
+        AssertPassive(session, authenticationChecks: session.StartupAuthenticationChecks);
         Assert.True(await session.Shell.Settings.ApplySavedDefinitionAsync(TestToken), session.Shell.Settings.ApplyStatusText);
         Assert.NotSame(previousMetadata, session.Input.Metadata);
         Assert.Equal(2U, session.Input.Metadata!.HeaderRowNumber);
@@ -560,16 +605,17 @@ public sealed class SettingsWorkflowSystemTests
         AssertDefinition(Definition(), session.Design.Draft);
         Assert.False(session.Shell.Settings.HasUnsavedChanges);
         session.Shell.CloseSettings();
-        AssertPassive(session);
+        AssertPassive(session, authenticationChecks: session.StartupAuthenticationChecks);
+        Assert.Equal(settingsBytes, await File.ReadAllBytesAsync(session.Shell.Settings.FilePath, TestToken));
     }
 
     private static async Task<LocalSession> OpenAdmittedAsync(
-        string settingsPath, X02TemporaryWorkbook workbook, LocalAi? ai = null)
+        string settingsPath, X02TemporaryWorkbook workbook, LocalAi? ai = null, bool expectStartupAuthentication = false)
     {
         LocalSession session = new(settingsPath, ai);
         try
         {
-            await InitializeAsync(session);
+            await InitializeAsync(session, expectStartupAuthentication);
             await LoadAndAdmitAsync(session, workbook);
             return session;
         }
@@ -594,16 +640,19 @@ public sealed class SettingsWorkflowSystemTests
             (long)EvaluationRequestCapacityValidator.MaximumWorstCaseAttemptsPerRun);
     }
 
-    private static async Task PrepareExecutionAsync(LocalSession session)
+    private static async Task<byte[]> PrepareExecutionAsync(LocalSession session, byte[]? savedBytes = null)
     {
         GoToExecution(session);
-        await AuthenticateAsync(session);
+        return await AuthenticateAsync(session, savedBytes);
     }
 
-    private static async Task AuthenticateAsync(LocalSession session)
+    private static async Task<byte[]> AuthenticateAsync(LocalSession session, byte[]? savedBytes = null)
     {
+        byte[] before = await File.ReadAllBytesAsync(session.Shell.Settings.FilePath, TestToken);
+        if (savedBytes is not null) Assert.Equal(savedBytes, before);
+        AssertPassive(session, authenticationChecks: session.StartupAuthenticationChecks);
         await session.Execution.CheckAuthenticationAsync(TestToken);
-        Assert.Equal(1, session.Authentication.CallCount);
+        Assert.Equal(session.StartupAuthenticationChecks + 1, session.Authentication.CallCount);
         Assert.True(session.Execution.IsAutoModelAvailable);
         Assert.Equal(ModelId, session.Execution.SelectedModelId);
         Assert.Empty(session.Execution.TechnicalErrors);
@@ -612,6 +661,9 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Empty(session.Ai.ReferenceCalls);
         Assert.Empty(session.Ai.NormalCalls);
         Assert.Equal(0, session.Login.CallCount);
+        AssertPassive(session, authenticationChecks: session.StartupAuthenticationChecks + 1);
+        return ModelCatalogPersistenceAssert.OnlyCatalogChanged(before,
+            await File.ReadAllBytesAsync(session.Shell.Settings.FilePath, TestToken), ExpectedCatalog);
     }
 
     private static async Task<RunSummary> RunAsync(LocalSession session)
@@ -631,6 +683,7 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Equal(ModelId, request.ModelId);
         Assert.Equal(2, request.MaxConcurrency);
         AssertDefinition(Definition(), request.DraftDefinition);
+        Assert.Equal(session.StartupAuthenticationChecks + 1, session.Authentication.CallCount);
         Assert.Equal(0, session.Login.CallCount);
         Assert.Null(session.Execution.LastLoginTask);
         return context.Summary;
@@ -805,9 +858,9 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Equal(expected.LastWriteTimeUtc, actual.LastWriteTimeUtc);
     }
 
-    private static void AssertPassive(LocalSession session)
+    private static void AssertPassive(LocalSession session, int authenticationChecks = 0)
     {
-        Assert.Equal(0, session.Authentication.CallCount);
+        Assert.Equal(authenticationChecks, session.Authentication.CallCount);
         Assert.Equal(0, session.Login.CallCount);
         Assert.Null(session.Execution.LastLoginTask);
         Assert.Empty(session.Boundary.Requests);
@@ -959,6 +1012,7 @@ public sealed class SettingsWorkflowSystemTests
         internal ExecutionViewModel Execution { get; }
         internal ResultsOutputViewModel Results { get; }
         internal MainWindowViewModel Shell { get; }
+        internal int StartupAuthenticationChecks { get; set; }
         public void Dispose() => Shell.Dispose();
     }
 

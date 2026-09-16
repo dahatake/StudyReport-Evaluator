@@ -126,9 +126,9 @@ repository内の現行サンプル正本は次とする。
 
 `sample/SampleReport.xlsx`
 
-2026-09-03に回答本文を出力せず、production readerで構造とheader由来mapping候補だけを再確認したprofileを使用する。このexact pathだけをrepository sample契約として使い、同directoryの他fileを列挙、fallback、代用しない。local deterministic technical E2Eも同じfileを使う。
+以下は2026-09-03に回答本文を出力せず、production readerで構造とheader由来mapping候補だけを再確認した履歴profileである。このexact pathだけをrepository sample契約として使い、同directoryの他fileを列挙、fallback、代用しない。local deterministic technical E2Eも同じfileを使う。
 
-| 項目 | 実測値 |
+| 項目 | 2026-09-03の履歴測定値 |
 |---|---|
 | Bytes | 470,806 |
 | SHA-256 | `73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA` |
@@ -141,7 +141,13 @@ repository内の現行サンプル正本は次とする。
 | Jの初期supporting候補 | K |
 | 初期target / 対象外 | F〜K / A〜E、L |
 
-F〜Kの役割はheader semanticsから得た候補であり、列位置だけで固定しない。利用者は実際のheaderと授業設計を確認し、通常Questionまたは固有評価のprimary/supportingを画面で変更する。
+**2026-09-16 利用者明示承認によるtest方針追補:** 上表のbytes・SHA-256・worksheet name hash・package entries／relationships 11／8は履歴測定として保持し、現在sampleとの固定一致を合否条件にしない。technical E2Eの過去の先頭128 bytes比較も診断専用とする。package件数はread-onlyで取得したZIPの実`Entries.Count`と`classification.PackagePartCount`の一致、metadataのpackage／relationship件数とclassificationの一致、relationship件数が正かつclassifierの安全上限内であることを検証する。canonical path、標準形式・外部relationship 0、sheet／dimension・行列数・mapping候補の検証と§4.5の実行前後SHA-256／size／last-write time一致は維持する。privacy・opt-in・実データのLive AI送信禁止は緩和しない。
+
+**2026-09-16のread-only観測:** 現在fileは469,976 bytes、ZIP entries 13、relationships 9（root 4〔classificationlabelsを含む〕、workbook 4、sheet1のtable 1）、external relationships 0で、classifierは`StandardXlsx`として受理した。13／9は今回の観測値であり、新たな固定件数gateではない。旧fileの元bytesがないため正確な差分・変更原因は証明できず、旧fixtureが何を変更されたかは断定しない。詳細は`dev/docs/preflight/sample-workbook-profile.md`に記録する。
+
+**2026-09-16 現行sample採用追補:** 利用者不在時の自律続行指示に基づき、production `WorkbookMetadataReader`＋`ColumnMappingSuggester`の測定済みprofileを現行契約とする。証跡は`TestResults/app-fixes-20260916/sample-profile/dahatake_DAHATAKE-OFFICE_2026-09-16_13_59_37_net10.0.trx`の標準出力。1 worksheet、`A1:J531`、531行／10列、header 1、data 2〜531（530行）、target D/E/F/G/H/I、対象外 A/B/C/J。D/Gは`PrimaryAnswer`、E/Hは`PrimaryAnswer | StudentPromptPrimary`、F/Iは`Supporting`。初期supportingはE→F、H→Iで、他候補は空。既定設問はD/E/G/Hの4問、KnowledgeCoverage／CustomPrompt／KnowledgeCoverage／CustomPrompt、各10点、base 60・special 0となる。旧12列profileは履歴として保持し、現行sampleの期待値だけを本追補で上書きする。既存12列syntheticと10人fixtureの契約は変更しない。証跡のtest自体は旧期待値との不一致でFAILであり、構造測定を修正後test／E2EのPASSへ読み替えない。構造assertをskip・任意化せず、元本不変と全安全境界を維持する。
+
+列の役割はheader semanticsから得た候補であり、列位置だけで固定しない。利用者は実際のheaderと授業設計を確認し、通常Questionまたは固有評価のprimary/supportingを画面で変更する。
 
 ### 4.5 元本不変
 
@@ -853,7 +859,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 |---|---|
 | AC-001 | native pickerまたはpathから標準 `.xlsx`を選び、元本を変更せず別 `.xlsx`を作る。 |
 | AC-002 | question text rowを1または2から選び、sheet、回答行、質問／通常回答／固有項目列を変更可能な候補として表示する。主回答列を選択すると、同じsheet・question text rowの交差セル値を当該設問textへ即時反映する。 |
-| AC-003 | 指定sampleでF〜Jをprimary候補、G/Jを学生Prompt primary候補、H/Kをsupporting候補、KをJの初期supporting候補として提示し、元本identityを維持する。 |
+| AC-003 | §4.4の現行sampleでD/E/G/Hをprimary候補、E/Hを学生Prompt primary候補、F/Iをsupporting候補、E→F・H→Iを初期supporting候補として提示し、元本identityを維持する。旧12列profileは履歴として分離する。 |
 | AC-004 | base既定60、special既定0、similarity weight既定0.1を表示・変更できる。 |
 | AC-005 | 設問Pointsの初期値が`(100-base-special)/有効設問数`となり、明示的な均等配分以外で手動値を変更しない。 |
 | AC-006 | `base + special + Σ question points = 100`をrun前とformulaで検証する。 |
@@ -898,7 +904,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 これらをF02後の`0.8.6`や全受入のPASSへ流用しない。追加nativeは3試行で停止し、最新`artifacts/test/ui-settings/t39/native-final-attempt.json`は`CONTROL_ID_PREDICATE_NOT_UNIQUE`でFAIL。120 DPI・1475×1000 pixel＝1180×800 DIP・合成入力読込・入力／EXE不変・実利用者設定非作成は部分観測であり、4画面・5カテゴリ・1024×720・実keyboardの成功ではない。Narrator／本人walkthrough4項目／隔離利用者でのnative保存とCH-01〜06は`NOT_RUN_EXTERNAL_PREREQUISITE`。以下は受入に必要な試験契約であり、要求承認・局所検証・過去evidenceを未実施範囲の成功へ拡張しない。
 
 1. Microsoft Forms型、Google Forms型、question row 1/2の匿名化synthetic workbook test。各rowで主回答列変更後の設問textが同列の交差セル値へ一致すること、および質問文行変更後・metadata再読込前は旧行の値を反映せず`HEADER_METADATA_MISMATCH`で再読込を要求することを含む。
-2. sample identity、sheet、dimension、F〜K role suggestion、input不変test。
+2. sampleのcanonical path、標準形式、実ZIP／classification／metadataの件数整合性とrelationship安全境界、sheet、dimension、行列数、§4.4の現行D〜I role suggestion、実行前後のinput identity不変test。§4.4の履歴固定hash／bytes・11 entries／8 relationships一致はgateにしない。
 3. native picker cancel/select、path direct input、unsupported format test。
 4. base/special/question pointsの初期配分、最後の設問への端数、手動値保持、均等配分test。
 5. 配点合計、range、similarity weight、enabled special minimumのvalidation test。

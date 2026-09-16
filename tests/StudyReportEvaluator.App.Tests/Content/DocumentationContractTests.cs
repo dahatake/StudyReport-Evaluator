@@ -877,15 +877,18 @@ public sealed class DocumentationContractTests
         string requirements = Read("docs/requirements-definition.md");
         string ledger = Read("dev/docs/readme-claim-ledger.md");
         string sampleProfile = Read("dev/docs/preflight/sample-workbook-profile.md");
-        string prompts = Read("SystemTest-prompt.md");
+        string prompts = Read("tests/SystemTest-prompt.md");
         string realDataSmoke = Read("tests/StudyReportEvaluator.App.Tests/E2E/RealDataSystemSmokeTests.cs");
 
         Assert.False(
+            File.Exists(Resolve(root, "SystemTest-prompt.md")),
+            "The consolidated tests/SystemTest-prompt.md must be the only system-test Prompt source.");
+        Assert.False(
             File.Exists(Resolve(root, "tests/system-test-prompt.md")),
-            "The consolidated root SystemTest-prompt.md must be the only system-test Prompt source.");
+            "The legacy system-test Prompt must remain consolidated into tests/SystemTest-prompt.md.");
         Assert.False(
             File.Exists(Resolve(root, "tests/e2e-systemtest-prompt.md")),
-            "The legacy real-data Prompt must remain consolidated into root SystemTest-prompt.md.");
+            "The legacy real-data Prompt must remain consolidated into tests/SystemTest-prompt.md.");
 
         AssertContainsAll(
             requirements,
@@ -900,6 +903,16 @@ public sealed class DocumentationContractTests
             "| Bytes | 470,806 |",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
             "| package entries / relationships | 11 / 8 |",
+            "2026-09-16 現行sample採用追補",
+            "1 worksheet、`A1:J531`、531行／10列、header 1、data 2〜531（530行）",
+            "target D/E/F/G/H/I、対象外 A/B/C/J",
+            "D/Gは`PrimaryAnswer`、E/Hは`PrimaryAnswer | StudentPromptPrimary`、F/Iは`Supporting`",
+            "初期supportingはE→F、H→Iで、他候補は空",
+            "旧12列profileは履歴として保持し、現行sampleの期待値だけを本追補で上書きする",
+            "既存12列syntheticと10人fixtureの契約は変更しない",
+            "bytes・SHA-256・worksheet name hash・package entries／relationships 11／8は履歴測定として保持し、現在sampleとの固定一致を合否条件にしない",
+            "実行前後SHA-256／size／last-write time一致は維持する",
+            "privacy・opt-in・実データのLive AI送信禁止は緩和しない",
             "同directoryの他fileを列挙、fallback、代用しない",
             "利用者が主回答列を選択した場合",
             "交差セルが空または存在しない場合は質問文を空として扱い",
@@ -908,8 +921,7 @@ public sealed class DocumentationContractTests
             requirements,
             "sample/realdata.xlsx",
             "469,995",
-            "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D",
-            "A1:J531");
+            "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D");
         AssertContainsAll(
             sampleProfile,
             "| Requirement | `docs/requirements-definition.md` v4.3 |",
@@ -919,20 +931,36 @@ public sealed class DocumentationContractTests
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
             "| ZIP entries | 11 |",
             "| Package relationships | 8 |",
+            "現行sample採用追補（2026-09-16）",
+            "| Worksheet / dimension | 1件 / `A1:J531` |",
+            "| Rows / columns | 531 / 10 |",
+            "| Header / first / last data row | 1 / 2 / 531（data 530行） |",
+            "| Initial target / unselected | D/E/F/G/H/I / A/B/C/J |",
+            "| D | PrimaryAnswer | なし |",
+            "| E | PrimaryAnswer + StudentPromptPrimary | F |",
+            "| F | Supporting | なし |",
+            "| G | PrimaryAnswer | なし |",
+            "| H | PrimaryAnswer + StudentPromptPrimary | I |",
+            "| I | Supporting | なし |",
+            "旧`A1:L531`／12列・F〜Kの履歴値は変更せず",
+            "`historical_sample_identity_gating=false`",
+            "`false`でもそれだけでFAIL／BLOCKEDにせず",
+            "実行前後SHA-256／size／last-write UTC不変",
+            "privacy・opt-in・Live AI送信禁止を維持する",
+            "既存12列synthetic／10人fixtureを変更・代用しない",
             "同directoryの他fileを列挙、fallback、代用しない");
         AssertDoesNotContainAny(
             sampleProfile,
             "sample/realdata.xlsx",
             "469,995",
-            "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D",
-            "A1:J531");
+            "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D");
         AssertSequentialTableIds(requirements, "AC-", 37);
         AssertSequentialTableIds(ledger, "C-", 47);
         AssertContainsAll(ledger, "VERIFIED", "BLOCKED", "EXCLUDED");
         AssertContainsAll(
             ledger,
             "`docs/requirements-definition.md` v4.6",
-            "`SystemTest-prompt.md` v4.6、ST-UC-01〜29、TR-01〜36",
+            "`tests/SystemTest-prompt.md` v4.6、ST-UC-01〜29、TR-01〜36",
             "`PASS_DEVELOPMENT`",
             "fresh user本人login／再起動後確認のCH-06は`NOT_RUN`");
 
@@ -1013,6 +1041,16 @@ public sealed class DocumentationContractTests
             "CH-01〜CH-06",
             "`sample/SampleReport.xlsx`",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
+            "2026-09-16 現行sample採用追補",
+            "1 worksheet、`A1:J531`、531行／10列、header 1、data 2〜531",
+            "target D/E/F/G/H/I、対象外 A/B/C/J",
+            "D/GはPrimaryAnswer、E/HはPrimaryAnswer + StudentPromptPrimary、F/IはSupporting",
+            "suggested supportingはE→F・H→Iだけ（他候補は空）",
+            "旧12列sample-only期待値を上書きし、12列syntheticと10人fixtureの固定契約・coverageは変更しない",
+            "旧bytes・SHA-256・worksheet name hash・先頭128 bytes・11 entries／8 relationships一致は非ゲートとする",
+            "旧測定値は履歴として保持し、現在の測定値へ書き換えない",
+            "実行前後SHA-256／size／last-write UTC不変も引き続き必須",
+            "opt-in、privacy、実データのLive AI送信禁止は変更しない",
             "他fileを列挙、fallback、代用しない",
             "question row 1と2の各fixtureで主回答列を変更すると",
             "Inputの主回答列ComboBoxを操作すると");
@@ -1040,7 +1078,7 @@ public sealed class DocumentationContractTests
         string contract = Read("dev/docs/ui-layout-contract.md");
         string traceability = Read("dev/docs/traceability.md");
         string ledger = Read("dev/docs/readme-claim-ledger.md");
-        string prompts = Read("SystemTest-prompt.md");
+        string prompts = Read("tests/SystemTest-prompt.md");
 
         AssertContainsAll(
             requirements,

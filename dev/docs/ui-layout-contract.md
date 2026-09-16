@@ -9,7 +9,7 @@
 | T27の範囲 | 実設定保存／復元・実ファイル出力を扱うローカルE2Eが7/7 Passed（§5.3）。native UI・実認証／実AI・別process再起動の確認ではない |
 | T28／T36の範囲 | 0.8.4のT28は8画像1440×1050・2回hash一致・最小frame検証を含む216/216でREVIEWED。T36は文書／画像contract 21/21でREVIEWED。0.8.6での再生成・実保存・nativeの証拠ではない |
 | 残る実測 | T39追加nativeは3試行後に停止し、最新CONTROL_ID_PREDICATE_NOT_UNIQUEでFAIL。120 DPI／1180×800 DIP等の部分観測のみ（§5.4）。Narrator・本人walkthrough4項目・隔離利用者native保存はNOT_RUN_EXTERNAL_PREREQUISITE |
-| 追跡 | AC-016／017／018／035〜037、TR-17／18／34〜36。[traceability](traceability.md)、[SystemTest](../../SystemTest-prompt.md) ST-UC-12／13／27〜29 |
+| 追跡 | AC-016／017／018／035〜037、TR-17／18／34〜36。[traceability](traceability.md)、[SystemTest](../../tests/SystemTest-prompt.md) ST-UC-12／13／27〜29 |
 | 版と公開 | 製品正本は親担当が0.8.5未公開候補へPATCHし、その後のauto model対応で0.8.6へPATCH済み。F01はREVIEWED、公開済みはv0.8.1 ZIP。D17の当初上書きとT01の版・CHANGELOG非変更は履歴。後続の自律続行指示でT39 BLOCKEDのままF01／F02を進めるが、全タスクDONE・署名・公開PASSにはしない |
 
 本書は要求から実装へ渡す契約と、§5に明示した対象に限る検証記録である。全UI・全要件の動作合格、改善率、native実DPI・本人walkthroughの証跡へは拡張しない。元プランの承認待ち表記は履歴として保持し、要求正本§22の後続承認を優先する。

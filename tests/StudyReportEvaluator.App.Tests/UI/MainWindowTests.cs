@@ -11,6 +11,7 @@ using Avalonia.VisualTree;
 using StudyReportEvaluator.App.Composition;
 using StudyReportEvaluator.App.Navigation;
 using StudyReportEvaluator.App.Settings;
+using StudyReportEvaluator.App.Tests.Settings;
 using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.App.ViewModels;
 using StudyReportEvaluator.App.Views;
@@ -1370,7 +1371,14 @@ public sealed class MainWindowTests
         AssertDefinition(sourceB, Assert.IsType<QuantificationDefinition>(viewModel.Settings.StoredDefinition));
         viewModel.NextCommand.Execute(null);
         viewModel.NextCommand.Execute(null);
+        Assert.Equal(savedBytes, File.ReadAllBytes(store.FilePath));
+        Assert.Equal(0, harness.Authentication.CallCount);
+        Assert.Equal(0, harness.Runner.CallCount);
         await harness.Execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+        savedBytes = ModelCatalogPersistenceAssert.OnlyCatalogChanged(savedBytes, File.ReadAllBytes(store.FilePath),
+            [new("model-test", 64_000, 128_000), new("auto", null, null)]);
+        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Equal(0, harness.Runner.CallCount);
         await harness.Execution.StartAsync(TestContext.Current.CancellationToken);
         QuantificationRunRequest previousRequest = Assert.IsType<QuantificationRunRequest>(harness.Runner.LastRequest);
         ExecutionRunContext completed = Assert.IsType<ExecutionRunContext>(harness.Execution.LastRunContext);
@@ -1473,6 +1481,7 @@ public sealed class MainWindowTests
 
             Assert.True(harness.Execution.CanStart);
             Assert.Equal(1, harness.Runner.CallCount);
+            Assert.Equal(savedBytes, File.ReadAllBytes(store.FilePath));
             await harness.Execution.StartAsync(TestContext.Current.CancellationToken);
             QuantificationRunRequest next = Assert.IsType<QuantificationRunRequest>(harness.Runner.LastRequest);
             Assert.NotSame(previousRequest, next);

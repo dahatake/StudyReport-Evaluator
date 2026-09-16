@@ -9,6 +9,10 @@ using Xunit;
 
 namespace StudyReportEvaluator.App.Tests.Packaging;
 
+// Candidate construction launches nested tools and flushes artifacts to disk.
+// Isolate its wall-clock deadline from the large durable workbook E2E load.
+// The explicit two-builder concurrency test below still runs both processes.
+[Collection<WindowsPublishPackageCollection>]
 public sealed class ReleaseMatrixBuilderTests
 {
     private const string SkipReason =
@@ -302,6 +306,51 @@ public sealed class ReleaseMatrixBuilderTests
         Assert.Equal(before, fixture.SnapshotOutput());
         Assert.False(File.Exists(Path.Combine(fixture.OutputDirectory, BuilderFixture.CleanHostFileName)));
         Assert.False(File.Exists(Path.Combine(fixture.OutputDirectory, BuilderFixture.MatrixFileName)));
+        fixture.AssertNoTransientDirectories();
+    }
+
+    [Theory(SkipUnless = nameof(RunC03ProcessTests), Skip = SkipReason)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PowerShell_process_preserves_UTF8_output_and_parameter_binding_errors(
+        bool rejectParameter)
+    {
+        using BuilderFixture fixture = new(RequiredTools);
+        const string message = "あいう 日本語 'quoted'; $literal";
+        string scriptPath = Path.Combine(fixture.PackageDirectory, "日本語 probe's.ps1");
+        File.WriteAllText(scriptPath, """
+            [CmdletBinding()]
+            param(
+                [ValidateScript({
+                    if ($_ -eq 'reject') { throw 'あいう 引数検証エラー' }
+                    $true
+                })]
+                [string] $Message
+            )
+            if ([Console]::OutputEncoding.CodePage -ne 65001) { throw 'EXPECTED_UTF8' }
+            [Console]::Out.Write($Message)
+            [Console]::Error.Write($Message)
+            exit 0
+            """, BuilderFixture.Utf8NoBom);
+
+        ProcessResult result = await fixture.RunPowerShellAsync(
+            scriptPath,
+            ["-Message", rejectParameter ? "reject" : message],
+            TestContext.Current.CancellationToken);
+
+        if (rejectParameter)
+        {
+            Assert.NotEqual(0, result.ExitCode);
+            Assert.True(string.IsNullOrWhiteSpace(result.StandardOutput));
+            Assert.Contains("あいう 引数検証エラー", result.StandardError, StringComparison.Ordinal);
+        }
+        else
+        {
+            AssertSucceeded(result);
+            Assert.Equal(message, result.StandardOutput);
+            Assert.Equal(message, result.StandardError);
+        }
+        Assert.Equal(string.Empty, fixture.GetGitStatus());
         fixture.AssertNoTransientDirectories();
     }
 
@@ -1136,7 +1185,7 @@ public sealed class ReleaseMatrixBuilderTests
             return result;
         }
 
-        private async Task<ProcessResult> RunPowerShellAsync(
+        internal async Task<ProcessResult> RunPowerShellAsync(
             string scriptPath,
             IEnumerable<string> arguments,
             CancellationToken cancellationToken)
@@ -1154,7 +1203,16 @@ public sealed class ReleaseMatrixBuilderTests
             };
             foreach (string argument in new[]
                      {
-                         "-NoLogo", "-NoProfile", "-NonInteractive", "-File", scriptPath,
+                         "-NoLogo", "-NoProfile", "-NonInteractive", "-CommandWithArgs",
+                         // Configure the producer before script parameter binding can emit a
+                         // localized error. ProcessStartInfo only configures our strict readers.
+                         // Keep paths and values as arguments, never interpolated PowerShell code.
+                         "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false, $true); " +
+                         "$ErrorActionPreference = 'Stop'; $scriptPath = $args[0]; $parameters = @{}; " +
+                         "for ($i = 1; $i -lt $args.Count; $i += 2) { " +
+                         "$parameters.Add($args[$i].TrimStart('-'), $args[$i + 1]) }; " +
+                         "& $scriptPath @parameters; if (-not $?) { exit 1 }",
+                         scriptPath,
                      })
             {
                 info.ArgumentList.Add(argument);

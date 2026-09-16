@@ -93,11 +93,11 @@ cacheはアプリ配置用で、入力／final／partial、利用者別設定、
 
 | 項目 | 内容 | 適用 | 出典 |
 |---|---|---|---|
-| OS | Windows 11以降（build 22000以上）のx64 OSとx64 process | B | [`scripts/publish-windows.ps1`](scripts/publish-windows.ps1)の`Assert-SupportedHost` |
-| .NET SDK | `10.0.400`と同系列の最新patch（`rollForward`は`latestPatch`、prereleaseは不可） | A・B | [`global.json`](global.json) |
-| PowerShell | PowerShell 7以上の`pwsh`。Windows PowerShell 5.1は非対応 | B | [`scripts/publish-windows.ps1`](scripts/publish-windows.ps1)の`#Requires -Version 7.0`／`#Requires -PSEdition Core` |
-| package取得 | [`NuGet.Config`](NuGet.Config)が指定する単一package sourceへ到達できること | A・B | [`NuGet.Config`](NuGet.Config) |
-| 同梱CLI取得 | `RuntimeIdentifier`指定時だけ、同梱するGitHub Copilot CLIを取得します | B | [`StudyReportEvaluator.App.csproj`](src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj)、[`scripts/publish-windows.ps1`](scripts/publish-windows.ps1) |
+| OS | Windows 11以降（build 22000以上）のx64 OSとx64 process | B | [`scripts/publish-windows.ps1`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/scripts/publish-windows.ps1)の`Assert-SupportedHost` |
+| .NET SDK | `10.0.400`と同系列の最新patch（`rollForward`は`latestPatch`、prereleaseは不可） | A・B | [`global.json`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/global.json) |
+| PowerShell | PowerShell 7以上の`pwsh`。Windows PowerShell 5.1は非対応 | B | [`scripts/publish-windows.ps1`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/scripts/publish-windows.ps1)の`#Requires -Version 7.0`／`#Requires -PSEdition Core` |
+| package取得 | [`NuGet.Config`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/NuGet.Config)が指定する単一package sourceへ到達できること | A・B | [`NuGet.Config`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/NuGet.Config) |
+| 同梱CLI取得 | `RuntimeIdentifier`指定時だけ、同梱するGitHub Copilot CLIを取得します | B | [`StudyReportEvaluator.App.csproj`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj)、[`scripts/publish-windows.ps1`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/scripts/publish-windows.ps1) |
 
 Microsoft Excel、Office、LibreOfficeはA・Bどちらでも不要です。
 
@@ -111,7 +111,7 @@ dotnet run --project .\src\StudyReportEvaluator.App\StudyReportEvaluator.App.csp
 
 ビルド後に「StudyReport Evaluator」ウィンドウが開き、入力 → 採点設計 → 実行 → 結果・出力の4ステップを操作できます。
 
-**この方法はGitHub Copilot CLIを同梱しません。** `RuntimeIdentifier`を指定しないビルドでは`CopilotSkipCliDownload`が`true`となり（[`StudyReportEvaluator.App.csproj`](src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj)）、同梱manifest`copilot-runtime.json`を出力しません。manifestが無い場合、アプリは同梱CLIを解決できず、PATH上の別CLIへfallbackもしません（[`CopilotClientFactory.cs`](src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs)）。したがって実行画面の認証確認・login・AI評価は利用できず、Excel読込、mapping、採点設計、設定の操作までが対象です。
+**この方法はGitHub Copilot CLIを同梱しません。** `RuntimeIdentifier`を指定しないビルドでは`CopilotSkipCliDownload`が`true`となり（[`StudyReportEvaluator.App.csproj`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj)）、同梱manifest`copilot-runtime.json`を出力しません。manifestが無い場合、アプリは同梱CLIを解決できず、PATH上の別CLIへfallbackもしません（[`CopilotClientFactory.cs`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs)）。したがって実行画面の認証確認・login・AI評価は利用できず、Excel読込、mapping、採点設計、設定の操作までが対象です。
 
 この`bin`出力はself-containedではなく、起動端末に.NETが必要です。配布物と同じ前提ではありません。
 
@@ -123,13 +123,13 @@ AI評価まで確認する場合は、公開用と同じself-contained `win-x64`
 pwsh.exe -NoLogo -NoProfile -File .\scripts\publish-windows.ps1
 ```
 
-成功すると`artifacts\package\publish\win-x64`へ出力し、最後に出力先pathを表示します（[`scripts/publish-windows.ps1`](scripts/publish-windows.ps1)）。そのdirectoryの`StudyReportEvaluator.App.exe`を起動してください。self-containedのため、起動端末への.NET追加導入は不要です。
+成功すると`artifacts\package\publish\win-x64`へ出力し、最後に出力先pathを表示します（[`scripts/publish-windows.ps1`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/scripts/publish-windows.ps1)）。そのdirectoryの`StudyReportEvaluator.App.exe`を起動してください。self-containedのため、起動端末への.NET追加導入は不要です。
 
 出力には`copilot-runtime.json`と`runtimes\win-x64\native\copilot.exe`が含まれ、アプリはmanifestのRID・版・SHA-256を検証した同梱CLIだけを使います。AI処理には、利用可能なGitHub Copilot account、本人の対話login、network接続、利用可能model、組織policy上の許可が別途必要です。GUIが起動しただけでAI利用可能とは判断しません。
 
 ### ローカルビルドの注意
 
-- `artifacts`配下の出力はgit管理外の作業成果で、公開配布物ではありません（[`.gitignore`](.gitignore)）。第三者への配布・公開に使わないでください。
+- `artifacts`配下の出力はgit管理外の作業成果で、公開配布物ではありません（[`.gitignore`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/.gitignore)）。第三者への配布・公開に使わないでください。
 - unsignedのため、SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行拒否は配布物と同様に起こり得ます。保護機能の無効化、MOTW除去、execution policy変更、UAC回避は案内しません。
 - ローカルビルドの成功は、fresh Windowsのclean-host試験、本人login、公開判定の完了を意味しません。
 

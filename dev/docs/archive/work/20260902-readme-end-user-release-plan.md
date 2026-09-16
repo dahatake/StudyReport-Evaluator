@@ -126,7 +126,7 @@ Live Copilot、canonical sample、Microsoft ExcelはGitHub-hosted runnerのrequi
 ## 8. 証跡正本
 
 - [`docs/requirements-definition.md`](../../../../docs/requirements-definition.md)
-- [`SystemTest-prompt.md`](../../../../SystemTest-prompt.md)
+- [`SystemTest-prompt.md`](../../../../tests/SystemTest-prompt.md)
 - [`dev/docs/traceability.md`](../../../../dev/docs/traceability.md)
 - [`dev/docs/readme-claim-ledger.md`](../../../../dev/docs/readme-claim-ledger.md)
 - [`dev/docs/version-management.md`](../../../../dev/docs/version-management.md)
