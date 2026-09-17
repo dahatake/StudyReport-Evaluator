@@ -277,7 +277,7 @@ public sealed class DurableQuantificationOrchestrator
             }
 
             checkpoint = loaded.Envelope;
-            string? admissionError = ValidateResumeAdmission(
+            string? admissionError = ResumeAdmissionEvaluator.Evaluate(
                 checkpoint,
                 request.ResumePartialPath,
                 snapshot,
@@ -285,7 +285,7 @@ public sealed class DurableQuantificationOrchestrator
                 currentInput,
                 run.InputPath,
                 run.ModelId,
-                request.Runtime);
+                request.Runtime).BlockingStatusCode;
             if (admissionError is not null)
             {
                 throw new QuantificationRunException(admissionError);
@@ -450,7 +450,7 @@ public sealed class DurableQuantificationOrchestrator
         DurableFinalizationResult finalized = finalizer.Finalize(summary, checkpoint, cancellationToken);
         bool finalPathMatches = finalized.IsSuccess
             && finalized.FinalPath is not null
-            && PathsEqual(finalized.FinalPath, checkpoint.FinalPath);
+            && ResumeAdmissionEvaluator.PathsEqual(finalized.FinalPath, checkpoint.FinalPath);
         bool cleanupFailed = false;
         string finalStatus;
         string? finalPath;
@@ -812,188 +812,6 @@ public sealed class DurableQuantificationOrchestrator
         return true;
     }
 
-    private static string? ValidateResumeAdmission(
-        CheckpointEnvelope checkpoint,
-        string requestedPartialPath,
-        QuantificationSnapshot snapshot,
-        EvaluationPlan plan,
-        InputSnapshot currentInput,
-        string inputPath,
-        string modelId,
-        CheckpointRuntimeIdentity runtime)
-    {
-        if (!PathsEqual(checkpoint.PartialPath, Path.GetFullPath(requestedPartialPath))
-            || !PathsEqual(checkpoint.InputPath, inputPath)
-            || !checkpoint.Input.Equals(currentInput))
-        {
-            return CheckpointAdmissionStatusCodes.InputMismatch;
-        }
-
-        if (!string.Equals(checkpoint.DefinitionSha256, snapshot.Sha256, StringComparison.Ordinal)
-            || !string.Equals(checkpoint.DefinitionCanonicalJson, snapshot.CanonicalJson, StringComparison.Ordinal))
-        {
-            return CheckpointAdmissionStatusCodes.DefinitionMismatch;
-        }
-
-        if (!string.Equals(checkpoint.NormalModelId, modelId, StringComparison.Ordinal)
-            || !string.Equals(checkpoint.ReferenceModelId, "auto", StringComparison.Ordinal))
-        {
-            return CheckpointAdmissionStatusCodes.ModelMismatch;
-        }
-
-        if (!RuntimeCompatible(checkpoint.Runtime, runtime))
-        {
-            return CheckpointAdmissionStatusCodes.RuntimeMismatch;
-        }
-
-        QuestionDefinition[] enabledQuestions = snapshot.Definition.Questions
-            .Where(question => question.Enabled)
-            .ToArray();
-        if (checkpoint.References.Length > enabledQuestions.Length)
-        {
-            return CheckpointStatusCodes.Invalid;
-        }
-
-        for (int index = 0; index < checkpoint.References.Length; index++)
-        {
-            CheckpointReference reference = checkpoint.References[index];
-            if (!string.Equals(reference.QuestionId, enabledQuestions[index].Id, StringComparison.Ordinal)
-                || string.Equals(reference.StatusCode, ResultsStatusCodes.Cancelled, StringComparison.Ordinal))
-            {
-                return CheckpointStatusCodes.Invalid;
-            }
-        }
-
-        if (checkpoint.CompletedRows.Length > plan.Mapping.SelectedRowCount
-            || (checkpoint.CompletedRows.Length > 0
-                && checkpoint.References.Length != enabledQuestions.Length))
-        {
-            return CheckpointStatusCodes.Invalid;
-        }
-
-        for (int index = 0; index < checkpoint.CompletedRows.Length; index++)
-        {
-            CheckpointCompletedRow row = checkpoint.CompletedRows[index];
-            if (row.SourceRowNumber != plan.Mapping.FirstDataRow + index
-                || !ValidateCompletedRowShape(row, plan, enabledQuestions)
-                || row.SimilarityResults.Select((similarity, questionIndex) => new
-                    {
-                        Similarity = similarity,
-                        Reference = checkpoint.References[questionIndex],
-                    })
-                    .Any(pair => !string.Equals(
-                            pair.Reference.StatusCode,
-                            ResultsStatusCodes.Success,
-                            StringComparison.Ordinal)
-                        && string.Equals(
-                            pair.Similarity.StatusCode,
-                            ResultsStatusCodes.Success,
-                            StringComparison.Ordinal)))
-            {
-                return CheckpointStatusCodes.Invalid;
-            }
-        }
-
-        return null;
-    }
-
-    private static bool ValidateCompletedRowShape(
-        CheckpointCompletedRow row,
-        EvaluationPlan plan,
-        IReadOnlyList<QuestionDefinition> enabledQuestions)
-    {
-        EvaluationPlanItem[] normalItems = plan.Items
-            .Where(item => item.SourceRowNumber == row.SourceRowNumber)
-            .ToArray();
-        if (row.NormalResults.Length != normalItems.Length)
-        {
-            return false;
-        }
-
-        for (int index = 0; index < normalItems.Length; index++)
-        {
-            EvaluationPlanItem expected = normalItems[index];
-            CheckpointNormalResult actual = row.NormalResults[index];
-            if (!string.Equals(actual.QuestionId, expected.QuestionId, StringComparison.Ordinal)
-                || !string.Equals(actual.EvaluatorId, expected.EvaluatorId, StringComparison.Ordinal)
-                || string.Equals(actual.StatusCode, ResultsStatusCodes.Cancelled, StringComparison.Ordinal)
-                || (string.Equals(actual.StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal)
-                    != (actual.AcceptedResult is not null)))
-            {
-                return false;
-            }
-
-            EvaluatorDefinition evaluator = enabledQuestions
-                .Single(question => question.Id == expected.QuestionId)
-                .Evaluators.Single(item => item.Enabled && item.Id == expected.EvaluatorId);
-            if (actual.AcceptedResult is QuantificationResult accepted)
-            {
-                CriterionDefinition[] criteria = evaluator.Criteria.Where(criterion => criterion.Enabled).ToArray();
-                if (accepted.Criteria.Length != criteria.Length)
-                {
-                    return false;
-                }
-
-                for (int criterionIndex = 0; criterionIndex < criteria.Length; criterionIndex++)
-                {
-                    CriterionDefinition criterion = criteria[criterionIndex];
-                    CriterionQuantificationResult submitted = accepted.Criteria[criterionIndex];
-                    ScoreRange range = criterion.Range ?? evaluator.Range;
-                    if (!string.Equals(criterion.Id, submitted.CriterionId, StringComparison.Ordinal)
-                        || submitted.RawScore < range.Minimum
-                        || submitted.RawScore > range.Maximum)
-                    {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        (string QuestionId, string SpecialId)[] specials = enabledQuestions
-            .SelectMany(question => question.SpecialEvaluations
-                .Where(special => special.Enabled)
-                .Select(special => (question.Id, special.Id)))
-            .ToArray();
-        if (row.SpecialResults.Length != specials.Length)
-        {
-            return false;
-        }
-
-        for (int index = 0; index < specials.Length; index++)
-        {
-            CheckpointSpecialResult actual = row.SpecialResults[index];
-            if (!string.Equals(actual.QuestionId, specials[index].QuestionId, StringComparison.Ordinal)
-                || !string.Equals(actual.SpecialEvaluationId, specials[index].SpecialId, StringComparison.Ordinal)
-                || string.Equals(actual.StatusCode, ResultsStatusCodes.Cancelled, StringComparison.Ordinal)
-                || (string.Equals(actual.StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal)
-                    != (actual.AcceptedResult is not null))
-                || ((plan.Snapshot.Definition.SpecialPoints == 0m)
-                    != string.Equals(actual.StatusCode, ResultsStatusCodes.NotRunZeroBudget, StringComparison.Ordinal)))
-            {
-                return false;
-            }
-        }
-
-        if (row.SimilarityResults.Length != enabledQuestions.Count)
-        {
-            return false;
-        }
-
-        for (int index = 0; index < enabledQuestions.Count; index++)
-        {
-            CheckpointSimilarityResult actual = row.SimilarityResults[index];
-            if (!string.Equals(actual.QuestionId, enabledQuestions[index].Id, StringComparison.Ordinal)
-                || string.Equals(actual.StatusCode, ResultsStatusCodes.Cancelled, StringComparison.Ordinal)
-                || (string.Equals(actual.StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal)
-                    != (actual.AcceptedResult is not null)))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     private static EvaluationScheduleResult BuildSchedule(
         EvaluationPlan plan,
         ImmutableArray<CheckpointCompletedRow> completedRows)
@@ -1151,36 +969,6 @@ public sealed class DurableQuantificationOrchestrator
         DateTimeOffset now = timeProvider.GetUtcNow();
         return now < minimum ? minimum : now;
     }
-
-    private static bool RuntimeCompatible(
-        CheckpointRuntimeIdentity saved,
-        CheckpointRuntimeIdentity current) =>
-        SameApplicationMajor(saved.ApplicationIdentity, current.ApplicationIdentity)
-        && string.Equals(saved.CliVersion, current.CliVersion, StringComparison.Ordinal)
-        && string.Equals(saved.CliSha256, current.CliSha256, StringComparison.Ordinal)
-        && string.Equals(saved.SdkInformationalVersion, current.SdkInformationalVersion, StringComparison.Ordinal);
-
-    private static bool SameApplicationMajor(string saved, string current)
-    {
-        int savedSeparator = saved.LastIndexOf('/');
-        int currentSeparator = current.LastIndexOf('/');
-        if (savedSeparator <= 0
-            || currentSeparator <= 0
-            || !string.Equals(saved[..savedSeparator], current[..currentSeparator], StringComparison.Ordinal)
-            || !Version.TryParse(saved[(savedSeparator + 1)..], out Version? savedVersion)
-            || !Version.TryParse(current[(currentSeparator + 1)..], out Version? currentVersion))
-        {
-            return string.Equals(saved, current, StringComparison.Ordinal);
-        }
-
-        return savedVersion.Major == currentVersion.Major;
-    }
-
-    private static bool PathsEqual(string first, string second) =>
-        string.Equals(
-            Path.GetFullPath(first),
-            Path.GetFullPath(second),
-            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     private static void ReportCurrent(
         Action<DurableEvaluationProgress>? progress,

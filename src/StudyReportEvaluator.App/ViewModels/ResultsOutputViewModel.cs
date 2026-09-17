@@ -592,6 +592,8 @@ public sealed class ResultsCriterionViewModel : UiObservableObject
 
 public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
 {
+    public JobCostViewModel Cost { get; } = new();
+
     private const NumberStyles OverrideNumberStyles =
         NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent;
 
@@ -1043,6 +1045,8 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         ArgumentNullException.ThrowIfNull(runContext);
         Interlocked.Increment(ref exportSequence);
         context = runContext;
+        Cost.Reset();
+        if (runContext.Cost is { } cost) Cost.Apply(cost);
         exportCancellation?.Cancel();
         exportCancellation?.Dispose();
         exportCancellation = null;

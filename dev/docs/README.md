@@ -24,6 +24,7 @@ F02の最終版再検証は本同期時点では親担当で未完了です。�
 | [ADR-0014](adr/0014-product-versioning.md) | アーキテクト、リリース | 製品SemVer、単一正本、tag/release identity |
 | [ADR-0015](adr/0015-windows-macos-installer-delivery.md) | アーキテクト、リリース、QA | Windows ZIP public、development MSIX、macOS source foundation |
 | [ADR-0016](adr/0016-windows-one-action-startup.md) | アーキテクト、リリース、QA | App限定Windows単一EXE、login導線、matrix v2、clean-host公開境界 |
+| [ADR-0018](adr/0018-job-cost-observability.md) | アーキテクト、QA | ジョブ単位のAI使用量観測、JSONLログ、単位・換算の境界 |
 | [Windows単一EXEの方式適合](preflight/windows-singlefile-feasibility.md) | 開発、QA、リリース | 固定.NET／SDK／CLIでの開発host適合結果と未実施clean-host境界 |
 | [Screenshot manifest](../../images/README.md) | UI開発、QA、利用者支援 | 8枚の合成説明画像。T28の生成履歴は`0.8.4`・1440×1050・2回hash一致。現在のソース`0.8.6`での再生成やnative／実保存の証拠ではない |
 

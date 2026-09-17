@@ -114,7 +114,7 @@ public sealed class ExecutionViewTests
         Assert.Equal(2, viewModel.RowTotal);
         Assert.Contains("eval.partial.xlsx", viewModel.OutputIdentityText, StringComparison.Ordinal);
         Assert.True(viewModel.LastRunContext?.Summary.IsPartial);
-        Assert.Contains("部分結果", viewModel.RunStatusText, StringComparison.Ordinal);
+        Assert.Contains("中断しました", viewModel.RunStatusText, StringComparison.Ordinal);
         Assert.DoesNotContain(viewModel.TechnicalErrors, error => error.Code == "RUN_FAILED");
         Assert.DoesNotContain(inputPath, viewModel.ToString(), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("PRIVATE-OBSERVER-CANARY", viewModel.ToString(), StringComparison.Ordinal);
@@ -146,7 +146,7 @@ public sealed class ExecutionViewTests
 
         Assert.True(viewModel.IsCancelling);
         Assert.False(viewModel.CanCancel);
-        Assert.Contains("cancel", viewModel.RunStatusText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("中断", viewModel.RunStatusText, StringComparison.Ordinal);
         runner.Release();
         await run;
 
@@ -156,11 +156,11 @@ public sealed class ExecutionViewTests
         Assert.Same(partial, viewModel.LastRunContext?.Summary);
         Assert.True(viewModel.LastRunContext?.Summary.IsExportReady);
         Assert.Equal(1, viewModel.ProgressCompleted);
-        Assert.Contains("部分結果", viewModel.RunStatusText, StringComparison.Ordinal);
+        Assert.Contains("中断しました", viewModel.RunStatusText, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task New_and_resume_modes_bind_output_directory_or_existing_partial_exclusively()
+    public async Task New_mode_binds_output_directory_and_resume_mode_requires_preflight()
     {
         QuantificationDefinition definition = U04TestSupport.Definition(2, 2);
         WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
@@ -188,14 +188,9 @@ public sealed class ExecutionViewTests
         try
         {
             viewModel.ResumePartialPath = partialPath;
-            Assert.True(viewModel.CanStart);
-
-            await viewModel.StartAsync(TestContext.Current.CancellationToken);
-
-            QuantificationRunRequest request = Assert.IsType<QuantificationRunRequest>(runner.LastRequest);
-            Assert.True(request.UseDurableWorkflow);
-            Assert.Equal(partialPath, request.ResumePartialPath);
-            Assert.Null(request.OutputDirectory);
+            Assert.False(viewModel.CanStart);
+            Assert.Contains("再開元", viewModel.ValidationSummary, StringComparison.Ordinal);
+            Assert.Equal(0, runner.CallCount);
         }
         finally
         {

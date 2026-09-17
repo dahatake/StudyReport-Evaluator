@@ -1,5 +1,6 @@
 using GitHub.Copilot;
 using StudyReportEvaluator.App.Logging;
+using StudyReportEvaluator.App.Usage;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Prompting;
 
@@ -205,6 +206,12 @@ internal sealed class CopilotAuxiliaryAttempt<TResult> : IEphemeralEvaluationAtt
     public string SessionId { get; }
 
     public EvaluationTokenUsage TokenUsage => Volatile.Read(ref tokenUsage);
+
+    public void SetUsageAttemptContext(int attemptNumber, Guid operationId) =>
+        transport.SetUsageAttemptContext(attemptNumber, operationId);
+
+    public void CompleteUsageAttempt(UsageAttemptOutcome outcome) =>
+        transport.CompleteUsageAttempt(outcome);
 
     public async Task<TResult> ExecuteAsync(CancellationToken cancellationToken)
     {

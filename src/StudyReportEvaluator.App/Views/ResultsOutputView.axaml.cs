@@ -96,6 +96,7 @@ public sealed partial class ResultsOutputView : UserControl
             detachedGoToRowSource = null;
             observedViewModel = current;
             current.PropertyChanged += HandleResultsPropertyChanged;
+            current.Cost.PropertyChanged += HandleCostPropertyChanged;
             scrollCriterionRequested = true;
             if (!sameGoToRowSource)
             {
@@ -111,6 +112,7 @@ public sealed partial class ResultsOutputView : UserControl
         if (observedViewModel is { } previous)
         {
             previous.PropertyChanged -= HandleResultsPropertyChanged;
+            previous.Cost.PropertyChanged -= HandleCostPropertyChanged;
         }
 
         observedViewModel = null;
@@ -188,6 +190,18 @@ public sealed partial class ResultsOutputView : UserControl
 
     private void HandleLayoutUpdated(object? sender, EventArgs e) => QueuePresentationRefresh();
 
+    private void HandleCostPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(JobCostViewModel.IsExpanded)
+            && observedViewModel is { } current && ReferenceEquals(sender, current.Cost))
+        {
+            // An explicit panel switch keeps focus on its checkbox. Do not replay
+            // an earlier detail/list focus request after the reader closes cost.
+            focusRequested = false;
+            QueuePresentationRefresh();
+        }
+    }
+
     private void QueuePresentationRefresh()
     {
         if (refreshQueued || observedViewModel is not { } current || !IsCurrent(current))
@@ -205,6 +219,12 @@ public sealed partial class ResultsOutputView : UserControl
             }
 
             refreshQueued = false;
+            if (current.Cost.IsExpanded)
+            {
+                focusRequested = false;
+                return;
+            }
+
             ResizePage(current);
             SynchronizeCriterion(current);
             if (focusRequested && IsEffectivelyVisible)
@@ -214,7 +234,10 @@ public sealed partial class ResultsOutputView : UserControl
                 Control target = activeList.SelectedIndex >= 0
                     ? activeList.ContainerFromIndex(activeList.SelectedIndex) ?? activeList
                     : activeList;
-                target.Focus(NavigationMethod.Tab, KeyModifiers.None);
+                if (target.IsEffectivelyVisible)
+                {
+                    target.Focus(NavigationMethod.Tab, KeyModifiers.None);
+                }
             }
         }, DispatcherPriority.Loaded);
     }

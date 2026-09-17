@@ -954,7 +954,7 @@ public sealed class DocumentationContractTests
             "sample/realdata.xlsx",
             "469,995",
             "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D");
-        AssertSequentialTableIds(requirements, "AC-", 37);
+        AssertSequentialTableIds(requirements, "AC-", 39);
         AssertSequentialTableIds(ledger, "C-", 47);
         AssertContainsAll(ledger, "VERIFIED", "BLOCKED", "EXCLUDED");
         AssertContainsAll(
@@ -1181,9 +1181,9 @@ public sealed class DocumentationContractTests
             "CHの欠落、`FAIL`、`NOT_RUN`",
             "ADV-01/ADV-02の`NOT_RUN`は許容");
 
-        AssertSequentialTableIds(traceability, "AC-", 37);
+        AssertSequentialTableIds(traceability, "AC-", 39);
         Assert.Equal(
-            Enumerable.Range(1, 36),
+            Enumerable.Range(1, 38),
             Regex.Matches(
                     traceability,
                     @"^\| TR-(\d{2}) \|",

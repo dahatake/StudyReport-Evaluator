@@ -21,6 +21,8 @@ public sealed partial class MainWindow : Window
     private long focusVersion;
     private bool opened;
     private bool closed;
+    private bool closePending;
+    private bool finalCloseAllowed;
 
     public MainWindow()
         : this(new ServiceRegistration().CreateMainWindowViewModel())
@@ -34,6 +36,7 @@ public sealed partial class MainWindow : Window
         DataContext = ViewModel;
         ViewModel.PropertyChanged += HandleViewModelPropertyChanged;
         Opened += HandleOpened;
+        Closing += HandleClosing;
         Closed += HandleClosed;
         ShowCurrentEditor();
     }
@@ -198,12 +201,69 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void HandleClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (closed || finalCloseAllowed) return;
+
+        if (e.CloseReason == WindowCloseReason.OSShutdown)
+        {
+            // OS termination cannot be delayed reliably. Request cooperative
+            // interruption, but do not veto shutdown or kill any process.
+            if (!closePending)
+            {
+                closePending = true;
+                _ = DrainBeforeCloseAsync(closeAfterDrain: false);
+            }
+            return;
+        }
+
+        // Repeated user/programmatic requests must not skip the pending drain,
+        // including the interval between IsRunning=false and task completion.
+        if (closePending)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        ExecutionViewModel execution = ViewModel.ExecutionViewModel;
+        if (!execution.IsRunning && execution.LastRunTask is not { IsCompleted: false }) return;
+        e.Cancel = true;
+        closePending = true;
+        _ = DrainBeforeCloseAsync(closeAfterDrain: true);
+    }
+
+    private async Task DrainBeforeCloseAsync(bool closeAfterDrain)
+    {
+        try
+        {
+            await ViewModel.ExecutionViewModel.StopAndDrainAsync(TimeSpan.FromSeconds(10));
+        }
+        catch
+        {
+            // Shutdown is finite and never depends on successful evaluation.
+            // Do not expose exception details or interfere with external tools.
+        }
+        finally
+        {
+            if (closeAfterDrain)
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (closed) return;
+                    finalCloseAllowed = true; // Only this internal Close bypasses the guard.
+                    Close();
+                });
+            }
+        }
+    }
+
     private void HandleClosed(object? sender, EventArgs e)
     {
         closed = true;
         opened = false;
         focusVersion++;
         Opened -= HandleOpened;
+        Closing -= HandleClosing;
         Closed -= HandleClosed;
         ViewModel.PropertyChanged -= HandleViewModelPropertyChanged;
         this.FindControl<ContentControl>("CurrentStepContent")!.Content = null;

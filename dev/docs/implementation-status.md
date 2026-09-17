@@ -1,5 +1,17 @@
 # Current implementation status
 
+## 2026-09-18 — 実行コスト表示とジョブログ（限定検証完了）
+
+AC-039／TR-38: 実行・結果画面の共有コストView、ジョブ単位JSONLログ、全4 operationへのtracker注入、未取得と明示0の区別、項目別の取得元、試行番号・相関ID・終端結果、モデル内訳と総量の不一致、下方訂正を実装済み。単位はSDK報告の原単位のままで、AIクレジット・通貨へ換算しない（[ADR-0018](adr/0018-job-cost-observability.md)）。
+
+コスト系限定実行は58件中57 PASS・1 SKIP・FAIL 0、Debug buildは0警告・0エラー。VERIFIED_SCOPEDであり、実AI、実課金照合、AIクレジット換算、native DPI、symlink保護の実証、全suiteは未実施。
+
+## 2026-09-17 — 中断・再開導線（限定検証完了）
+
+AC-038／TR-37: 共通admission、再開元picker、開始前の項目別検証、中断後の明示再開準備、入力／modelの明示適用、最大10秒のclose drainを実装済み。中断は実行画面に留まり、前runの遅延進捗を除外する。
+
+`TestResults/resume-focused/resume-verified.trx` は12/12 PASS（再開関連10、料金記録のビルド接続回帰2）、`resume-durable.trx` は既存再開回帰5/5 PASS。Debug build成功。VERIFIED_SCOPEDであり、本人／native／別process／OS shutdown／exact配布物の受入は未実施。
+
 ## 2026-09-07 — F02文書同期時点の現在状態
 
 現在の製品は**`0.8.6`未公開候補（UNRELEASED）**、要求はv4.6、公開済みは`v0.8.1`のunsigned ZIP／sidecarである。親担当が`Directory.Build.props`をPATCHし、F01のUnreleased追記はREVIEWED。以下は[親担当の実行記録](archive/work/20260907-ui-settings-execution-record.md)と後続引継ぎに基づく既存結果の同期で、この文書編集では端末・build・test・package・native操作を実行していない。

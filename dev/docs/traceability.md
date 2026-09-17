@@ -2,7 +2,7 @@
 
 | 項目 | 値 |
 |---|---|
-| Requirement | `docs/requirements-definition.md` v4.6 / 2026-09-07（AC-016／017の到達契約、追加AC-035〜037／TR-34〜36。既存AC-029〜034／TR-30〜33のdelivery境界を維持） |
+| Requirement | `docs/requirements-definition.md` v4.6 / 2026-09-07（AC-016／017の到達契約、追加AC-035〜039／TR-34〜38。既存AC-029〜034／TR-30〜33のdelivery境界を維持） |
 | Decision | ADR-0012（機能）/ ADR-0015（target delivery）/ ADR-0013（current public evidence）/ ADR-0016（Windows単一EXE 1操作起動） |
 | Detailed design | `dev/docs/detailed-design.md` |
 | Plan | [UI・設定保存プランv2](archive/work/20260907-ui-settings-redesign-plan-v2.md)。要求所有者の2026-09-07のD01〜D20デフォルト採用・全実装承認を優先 |
@@ -18,6 +18,14 @@
 2026-09-07のD17上書き「全タスク完了後だけUnreleased追記 → 製品PATCH `0.8.4` → `0.8.5`」と、T01で製品版・CHANGELOG・元プラン・履歴evidenceを変更しない方針は履歴として保持する。さらに後続の利用者不在時の自律続行指示により、T39をBLOCKEDのままF01／F02を進める。F01はREVIEWED、親担当の版正本PATCHは反映済み。G4・全タスクDONE・公開PASSを意味せず、最終`0.8.6`の判定は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄へ接続する。
 
 ## Evidence integrity and storage
+
+### 2026-09-18 ジョブコスト観測の局所検証
+
+コスト系限定実行は58件中57 PASS・1 SKIP（symlink作成権限なし）・FAIL 0。対象はJobUsageTracker、SdkUsageAdapter、UsageProvenance、JobCostBackend、JobCostModel、JobCostSnapshot、AttemptOutcomeLogging、JobCostView、CostAttemptLifecycle。Debug buildは0警告・0エラー。fake transportと一時directoryの実fileだけを使い、実AI・実認証・実課金照合・native DPI・全suiteは未実施。AIクレジット換算は未確認のため実装していない。
+
+### 2026-09-17 中断・再開の局所検証
+
+`TestResults/resume-focused/resume-verified.trx`: 12/12 PASS（ResumeWorkflowTests 8、ResumeAdmissionEvaluatorTests 2、ビルド接続修正のAttemptOutcomeLoggingTests 2）。`resume-durable.trx`: 既存DurableQuantificationOrchestratorの再開とmismatch 5/5 PASS。Debug build成功。実checkpointとfake run、headless picker取消・繰返しwindow closeを確認。全suite、native DPI、本人login、実AI、別process再起動、OS shutdown、配布物・公開gateは未実施。過去の探索済みテストだけの9/9報告は新規導線の検証根拠にしない。
 
 ### 2026-09-05 baseline（履歴）
 
@@ -119,6 +127,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | 通常／例外layout：AC-016／017、TR-17、ST-UC-12 | MainWindow／SettingsViewの有限本文と既存Input／Design／Resultsのページ一覧 | [`ResponsiveLayoutTests`](../../tests/StudyReportEvaluator.App.Tests/UI/ResponsiveLayoutTests.cs)の`Normal_shell_contains_every_step_without_body_scroll_at_actual_client_size`／`Results_rows_stay_virtualized_after_the_responsive_reflow`、[`CompactWorkflowLayoutTests`](../../tests/StudyReportEvaluator.App.Tests/UI/CompactWorkflowLayoutTests.cs)の`Long_content_in_four_steps_and_every_settings_category_keeps_normal_body_contained`／`Narrow_scaled_shell_reaches_last_operations_without_moving_warning_or_navigation`／`Twenty_thousand_item_page_math_resizes_clamps_after_deletion_and_empties_without_UI`。15メソッド・27ケースは74件の内数。通常・狭小・scale 2・20,000件計算を相互代用しない |
 | 結果・override：AC-016／037、TR-17／36 | [`ResultsOutputViewModel`](../../src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs)の元Results／run snapshot、ページ・選択詳細・別名出力 | [`ResultsPresentationTests`](../../tests/StudyReportEvaluator.App.Tests/UI/ResultsPresentationTests.cs)の`Paging_and_recomputation_keep_overrides_and_do_not_recreate_selected_criterion_editors`／`Draft_edits_do_not_change_loaded_run_identity_scores_or_override_range`。legacyとdurable、empty／zero／technical blankの既存oracleを維持。実fileのoverride出力は次行のT27で確認 |
 | 設定から実fileまで：AC-013／035〜037、TR-34〜36、ST-UC-27〜29 | Settings／Input／Execution／ResultsのVM、実`DurableQuantificationOrchestrator`／`CheckpointStore`／`WorkbookDurableRunFinalizer`／`ResultsOutputBoundary`／`OutputPackageValidator`／`AtomicOutputCommitter` | [`SettingsWorkflowSystemTests`](../../tests/StudyReportEvaluator.App.Tests/E2E/SettingsWorkflowSystemTests.cs)の`Saved_output_preference_survives_new_instances_and_input_change_before_real_final_output`（2ケース）、`Saved_definition_admission_rejects_missing_sheet_without_mutation_then_accepts_the_matching_input`、`Cancel_saves_a_real_partial_and_new_instances_resume_without_repeating_completed_AI_or_reference`、`Override_exports_a_separate_real_workbook_using_the_run_snapshot_not_next_settings`、`Real_final_and_preview_distinguish_missing_answer_numeric_zero_and_technical_failure`、`Real_atomic_final_validation_rejects_a_corrupted_cached_score_and_does_not_publish_it`（各1ケース）。7/7は74件の内数で最新216件にも含む。4合成行の実file E2Eであり、530行E2E・別process再起動・native・実AIの代替ではない |
+| 中断からの再開準備：AC-038／TR-37 | [`ResumeAdmissionEvaluator`](../../src/StudyReportEvaluator.App/Workflow/ResumeAdmissionEvaluator.cs)、[`ResumeInspectionBoundary`](../../src/StudyReportEvaluator.App/Workflow/ResumeInspectionBoundary.cs)、[`ExecutionViewModel`](../../src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs)、[`ExecutionView`](../../src/StudyReportEvaluator.App/Views/ExecutionView.axaml)、[`MainWindow`](../../src/StudyReportEvaluator.App/Views/MainWindow.axaml.cs) | partialのread-only項目別検証、明示的な入力／model反映、native pickerの取消状態不変、有限close drain。実AI・別process・native OS終了の証拠は含まない |
 
 ## Acceptance criteria mapping
 
@@ -161,6 +170,8 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | AC-035 | 共通＋定義1件の明示atomic保存、schema／IO失敗保持、header／貼付内容平文、明示出力先復元・null時だけresult | T02/T03/T06/T10/T23/T27、最新修正T28 | TR-34／ST-UC-27。ApplicationSettingsTests／SettingsFileStoreTests／SettingsViewModelTests／SettingsCompositionTests／ExecutionSettingsTests／MainWindowTests／SettingsWorkflowSystemTests。一時pathの実IOと新instance復元のみ | VERIFIED_SCOPED |
 | AC-036 | 保存header metadataを検証した明示適用、成功時だけ一括更新、失敗・取消無変更、ID／Prompt／Imported Prompt保持 | T04/T10/T17/T24/T27、最新修正T28 | TR-35／ST-UC-28。SavedDefinitionApplicationTests／SettingsViewModelTests／SettingsViewTests／MainWindowTests／WorkflowStateTests／SettingsWorkflowSystemTests。授業内容の意味的一致や本人確認は証明しない | VERIFIED_SCOPED |
 | AC-037 | 4step外の設定、選択・ページ・編集保持、model希望ID／実効選択、no fallback／no-auto-login/run、現在snapshot／前回結果不変 | T05〜10/T13〜27、最新修正T28 | TR-36／ST-UC-29。MainWindowSettingsTests／WorkflowStateTests／ExecutionSettingsTests／ResultsPresentationTests／SettingsWorkflowSystemTests。headlessと実file E2Eを分離。T39追加native FAILと本人確認NOT_RUN_EXTERNAL_PREREQUISITEは未解消 | VERIFIED_SCOPED |
+| AC-038 | 中断後の再開準備、開始前検証、明示条件適用、有限close drain | W-01/W-02/U-03 | ResumeWorkflowTests 8件、ResumeAdmissionEvaluatorTests 2件。2026-09-17の局所記録を参照 | VERIFIED_SCOPED |
+| AC-039 | 今回ジョブのAI使用量を画面とJSONLで確認、未取得をゼロ化しない、項目別取得元・試行番号・終端結果・内訳不一致の保持、原単位維持 | J-01 + U-03 | JobUsageTrackerTests／SdkUsageAdapterTests／UsageProvenanceTests／AttemptOutcomeLoggingTests／JobCostBackendTests／JobCostViewTests／CostAttemptLifecycleTests。2026-09-18の局所記録を参照。実AI・課金照合・AIクレジット換算・nativeは未実施 | VERIFIED_SCOPED |
 
 ## Test requirement mapping
 
@@ -202,6 +213,8 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | TR-34 | 設定明示保存・再読込、平文／非保存境界、schema・実IO拒否、旧bytes保持、明示出力先復元／null（AC-035） | ApplicationSettingsTests／SettingsFileStoreTests／SettingsViewModelTests／SettingsCompositionTests／ExecutionSettingsTests／MainWindowTests／SettingsWorkflowSystemTests、ST-UC-27。一時absolute pathの実IO。別process・nativeは未測定 | VERIFIED_SCOPED |
 | TR-35 | 同入力／別header／不足sheet・列・行、明示適用成功と失敗・取消無変更、ID／canonical hash／Imported Prompt保持（AC-036） | SavedDefinitionApplicationTests／SettingsViewModelTests／SettingsViewTests／MainWindowTests／WorkflowStateTests／SettingsWorkflowSystemTests、ST-UC-28。read-only synthetic、最新216件の失敗時保持回帰。意味的適合・本人確認は別 | VERIFIED_SCOPED |
 | TR-36 | 往復・交互編集・model希望、no-auto、現在run固定・停止・設定中完了、前回結果／override、保存→再読込→明示適用→fake run／resume E2E（AC-035〜037） | MainWindowSettingsTests／WorkflowStateTests／ExecutionSettingsTests／ResultsPresentationTests／SettingsWorkflowSystemTests、ST-UC-29。T24の12ケースとT27の7ケースは各集合の内数。T39追加native FAIL、本人walkthroughはNOT_RUN_EXTERNAL_PREREQUISITE | VERIFIED_SCOPED |
+| TR-37 | 中断後の再開準備、partial picker取消、開始前の項目別検証、明示入力／model反映、有限close drain（AC-038） | ResumeWorkflowTests／ResumeAdmissionEvaluatorTests。実AI・別process・OS shutdownは別境界 | VERIFIED_SCOPED |
+| TR-38 | 使用量の取得成功／一部欠落／全欠落、明示0と未取得、イベント重複・順序逆転・final複数通知、再試行と4 operation、項目別取得元、内訳不一致、下方訂正、overflow／負数、JSONLのcanary非記録・容量上限・保存失敗時の観測値保持（AC-039） | JobUsageTrackerTests／SdkUsageAdapterTests／UsageProvenanceTests／AttemptOutcomeLoggingTests／JobCostBackendTests／JobCostViewTests／CostAttemptLifecycleTests。symlink保護は権限不足でSKIP、実AI・課金照合は別境界 | VERIFIED_SCOPED |
 
 ## Mandatory safety surfaces
 

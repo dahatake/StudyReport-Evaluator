@@ -4,6 +4,7 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:viewModels="using:StudyReportEvaluator.App.ViewModels"
+    xmlns:views="using:StudyReportEvaluator.App.Views"
     Background="{DynamicResource AppCanvasBrush}"
     Foreground="{DynamicResource AppTextBrush}"
     FontSize="14"
@@ -88,12 +89,23 @@
           <TextBlock Grid.Column="2" Text="部分結果" IsVisible="{Binding IsPartial}" FontWeight="SemiBold"
                      AutomationProperties.AutomationId="ResultsPartialStatus" />
         </Grid>
-        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding RunIdentityText}" IsVisible="{Binding IsLoaded}"
+        <TextBlock Grid.Row="1" Text="{Binding RunIdentityText}" IsVisible="{Binding IsLoaded}"
                    FontSize="12" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding RunIdentityText}"
                    AutomationProperties.AutomationId="ResultsRunIdentity" />
-        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="この結果は表示時の採点draftから自動再評価しない"
+        <TextBlock Grid.Row="2" Text="この結果は表示時の採点draftから自動再評価しない"
                    IsVisible="{Binding IsLoaded}" FontSize="12" Classes="label"
+             TextTrimming="CharacterEllipsis" ToolTip.Tip="この結果は表示時の採点draftから自動再評価しない"
                    AutomationProperties.AutomationId="ResultsSnapshotCaption" />
+        <CheckBox x:Name="ResultsCostToggle" Grid.Row="1" Grid.RowSpan="2" Grid.Column="1"
+            MinHeight="44" MinWidth="44" FontSize="14" HorizontalContentAlignment="Stretch"
+            IsChecked="{Binding Cost.IsExpanded, Mode=TwoWay}"
+            AutomationProperties.AutomationId="ResultsCostToggle"
+            AutomationProperties.Name="この結果のコスト詳細とジョブログを表示。オフで採点結果に戻る"
+            ToolTip.Tip="{Binding Cost.SummaryText}">
+          <TextBlock Text="{Binding Cost.SummaryText}" TextTrimming="CharacterEllipsis"
+               AutomationProperties.AutomationId="ResultsCostSummary"
+               AutomationProperties.Name="{Binding Cost.SummaryText}" />
+        </CheckBox>
         <ScrollViewer Grid.Row="3" Focusable="True" HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto" AutomationProperties.Name="元のfinal・partial、保存済み修正版の保存先と cleanup 警告の全文">
           <StackPanel>
@@ -116,7 +128,9 @@
         </ScrollViewer>
       </Grid>
 
-      <Grid Grid.Row="1" RowDefinitions="*,44" RowSpacing="4">
+      <Grid Grid.Row="1">
+      <Grid x:Name="ResultsReviewPanel" IsVisible="{Binding !Cost.IsExpanded}"
+        RowDefinitions="*,44" RowSpacing="4">
         <Grid x:Name="ResultsListPanel" IsVisible="{Binding !IsDetailVisible}"
               RowDefinitions="24,*" RowSpacing="4">
           <Grid Margin="8,0" ColumnDefinitions="68,82,96,96,112,*" ColumnSpacing="8">
@@ -256,6 +270,9 @@
           <Button x:Name="ShowListButton" Grid.Column="6" Content="一覧に戻る" Command="{Binding ShowListCommand}"
                   IsVisible="{Binding IsDetailVisible}" AutomationProperties.AutomationId="ResultsShowList" AutomationProperties.Name="選択とoverrideを保持して学生一覧に戻る" />
         </Grid>
+      </Grid>
+      <views:JobCostView x:Name="ResultsCostView" DataContext="{Binding Cost}"
+                         AutomationScope="ResultsCost" IsVisible="{Binding IsExpanded}" />
       </Grid>
 
       <Grid Grid.Row="2" RowDefinitions="Auto,44,40" RowSpacing="4">

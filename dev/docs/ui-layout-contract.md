@@ -28,6 +28,10 @@ T01〜T38はREVIEWED、T39はBLOCKED。F02の最終0.8.6再検証は本同期時
 
 ## 2. 主画面と設定
 
+2026-09-18のExecution／Results追加: 共有の`JobCostView`を進捗・結果一覧と同じ内容領域のタブへ置き、`ExecutionCost`／`ResultsCost`のscopeで`CostTabs`・`CostDetailsTextBox`・`LogTextBox`・`AutoFollowCheckBox`・`OpenLogButton`・`OpenDirectoryButton`のAutomation IDを一意化する。開始／停止と結果の主要操作は固定位置のまま、コスト詳細とログは局所scrollへ収める。ログ表示は最新200行で、追従offの間は表示位置と選択を奪わない。`JobCostViewTests`でheadless確認済みで、追加後のnative DPI／Narrator再測定は未実施。
+
+2026-09-17のExecution追加: `ExecutionPickResumeCheckpoint`、`ExecutionResumeInterruptedRun`、`ExecutionValidateResumeCheckpoint`、`ExecutionApplyCheckpointInput`、`ExecutionApplyCheckpointModel`、`ExecutionResumeFindings`、`ExecutionResumeFindingDetail`。再開元編集→確認→項目一覧／全文詳細を局所scrollに置き、Start／中断を固定する。再開準備はAIを開始しない。`ResumeWorkflowTests`でpicker取消と繰返しwindow closeをheadless確認済み。追加後のnative DPI／Narrator／全レイアウト再測定は未実施で、過去の§5の成功を流用しない。
+
 固定の「1 入力 / 2 採点設計 / 3 実行 / 4 結果」を維持する。設定は同じwindowの独立した内容画面で、第5ステップ、modal、drawerではない。元ステップと同じ対象を保って1操作で開き、元の対象とfocusへ戻る。同じ入力欄を二重配置しない。
 
 | 画面 | 主画面の最小責務 | 設定で扱う詳細 |

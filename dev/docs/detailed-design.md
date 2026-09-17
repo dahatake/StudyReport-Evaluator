@@ -474,7 +474,7 @@ Checkpoint sheet:
 
 ### 7.4 Load / resume
 
-1. 利用者がpartialを選ぶか、選択inputのresult directoryに一致候補を検出する。
+1. 利用者がpartialをpickerまたはpathで指定する。出力directoryの自動走査はしない。
 2. fileをread-onlyで開き、Checkpoint sheetとpayloadをclosed validateする。
 3. input pathをcheckpointから取得し、identityを再計算する。
 4. canonical definitionからsnapshotを復元し、hashを再計算する。
@@ -483,6 +483,10 @@ Checkpoint sheet:
 7. 保存済みreferenceとcompleted rowsをseedとしてrunを続行する。
 
 mismatch時はpartialへwriteしない。
+
+`ResumeInspectionBoundary`はread-onlyでcheckpointと現在入力を確認し、`ResumeAdmissionEvaluator`をUIとorchestratorで共有する。採点設計は自動復元せず現在の定義との一致を要求する。`ApplyCheckpointInputAsync`は親VM経由で`TryLoadCheckpointInputAsync`を呼び、入力未読込なら通常の初回読込、既存入力なら採点設計を保持する。失敗時は現在入力を変更しない。model適用も明示操作だけで、開始には再確認とStartが必要。
+
+`LastRunTask`は開始通知前に公開し、`StopAndDrainAsync`で有限待機する。`MainWindow.Closing`の繰返し要求は待機を省略せず、内部Closeだけを許可する。OS shutdownは中断要求のみ。中断後は結果画面へ自動移動せず、過去runの遅延進捗を除外する。
 
 ## 8. Workflow
 
@@ -848,6 +852,10 @@ checkpointとRun sheetへ次を保存する。
 - application logはoperation kind、safe IDs、counts、status、timingだけ。
 - file path、answer、Prompt、reference、reason、evidence、credentialをlogへ渡さない。
 - tempとpartialはtarget directoryの既存OS access controlを継承し、より広いpermissionへ変更しない。
+- ジョブ単位のコスト観測は`App/Usage`が所有し、application logとは別の`Logging/JobCostLogger`がUTF-8 JSON Linesへ数値・生成ID・閉じたコードだけを書く。閉じたDTOを経由し、SDK応答全文・例外本文を渡さない（[ADR-0018](adr/0018-job-cost-observability.md)）。
+- 集計は開始操作ごとのジョブへ閉じ、attemptの累計は置換で更新する。イベント合計とセッション累計、モデル別内訳とセッション総量を加算せず、不一致は不一致のまま記録する。
+- 単位はSDK報告の原単位（`nano-AI units`、premium request消費量）を保持し、AIクレジット・通貨へ換算しない。`AggregationScope`と`UnitPolicy`を固定コードで記録する。
+- ログのI/O障害・容量上限・記録欠落はUIの独立表示とし、評価・retry・cleanup・checkpointの結果へ影響させない。
 
 ## 15. Error code
 
@@ -972,6 +980,7 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 | X-04 | path planner/final writer | atomic/path tests |
 | W-01 | checkpoint reader/writer | checkpoint tests |
 | W-02 | orchestrator/scheduler/run summary | workflow/resume tests |
+| J-01 | `Usage/*`、`Logging/JobCostLogEntry.cs`・`JobCostLogger.cs`、`ViewModels/JobCostViewModel.cs`、`Views/JobCostView.axaml` | JobUsageTracker／SdkUsageAdapter／UsageProvenance／JobCostBackend／JobCostView／CostAttemptLifecycle tests |
 | U-01 | Input View/VM/code-behind | UI tests |
 | U-02 | Design View/VM | UI tests |
 | U-03 | Execution/Results View/VM | UI tests |

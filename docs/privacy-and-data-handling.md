@@ -17,6 +17,7 @@ flowchart LR
     APP --> PARTIAL[partial .xlsx]
     APP --> FINAL[final .xlsx]
     APP -. closed fields only .-> LOG[application log]
+    APP -. job cost metrics only .-> JOBLOG[local job cost JSONL]
 ```
 
 ## offline GUIと外部通信
@@ -56,7 +57,21 @@ application loggerはclosedな項目だけを扱います。
 - failure category
 - appが生成したsession ID
 
-回答、Prompt、Reference、reason、evidence、file path、credentialを受け取るfree-text parameterはありません。SDKが返したtoken usage数値はapplication logへ出さず、観測できたunitだけをRun sheetへ集計します。
+回答、Prompt、Reference、reason、evidence、file path、credentialを受け取るfree-text parameterはありません。SDKが返したtoken usage数値はapplication logへ出さず、観測できたunitだけをRun sheetへ集計します。これは次節の専用ジョブコストログとは別です。
+
+## ジョブコストログ
+
+AI処理を開始すると、アプリは今回のジョブだけの観測値を画面の**コスト詳細／ジョブログ**と、利用者別の`%LOCALAPPDATA%\StudyReportEvaluator\jobs\<job-id>.jsonl`へ記録します。JSON LinesはUTF-8の平文で、同じ入力・checkpointを再開した場合も開始操作ごとに別のjob ID・別ファイルです。既存Excelの`Quantification_Run`シートは残りますが、画面・ジョブログの表示はExcelを読む必要がありません。
+
+記録するのは、生成したjob／attempt ID、UTC時刻、閉じた状態コード、試行数、入力・出力・推論・キャッシュのtoken数、SDKが報告した`nano-AI units`とpremium request消費量、項目ごとの観測状態と取得元（イベント／最終RPC／最後の呼び出しのみ）の試行数、モデル内訳とセッション総量が一致しなかった試行数です。**記録しない**ものは、回答、Prompt、Reference、reason、evidence、学生識別子、設問本文・名称、入力／出力の実path、credential・PAT・account識別子、SDK応答全文、例外本文・stack traceです。モデル内訳は実モデル名を保存せず、匿名化した識別子だけを記録します。
+
+数値はGitHub Copilot SDKから観測できた範囲であり、請求確定額、アカウント全体の利用量、すべての実消費を保証しません。未取得は`—（未取得）`で表示し、0へ置き換えません。再試行、失敗、取消、checkpointへ保存されなかった途中行で観測できた値は今回ジョブに含み得ます。`nano-AI units`はSDK報告値で、アプリは通貨やAIクレジットへ換算しません。
+
+ログは1ジョブ32 MiB、画面表示は最新200行までです。詳細が上限で省略された場合や保存に失敗した場合も、画面に状態を表示します。対応対象のWindowsでは、アプリは開始時に30日より古い、自身が作成した非稼働のジョブログだけを整理します。非Windowsでソースを実行した場合、安全な保持整理は未対応のため自動削除せず、その旨を表示します。ログは暗号化・監査証明・自動公開・cloud同期の対象ではありません。共有、保持、削除は所属組織の規則に従ってください。
+
+画面内のジョブログは今回ジョブのメモリ上の履歴で、ディスク保存の成功を保証するものではありません。各行に入力・出力・推論・cache・`nano-AI units`・premium消費量の観測済み累計を表示します。**行同士を足し合わせないでください。** JSONLの`AggregationScope`は`CurrentInvocation`、`UnitPolicy`はSDK報告の原単位を保持しクレジット・通貨へ換算しない方針を示します。過去ログのアプリへの再取込・画面復元はありません。
+
+開始・終端レコードの`Context`にはアプリ／SDK／CLIの数値バージョン、並列度、再開有無、匿名化した要求モデル識別子を記録します。不明な項目はnullです。バージョンのsuffixや任意文字列は保持しません。新しい観測値が以前の値より減った場合は下方訂正の履歴を示し、古い値を加算しません。
 
 ## 単一EXEのruntime抽出cacheと保存先
 

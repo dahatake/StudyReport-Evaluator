@@ -1,8 +1,10 @@
+using System.Collections.Immutable;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using GitHub.Copilot;
 using StudyReportEvaluator.App.Logging;
+using StudyReportEvaluator.App.Usage;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Prompting;
 
@@ -51,6 +53,10 @@ public interface IEphemeralCopilotTransportFactory
 
 public interface IEphemeralCopilotTransport : IAsyncDisposable
 {
+    void SetUsageAttemptContext(int attemptNumber, Guid operationId) { }
+
+    void CompleteUsageAttempt(UsageAttemptOutcome outcome) { }
+
     Task StartAsync(CancellationToken cancellationToken);
 
     Task<bool> IsAuthenticatedAsync(CancellationToken cancellationToken);
@@ -195,6 +201,12 @@ internal sealed class CopilotEvaluationAttempt : IEphemeralEvaluationAttempt
 
     public EvaluationTokenUsage TokenUsage => Volatile.Read(ref _tokenUsage);
 
+    public void SetUsageAttemptContext(int attemptNumber, Guid operationId) =>
+        _transport.SetUsageAttemptContext(attemptNumber, operationId);
+
+    public void CompleteUsageAttempt(UsageAttemptOutcome outcome) =>
+        _transport.CompleteUsageAttempt(outcome);
+
     public async Task<QuantificationResult> ExecuteAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -313,27 +325,54 @@ internal sealed class CopilotEvaluationAttempt : IEphemeralEvaluationAttempt
 internal sealed class SdkEphemeralCopilotTransportFactory : IEphemeralCopilotTransportFactory
 {
     private readonly ICopilotClientFactory _clientFactory;
+    private readonly JobUsageTracker? _usageTracker;
+    private readonly UsageOperation _operation;
 
-    internal SdkEphemeralCopilotTransportFactory(ICopilotClientFactory clientFactory)
+    internal SdkEphemeralCopilotTransportFactory(
+        ICopilotClientFactory clientFactory,
+        JobUsageTracker? usageTracker = null,
+        UsageOperation operation = UsageOperation.Normal)
     {
         ArgumentNullException.ThrowIfNull(clientFactory);
         _clientFactory = clientFactory;
+        _usageTracker = usageTracker;
+        _operation = operation;
     }
 
     public IEphemeralCopilotTransport Create() =>
-        new SdkEphemeralCopilotTransport(_clientFactory);
+        new SdkEphemeralCopilotTransport(_clientFactory, _usageTracker, _operation);
 }
 
 internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
 {
     private readonly ICopilotClientFactory _clientFactory;
+    private readonly JobUsageTracker? _usageTracker;
+    private readonly UsageOperation _operation;
     private CopilotClient? _client;
+    private SdkEphemeralCopilotSession? _usageSession;
+    private int _usageAttemptNumber;
+    private Guid _usageOperationId;
 
-    internal SdkEphemeralCopilotTransport(ICopilotClientFactory clientFactory)
+    internal SdkEphemeralCopilotTransport(
+        ICopilotClientFactory clientFactory,
+        JobUsageTracker? usageTracker = null,
+        UsageOperation operation = UsageOperation.Normal)
     {
         ArgumentNullException.ThrowIfNull(clientFactory);
         _clientFactory = clientFactory;
+        _usageTracker = usageTracker;
+        _operation = operation;
     }
+
+    public void SetUsageAttemptContext(int attemptNumber, Guid operationId)
+    {
+        _usageAttemptNumber = attemptNumber;
+        _usageOperationId = operationId;
+    }
+
+    public void CompleteUsageAttempt(UsageAttemptOutcome outcome) =>
+        Volatile.Read(ref _usageSession)?.CompleteUsageAttempt(
+            _usageAttemptNumber, _usageOperationId, outcome);
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -378,7 +417,9 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
             CopilotSession session = await GetClient()
                 .CreateSessionAsync(config, cancellationToken)
                 .ConfigureAwait(false);
-            return new SdkEphemeralCopilotSession(session);
+            SdkEphemeralCopilotSession usageSession = new(session, _usageTracker, _operation, config.Model);
+            Volatile.Write(ref _usageSession, usageSession);
+            return usageSession;
         });
     }
 
@@ -476,22 +517,96 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
 internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
 {
     private readonly CopilotSession _session;
+    private readonly object _usageGate = new();
+    private readonly JobUsageTracker? _usageTracker;
+    private readonly UsageOperation _operation;
+    private readonly IDisposable? _usageSubscription;
+    private readonly HashSet<Guid> _eventIds = [];
+    private readonly List<UsageMetrics> _eventMetrics = [];
+    private readonly Dictionary<string, List<UsageMetrics>> _modelEvents = new(StringComparer.Ordinal);
+    private readonly string? _requestedModelKey;
+    private readonly bool? _requestedModelIsAuto;
+    private ImmutableArray<ModelUsageSnapshot> _models = [];
+    private bool _modelsTruncated;
+    private Guid _attemptId;
+    private long _usageRevision;
+    private bool _sendStarted;
+    private bool _sendPending;
+    private bool _closed;
+    private bool _finalCaptured;
+    private bool _invalidUsage;
+    private bool _partialUsage = true;
+    private UsageSource _usageSource;
+    private UsageObservationStatus _usageStatus;
+    private UsageMetrics _observedUsage = new();
+    private ImmutableDictionary<UsageMetric, MetricProvenance> _metricProvenance
+        = ImmutableDictionary<UsageMetric, MetricProvenance>.Empty;
+    private ModelCostComparison _modelCostComparison;
+    private EvaluationTokenUsage _legacyUsage = EvaluationTokenUsage.Unavailable;
+    private Task<EvaluationTokenUsage>? _captureTask;
+    private Task? _abortTask;
+    private Task? _disposeTask;
 
-    internal SdkEphemeralCopilotSession(CopilotSession session)
+    internal SdkEphemeralCopilotSession(
+        CopilotSession session,
+        JobUsageTracker? usageTracker = null,
+        UsageOperation operation = UsageOperation.Normal,
+        string? requestedModel = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
+        _usageTracker = usageTracker;
+        _operation = operation;
+        _requestedModelKey = requestedModel is null ? null : ModelUsageSnapshot.CreateModelKey(requestedModel);
+        _requestedModelIsAuto = requestedModel is null ? null : string.Equals(requestedModel, "auto", StringComparison.Ordinal);
+        if (usageTracker is not null)
+        {
+            try { _usageSubscription = session.On<AssistantUsageEvent>(OnUsage); }
+            catch { _usageStatus = UsageObservationStatus.EventsUnavailable; }
+        }
     }
 
     public string SessionId => _session.SessionId;
+
+    internal void CompleteUsageAttempt(int attemptNumber, Guid operationId, UsageAttemptOutcome outcome)
+    {
+        Guid attemptId;
+        lock (_usageGate)
+        {
+            attemptId = _attemptId;
+        }
+
+        // Disposal seals numeric observations, not the evaluation outcome. No send means no usage attempt.
+        // Do not hold the session gate while calling the independent job tracker.
+        if (attemptId == Guid.Empty) { return; }
+        try { _usageTracker?.RecordAttemptOutcome(attemptId, attemptNumber, operationId, outcome); }
+        catch { /* Outcome logging must never replace the evaluation or cleanup result. */ }
+    }
 
     public async Task SendAndWaitAsync(
         MessageOptions options,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(options);
+        bool ownsSend = false;
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_usageGate)
+            {
+                if (_sendStarted || _closed || _disposeTask is not null)
+                {
+                    throw new EvaluationFatalException();
+                }
+
+                _sendStarted = true;
+                _sendPending = true;
+                ownsSend = true;
+                try { _attemptId = _usageTracker?.BeginAttempt(_operation) ?? Guid.Empty; }
+                catch { /* Observation must not turn an AI send into a retry. */ }
+                PublishUsage(finished: false);
+            }
+
             _ = await _session
                 .SendAndWaitAsync(
                     options,
@@ -523,19 +638,58 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
         {
             throw new EvaluationFatalException();
         }
+        finally
+        {
+            if (ownsSend)
+            {
+                lock (_usageGate) { _sendPending = false; }
+            }
+        }
     }
 
-    public Task AbortAsync(CancellationToken cancellationToken) =>
-        _session.AbortAsync(cancellationToken);
+    public Task AbortAsync(CancellationToken cancellationToken)
+    {
+        lock (_usageGate)
+        {
+            return _abortTask ??= _session.AbortAsync(cancellationToken);
+        }
+    }
 
-    public async Task<EvaluationTokenUsage> GetUsageAsync(
+    public Task<EvaluationTokenUsage> GetUsageAsync(
         CancellationToken cancellationToken)
     {
+        // Independent finite token: the run token is usually already cancelled on cleanup.
+        lock (_usageGate)
+        {
+            if (_closed || !_sendStarted || _sendPending || _abortTask is { IsCompleted: false })
+            {
+                if (!_closed && _sendStarted)
+                {
+                    _usageStatus = _sendPending ? UsageObservationStatus.SendPending : UsageObservationStatus.AbortPending;
+                    _partialUsage = true;
+                    PublishUsage(finished: false);
+                }
+
+                return Task.FromResult(_legacyUsage);
+            }
+
+            return _captureTask ??= Task.Run(CaptureUsageAsync);
+        }
+    }
+
+    private async Task<EvaluationTokenUsage> CaptureUsageAsync()
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        CancellationToken finiteToken = deadline.Token;
+#pragma warning disable GHCP001 // Fixed SDK usage.getMetrics experimental result type.
+        Task<GitHub.Copilot.Rpc.UsageGetMetricsResult>? rpc = null;
+#pragma warning restore GHCP001
         try
         {
-            var metrics = await _session.Rpc.Usage
-                .GetMetricsAsync(cancellationToken)
-                .ConfigureAwait(false);
+            rpc = Task.Run(() => _session.Rpc.Usage.GetMetricsAsync(finiteToken), finiteToken);
+            var metrics = await rpc.WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+
+            // Keep the pre-existing Excel projection, including its established fallback.
             EvaluationTokenUsage total = EvaluationTokenUsage.Unavailable;
             if (metrics.ModelMetrics is not null)
             {
@@ -556,7 +710,7 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
                 }
             }
 
-            return total.IsAvailable
+            EvaluationTokenUsage legacy = total.IsAvailable
                 ? total
                 : new EvaluationTokenUsage(
                     true,
@@ -565,14 +719,159 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
                     0,
                     0,
                     0);
+            UsageMetrics final = SdkUsageAdapter.FromFinal(metrics,
+                out UsageSource source, out bool partial, out bool invalid, out var finalProvenance);
+            var finalModels = SdkUsageAdapter.ModelsFromFinal(metrics, out bool modelsTruncated);
+            ModelCostComparison comparison = SdkUsageAdapter.CompareModelCosts(metrics);
+            lock (_usageGate)
+            {
+                if (!_closed)
+                {
+                    // LastCall token fields are not a session total: prefer cumulative events.
+                    UsageMetrics replacement = UsageProvenance.MergeFinal(final, _observedUsage,
+                        finalProvenance, out _metricProvenance);
+                    _modelCostComparison = comparison;
+                    _partialUsage = partial || final != replacement;
+                    _observedUsage = replacement;
+                    if (finalModels is { } reportedModels)
+                    {
+                        _models = reportedModels;
+                        _modelsTruncated = modelsTruncated;
+                    }
+                    // No map: retain partial event attribution, never infer it from requested model.
+                    _usageSource = source;
+                    _usageStatus = UsageObservationStatus.FinalObserved;
+                    _invalidUsage |= invalid;
+                    _legacyUsage = legacy;
+                    _finalCaptured = true;
+                    PublishUsage(finished: false);
+                }
+
+                return _legacyUsage;
+            }
         }
-        catch
+        catch (Exception exception)
         {
-            return EvaluationTokenUsage.Unavailable;
+            ObserveLateFault(rpc);
+            lock (_usageGate)
+            {
+                if (!_closed)
+                {
+                    _usageStatus = exception is TimeoutException or OperationCanceledException
+                        ? UsageObservationStatus.RpcTimedOut : UsageObservationStatus.RpcUnavailable;
+                    _partialUsage = true;
+                    PublishUsage(finished: false);
+                }
+
+                return _legacyUsage;
+            }
         }
     }
 
-    public ValueTask DisposeAsync() => _session.DisposeAsync();
+    public ValueTask DisposeAsync()
+    {
+        lock (_usageGate)
+        {
+            return new ValueTask(_disposeTask ??= Task.Run(DisposeCoreAsync));
+        }
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        // The coordinator aborts first on failure. GetUsageAsync refuses concurrent send/abort RPC.
+        try { await GetUsageAsync(CancellationToken.None).ConfigureAwait(false); }
+        catch { /* Observation failure must not replace cleanup's result. */ }
+        lock (_usageGate)
+        {
+            _closed = true;
+            PublishUsage(finished: true);
+            _eventIds.Clear();
+            _eventMetrics.Clear();
+            _modelEvents.Clear();
+        }
+
+        try { _usageSubscription?.Dispose(); }
+        catch { /* Observation teardown is advisory. */ }
+        await _session.DisposeAsync().ConfigureAwait(false);
+    }
+
+    private void OnUsage(AssistantUsageEvent usageEvent)
+    {
+        try
+        {
+            lock (_usageGate)
+            {
+                if (_closed || _finalCaptured || !_sendStarted || usageEvent.Data is null) { return; }
+                // Empty identifiers cannot establish uniqueness. Bound retained event metadata.
+                if (_eventIds.Contains(usageEvent.Id)) { return; }
+                if (usageEvent.Id == Guid.Empty || _eventIds.Count >= 4096)
+                {
+                    if (_usageStatus != UsageObservationStatus.EventsIncomplete)
+                    {
+                        _usageStatus = UsageObservationStatus.EventsIncomplete;
+                        PublishUsage(finished: false);
+                    }
+
+                    return;
+                }
+                if (!_eventIds.Add(usageEvent.Id)) { return; }
+                UsageMetrics value = SdkUsageAdapter.FromEvent(usageEvent.Data, out bool invalid);
+                _eventMetrics.Add(value);
+                _observedUsage = UsageMath.Sum(_eventMetrics, out bool overflow, out _);
+                _metricProvenance = UsageProvenance.FromSource(_observedUsage, UsageSource.Events);
+                string key = ModelUsageSnapshot.CreateModelKey(usageEvent.Data.Model);
+                if (!_modelEvents.TryGetValue(key, out var modelValues)
+                    && _modelEvents.Count < ModelUsageSnapshot.MaximumModels)
+                {
+                    modelValues = [];
+                    _modelEvents.Add(key, modelValues);
+                }
+                if (modelValues is not null) { modelValues.Add(value); }
+                else { _modelsTruncated = true; }
+                // Shares the aggregate's dedup gate and 4096-event retention bound.
+                _models = _modelEvents.Select(pair => new ModelUsageSnapshot(pair.Key,
+                    UsageMath.Sum(pair.Value, out _, out _))).ToImmutableArray();
+                _invalidUsage |= invalid || overflow;
+                _usageSource = UsageSource.Events;
+                if (_usageStatus != UsageObservationStatus.EventsIncomplete)
+                {
+                    _usageStatus = UsageObservationStatus.EventObserved;
+                }
+                PublishUsage(finished: false);
+            }
+        }
+        catch
+        {
+            // Never propagate an observation callback exception into the SDK event dispatcher.
+        }
+    }
+
+    private void PublishUsage(bool finished)
+    {
+        if (_usageTracker is null || _attemptId == Guid.Empty) { return; }
+        try
+        {
+            _usageTracker.ReplaceAttempt(new AttemptUsageSnapshot(_attemptId, _operation,
+                ++_usageRevision, _observedUsage, _usageSource, finished, _invalidUsage, _partialUsage, _usageStatus)
+            {
+                Models = _models,
+                ModelsTruncated = _modelsTruncated,
+                RequestedModelKey = _requestedModelKey,
+                RequestedModelIsAuto = _requestedModelIsAuto,
+                MetricProvenance = _metricProvenance,
+                ModelCostComparison = _modelCostComparison,
+            });
+        }
+        catch { /* Usage does not determine evaluation success. */ }
+    }
+
+    private static void ObserveLateFault(Task? task)
+    {
+        if (task is null) { return; }
+        _ = task.ContinueWith(static completed => _ = completed.Exception,
+            CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
 
     private static long NonNegative(long value) => Math.Max(0, value);
 }

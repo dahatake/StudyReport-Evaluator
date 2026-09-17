@@ -521,6 +521,8 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 不一致時は当該checkpointを変更せず、具体的なsafe errorを表示して再開しない。回答、Prompt、reason、evidence本文をerrorへ含めない。
 
+再開元を明示指定した後、run開始前に入力、採点設計、通常評価model、runtime、checkpoint構造の項目別結果をread-onlyで表示する。開始時には同じ条件と完了行内容を再検証する。
+
 ### 10.5 再開動作
 
 - 保存済み参照回答は再利用する。
@@ -530,6 +532,13 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 - 完成成功後にpartial fileを削除する。削除失敗は完成fileを無効にせず、明確なcleanup warningを表示する。
 - cleanup warningは結果画面へnon-modalに表示し、完成file pathと残存partial pathを示す。確認操作をworkflow条件にしない。
 - 新規runの候補pathに既存partial fileがある場合は上書きせず、再開可能性を検査するか、次の未使用suffixを割り当てる。
+
+### 10.6 中断と再開の引き継ぎ
+
+- 停止はpartialを破棄せず、最後のatomic checkpointを再開元として保持する。
+- 同一セッションでは「中断した処理を再開準備」の明示操作で再開元を設定・検査する。この操作とpicker選択はAI処理を開始しない。
+- 再起動後はnative pickerまたはfull pathの直接入力で`.partial.xlsx`を指定する。picker取消は現在の状態を変更しない。
+- checkpointの入力またはmodelへ合わせる操作は利用者が明示的に選ぶ。採点設計およびruntimeは自動変更しない。
 
 ## 11. UI workflow
 
@@ -550,7 +559,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
    - 実効output／partial pathと設定変更への入口
    - 参照生成、通常評価、固有評価、類似度、finalizationの段階表示
    - completed rows / total rows、in-flight、error、cancel
-   - 利用可能checkpointの再開
+   - 利用可能checkpointの再開、中断からの再開準備、再開条件の項目別read-only検証
 4. **結果**
    - 完了／一部失敗／取消を明示
    - finalまたはpartial path
@@ -640,6 +649,18 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 - run開始時にrequest／immutable snapshotを固定し、実行中も戻る・次回用編集を許可するが現在runを再構成しない。進捗入口・停止・予約済みpathを全画面で利用可能にし、現在runと次回条件を別表示する。設定表示中にrunが完了しても設定を閉じず、結果到着だけを通知する。
 - 同じ入力・定義の単なる往復では新規／再開・partial指定・進捗・直前runを初期化しない。入力／定義を変更した場合だけ次回準備を更新し、再開指定を再確認または解除して理由を表示する。新規／再開・partial指定は設定fileへ永続化しない。
 - 結果は前回runとして保持し、次回draftを過去結果へ混入させない。結果の一覧／詳細は追加ステップではなく、ページ移動後も元Results collectionのoverrideを保持する。0とblank、完成版と未保存修正版、予定名／予約済み／保存中／完成を実データから区別し、未実行scoreや未完成fileを生成済みとして表示しない。
+
+### 11.9 実行コストの表示とジョブログ
+
+- 「3 実行」「4 結果」でExcelを開かずに、今回のAI処理で観測できた使用量を確認できる。対象は開始操作ごとのジョブ1件で、入力・出力・推論・キャッシュのtoken数、SDKが報告した`nano-AI units`、premium request消費量、観測状態を示す。
+- 通常評価・参照回答生成・固有評価・類似度評価と、それぞれの再試行を対象とする。成功・技術失敗・取消・timeout・出力失敗、checkpointへ保存されなかった行で観測できた値も今回ジョブに残す。
+- 取得できない値は理由とともに未取得として示し、0や推定値へ置き換えない。明示的な0、未送信、送信状況不明、最後の呼び出しのみの部分取得を区別する。
+- 単位はSDK報告の原単位を保持し、AIクレジット・通貨へ換算しない。換算根拠を確認できるまでAIクレジットの数値を表示しない。
+- 同一attemptの累計は置換で更新し、イベント合計とセッション累計、モデル別内訳とセッション総量を加算しない。内訳と総量が一致しない場合は不一致として示し、配賦・補正で一致させない。
+- 項目ごとに取得元（イベント／最終RPC／最後の呼び出しのみ）と部分取得を保持する。再試行は別attemptとして数え、試行番号・相関ID・終端結果を記録する。
+- ジョブ単位のUTF-8 JSON Linesログを利用者別のローカル領域へ作り、数値・生成ID・閉じたコードだけを記録する。回答・Prompt・reason・evidence・学生識別子・実path・credentialを記録せず、モデル名は匿名化した識別子だけを保存する。
+- ログの保存失敗・記録欠落・容量上限は採点と分けて表示し、観測済みの画面表示を消さない。コスト取得の失敗だけでAIを再送しない。
+- 既存Excelの使用量出力とcheckpoint schemaは変更しない。過去ジョブの累計表示・再取込は本版の対象外とする。
 
 ## 12. Promptファイルからの起動
 
@@ -803,6 +824,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | process終了 | 最後にatomic保存したcheckpointから再開可能 |
 | input changed | checkpoint更新とfinal renameを停止、`INPUT_CHANGED` |
 | checkpoint mismatch | checkpointを変更せず再開拒否 |
+| app close中のrun | 新規送信を停止し、最大10秒だけ中断処理を待つ。繰返しcloseも待機を飛ばさない。OS shutdownは中断要求のみで終了を妨げない。復旧は最後に成功したatomic checkpointに限定 |
 | output validation failure | 完成名を作らずpartialを保持、`OUTPUT_INVALID` |
 | partial cleanup failure after success | finalは有効、cleanup warningを表示 |
 
@@ -830,6 +852,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 - 4ステップを維持した同一window内の設定5カテゴリ、通常最小サイズの外側スクロール不要、ページ切替と長文／狭小／拡大の到達性例外
 - 利用者別setting.txtへの共通設定＋採点定義1件の明示保存、検証後の保存定義明示適用、明示出力先復元とnull時だけの入力隣接result
 - 値・対象・ページ・カテゴリの往復保持、保存model希望IDと実効選択の分離、現在run／次回draft／前回結果の区別
+- 実行・結果画面とジョブ単位ローカルJSON Linesログによる今回ジョブのAI使用量表示（SDK報告の原単位のみ、AIクレジット・通貨換算なし）
 
 ### 17.2 out of scope
 
@@ -894,10 +917,12 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | AC-035 | 利用者別setting.txt（UTF-8 JSON、schema整数1）へ共通設定＋任意の採点定義1件を明示保存し、ID／decimal／Prompt／canonical hashを復元する。header由来の設問text・貼付内容は明示保存時に平文で含まれ、§11.6の非保存対象は保存しない。破損・未知schema・IO失敗は元fileとdraftを保持しoffline継続する。保存中再編集は未保存のまま、同時保存は最後の成功が優先する。明示出力先は再起動・入力変更後も復元し、初回の未指定または空欄への明示編集によるnullの場合だけ入力隣接resultを算出し、fallback・復元時directory作成をしない。 |
 | AC-036 | 保存定義はExcel読込後の明示操作で、保存headerのmetadata・sheet・行・列・定義全体を検証してからInput／Designへ一括適用する。失敗・取消時は現在状態とfileを変更せず、成功時はID・順序・設問text・Prompt・配点を保持する。Imported Prompt一覧は不変、run中の一括適用は禁止し、既存checkpoint admissionを緩めない。 |
 | AC-037 | 設定を第5ステップにせず、同じ対象へ1操作で移動し、値・対象ID・ページ・カテゴリ・入力途中の編集を保持して戻れる。希望modelは明示確認後だけ実効選択にし、不在なら未選択・no fallback、確認失敗だけで保存希望を消さない。遷移・設定読込／保存／適用・login完了で認証確認／login／runを自動開始せず、実行中の次回draft編集は現在snapshotへ混入しない。全画面で進捗・停止を保持し、設定中完了は結果通知だけとする。前回結果・override・未保存修正版を次回設定から分離する。 |
+| AC-038 | 中断後は部分結果のpartial pathと再開準備を表示し、同一セッションでは明示操作で、再起動後はpartial選択またはpath指定で再開条件を開始前に項目別検証する。不一致時はcheckpointを変更せず開始しない。入力・modelだけは明示操作で合わせられ、採点設計・runtimeは自動変更しない。window close時は有限時間の中断待機後に閉じる。 |
+| AC-039 | 実行・結果画面とジョブ単位のローカルJSON Linesログで、今回の開始操作に対応するAI使用量（入力・出力・推論・キャッシュtoken、`nano-AI units`、premium request消費量）を、全4 operationと再試行・失敗・取消・未保存行を含めて確認できる。未取得は0や推定値にせず理由とともに示し、明示0・未送信・送信状況不明・部分取得を区別する。項目別の取得元、試行番号・相関ID・終端結果、モデル内訳と総量の不一致を保持し、内訳を総量へ加算・配賦しない。SDK報告の原単位を保ち、換算根拠のないAIクレジット・通貨表示をしない。ログは数値・生成ID・閉じたコードだけを記録し、保存失敗でも観測済み表示と採点を壊さない。 |
 
 ## 19. Test requirements
 
-以下の番号は追跡ID `TR-01`〜`TR-36`に対応する。既存1〜33を再番号付けせず、17等の直接関連する到達契約を追補し、34〜36を末尾へ追加する。T01時点の未実装・試験NOT_RUNは履歴であり、現在の実装・局所検証は[traceability](../dev/docs/traceability.md)のVERIFIED_SCOPEDに限定する。T25〜27の74/74（T26の27ケース・T27の7ケースを含む）と最新修正を含むT28の216/216は別の対象集合で、合算しない。
+以下の番号は追跡ID `TR-01`〜`TR-38`に対応する。既存番号を維持し、中断・再開導線の37とジョブコスト表示の38を末尾へ追加する。T01時点の未実装・試験NOT_RUNは履歴であり、現在の実装・局所検証は[traceability](../dev/docs/traceability.md)のVERIFIED_SCOPEDに限定する。過去の試験結果と現在の局所検証は同追跡表で区別し、異なる対象集合を合算して全体合格にしない。
 
 **0.8.4での記録済み結果:** T35の対象文書試験は4/4成功・敵対的レビュー済み（`artifacts/test/ui-settings/t35/t35-reviewed.trx`、指摘0）。T36の文書・画像contract全体は別scopeで、独自の`artifacts/test/ui-settings/t36/t36-current.trx`が21/21成功・REVIEWED。T37は`artifacts/test/ui-settings/t37/t37.trx`の9/9（実ZIP＋MSIX静的契約）、T38は`artifacts/test/ui-settings/t38/t38.trx`の114/114とP06実EXE 7/7・P07 `PASS_DEVELOPMENT`。T39の自動回帰は`artifacts/test/ui-settings/t39/reviewed/`の2026-09-07の2 TRXでCore 190＋App 1702＝1892/1892、skip 0。初回1失敗→fixture修正→126/126・レビュー指摘0→全体再実行成功の履歴を保持する。MSIX実物は`artifacts/package/mechanism/StudyReportEvaluator-win-x64.unsigned.test.evidence.json`の`PASS_MECHANISM`（256 entries、0.8.4.0）で、install／公開の成功ではない。
 
@@ -939,6 +964,10 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 34. 一時absolute pathに限定した設定storeの明示保存・再読込test。fileなし、BOM、型／enum／範囲、schema欠損／不正型／未知版／未知項目、定義なし／不正draft、入力未読込時の保存定義保持、ID／decimal／Unicode／Prompt／canonical hash往復、保存中再編集、atomic置換と旧bytes保持・temp後始末を確認する。Windowsの排他file・file-valued親path等で実際のIO拒否を確認し、ReadOnlyディレクトリだけを拒否根拠にしない。合成header／貼付内容の平文保存、回答自動収集・credential／AI結果非保存・no-content logを検証する。未指定で入力A→Bのresult、明示先の再起動→入力Bでの復元、空欄→null、利用不可no fallback、復元時directory非作成を確認し、実利用者設定を使わない（AC-035）。
 35. 保存定義の明示適用test。Excel未読込／run中の禁止、同入力／別header／sheet・列・行不一致、取消・失敗時のInput metadata／draft／Design／保存file無変更、成功時のID・順序・設問text・Prompt・配点・canonical hash保持を確認する。後続主列変更の既存同期、Imported Prompt一覧・本文・順序不変、AI送信0、既存checkpoint admission維持を検証する（AC-036）。
 36. Input→Design→Settings→Input→Executionの往復と交互編集→保存、入力途中、選択ID／ページ／カテゴリ保持、同じ入力・定義での再開指定非初期化と変更時の再確認、保存希望modelの有／無／欠落・確認失敗・auto欠落、no fallback／no-auto-login/runをfake境界で検証する。実行中の次回編集で現在request／snapshot不変、全画面の進捗・停止、設定中完了の非強制遷移、前回結果とoverrideの保持を確認する。save→新VM／store→read-only Excel明示適用→fake run→別名出力・resumeのdeterministic E2Eで元本、exact100、zero／blank、formula、checkpoint契約を維持する。本人walkthroughは別途実施し未確認を合格にしない（AC-035〜037、AC-016〜019）。
+
+37. 中断後の再開準備、partial picker取消時の状態不変、開始前の項目別再開検証、入力・modelの明示適用、window close時の有限中断待機をdeterministicに確認する。
+
+38. ジョブ使用量の集計・表示・JSONLログのdeterministic test。取得成功／一部欠落／全欠落、明示0と未取得、最後の呼び出しのみ、イベント重複・順序逆転・final複数通知、再試行と4 operation、取消・cleanup失敗、項目別の取得元、モデル内訳と総量の不一致、下方訂正、overflow／負数を確認する。JSONLは一時directoryだけを使い、回答・Prompt・path・credentialのcanary非記録、容量上限・保存失敗時の観測値保持、終端記録の整合を検証する。実AI・実課金照合・AIクレジット換算は含めない（AC-039）。
 
 ## 20. 外部仕様出典
 
@@ -988,6 +1017,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | OS-only実測 | fresh Windows 11 x64標準userでのexact EXE CH-01〜06（AC-029／034、TR-33） |
 | Platform release matrix | 既存protected CI/release workflow + candidate-bound v2 matrix／metadata evidence（AC-028／034、TR-29／33） |
 | User/developer documentation | docs + dev/docs + screenshot tests |
+| 実行コスト表示・ジョブログ | App `Usage`の集計と`Logging`のJSONL writer、Execution／Resultsが共有するコストView（AC-039、TR-38）。JobUsageTracker／SdkUsageAdapter／UsageProvenance／JobCostBackend／JobCostView testsで局所検証済み（VERIFIED_SCOPED）。実AI・実課金照合・AIクレジット換算・native確認は未実施 |
 
 ## 22. Approval record
 

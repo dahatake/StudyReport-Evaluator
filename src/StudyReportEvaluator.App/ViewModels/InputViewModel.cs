@@ -895,6 +895,72 @@ public sealed class InputViewModel : UiObservableObject
         await LoadAsync(cancellationToken);
     }
 
+    /// <summary>Loads a checkpoint input without replacing the current input until successful.</summary>
+    public async Task<bool> TryLoadCheckpointInputAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        if (IsBusy || !Path.IsPathFullyQualified(path))
+        {
+            return false;
+        }
+
+        string normalizedPath = Path.GetFullPath(path);
+        QuantificationDefinition originalDraft = definitionDraft;
+        bool preserveMapping = HasLoadedWorkbook;
+        long sequence = Interlocked.Increment(ref loadSequence);
+        IsBusy = true;
+        try
+        {
+            InputWorkbookLoadResult result = await loader.LoadAsync(
+                normalizedPath,
+                checked((uint)HeaderRow),
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (sequence != Volatile.Read(ref loadSequence)
+                || !ReferenceEquals(originalDraft, definitionDraft))
+            {
+                return false;
+            }
+
+            if (preserveMapping && !mappingValidator.Validate(result.Metadata, originalDraft).IsValid)
+            {
+                return false;
+            }
+
+            filePath = normalizedPath;
+            loadError = null;
+            ApplyLoadResult(result, preserveMapping);
+            OnPropertyChanged(nameof(FilePath));
+            Revalidate();
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (InputWorkbookLoadException)
+        {
+            return false;
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or InvalidDataException
+            or ArgumentException)
+        {
+            return false;
+        }
+        finally
+        {
+            if (sequence == Volatile.Read(ref loadSequence))
+            {
+                IsBusy = false;
+                Revalidate();
+            }
+        }
+    }
+
     public Task LoadAsync(CancellationToken cancellationToken = default) =>
         LoadCoreAsync(preserveMapping: false, cancellationToken);
 

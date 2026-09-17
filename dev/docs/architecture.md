@@ -65,6 +65,8 @@ flowchart TD
 
 run開始後のdraft変更は次runだけへ反映する。current run、checkpoint、resume、formula、final workbookは同じsnapshotを使用する。
 
+中断 → 保存済みpartialのhandoff → 明示再開準備 → `ResumeInspectionBoundary`のread-only確認 → `ResumeAdmissionEvaluator` → 明示Start → 同じadmissionと完了行内容の再検証、の順に再開する。中断後は実行画面を保持する。`MainWindow`はClose連打でも待機を飛ばさず最大10秒待機するが、OS shutdownの保存完了は保証しない（ADR-0017、AC-038／TR-37）。
+
 ## 3. AI境界
 
 | Operation | Model | Workbook由来input | Tool |

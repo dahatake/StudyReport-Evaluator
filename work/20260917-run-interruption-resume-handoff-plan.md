@@ -1,5 +1,15 @@
 # ステップ3 実行の「中断して後から再開」機能追加 — 実装プラン
 
+## 2026-09-17 確定記録（以下の当初案より優先）
+
+- P1〜P6は実装・文書同期済み。実際の追加要求はAC-038／TR-37。以下のAC-037／TR-33案は重複IDのため不採用。
+- 「中断した処理を再開準備」は条件確認だけで、AI再開には別途Startが必要。再起動後は元Excelと中断時の採点設計を明示的に用意する。checkpointから定義を自動適用しない。
+- Close待機は最大10秒。繰返しCloseは待機を飛ばさず、内部Closeだけを許可する。OS shutdownは中断要求のみで終了を妨げず、保存完了を保証しない。復旧源は最後に成功したatomic checkpointに限定する。
+- 最新の最小テスト指示に従い全suite・実AI・40行実機試験・再package・公開は実行しない。0.9.0への版更新は今回行わず、他の未公開機能と合わせたrelease判断へ分離する。
+- Debug build成功。`TestResults/resume-focused/resume-verified.trx` は12/12 PASS（ResumeWorkflowTests 8、ResumeAdmissionEvaluatorTests 2、料金記録のビルド接続回帰2）。`resume-durable.trx` は既存再開／mismatch 5/5 PASS。今回の局所実行は17件であり全体gateではない。
+- 長時間待機は評価単位0のfakeがin-flight=1を通知して開始通知前に例外となったテスト不備。fixture修正と開始待ち5秒上限で解消し、削除されていたwindow closeテストも復元して成功した。残存test processのDLLロックと同時編集の重複メソッドも解消した。
+- 残る受入確認は本人操作・Narrator・native DPI、別process再起動・OS shutdown、exact配布物のclean-host／公開承認。局所成功をこれらの完了へ読み替えない。
+
 - 作成: 2026-09-17
 - 対象: ステップ3（実行 / Execution）の run を利用者の意思で停止し、後から続きを再開する導線
 - 版: `0.8.6`（未公開候補）を起点。ADR-0014 に従い機能追加のため MINOR bump（`0.9.0`）を推奨

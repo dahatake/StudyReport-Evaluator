@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Windows.Input;
 using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Settings;
+using StudyReportEvaluator.App.Usage;
 using StudyReportEvaluator.App.Workflow;
 using StudyReportEvaluator.App.Workbooks.Mapping;
 using StudyReportEvaluator.App.Workbooks.Checkpoint;
@@ -136,6 +137,13 @@ public interface IQuantificationRunBoundary
         QuantificationRunRequest request,
         Action<EvaluationProgress>? progress,
         CancellationToken cancellationToken);
+
+    // Existing fake/legacy boundaries can run without claiming cost observations.
+    Task<RunSummary> RunAsync(
+        QuantificationRunRequest request,
+        Action<EvaluationProgress>? progress,
+        Action<JobCostSnapshot>? costChanged,
+        CancellationToken cancellationToken) => RunAsync(request, progress, cancellationToken);
 }
 
 public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
@@ -143,6 +151,51 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
     public Task<RunSummary> RunAsync(
         QuantificationRunRequest request,
         Action<EvaluationProgress>? progress,
+        CancellationToken cancellationToken) => RunAsync(request, progress, null, cancellationToken);
+
+    public Task<RunSummary> RunAsync(
+        QuantificationRunRequest request,
+        Action<EvaluationProgress>? progress,
+        Action<JobCostSnapshot>? costChanged,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        // Job setup, log IO and final drain must not run on the UI thread.
+        return Task.Run(async () =>
+        {
+            var assembly = typeof(QuantificationRunBoundary).Assembly;
+            var usageContext = new JobUsageContext(
+                assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
+                request.RuntimeIdentity?.SdkInformationalVersion, request.RuntimeIdentity?.CliVersion,
+                request.ModelId, request.MaxConcurrency, request.ResumePartialPath is not null);
+            await using JobUsageTracker usage = new(costChanged, context: usageContext);
+            string status = "RUN_FAILED";
+            try
+            {
+                RunSummary summary = await RunCoreAsync(request, progress, usage, cancellationToken)
+                    .ConfigureAwait(false);
+                status = summary.StatusCode;
+                return summary;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                status = "CANCELLED";
+                throw;
+            }
+            finally
+            {
+                await usage.CompleteAsync(status).ConfigureAwait(false);
+                // A final delivery after the bounded log drain also covers summary-less errors.
+                try { costChanged?.Invoke(usage.Snapshot); }
+                catch { /* Presentation cannot replace an evaluation result. */ }
+            }
+        }, CancellationToken.None);
+    }
+
+    private static Task<RunSummary> RunCoreAsync(
+        QuantificationRunRequest request,
+        Action<EvaluationProgress>? progress,
+        JobUsageTracker usage,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -150,7 +203,7 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
         EphemeralEvaluationRunnerOptions runnerOptions = new(
             maxConcurrency: request.MaxConcurrency);
         EphemeralEvaluationRunner runner = new(
-            new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory()),
+            new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory(), usage, UsageOperation.Normal),
             runnerOptions);
         EphemeralEvaluationRunnerAdapter normalRunner = new(runner);
         if (!request.UseDurableWorkflow)
@@ -161,19 +214,17 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
 
         CopilotRuntimeIdentity identity = request.RuntimeIdentity
             ?? throw new QuantificationRunException("RUNTIME_IDENTITY_REQUIRED");
-        SdkEphemeralCopilotTransportFactory transportFactory =
-            new(new CopilotClientFactory());
         DurableQuantificationOrchestrator durable = new(
             rowSource,
             normalRunner,
             new ReferenceAnswerOperationRunnerAdapter(new ReferenceAnswerEvaluationRunner(
-                transportFactory,
+                new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory(), usage, UsageOperation.Reference),
                 runnerOptions)),
             new SpecialEvaluationOperationRunnerAdapter(new SpecialEvaluationRunner(
-                transportFactory,
+                new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory(), usage, UsageOperation.Special),
                 runnerOptions)),
             new SimilarityEvaluationOperationRunnerAdapter(new SimilarityEvaluationRunner(
-                transportFactory,
+                new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory(), usage, UsageOperation.Similarity),
                 runnerOptions)));
         return durable.RunAsync(
             new DurableQuantificationRunRequest
@@ -220,7 +271,7 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
             value.FinalPath,
             value.PartialPath);
 
-    private static string ApplicationIdentity()
+    internal static string ApplicationIdentity()
     {
         Assembly assembly = typeof(QuantificationRunBoundary).Assembly;
         string? informationalVersion = assembly
@@ -280,7 +331,8 @@ public sealed class ExecutionRunContext
         RunSummary summary,
         string inputPath,
         string modelId,
-        CopilotRuntimeIdentity runtimeIdentity)
+        CopilotRuntimeIdentity runtimeIdentity,
+        JobCostSnapshot? cost = null)
     {
         Summary = summary ?? throw new ArgumentNullException(nameof(summary));
         ArgumentException.ThrowIfNullOrWhiteSpace(inputPath);
@@ -296,6 +348,7 @@ public sealed class ExecutionRunContext
 
         InputPath = Path.GetFullPath(inputPath);
         ModelId = modelId;
+        Cost = cost;
     }
 
     public RunSummary Summary { get; }
@@ -305,6 +358,8 @@ public sealed class ExecutionRunContext
     public string ModelId { get; }
 
     public CopilotRuntimeIdentity RuntimeIdentity { get; }
+
+    public JobCostSnapshot? Cost { get; }
 
     public override string ToString() =>
         $"{nameof(ExecutionRunContext)} {{ StatusCode = {Summary.StatusCode}, Content = <redacted> }}";
@@ -320,7 +375,7 @@ public sealed class ExecutionRunCompletedEventArgs : EventArgs
     public ExecutionRunContext Context { get; }
 }
 
-public sealed class ExecutionViewModel : UiObservableObject, IDisposable
+public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
 {
     private const string BundledCliUnavailableMessage =
         "同梱 Copilot CLI を確認できません。配布物を再取得し、ZIP 版は再展開してください。";
@@ -387,7 +442,11 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     private CancellationTokenSource? loginCancellation;
     private CancellationTokenSource? runCancellation;
     private long authenticationSequence;
+    private long costSequence;
+    private long progressSequence;
     private bool disposed;
+
+    public JobCostViewModel Cost { get; } = new();
 
     public ExecutionViewModel()
         : this(
@@ -399,7 +458,8 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     public ExecutionViewModel(
         IExecutionAuthenticationBoundary authenticationBoundary,
         IQuantificationRunBoundary runBoundary,
-        BundledCopilotLoginService? loginService = null)
+        BundledCopilotLoginService? loginService = null,
+        IResumeInspectionBoundary? resumeInspectionBoundary = null)
     {
         this.authenticationBoundary = authenticationBoundary
             ?? throw new ArgumentNullException(nameof(authenticationBoundary));
@@ -407,8 +467,10 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             ?? throw new ArgumentNullException(nameof(runBoundary));
         // The view model owns the service, including an explicitly supplied instance.
         this.loginService = loginService ?? new BundledCopilotLoginService();
+        this.resumeInspectionBoundary = resumeInspectionBoundary ?? new ResumeInspectionBoundary();
         AvailableModelIds = new ReadOnlyObservableCollection<string>(modelItems);
         TechnicalErrors = new ReadOnlyObservableCollection<ExecutionTechnicalError>(technicalErrorItems);
+        ResumeFindings = new ReadOnlyObservableCollection<ResumeAdmissionFinding>(resumeFindingItems);
         checkAuthenticationCommand = new ViewModelCommand(
             _ => _ = CheckAuthenticationAsync(),
             _ => CanCheckAuthentication);
@@ -424,6 +486,14 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         cancelCommand = new ViewModelCommand(
             _ => Cancel(),
             _ => CanCancel);
+        resumeInterruptedRunCommand = new ViewModelCommand(
+            _ => _ = SelectInterruptedRunAsync(), _ => CanEditResume && HasInterruptedRun);
+        validateResumeCheckpointCommand = new ViewModelCommand(
+            _ => _ = PrepareResumeAsync(), _ => CanPrepareResume);
+        applyCheckpointInputCommand = new ViewModelCommand(
+            _ => _ = ApplyCheckpointInputAsync(), _ => CanEditResume && inspectedCheckpoint is not null);
+        applyCheckpointModelCommand = new ViewModelCommand(
+            _ => ApplyCheckpointModel(), _ => CanEditResume && inspectedCheckpoint is not null);
         Revalidate();
     }
 
@@ -523,6 +593,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         {
             if (SetProperty(ref maxConcurrency, value))
             {
+                InvalidateResumePreflight();
                 runtimeErrorCode = null;
                 runPreflightErrors = [];
                 Revalidate();
@@ -543,6 +614,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             string? next = string.IsNullOrWhiteSpace(value) ? null : value;
             if (SetProperty(ref outputDirectoryOverride, next))
             {
+                InvalidateResumePreflight();
                 runtimeErrorCode = null;
                 OnPropertyChanged(nameof(OutputDirectory));
                 Revalidate();
@@ -567,6 +639,8 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         {
             if (SetProperty(ref resumePartialPath, value ?? string.Empty))
             {
+                resumeSelectionSequence++;
+                InvalidateResumePreflight(clearCheckpoint: true);
                 runtimeErrorCode = null;
                 resumeResetReason = string.Empty;
                 OnPropertiesChanged(nameof(ResumeResetReason), nameof(OutputModeText));
@@ -582,6 +656,8 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         {
             if (SetProperty(ref isResumeMode, value))
             {
+                resumeSelectionSequence++;
+                InvalidateResumePreflight();
                 runtimeErrorCode = null;
                 resumeResetReason = string.Empty;
                 OnPropertiesChanged(nameof(ResumeResetReason), nameof(OutputModeText), nameof(CanStart));
@@ -723,7 +799,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         DurableEvaluationStage.SavingCheckpoint => "checkpointを保存中",
         DurableEvaluationStage.FinalizingWorkbook => "final workbookを検証中",
         DurableEvaluationStage.Completed => "完了",
-        DurableEvaluationStage.Cancelling => "cancel処理中",
+        DurableEvaluationStage.Cancelling => "中断処理中",
         _ => "未開始",
     };
 
@@ -748,7 +824,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         {
             if (IsCancelling)
             {
-                return "cancel を受け付けました。実行中 unit の安全な終了を待っています。";
+                return "中断を受け付けました。処理中の行を中止し、保存済みの行を保持します。途中の行は再開時に最初から評価します。";
             }
 
             if (IsRunning)
@@ -767,7 +843,8 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 QuantificationRunStatusCodes.Success when summary.PartialCleanupFailed =>
                     "final workbookは有効ですが、partial cleanupに失敗しました。",
                 QuantificationRunStatusCodes.Success => "検証済みfinal workbookを自動作成しました。",
-                QuantificationRunStatusCodes.Cancelled => "cancel 済みの部分結果をpartial checkpointへ保持しました。",
+                QuantificationRunStatusCodes.Cancelled when HasInterruptedRun => "中断しました。.partial.xlsx に保存済みの結果を保持しています。「中断した処理を再開準備」で再開元を設定できます。",
+                QuantificationRunStatusCodes.Cancelled => "中断しました。再開元として確認できる保存済み checkpoint はありません。",
                 QuantificationRunStatusCodes.InputChanged => "入力変更を検出したため、出力は停止されています。",
                 QuantificationRunStatusCodes.CheckpointFailed => "checkpointを安全に保存できなかったため停止しました。",
                 QuantificationRunStatusCodes.OutputInvalid => "final検証に失敗したためpartialを保持しました。",
@@ -830,6 +907,9 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 return "アプリを開き直すまで run は開始できません。";
             }
 
+            if (closing) return "終了処理中です。新しい実行は開始できません。";
+            if (IsPreparingResume) return "再開条件を確認中です。実行はまだ開始できません。";
+
             if (IsRunning)
             {
                 return IsCancelling
@@ -867,6 +947,8 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
                 return $"実行前に解消する技術的な問題が {technicalErrorItems.Count.ToString(CultureInfo.InvariantCulture)} 件あります。";
             }
 
+            if (IsResumeMode && !HasMatchingResumePreflight) return ResumeValidationText;
+
             return IsAuthenticationAvailable
                 ? "実行条件を確認してください。run はまだ開始できません。"
                 : AuthenticationStatusText;
@@ -874,6 +956,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
     }
 
     public bool CanCheckAuthentication => !disposed
+        && !closing
         && !IsCheckingAuthentication
         && !IsLoggingIn
         && !loginExitUnconfirmed
@@ -881,6 +964,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         && !IsRunning;
 
     public bool CanLogin => !disposed
+        && !closing
         && !loginServiceDisposed
         && !IsLoggingIn
         && !IsCheckingAuthentication
@@ -891,6 +975,10 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         && loginCancellation is { IsCancellationRequested: false };
 
     public bool CanStart => !disposed
+        && !closing
+        && !runStarting
+        && !IsPreparingResume
+        && (!IsResumeMode || HasMatchingResumePreflight)
         && IsConfigured
         && nextDraftSummary is null
         && !IsCheckingAuthentication
@@ -962,6 +1050,13 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         string nextInputPath = draftDefinition is null || string.IsNullOrWhiteSpace(configuredInputPath)
             ? string.Empty
             : Path.GetFullPath(configuredInputPath);
+        // Summary counts alone cannot detect a changed criterion or prompt.
+        if (draftDefinition is null || workbookMetadata is null
+            || !IsSameConfiguration(draftDefinition, workbookMetadata, nextInputPath))
+        {
+            InvalidateResumePreflight();
+            if (!isApplyingCheckpointInput) ClearInterruptedRun();
+        }
         (string InputPath, long EvaluationCount) next = (
             nextInputPath,
             nextInputPath.Length == 0 ? 0 : CountPlannedEvaluations(draftDefinition));
@@ -1027,11 +1122,13 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         definition = InputViewModel.CloneDefinition(draftDefinition);
         workbookMetadata = metadata;
         inputPath = nextInputPath;
-        resumeResetReason = isResumeMode || !string.IsNullOrWhiteSpace(resumePartialPath)
+        resumeResetReason = isResumeMode || !string.IsNullOrWhiteSpace(resumePartialPath) || HasInterruptedRun
             ? "入力または採点定義が変更されたため、再開指定を解除しました。再開する場合はcheckpointを指定し直してください。"
             : string.Empty;
         resumePartialPath = string.Empty;
         isResumeMode = false;
+        InvalidateResumePreflight(clearCheckpoint: true);
+        ClearInterruptedRun();
         runtimeErrorCode = null;
         runPreflightErrors = [];
         LastRunContext = null;
@@ -1062,11 +1159,13 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         workbookMetadata = null;
         inputPath = string.Empty;
         nextDraftSummary = null;
-        resumeResetReason = isResumeMode || !string.IsNullOrWhiteSpace(resumePartialPath)
+        resumeResetReason = isResumeMode || !string.IsNullOrWhiteSpace(resumePartialPath) || HasInterruptedRun
             ? "入力が未選択になったため、再開指定を解除しました。入力を読み込み、checkpointを指定し直してください。"
             : string.Empty;
         resumePartialPath = string.Empty;
         isResumeMode = false;
+        InvalidateResumePreflight(clearCheckpoint: true);
+        ClearInterruptedRun();
         runtimeErrorCode = null;
         runPreflightErrors = [];
         LastRunContext = null;
@@ -1308,35 +1407,69 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         CancellationToken token = runCancellation.Token;
         SynchronizationContext? observerContext = SynchronizationContext.Current;
+        long currentProgressSequence = Interlocked.Increment(ref progressSequence);
+        long jobSequence = Interlocked.Increment(ref costSequence);
+        JobCostSnapshot? latestCost = null;
+        object costGate = new();
+        Cost.Reset();
+        void OnCostChanged(JobCostSnapshot value)
+        {
+            lock (costGate)
+            {
+                if (latestCost is { } previous
+                    && (previous.JobId != value.JobId || previous.Revision >= value.Revision)) return;
+                latestCost = value;
+            }
+
+            void Apply()
+            {
+                if (!disposed && jobSequence == Volatile.Read(ref costSequence)) Cost.Apply(value);
+            }
+            if (observerContext is null || ReferenceEquals(observerContext, SynchronizationContext.Current)) Apply();
+            else observerContext.Post(_ => Apply(), null);
+        }
+        // Publish a completion promise before any IsRunning observer can reenter close.
+        // Keep the start gate closed through all completion notifications as well.
+        TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        runStarting = true;
+        LastRunTask = completion.Task;
         runtimeErrorCode = null;
         runPreflightErrors = [];
         // Freeze before start-state observers can edit settings. The same immutable
         // request goes to the boundary; no draft-derived snapshot or path is invented.
         currentRunRequest = request;
-        IsCancelling = false;
-        IsRunning = true;
-        LastRunContext = null;
-        ResetProgress();
-        OnPropertiesChanged(
-            nameof(HasCurrentRun),
-            nameof(CurrentRunModelId),
-            nameof(CurrentRunMaxConcurrency),
-            nameof(CurrentRunLimitText),
-            nameof(CurrentRunOutputSummary));
-        Revalidate();
-
         try
         {
+            InvalidateResumePreflight();
+            long runResumeSequence = resumeInspectionSequence;
+            ClearInterruptedRun();
+            IsCancelling = false;
+            IsRunning = true;
+            OnPropertyChanged(nameof(LastRunTask));
+            LastRunContext = null;
+            ResetProgress();
+            OnPropertiesChanged(
+                nameof(HasCurrentRun),
+                nameof(CurrentRunModelId),
+                nameof(CurrentRunMaxConcurrency),
+                nameof(CurrentRunLimitText),
+                nameof(CurrentRunOutputSummary));
+            Revalidate();
             RunSummary summary = await runBoundary.RunAsync(
                 request,
-                progress => ReportProgress(progress, observerContext),
+                progress => ReportProgress(progress, observerContext, currentProgressSequence),
+                OnCostChanged,
                 token);
+            if (disposed) return;
+            Interlocked.Increment(ref progressSequence);
             ApplyCompletedSummary(summary);
+            if (runResumeSequence == resumeInspectionSequence) RememberInterruptedRun(summary);
             ExecutionRunContext context = new(
                 summary,
                 runInputPath,
                 runModelId,
-                runRuntimeIdentity);
+                runRuntimeIdentity,
+                latestCost);
             LastRunContext = context;
             RaiseRunCompleted(context);
         }
@@ -1370,13 +1503,25 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         }
         finally
         {
-            IsRunning = false;
-            IsCancelling = false;
-            OnPropertiesChanged(
-                nameof(ProgressText),
-                nameof(ProgressPercent),
-                nameof(RunStatusText));
-            Revalidate();
+            try
+            {
+                if (!disposed && jobSequence == Volatile.Read(ref costSequence) && latestCost is { } finalCost)
+                {
+                    Cost.Apply(finalCost);
+                }
+                IsRunning = false;
+                IsCancelling = false;
+                OnPropertiesChanged(
+                    nameof(ProgressText),
+                    nameof(ProgressPercent),
+                    nameof(RunStatusText));
+            }
+            finally
+            {
+                runStarting = false;
+                completion.TrySetResult();
+                if (!disposed) Revalidate();
+            }
         }
     }
 
@@ -1389,7 +1534,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
         IsCancelling = true;
         progressStatus = EvaluationProgressStatus.Cancelling;
-        runCancellation?.Cancel();
+        TryCancel(runCancellation);
         OnPropertiesChanged(nameof(ProgressText), nameof(RunStatusText));
     }
 
@@ -1401,6 +1546,9 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         }
 
         disposed = true;
+        closing = true;
+        InvalidateResumePreflight(clearCheckpoint: true);
+        TryCancel(checkpointInputCancellation);
         Interlocked.Increment(ref authenticationSequence);
         CancellationTokenSource? cancellation = loginCancellation;
         loginCancellation = null;
@@ -1420,9 +1568,9 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             cancellation?.Dispose();
         }
 
-        authenticationCancellation?.Cancel();
+        TryCancel(authenticationCancellation);
         authenticationCancellation?.Dispose();
-        runCancellation?.Cancel();
+        TryCancel(runCancellation);
         runCancellation?.Dispose();
         LoginStatusText = "アプリを終了したため、ログインは開始できません。";
         IsLoggingIn = false;
@@ -1531,6 +1679,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
             return;
         }
 
+        InvalidateResumePreflight();
         runtimeErrorCode = null;
         runPreflightErrors = [];
         updatingModelSelection = true;
@@ -1559,6 +1708,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
     private void ClearAuthenticationModels()
     {
+        InvalidateResumePreflight();
         updatingModelSelection = true;
         try
         {
@@ -1582,6 +1732,7 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
     private void ApplyAuthentication(ExecutionAuthenticationSnapshot result)
     {
+        InvalidateResumePreflight();
         updatingModelSelection = true;
         try
         {
@@ -1670,19 +1821,21 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
 
     private void ReportProgress(
         EvaluationProgress progress,
-        SynchronizationContext? observerContext)
+        SynchronizationContext? observerContext,
+        long sequence)
     {
         if (observerContext is null || ReferenceEquals(observerContext, SynchronizationContext.Current))
         {
-            ApplyProgress(progress);
+            ApplyProgress(progress, sequence);
             return;
         }
 
-        observerContext.Post(_ => ApplyProgress(progress), null);
+        observerContext.Post(_ => ApplyProgress(progress, sequence), null);
     }
 
-    private void ApplyProgress(EvaluationProgress progress)
+    private void ApplyProgress(EvaluationProgress progress, long sequence)
     {
+        if (disposed || !IsRunning || sequence != Volatile.Read(ref progressSequence)) return;
         progressTotal = progress.Total;
         progressCompleted = progress.Completed;
         progressInFlight = progress.InFlight;
@@ -2044,5 +2197,6 @@ public sealed class ExecutionViewModel : UiObservableObject, IDisposable
         cancelLoginCommand.RaiseCanExecuteChanged();
         startCommand.RaiseCanExecuteChanged();
         cancelCommand.RaiseCanExecuteChanged();
+        RaiseResumeStates();
     }
 }

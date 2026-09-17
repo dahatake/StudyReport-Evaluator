@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using StudyReportEvaluator.App.Navigation;
 using StudyReportEvaluator.App.Settings;
+using StudyReportEvaluator.App.Workflow;
 using StudyReportEvaluator.Core.Domain;
 
 namespace StudyReportEvaluator.App.ViewModels;
@@ -108,6 +109,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         this.designViewModel.PropertyChanged += HandleDesignViewModelPropertyChanged;
         this.executionViewModel.PropertyChanged += HandleExecutionViewModelPropertyChanged;
         this.executionViewModel.RunCompleted += HandleRunCompleted;
+        this.executionViewModel.CheckpointInputRequested += HandleCheckpointInputRequestedAsync;
         settingsViewModel.PropertyChanged += HandleSettingsViewModelPropertyChanged;
         settingsViewModel.CloseRequested += HandleSettingsCloseRequested;
     }
@@ -207,6 +209,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         designViewModel.PropertyChanged -= HandleDesignViewModelPropertyChanged;
         executionViewModel.PropertyChanged -= HandleExecutionViewModelPropertyChanged;
         executionViewModel.RunCompleted -= HandleRunCompleted;
+        executionViewModel.CheckpointInputRequested -= HandleCheckpointInputRequestedAsync;
         settingsViewModel.PropertyChanged -= HandleSettingsViewModelPropertyChanged;
         settingsViewModel.CloseRequested -= HandleSettingsCloseRequested;
         settingsViewModel.Dispose();
@@ -388,7 +391,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         }
 
         resultsOutputViewModel.Load(e.Context);
-        if (!IsSettingsOpen && navigator.CurrentStep == WorkflowStep.Execution)
+        if (!IsSettingsOpen && navigator.CurrentStep == WorkflowStep.Execution
+            && e.Context.Summary.StatusCode == QuantificationRunStatusCodes.Success)
         {
             navigator.MoveNext();
         }
@@ -437,6 +441,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             RefreshExecutionConfiguration();
         }
     }
+
+    private Task<bool> HandleCheckpointInputRequestedAsync(
+        string inputPath,
+        CancellationToken cancellationToken) =>
+        InputViewModel.TryLoadCheckpointInputAsync(inputPath, cancellationToken);
 
     private void HandleSettingsCloseRequested(object? sender, EventArgs e) =>
         CloseSettings(synchronizeDrafts: false);

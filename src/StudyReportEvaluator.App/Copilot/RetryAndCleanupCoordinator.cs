@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using StudyReportEvaluator.App.Logging;
+using StudyReportEvaluator.App.Usage;
 using StudyReportEvaluator.Core.Domain;
 
 namespace StudyReportEvaluator.App.Copilot;
@@ -154,6 +155,10 @@ public interface IEphemeralEvaluationAttempt<TResult>
     string SessionId { get; }
 
     EvaluationTokenUsage TokenUsage => EvaluationTokenUsage.Unavailable;
+
+    void SetUsageAttemptContext(int attemptNumber, Guid operationId) { }
+
+    void CompleteUsageAttempt(UsageAttemptOutcome outcome) { }
 
     Task<TResult> ExecuteAsync(CancellationToken cancellationToken);
 
@@ -324,6 +329,7 @@ public sealed class RetryAndCleanupCoordinator
         int attemptCount = 0;
         int schemaRetryCount = 0;
         int transientRetryCount = 0;
+        Guid operationId = Guid.NewGuid();
         EvaluationTokenUsage tokenUsage = EvaluationTokenUsage.Unavailable;
         HashSet<string> observedSessionIds = new(StringComparer.Ordinal);
 
@@ -367,6 +373,9 @@ public sealed class RetryAndCleanupCoordinator
                     attemptCount,
                     tokenUsage);
             }
+
+            try { attempt.SetUsageAttemptContext(attemptCount, operationId); }
+            catch { /* Observation must not change execution or retry behavior. */ }
 
             SafeLogIdentity? identity = SafeLogIdentity.TryCreateSession(attempt.SessionId, out SafeLogIdentity? safeIdentity)
                 ? safeIdentity
@@ -456,6 +465,7 @@ public sealed class RetryAndCleanupCoordinator
 
             if (!cleanupSucceeded)
             {
+                CompleteUsageAttempt(attempt, UsageAttemptOutcome.CleanupFailed);
                 Log(
                     SafeLogSeverity.Error,
                     SafeLogEventCode.EvaluationCleanupFailed,
@@ -472,6 +482,7 @@ public sealed class RetryAndCleanupCoordinator
 
             if (acceptedResult is not null)
             {
+                CompleteUsageAttempt(attempt, UsageAttemptOutcome.Succeeded);
                 Log(
                     SafeLogSeverity.Information,
                     SafeLogEventCode.EvaluationAttemptSucceeded,
@@ -490,6 +501,7 @@ public sealed class RetryAndCleanupCoordinator
             if (cancellationToken.IsCancellationRequested
                 || terminalFailure == EvaluationAttemptFailureKind.Cancelled)
             {
+                CompleteUsageAttempt(attempt, UsageAttemptOutcome.Cancelled);
                 Log(
                     SafeLogSeverity.Information,
                     SafeLogEventCode.EvaluationCancelled,
@@ -503,6 +515,15 @@ public sealed class RetryAndCleanupCoordinator
                     attemptCount,
                     tokenUsage);
             }
+
+            CompleteUsageAttempt(attempt, terminalFailure switch
+            {
+                EvaluationAttemptFailureKind.SchemaInvalid => UsageAttemptOutcome.SchemaInvalid,
+                EvaluationAttemptFailureKind.Network => UsageAttemptOutcome.NetworkFailed,
+                EvaluationAttemptFailureKind.Timeout => UsageAttemptOutcome.TimedOut,
+                EvaluationAttemptFailureKind.Authentication => UsageAttemptOutcome.AuthRequired,
+                _ => UsageAttemptOutcome.Fatal,
+            });
 
             Log(
                 SeverityFor(terminalFailure),
@@ -535,6 +556,15 @@ public sealed class RetryAndCleanupCoordinator
                 attemptCount,
                 tokenUsage);
         }
+    }
+
+    private static void CompleteUsageAttempt<TResult>(
+        IEphemeralEvaluationAttempt<TResult> attempt,
+        UsageAttemptOutcome outcome)
+        where TResult : class
+    {
+        try { attempt.CompleteUsageAttempt(outcome); }
+        catch { /* Outcome logging is advisory, including after metrics have been sealed. */ }
     }
 
     private static async Task<bool> CleanupAsync<TResult>(
