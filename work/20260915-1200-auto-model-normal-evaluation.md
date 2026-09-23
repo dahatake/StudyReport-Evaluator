@@ -30,6 +30,12 @@ id=claude-sonnet-5  maxPrompt=936000  maxContext=1000000
 | T8 | 全テスト実行 | T6 と統合 |
 | T9 | CHANGELOG・PATCH 版上げ | 未着手 |
 
+> **訂正の注記（2026-09-24 追記、上表の状態欄は書き換えていない）**
+> - T8 と T9 の実行ログ節は、ともに「完了」と記録している（下記「T8 最終検証（完了）」「T9 CHANGELOG・版上げ（完了）」）。表の「T6 と統合」「未着手」はログと食い違う。
+> - T6 の根拠は、T8 のログ（UI 文字列の期待値更新後に全通過）と、commit `ea91d9f` での `tests/StudyReportEvaluator.App.Tests/` 配下 17 ファイルの変更（`tests/SystemTest-prompt.md` を含めると `tests/` 配下 18 ファイル。`git show --name-only ea91d9f`）である。「fixture 現実化」は個別の記録がなく、未確認。
+> - T8 の時点で並行セッションが原因だった失敗（`MainWindowTests`／`SettingsWorkflowSystemTests`／`WorkflowStateTests` 19件、`DocumentationContractTests` 3件）は、[20260916-app-tests-root-cause-report.md](20260916-app-tests-root-cause-report.md) の「原因と解決方針」で解決済み。
+> - この注記は記録の整合を取るためのもので、検証をやり直したものではない。
+
 各タスク完了時に敵対的レビューを行い、結果を反映してから次へ進む。
 
 ## 実行ログ

@@ -94,7 +94,7 @@
                    AutomationProperties.AutomationId="ResultsRunIdentity" />
         <TextBlock Grid.Row="2" Text="この結果は表示時の採点draftから自動再評価しない"
                    IsVisible="{Binding IsLoaded}" FontSize="12" Classes="label"
-             TextTrimming="CharacterEllipsis" ToolTip.Tip="この結果は表示時の採点draftから自動再評価しない"
+                   TextTrimming="None" ToolTip.Tip="この結果は表示時の採点draftから自動再評価しない"
                    AutomationProperties.AutomationId="ResultsSnapshotCaption" />
         <CheckBox x:Name="ResultsCostToggle" Grid.Row="1" Grid.RowSpan="2" Grid.Column="1"
             MinHeight="44" MinWidth="44" FontSize="14" HorizontalContentAlignment="Stretch"

@@ -23,6 +23,7 @@
     </Style>
     <Style Selector="TextBlock">
       <Setter Property="FontSize" Value="14" />
+      <Setter Property="TextTrimming" Value="None" />
     </Style>
     <Style Selector="TextBox.single-line">
       <Setter Property="Height" Value="44" />
@@ -64,7 +65,7 @@
     <Grid x:Name="ExecutionSettingsSummary" ColumnDefinitions="84,*,108,84,72" ColumnSpacing="8">
       <TextBlock Text="実行条件&#10;今回／次回" Classes="label" />
       <TextBox x:Name="EffectiveModelTextBox" Grid.Column="1" Classes="single-line"
-               IsReadOnly="True" TabIndex="15"
+               IsReadOnly="True" TabIndex="70"
                AutomationProperties.AutomationId="ExecutionEffectiveModel"
                AutomationProperties.Name="実行中または前回と次回のモデル・並列度・モデル上限・読取専用"
                ToolTip.Tip="実行中／前回runは開始時の固定値、次回は現在の設定の実効値です。希望IDが使えなくても別モデルへ自動変更しません。上限が「SDK未公開」のモデル（autoなど）では、実行前のモデル相対の容量検証を行いません。全文を選択・コピーできます。" />
@@ -86,57 +87,57 @@
       <Grid RowDefinitions="*,Auto,Auto" RowSpacing="4">
         <ScrollViewer x:Name="ExecutionAuthenticationScroll"
                       HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <StackPanel x:Name="CopilotLoginPanel" Spacing="4">
-            <TextBlock x:Name="CopilotAuthenticationStatus" Text="{Binding AuthenticationStatusText}"
-                       TextWrapping="Wrap" FontWeight="SemiBold"
-                       AutomationProperties.AutomationId="CopilotAuthenticationStatus" />
-            <WrapPanel x:Name="CopilotLoginActions" ItemSpacing="4" LineSpacing="4">
-              <Button x:Name="CheckAuthenticationButton" Content="Copilot 状態を確認"
-                      Command="{Binding CheckAuthenticationCommand}" TabIndex="0"
-                      AutomationProperties.AutomationId="CheckCopilotAuthentication"
-                      AutomationProperties.Name="既存 Copilot CLI login と model を確認"
-                      ToolTip.Tip="本人の操作で既存loginと利用可能モデルを確認します。ログインや定量化は開始しません。" />
-              <Button x:Name="StartCopilotLogin" Content="GitHubにログイン"
-                      Command="{Binding LoginCommand}" TabIndex="1"
-                      AutomationProperties.AutomationId="StartCopilotLogin"
-                      AutomationProperties.Name="GitHubにログイン"
-                      AutomationProperties.HelpText="同梱 Copilot CLI を起動し、別のブラウザーで認証します。このアプリはトークンを取得・保存しません。"
-                      ToolTip.Tip="同梱 CLI を直接起動し、別のブラウザーで認証します。このアプリはパスワードやトークンを取得・保存しません。完了後に認証状態とモデル一覧を自動更新します。" />
-              <Button x:Name="CancelCopilotLogin" Content="ログインを取り消す"
-                      Command="{Binding CancelLoginCommand}" TabIndex="2"
-                      AutomationProperties.AutomationId="CancelCopilotLogin"
-                      AutomationProperties.Name="ログインを取り消す"
-                      AutomationProperties.HelpText="このアプリで開始したログイン処理だけを取り消します。ブラウザーは閉じません。"
-                      ToolTip.Tip="このアプリが所有するログイン処理だけを取り消します。外部のCLIやブラウザーは終了しません。" />
-            </WrapPanel>
-            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsCheckingAuthentication}" Height="4" />
-            <TextBlock x:Name="CopilotLoginStatus" Text="{Binding LoginStatusText}" TextWrapping="Wrap"
-                       AutomationProperties.AutomationId="CopilotLoginStatus"
-                       AutomationProperties.Name="{Binding LoginStatusText}"
-                       AutomationProperties.HelpText="ログインと完了後のモデル一覧更新の状態です。失敗時は「Copilot 状態を確認」で再試行できます。" />
-            <TextBlock x:Name="CopilotLoginInstructions" Classes="muted" TextWrapping="Wrap"
-                       Text="別のブラウザーで認証後、モデル一覧を自動更新・保存します。ログイン・定量化は自動で開始しません。" />
-          <CheckBox x:Name="ResumeModeCheckBox" Content="checkpoint から再開"
-                    IsChecked="{Binding IsResumeMode, Mode=TwoWay}" TabIndex="4"
-                    IsEnabled="{Binding CanEditResume}"
-                    AutomationProperties.AutomationId="ExecutionResumeMode"
-                    AutomationProperties.Name="新規runとcheckpoint再開を切り替え"
-                    ToolTip.Tip="オフなら新規run、オンなら既存のpartial checkpointから再開します。切替だけでは実行しません。" />
-        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding IsResumeMode}">
-          <Button x:Name="PickResumeCheckpointButton" Content="参照…" TabIndex="5"
-                  Click="HandlePickResumeCheckpointClick"
-                  AutomationProperties.AutomationId="ExecutionPickResumeCheckpoint"
-                  AutomationProperties.Name="再開元の partial xlsx を選択"
-                  AutomationProperties.HelpText="選択後に再開条件だけを確認します。定量化は自動で開始しません。取消では現在の状態を変更しません。"
-                  ToolTip.Tip="中断時の場所にある .partial.xlsx を選びます。入力・モデル・採点設計の自動適用や実行はしません。" />
-          <TextBox x:Name="ResumePartialPathTextBox" Grid.Column="1" Classes="single-line"
-                   IsVisible="{Binding IsResumeMode}" PlaceholderText="既存の .partial.xlsx"
-                   IsEnabled="{Binding CanEditResume}"
-                   Text="{Binding ResumePartialPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                   TabIndex="6" AutomationProperties.AutomationId="ExecutionResumePartialPath"
-                   AutomationProperties.Name="再開する既存 partial xlsx path"
-                   ToolTip.Tip="再開する既存.partial.xlsxのパスです。全文を編集・選択・コピーできます。入力や設計の変更時は再指定が必要です。" />
-        </Grid>
+          <StackPanel Spacing="4">
+            <StackPanel x:Name="CopilotLoginPanel" Spacing="4">
+              <TextBlock x:Name="CopilotAuthenticationStatus" Text="{Binding AuthenticationStatusText}"
+                         TextWrapping="Wrap" FontWeight="SemiBold"
+                         AutomationProperties.AutomationId="CopilotAuthenticationStatus" />
+              <WrapPanel x:Name="CopilotLoginActions" ItemSpacing="4" LineSpacing="4">
+                <Button x:Name="CheckAuthenticationButton" Content="Copilot 状態を確認"
+                        Command="{Binding CheckAuthenticationCommand}" TabIndex="0"
+                        AutomationProperties.AutomationId="CheckCopilotAuthentication"
+                        AutomationProperties.Name="既存 Copilot CLI login と model を確認"
+                        ToolTip.Tip="本人の操作で既存loginと利用可能モデルを確認します。ログインや定量化は開始しません。" />
+                <Button x:Name="StartCopilotLogin" Content="GitHubにログイン"
+                        Command="{Binding LoginCommand}" TabIndex="1"
+                        AutomationProperties.AutomationId="StartCopilotLogin"
+                        AutomationProperties.Name="GitHubにログイン"
+                        AutomationProperties.HelpText="同梱 Copilot CLI を起動し、別のブラウザーで認証します。このアプリはトークンを取得・保存しません。"
+                        ToolTip.Tip="同梱 CLI を直接起動し、別のブラウザーで認証します。このアプリはパスワードやトークンを取得・保存しません。完了後に認証状態とモデル一覧を自動更新します。" />
+                <Button x:Name="CancelCopilotLogin" Content="ログインを取り消す"
+                        Command="{Binding CancelLoginCommand}" TabIndex="2"
+                        AutomationProperties.AutomationId="CancelCopilotLogin"
+                        AutomationProperties.Name="ログインを取り消す"
+                        AutomationProperties.HelpText="このアプリで開始したログイン処理だけを取り消します。ブラウザーは閉じません。"
+                        ToolTip.Tip="このアプリが所有するログイン処理だけを取り消します。外部のCLIやブラウザーは終了しません。" />
+              </WrapPanel>
+              <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsCheckingAuthentication}" Height="4" />
+              <TextBlock x:Name="CopilotLoginStatus" Text="{Binding LoginStatusText}" TextWrapping="Wrap"
+                         AutomationProperties.AutomationId="CopilotLoginStatus"
+                         AutomationProperties.Name="{Binding LoginStatusText}"
+                         AutomationProperties.HelpText="ログインと完了後のモデル一覧更新の状態です。失敗時は「Copilot 状態を確認」で再試行できます。" />
+            </StackPanel>
+            <CheckBox x:Name="ResumeModeCheckBox" Content="checkpoint から再開"
+                      IsChecked="{Binding IsResumeMode, Mode=TwoWay}" TabIndex="4"
+                      IsEnabled="{Binding CanEditResume}"
+                      AutomationProperties.AutomationId="ExecutionResumeMode"
+                      AutomationProperties.Name="新規runとcheckpoint再開を切り替え"
+                      ToolTip.Tip="オフなら新規run、オンなら既存のpartial checkpointから再開します。切替だけでは実行しません。" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding IsResumeMode}">
+              <TextBox x:Name="ResumePartialPathTextBox" Classes="single-line"
+                       IsVisible="{Binding IsResumeMode}" PlaceholderText="既存の .partial.xlsx"
+                       IsEnabled="{Binding CanEditResume}"
+                       Text="{Binding ResumePartialPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                       TabIndex="5" AutomationProperties.AutomationId="ExecutionResumePartialPath"
+                       AutomationProperties.Name="再開する既存 partial xlsx path"
+                       ToolTip.Tip="再開する既存.partial.xlsxのパスです。全文を編集・選択・コピーできます。入力や設計の変更時は再指定が必要です。" />
+              <Button x:Name="PickResumeCheckpointButton" Grid.Column="1" Content="参照…" TabIndex="6"
+                      Click="HandlePickResumeCheckpointClick"
+                      AutomationProperties.AutomationId="ExecutionPickResumeCheckpoint"
+                      AutomationProperties.Name="再開元の partial xlsx を選択"
+                      AutomationProperties.HelpText="選択後に再開条件だけを確認します。定量化は自動で開始しません。取消では現在の状態を変更しません。"
+                      ToolTip.Tip="中断時の場所にある .partial.xlsx を選びます。入力・モデル・採点設計の自動適用や実行はしません。" />
+            </Grid>
             <TextBlock x:Name="ResumePickerStatusMessage" IsVisible="False" TextWrapping="Wrap"
                        AutomationProperties.AutomationId="ExecutionResumePickerStatus"
                        AutomationProperties.Name="再開元ファイル選択の状態" />
@@ -208,6 +209,8 @@
                 </Grid>
               </Border>
             </StackPanel>
+            <TextBlock x:Name="CopilotLoginInstructions" Classes="muted" TextWrapping="Wrap"
+                       Text="別のブラウザーで認証後、モデル一覧を自動更新・保存します。ログイン・定量化は自動で開始しません。" />
           </StackPanel>
         </ScrollViewer>
         <ScrollViewer Grid.Row="1" MaxHeight="44"
@@ -259,7 +262,7 @@
           <TextBlock x:Name="OutputDirectorySource" Classes="label" />
           <TextBox x:Name="EffectiveOutputDirectoryTextBox" Grid.Column="1" Classes="single-line"
                    Text="{Binding OutputDirectory, Mode=OneWay}" IsReadOnly="True" PlaceholderText="入力後に決定"
-                   TabIndex="16" AutomationProperties.AutomationId="ExecutionEffectiveOutputDirectory"
+                   TabIndex="71" AutomationProperties.AutomationId="ExecutionEffectiveOutputDirectory"
                    AutomationProperties.Name="次回新規runの実効出力先・読取専用"
                    ToolTip.Tip="次回新規runの実効出力先です。今回／前回runの出力条件とは別です。再開には左のpartialパスを使用します。長い値は欄内を横スクロールし、全文を選択・コピーできます。" />
         </Grid>
@@ -268,7 +271,7 @@
           <StackPanel Spacing="4">
             <TextBox x:Name="CurrentRunOutputTextBox" Classes="single-line"
                      Text="{Binding CurrentRunOutputSummary, Mode=OneWay}" IsReadOnly="True"
-                     IsVisible="{Binding HasCurrentRun, FallbackValue=False}" TabIndex="17"
+                     IsVisible="{Binding HasCurrentRun, FallbackValue=False}" TabIndex="72"
                      AutomationProperties.AutomationId="ExecutionCurrentRunOutput"
                      AutomationProperties.Name="今回または前回runの固定した出力条件・読取専用"
                      ToolTip.Tip="実際のrequestに固定した新規出力先または再開元です。取消・完了後も保持します。予約パスやファイル作成完了を示す値ではありません。全文を選択・コピーできます。" />
@@ -300,7 +303,7 @@
           <TextBlock Text="final（予約名）" Classes="label" />
           <TextBox x:Name="ReservedFinalPathTextBox" Grid.Column="1" Classes="single-line"
                    Text="{Binding ReservedFinalPath, Mode=OneWay}" IsReadOnly="True" PlaceholderText="run開始時に予約"
-                   TabIndex="18" AutomationProperties.AutomationId="ExecutionReservedFinalPath"
+                   TabIndex="73" AutomationProperties.AutomationId="ExecutionReservedFinalPath"
                    AutomationProperties.Name="finalの予約パス・作成完了とは別・読取専用"
                    ToolTip.Tip="finalの予約名です。作成・検証の成否は実行状態で確認してください。長いパスも全文を選択・コピーできます。" />
         </Grid>
@@ -308,7 +311,7 @@
           <TextBlock Text="partial（予約名）" Classes="label" />
           <TextBox x:Name="PartialPathTextBox" Grid.Column="1" Classes="single-line"
                    Text="{Binding PartialPath, Mode=OneWay}" IsReadOnly="True" PlaceholderText="run開始時に予約"
-                   TabIndex="19" AutomationProperties.AutomationId="ExecutionPartialPath"
+                   TabIndex="74" AutomationProperties.AutomationId="ExecutionPartialPath"
                    AutomationProperties.Name="partial checkpointの予約パス・保存完了とは別・読取専用"
                    ToolTip.Tip="partial checkpointの予約名です。保存の成否は実行状態で確認してください。長いパスも全文を選択・コピーできます。" />
         </Grid>
@@ -324,6 +327,7 @@
                  AutomationProperties.AutomationId="ExecutionValidationStatus" />
       <CheckBox x:Name="ExecutionCostToggle" Grid.Column="1" MinHeight="44"
                 HorizontalContentAlignment="Stretch" IsChecked="{Binding Cost.IsExpanded, Mode=TwoWay}"
+                TabIndex="63"
                 AutomationProperties.AutomationId="ExecutionCostToggle"
                 AutomationProperties.Name="コスト詳細とジョブログを表示。オフで進捗に戻る"
                 ToolTip.Tip="{Binding Cost.SummaryText}">

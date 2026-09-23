@@ -468,22 +468,58 @@ public sealed class ReleaseMatrixBuilderTests
             {
                 return null;
             }
-            string output = process.StandardOutput.ReadToEnd();
-            _ = process.StandardError.ReadToEnd();
-            if (!process.WaitForExit(10_000) || process.ExitCode != 0 ||
-                !Version.TryParse(output.Trim(), out Version? version) ||
+            Stopwatch watch = Stopwatch.StartNew();
+            Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+            Task<string> errorTask = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(10_000))
+            {
+                KillIfRunning(process);
+                _ = process.WaitForExit(5_000);
+                _ = Task.WaitAll([outputTask, errorTask], TimeSpan.FromSeconds(5));
+                return null;
+            }
+
+            int remainingMilliseconds = Math.Max(
+                0,
+                10_000 - checked((int)Math.Min(watch.ElapsedMilliseconds, int.MaxValue)));
+            if (!Task.WaitAll([outputTask, errorTask], remainingMilliseconds) ||
+                process.ExitCode != 0 ||
+                outputTask.IsFaulted ||
+                errorTask.IsFaulted ||
+                !Version.TryParse(outputTask.Result.Trim(), out Version? version) ||
                 version < new Version(7, 5))
             {
+                KillIfRunning(process);
+                _ = process.WaitForExit(5_000);
+                _ = Task.WaitAll([outputTask, errorTask], TimeSpan.FromSeconds(5));
                 return null;
             }
         }
         catch (Exception exception) when (
-            exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+            exception is InvalidOperationException
+                or System.ComponentModel.Win32Exception
+                or AggregateException
+                or IOException
+                or ObjectDisposedException)
         {
             return null;
         }
 
         return new HostTools(powerShell, git);
+    }
+
+    private static void KillIfRunning(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
     }
 
     private static string? FindOnPath(string executableName)

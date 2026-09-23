@@ -134,6 +134,127 @@ public sealed class JobCostViewTests
     }
 
     [Fact]
+    public async Task Stale_cost_notification_from_previous_run_cannot_replace_new_run_cost()
+    {
+        var definition = U04TestSupport.Definition(2, 2);
+        var metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RunSummary summary = await U04TestSupport.CreateSummaryAsync(definition, metadata);
+        JobCostSnapshot first = Snapshot(Guid.NewGuid(), 2) with
+        {
+            IsFinished = true,
+            SummaryText = "first run",
+        };
+        JobCostSnapshot staleFirst = first with
+        {
+            Revision = 99,
+            SummaryText = "stale previous run",
+        };
+        JobCostSnapshot second = Snapshot(Guid.NewGuid(), 1) with
+        {
+            SummaryText = "second run",
+        };
+        StaleCostRunBoundary boundary = new(summary, first, staleFirst, second);
+        using ExecutionViewModel execution = U04TestSupport.ConfiguredExecutionViewModel(definition, metadata, boundary);
+        await execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+
+        await execution.StartAsync(TestContext.Current.CancellationToken);
+        Assert.Same(first, execution.Cost.Snapshot);
+
+        await execution.StartAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, boundary.CallCount);
+        Assert.Same(second, execution.Cost.Snapshot);
+        Assert.Equal("second run", execution.Cost.SummaryText);
+        Assert.NotEqual(staleFirst.JobId, execution.Cost.Snapshot!.JobId);
+    }
+
+    [Fact]
+    public async Task Cancelled_run_keeps_terminal_cost_for_discarded_row_snapshot()
+    {
+        var definition = U04TestSupport.Definition(2, 2);
+        var metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RunSummary discarded = EmptyDurableSummary(definition, QuantificationRunStatusCodes.Cancelled);
+        using TrackerTerminalCostBoundary boundary = new(
+            discarded,
+            "CANCELLED",
+            new UsageMetrics(InputTokens: 29, TotalNanoAiu: 0.29m));
+        using ExecutionViewModel execution = U04TestSupport.ConfiguredExecutionViewModel(definition, metadata, boundary);
+        await execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+
+        await execution.StartAsync(TestContext.Current.CancellationToken);
+
+        ExecutionRunContext context = Assert.IsType<ExecutionRunContext>(execution.LastRunContext);
+        Assert.Empty(context.Summary.CompletedRows);
+        JobCostSnapshot cost = Assert.IsType<JobCostSnapshot>(context.Cost);
+        Assert.Same(cost, execution.Cost.Snapshot);
+        Assert.Equal(29, cost.Metrics.InputTokens);
+        Assert.Equal(0.29m, cost.Metrics.TotalNanoAiu);
+        Assert.Contains("ジョブ終了（Cancelled）", cost.LogText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Summaryless_boundary_failure_keeps_terminal_cost_in_view_model()
+    {
+        var definition = U04TestSupport.Definition(2, 2);
+        var metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        using TrackerTerminalCostBoundary boundary = new(
+            EmptyDurableSummary(definition, QuantificationRunStatusCodes.CheckpointFailed),
+            "CHECKPOINT_SAVE_FAILED",
+            new UsageMetrics(InputTokens: 31, OutputTokens: 4),
+            throwCode: "CHECKPOINT_SAVE_FAILED");
+        using ExecutionViewModel execution = U04TestSupport.ConfiguredExecutionViewModel(definition, metadata, boundary);
+        await execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+
+        await execution.StartAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(execution.LastRunContext);
+        JobCostSnapshot cost = Assert.IsType<JobCostSnapshot>(execution.Cost.Snapshot);
+        Assert.Equal(31, cost.Metrics.InputTokens);
+        Assert.Equal(4, cost.Metrics.OutputTokens);
+        Assert.Contains("ジョブ終了（Failed）", cost.LogText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Disposed_execution_view_model_ignores_late_cost_callback()
+    {
+        var definition = U04TestSupport.Definition(2, 2);
+        var metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RunSummary summary = await U04TestSupport.CreateSummaryAsync(definition, metadata);
+        HoldingCostRunBoundary boundary = new(summary);
+        ExecutionViewModel execution = U04TestSupport.ConfiguredExecutionViewModel(definition, metadata, boundary);
+        await execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+        QueuedSynchronizationContext context = new();
+        SynchronizationContext? previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(context);
+        Task run;
+        try
+        {
+            run = execution.StartAsync(TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+        await boundary.Started.WaitAsync(TestContext.Current.CancellationToken);
+
+        execution.Dispose();
+        boundary.Publish(Snapshot(Guid.NewGuid(), 1) with { SummaryText = "late disposed update" });
+        Assert.True(context.PendingCount > 0);
+        context.Drain();
+        boundary.Release();
+        for (int i = 0; i < 30 && !run.IsCompleted; i++)
+        {
+            context.Drain();
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+        }
+        context.Drain();
+        await run.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(execution.Cost.Snapshot);
+        Assert.Equal(JobCostViewModel.NoDataText, execution.Cost.LogText);
+    }
+
+    [Fact]
     public void File_commands_reject_non_generated_and_traversal_paths_and_only_call_injected_launcher()
     {
         using TemporaryJobs jobs = new();
@@ -272,6 +393,20 @@ public sealed class JobCostViewTests
     private static JobCostSnapshot Snapshot(Guid jobId, long revision) => new(
         jobId, revision, false, "synthetic summary", "synthetic details", "synthetic log", null, "保存先なし");
 
+    private static RunSummary EmptyDurableSummary(StudyReportEvaluator.Core.Domain.QuantificationDefinition definition,
+        string statusCode)
+    {
+        EvaluationPlan plan = U01TestSupport.Plan(definition);
+        return new RunSummary(
+            new EvaluationScheduleResult(plan, []),
+            U01TestSupport.InputSnapshot(),
+            statusCode,
+            DateTimeOffset.UnixEpoch,
+            DateTimeOffset.UnixEpoch,
+            isDurable: true,
+            partialPath: Path.Combine(Path.GetTempPath(), "job-cost-empty.partial.xlsx"));
+    }
+
     private static void AssertNoRecord(JobCostViewModel cost)
     {
         Assert.Null(cost.Snapshot);
@@ -365,6 +500,146 @@ public sealed class JobCostViewTests
             costChanged?.Invoke(final with { Revision = 1, IsFinished = false });
             costChanged?.Invoke(final);
             return Task.FromResult(summary);
+        }
+    }
+
+    private sealed class StaleCostRunBoundary(
+        RunSummary summary,
+        JobCostSnapshot first,
+        JobCostSnapshot staleFirst,
+        JobCostSnapshot second) : IQuantificationRunBoundary
+    {
+        private Action<JobCostSnapshot>? firstCallback;
+
+        public int CallCount { get; private set; }
+
+        public Task<RunSummary> RunAsync(
+            QuantificationRunRequest request,
+            Action<EvaluationProgress>? progress,
+            CancellationToken cancellationToken) => throw new InvalidOperationException("Cost callback is required.");
+
+        public Task<RunSummary> RunAsync(
+            QuantificationRunRequest request,
+            Action<EvaluationProgress>? progress,
+            Action<JobCostSnapshot>? costChanged,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CallCount++;
+            if (CallCount == 1)
+            {
+                firstCallback = costChanged;
+                costChanged?.Invoke(first);
+            }
+            else
+            {
+                costChanged?.Invoke(second);
+                firstCallback?.Invoke(staleFirst);
+            }
+
+            return Task.FromResult(summary);
+        }
+    }
+
+    private sealed class TrackerTerminalCostBoundary(
+        RunSummary summary,
+        string completionCode,
+        UsageMetrics metrics,
+        string? throwCode = null) : IQuantificationRunBoundary, IDisposable
+    {
+        private readonly string directory = Path.Combine(Path.GetTempPath(),
+            "JobCostBoundaryTests-" + Guid.NewGuid().ToString("N"));
+
+        public Task<RunSummary> RunAsync(
+            QuantificationRunRequest request,
+            Action<EvaluationProgress>? progress,
+            CancellationToken cancellationToken) => throw new InvalidOperationException("Cost callback is required.");
+
+        public async Task<RunSummary> RunAsync(
+            QuantificationRunRequest request,
+            Action<EvaluationProgress>? progress,
+            Action<JobCostSnapshot>? costChanged,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Directory.CreateDirectory(directory);
+            await using var tracker = new JobUsageTracker(logDirectory: directory);
+            Guid id = tracker.BeginAttempt(UsageOperation.Normal);
+            tracker.ReplaceAttempt(new(id, UsageOperation.Normal, 1, metrics, UsageSource.Events,
+                IsFinished: false, IsPartial: true, Status: UsageObservationStatus.EventObserved));
+            await tracker.CompleteAsync(completionCode);
+            costChanged?.Invoke(tracker.Snapshot);
+            if (throwCode is not null)
+            {
+                throw new QuantificationRunException(throwCode);
+            }
+
+            return summary;
+        }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(directory)) { Directory.Delete(directory, recursive: true); }
+        }
+    }
+
+    private sealed class HoldingCostRunBoundary(RunSummary summary) : IQuantificationRunBoundary
+    {
+        private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private Action<JobCostSnapshot>? costChanged;
+
+        public Task Started => started.Task;
+
+        public Task<RunSummary> RunAsync(
+            QuantificationRunRequest request,
+            Action<EvaluationProgress>? progress,
+            CancellationToken cancellationToken) => throw new InvalidOperationException("Cost callback is required.");
+
+        public async Task<RunSummary> RunAsync(
+            QuantificationRunRequest request,
+            Action<EvaluationProgress>? progress,
+            Action<JobCostSnapshot>? costChanged,
+            CancellationToken cancellationToken)
+        {
+            this.costChanged = costChanged;
+            started.TrySetResult();
+            await release.Task.WaitAsync(cancellationToken);
+            return summary;
+        }
+
+        public void Publish(JobCostSnapshot snapshot) => costChanged?.Invoke(snapshot);
+
+        public void Release() => release.TrySetResult();
+    }
+
+    private sealed class QueuedSynchronizationContext : SynchronizationContext
+    {
+        private readonly Queue<(SendOrPostCallback Callback, object? State)> posts = new();
+
+        public int PendingCount
+        {
+            get { lock (posts) { return posts.Count; } }
+        }
+
+        public override void Post(SendOrPostCallback d, object? state)
+        {
+            lock (posts) { posts.Enqueue((d, state)); }
+        }
+
+        public void Drain()
+        {
+            while (true)
+            {
+                (SendOrPostCallback Callback, object? State) next;
+                lock (posts)
+                {
+                    if (posts.Count == 0) { return; }
+                    next = posts.Dequeue();
+                }
+
+                next.Callback(next.State);
+            }
         }
     }
 }

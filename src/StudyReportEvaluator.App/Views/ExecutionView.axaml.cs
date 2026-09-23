@@ -36,9 +36,9 @@ public sealed partial class ExecutionView : UserControl
         ArgumentNullException.ThrowIfNull(viewModel);
         this.picker = picker ?? throw new ArgumentNullException(nameof(picker));
         InitializeComponent();
-        // Keep the pre-existing JobCost XAML intact; put its footer toggle after
-        // the content controls and before the fixed Start/Interrupt actions.
-        this.FindControl<CheckBox>("ExecutionCostToggle")!.TabIndex = 60;
+        // Keep the pre-existing JobCost XAML intact; keep the primary Start/Interrupt
+        // tab path ahead of the optional cost detail toggle.
+        this.FindControl<CheckBox>("ExecutionCostToggle")!.TabIndex = 63;
         DataContextChanged += HandleDataContextChanged;
         DataContext = viewModel;
         Loaded += HandleLoaded;

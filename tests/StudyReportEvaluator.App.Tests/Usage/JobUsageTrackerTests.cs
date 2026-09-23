@@ -16,6 +16,7 @@ public sealed class JobUsageTrackerTests
         tracker.ReplaceAttempt(new(first, UsageOperation.Normal, 1, new(InputTokens: 100), UsageSource.Events));
         tracker.ReplaceAttempt(new(first, UsageOperation.Normal, 2, new(InputTokens: 80), UsageSource.FinalRpc, true));
         tracker.ReplaceAttempt(new(first, UsageOperation.Normal, 1, new(InputTokens: 999), UsageSource.Events));
+        tracker.ReplaceAttempt(new(first, UsageOperation.Normal, 3, new(InputTokens: 999), UsageSource.FinalRpc, true));
         tracker.ReplaceAttempt(new(retry, UsageOperation.Normal, 1, new(InputTokens: 7), UsageSource.Events));
         await tracker.CompleteAsync("SUCCESS");
 
@@ -58,6 +59,25 @@ public sealed class JobUsageTrackerTests
         Assert.Equal("CurrentInvocation", final.RootElement.GetProperty("AggregationScope").GetString());
         Assert.Equal("SdkReportedNanoAiuAndPremiumRequests_NoCreditOrCurrencyConversion_v1",
             final.RootElement.GetProperty("UnitPolicy").GetString());
+    }
+
+    [Fact]
+    public async Task All_missing_metrics_remain_unknown_in_terminal_record()
+    {
+        using var temp = new TemporaryDirectory();
+        await using var tracker = new JobUsageTracker(logDirectory: temp.Path);
+        _ = tracker.BeginAttempt(UsageOperation.Normal);
+
+        await tracker.CompleteAsync("SUCCESS");
+
+        using JsonDocument final = await ReadFinalAsync(tracker);
+        JsonElement metrics = final.RootElement.GetProperty("Metrics");
+        Assert.Equal(JsonValueKind.Null, metrics.GetProperty("InputTokens").ValueKind);
+        Assert.Equal(JsonValueKind.Null, metrics.GetProperty("OutputTokens").ValueKind);
+        Assert.Equal(JsonValueKind.Null, metrics.GetProperty("TotalNanoAiu").ValueKind);
+        Assert.Equal(JsonValueKind.Null, metrics.GetProperty("PremiumRequests").ValueKind);
+        Assert.DoesNotContain("入力 0", tracker.Snapshot.SummaryText, StringComparison.Ordinal);
+        Assert.Contains("未取得", tracker.Snapshot.SummaryText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -150,6 +170,136 @@ public sealed class JobUsageTrackerTests
         Assert.True(final.RootElement.GetProperty("HasInvalidValues").GetBoolean());
         Assert.Equal(JsonValueKind.Null, final.RootElement.GetProperty("Metrics").GetProperty("InputTokens").ValueKind);
         Assert.Contains("異常値", tracker.Snapshot.SummaryText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Cancelled_job_keeps_observed_usage_for_unsaved_row()
+    {
+        using var temp = new TemporaryDirectory();
+        await using var tracker = new JobUsageTracker(logDirectory: temp.Path);
+        Guid id = tracker.BeginAttempt(UsageOperation.Normal);
+        tracker.ReplaceAttempt(new(id, UsageOperation.Normal, 1,
+            new(InputTokens: 13, OutputTokens: 2, TotalNanoAiu: 0.25m), UsageSource.Events,
+            IsFinished: false, IsPartial: true, Status: UsageObservationStatus.SendPending));
+
+        await tracker.CompleteAsync("CANCELLED");
+
+        using JsonDocument final = await ReadFinalAsync(tracker);
+        JsonElement root = final.RootElement;
+        Assert.Equal(2, root.GetProperty("Completion").GetInt32());
+        Assert.Equal(13, root.GetProperty("Metrics").GetProperty("InputTokens").GetInt64());
+        Assert.Equal(2, root.GetProperty("Metrics").GetProperty("OutputTokens").GetInt64());
+        Assert.Equal(0.25m, root.GetProperty("Metrics").GetProperty("TotalNanoAiu").GetDecimal());
+        Assert.Contains("今回のジョブのみ。再試行・失敗・未保存行を含む観測値", tracker.Snapshot.DetailsText,
+            StringComparison.Ordinal);
+        Assert.Contains("ジョブ終了（Cancelled）", tracker.Snapshot.LogText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Operation_breakdown_keeps_all_operations_separate_under_parallel_updates()
+    {
+        using var temp = new TemporaryDirectory();
+        await using var tracker = new JobUsageTracker(logDirectory: temp.Path);
+        (UsageOperation Operation, long Tokens)[] cases =
+        [
+            (UsageOperation.Normal, 11),
+            (UsageOperation.Reference, 13),
+            (UsageOperation.Special, 17),
+            (UsageOperation.Similarity, 19),
+        ];
+        var attempts = cases.Select(item => (item.Operation, item.Tokens, AttemptId: tracker.BeginAttempt(item.Operation)))
+            .ToArray();
+
+        using Barrier start = new(3);
+        Task[] concurrent = attempts.Take(3).Select(item => Task.Run(() =>
+        {
+            Assert.True(start.SignalAndWait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+            tracker.ReplaceAttempt(new(item.AttemptId, item.Operation, 1,
+                new(InputTokens: item.Tokens, TotalNanoAiu: item.Tokens / 10m), UsageSource.Events)
+            {
+                Models =
+                [
+                    new ModelUsageSnapshot(ModelUsageSnapshot.CreateModelKey(item.Operation.ToString()),
+                        new(InputTokens: item.Tokens, TotalNanoAiu: item.Tokens / 10m)),
+                ],
+            });
+        })).ToArray();
+        await Task.WhenAll(concurrent);
+        var last = attempts[^1];
+        tracker.ReplaceAttempt(new(last.AttemptId, last.Operation, 1,
+            new(InputTokens: last.Tokens, TotalNanoAiu: last.Tokens / 10m), UsageSource.Events)
+        {
+            Models =
+            [
+                new ModelUsageSnapshot(ModelUsageSnapshot.CreateModelKey(last.Operation.ToString()),
+                    new(InputTokens: last.Tokens, TotalNanoAiu: last.Tokens / 10m)),
+            ],
+        });
+
+        await tracker.CompleteAsync("SUCCESS");
+        JobCostSnapshot snapshot = tracker.Snapshot;
+        Assert.Equal(60, snapshot.Metrics.InputTokens);
+        Assert.Equal(6.0m, snapshot.Metrics.TotalNanoAiu);
+        Assert.Equal(4, snapshot.AttemptCount);
+        Assert.Equal(Enum.GetValues<UsageOperation>().OrderBy(item => item).ToArray(),
+            snapshot.OperationBreakdown.Select(item => item.Operation).ToArray());
+        Assert.Equal(4, snapshot.Models.Length);
+        foreach (var expected in cases)
+        {
+            OperationUsageSnapshot operation = Assert.Single(snapshot.OperationBreakdown,
+                item => item.Operation == expected.Operation);
+            Assert.Equal(1, operation.AttemptCount);
+            Assert.Equal(expected.Tokens, operation.Metrics.InputTokens);
+            Assert.Equal(expected.Tokens / 10m, operation.Metrics.TotalNanoAiu);
+            ModelUsageSnapshot model = Assert.Single(snapshot.Models,
+                item => item.ModelKey == ModelUsageSnapshot.CreateModelKey(expected.Operation.ToString()));
+            Assert.Equal(expected.Tokens, model.Metrics.InputTokens);
+            Assert.Equal(expected.Tokens / 10m, model.Metrics.TotalNanoAiu);
+        }
+    }
+
+    [Fact]
+    public async Task Unobserved_retry_counts_without_manufacturing_zero_usage()
+    {
+        using var temp = new TemporaryDirectory();
+        await using var tracker = new JobUsageTracker(logDirectory: temp.Path);
+        Guid observed = tracker.BeginAttempt(UsageOperation.Normal);
+        _ = tracker.BeginAttempt(UsageOperation.Normal);
+        tracker.ReplaceAttempt(new(observed, UsageOperation.Normal, 1,
+            new(InputTokens: 7), UsageSource.Events));
+
+        await tracker.CompleteAsync("SUCCESS");
+
+        using JsonDocument final = await ReadFinalAsync(tracker);
+        Assert.Equal(2, final.RootElement.GetProperty("AttemptCount").GetInt32());
+        JsonElement metrics = final.RootElement.GetProperty("Metrics");
+        Assert.Equal(7, metrics.GetProperty("InputTokens").GetInt64());
+        Assert.Equal(JsonValueKind.Null, metrics.GetProperty("OutputTokens").ValueKind);
+        Assert.Contains("観測 1/2", tracker.Snapshot.SummaryText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Resume_context_logs_current_invocation_without_importing_previous_usage()
+    {
+        using var temp = new TemporaryDirectory();
+        await using var tracker = new JobUsageTracker(
+            logDirectory: temp.Path,
+            context: new JobUsageContext(requestedModelKey: "model-test", isResume: true));
+        Guid id = tracker.BeginAttempt(UsageOperation.Normal);
+        tracker.ReplaceAttempt(new(id, UsageOperation.Normal, 1,
+            new(InputTokens: 23, TotalNanoAiu: 0.75m), UsageSource.FinalRpc,
+            IsFinished: true, IsPartial: false, Status: UsageObservationStatus.FinalObserved));
+
+        await tracker.CompleteAsync("SUCCESS");
+
+        using JsonDocument final = await ReadFinalAsync(tracker);
+        JsonElement root = final.RootElement;
+        Assert.Equal(1, root.GetProperty("SchemaVersion").GetInt32());
+        Assert.Equal("CurrentInvocation", root.GetProperty("AggregationScope").GetString());
+        Assert.Equal(1, root.GetProperty("AttemptCount").GetInt32());
+        Assert.Equal(23, root.GetProperty("Metrics").GetProperty("InputTokens").GetInt64());
+        Assert.Equal(0.75m, root.GetProperty("Metrics").GetProperty("TotalNanoAiu").GetDecimal());
+        Assert.True(root.GetProperty("Context").GetProperty("IsResume").GetBoolean());
     }
 
     private static async Task<JsonDocument> ReadFinalAsync(JobUsageTracker tracker)

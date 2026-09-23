@@ -458,8 +458,16 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
     public ExecutionViewModel(
         IExecutionAuthenticationBoundary authenticationBoundary,
         IQuantificationRunBoundary runBoundary,
-        BundledCopilotLoginService? loginService = null,
-        IResumeInspectionBoundary? resumeInspectionBoundary = null)
+        BundledCopilotLoginService? loginService = null)
+        : this(authenticationBoundary, runBoundary, loginService, resumeInspectionBoundary: null)
+    {
+    }
+
+    public ExecutionViewModel(
+        IExecutionAuthenticationBoundary authenticationBoundary,
+        IQuantificationRunBoundary runBoundary,
+        BundledCopilotLoginService? loginService,
+        IResumeInspectionBoundary? resumeInspectionBoundary)
     {
         this.authenticationBoundary = authenticationBoundary
             ?? throw new ArgumentNullException(nameof(authenticationBoundary));
@@ -1054,7 +1062,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         if (draftDefinition is null || workbookMetadata is null
             || !IsSameConfiguration(draftDefinition, workbookMetadata, nextInputPath))
         {
-            InvalidateResumePreflight();
+            InvalidateResumePreflight(notifyValidationSummary: IsResumeMode);
             if (!isApplyingCheckpointInput) ClearInterruptedRun();
         }
         (string InputPath, long EvaluationCount) next = (

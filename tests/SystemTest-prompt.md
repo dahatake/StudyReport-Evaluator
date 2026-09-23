@@ -1064,7 +1064,15 @@ Requirement: supplemental deterministic scenario / AC-009〜AC-016 / AC-019
 
 2 testの両方が今回PASSし、全固定oracleが一致した場合だけPASS。不一致はFAIL、fixture/environment不足はBLOCKEDです。
 
-報告順: Test ID / UTC開始終了 / commit・環境 / fixture identity / targeted test結果 / baseline count / interruption point・count / resume count / result・formula equality / final構造 / input・temp不変 / 証跡 / Status / 差異 / 非保証事項。
+部分ケース ST-UC-17-R（再起動したのと同じ状態からの再開。上の固定oracleとは別に判定し、上の判定を変えません）:
+1. 次の3 testをReleaseで名前指定して実行し、TRXをrepository外へ保存します。
+	- `StudyReportEvaluator.App.Tests.E2E.SettingsWorkflowSystemTests.Cancel_saves_a_real_partial_and_new_instances_resume_without_repeating_completed_AI_or_reference`
+	- `StudyReportEvaluator.App.Tests.UI.ResumeWorkflowTests.Real_checkpoint_preflight_requires_explicit_start_and_invalidates_after_model_change`
+	- `StudyReportEvaluator.App.Tests.UI.ResumeWorkflowTests.Picker_cancel_preserves_selection_and_never_starts_AI`
+2. 期待値: 新しいapp instance（同じ入力workbook・setting.txt・実在partialを引き継ぐ）で、partialのpathを指定→開始前検証（全項目OK、この時点ではrun requestなし）→明示的なStartを経て再開し、完了済みのAI呼出しとreferenceを繰り返さない。開始前検証の後もStartを押すまでrunは始まらず、model変更で検証結果が無効になる。picker取消では選択中の再開元を変えず、AIを呼ばない。
+3. 3 testがすべて今回PASSした場合だけPASS。1件でも失敗ならFAILです。これはheadless・fakeの確認で、別processでの再起動、native picker、OS shutdownの確認ではありません。
+
+報告順: Test ID / UTC開始終了 / commit・環境 / fixture identity / targeted test結果 / baseline count / interruption point・count / resume count / result・formula equality / final構造 / input・temp不変 / 証跡 / Status / 差異 / 非保証事項。ST-UC-17-Rは別のStatusとして報告します。
 
 最後に、deterministic midpoint/reference/similarityは配線、checkpoint、formula検証用であり、学生の採点結果やAI品質の証明ではないと明記します。
 ```

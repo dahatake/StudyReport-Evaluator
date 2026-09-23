@@ -128,6 +128,11 @@ public sealed class PrimaryJourneyAccessibilityTests
             AssertKeyboardTarget(resumePath);
             Press(window, Key.Tab);
             Assert.Same(resumePath, window.FocusManager?.GetFocusedElement());
+            // Same path-then-picker order as the input step (InputView FilePath 0 → PickFile 1).
+            Press(window, Key.Tab);
+            Assert.Same(Required<Button>(view, "PickResumeCheckpointButton"), window.FocusManager?.GetFocusedElement());
+            Press(window, Key.Tab, RawInputModifiers.Shift);
+            Assert.Same(resumePath, window.FocusManager?.GetFocusedElement());
             Press(window, Key.Tab, RawInputModifiers.Shift);
             Assert.Same(resumeMode, window.FocusManager?.GetFocusedElement());
             Press(window, Key.Space);

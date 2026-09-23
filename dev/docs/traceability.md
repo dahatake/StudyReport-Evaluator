@@ -170,7 +170,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | AC-035 | 共通＋定義1件の明示atomic保存、schema／IO失敗保持、header／貼付内容平文、明示出力先復元・null時だけresult | T02/T03/T06/T10/T23/T27、最新修正T28 | TR-34／ST-UC-27。ApplicationSettingsTests／SettingsFileStoreTests／SettingsViewModelTests／SettingsCompositionTests／ExecutionSettingsTests／MainWindowTests／SettingsWorkflowSystemTests。一時pathの実IOと新instance復元のみ | VERIFIED_SCOPED |
 | AC-036 | 保存header metadataを検証した明示適用、成功時だけ一括更新、失敗・取消無変更、ID／Prompt／Imported Prompt保持 | T04/T10/T17/T24/T27、最新修正T28 | TR-35／ST-UC-28。SavedDefinitionApplicationTests／SettingsViewModelTests／SettingsViewTests／MainWindowTests／WorkflowStateTests／SettingsWorkflowSystemTests。授業内容の意味的一致や本人確認は証明しない | VERIFIED_SCOPED |
 | AC-037 | 4step外の設定、選択・ページ・編集保持、model希望ID／実効選択、no fallback／no-auto-login/run、現在snapshot／前回結果不変 | T05〜10/T13〜27、最新修正T28 | TR-36／ST-UC-29。MainWindowSettingsTests／WorkflowStateTests／ExecutionSettingsTests／ResultsPresentationTests／SettingsWorkflowSystemTests。headlessと実file E2Eを分離。T39追加native FAILと本人確認NOT_RUN_EXTERNAL_PREREQUISITEは未解消 | VERIFIED_SCOPED |
-| AC-038 | 中断後の再開準備、開始前検証、明示条件適用、有限close drain | W-01/W-02/U-03 | ResumeWorkflowTests 8件、ResumeAdmissionEvaluatorTests 2件。2026-09-17の局所記録を参照 | VERIFIED_SCOPED |
+| AC-038 | 中断後の再開準備、開始前検証、明示条件適用、有限close drain | W-01/W-02/U-03 | ResumeWorkflowTests 14件、ResumeAdmissionEvaluatorTests 8件（2026-09-24時点の件数。2026-09-17の局所記録は8件・2件） | VERIFIED_SCOPED |
 | AC-039 | 今回ジョブのAI使用量を画面とJSONLで確認、未取得をゼロ化しない、項目別取得元・試行番号・終端結果・内訳不一致の保持、原単位維持 | J-01 + U-03 | JobUsageTrackerTests／SdkUsageAdapterTests／UsageProvenanceTests／AttemptOutcomeLoggingTests／JobCostBackendTests／JobCostViewTests／CostAttemptLifecycleTests。2026-09-18の局所記録を参照。実AI・課金照合・AIクレジット換算・nativeは未実施 | VERIFIED_SCOPED |
 
 ## Test requirement mapping

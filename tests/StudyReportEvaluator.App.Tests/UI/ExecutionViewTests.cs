@@ -593,7 +593,7 @@ public sealed class ExecutionViewTests
         Assert.Equal("CancelQuantification", AutomationProperties.GetAutomationId(cancelRun));
         Assert.Equal("Copilot 状態を確認", check.Content);
         Assert.Equal("定量化を開始", start.Content);
-        Assert.Equal("cancel", cancelRun.Content);
+        Assert.Equal("中断", cancelRun.Content);
         Assert.Same(check, harness.Window.FocusManager?.GetFocusedElement());
         Assert.Contains("別のブラウザー", instructions.Text, StringComparison.Ordinal);
         Assert.Contains("パスワードやトークンを取得・保存しません", ToolTip.GetTip(login)?.ToString(), StringComparison.Ordinal);
@@ -1221,7 +1221,7 @@ public sealed class ExecutionViewTests
         Render();
         Assert.False(harness.ViewModel.IsRunning);
         Assert.Same(summary, harness.ViewModel.LastRunContext?.Summary);
-        Assert.Contains(cancelRun ? "部分結果" : "検証済みfinal", Required<TextBlock>(harness.View, "RunStatusSummary").Text, StringComparison.Ordinal);
+        Assert.Contains(cancelRun ? "保存済み checkpoint はありません" : "検証済みfinal", Required<TextBlock>(harness.View, "RunStatusSummary").Text, StringComparison.Ordinal);
         Assert.True(harness.ViewModel.HasCurrentRun);
         Assert.Equal("model-a", harness.ViewModel.CurrentRunModelId);
         Assert.Equal(1, harness.ViewModel.CurrentRunMaxConcurrency);

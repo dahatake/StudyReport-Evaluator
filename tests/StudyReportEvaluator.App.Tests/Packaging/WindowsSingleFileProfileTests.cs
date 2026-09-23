@@ -44,8 +44,9 @@ public sealed class WindowsSingleFileProfileTests
 
         Assert.Equal("Project", profile.Name.ToString());
         Assert.Empty(profile.Attributes());
+        // One ItemGroup pins the ILLink pack; the other is the public Content allowlist.
         Assert.Equal(
-            ["PropertyGroup", "ItemGroup"],
+            ["PropertyGroup", "ItemGroup", "ItemGroup"],
             profile.Elements().Select(group => group.Name.ToString()).ToArray());
 
         foreach (XElement group in profile.Elements())
@@ -54,6 +55,14 @@ public sealed class WindowsSingleFileProfileTests
             Assert.Equal("Condition", condition.Name.ToString());
             Assert.Equal(AppCondition, condition.Value);
         }
+
+        // Pin values are asserted by WindowsSingleFilePublishTests; this keeps the pin group closed.
+        XElement[] itemGroups = profile.Elements("ItemGroup").ToArray();
+        XElement pinGroup = Assert.Single(itemGroups, group => group.Elements("KnownILLinkPack").Any());
+        Assert.Equal(
+            ["KnownILLinkPack"],
+            pinGroup.Elements().Select(item => item.Name.ToString()).ToArray());
+        Assert.Same(LoadContentItemGroup(profile), Assert.Single(itemGroups, group => group != pinGroup));
 
         Assert.Empty(profile.Descendants("Target"));
         Assert.Empty(profile.Descendants("Import"));
@@ -70,6 +79,7 @@ public sealed class WindowsSingleFileProfileTests
         {
             ["TargetFramework"] = "net10.0",
             ["RuntimeIdentifier"] = "win-x64",
+            ["RuntimeFrameworkVersion"] = "10.0.11",
             ["SelfContained"] = "true",
             ["UseAppHost"] = "true",
             ["PublishSingleFile"] = "true",
@@ -97,8 +107,7 @@ public sealed class WindowsSingleFileProfileTests
     public void Windows_single_file_profile_registers_only_the_exact_safe_public_allowlist()
     {
         string repositoryRoot = FindRepositoryRoot();
-        XElement itemGroup = Assert.Single(LoadProfile().Elements("ItemGroup"));
-        XElement[] contentItems = itemGroup.Elements().ToArray();
+        XElement[] contentItems = LoadContentItemGroup(LoadProfile()).Elements().ToArray();
 
         Assert.Equal(24, RequiredDocumentationFiles.Length);
         Assert.Equal(24, contentItems.Length);
@@ -173,6 +182,10 @@ public sealed class WindowsSingleFileProfileTests
             relativePath.Split('/'),
             segment => string.IsNullOrEmpty(segment) || segment is "." or "..");
     }
+
+    // Selecting by any Content child keeps a stray Content in another group from being ignored.
+    private static XElement LoadContentItemGroup(XElement profile) =>
+        Assert.Single(profile.Elements("ItemGroup"), group => group.Elements("Content").Any());
 
     private static XElement LoadProfile()
     {

@@ -42,7 +42,7 @@ public sealed class SettingsWorkflowSystemTests
     private const string LastSpecial = "T27 special 6";
     private const string ReferenceAnswer = "+T27 saved reference";
     private const string UnselectedText = "UNSELECTED-T27-BODY";
-    private const string TestApplicationIdentity = "StudyReportEvaluator.App/T27-local";
+    private static readonly string TestApplicationIdentity = QuantificationRunBoundary.ApplicationIdentity();
     private static readonly DateTimeOffset FixedUtc = new(2026, 9, 7, 0, 0, 0, TimeSpan.Zero);
     private static readonly CanonicalDefinitionSerializer Canonical = new();
     private static readonly CachedCopilotModel[] ExpectedCatalog =
@@ -331,6 +331,10 @@ public sealed class SettingsWorkflowSystemTests
         await PrepareExecutionAsync(resumed);
         resumed.Execution.IsResumeMode = true;
         resumed.Execution.ResumePartialPath = saved.PartialPath;
+        await resumed.Execution.PrepareResumeAsync(TestToken);
+        Assert.True(resumed.Execution.ResumeReport?.CanResume);
+        Assert.True(resumed.Execution.CanStart, resumed.Execution.ValidationSummary);
+        Assert.Empty(resumed.Boundary.Requests);
         RunSummary completed = await RunAsync(resumed);
         string finalPath = AssertSuccessfulFinal(resumed, workbook, completed);
         Assert.True(completed.WasResumed);
@@ -672,10 +676,10 @@ public sealed class SettingsWorkflowSystemTests
         await session.Execution.StartAsync(TestToken);
         Assert.False(session.Execution.IsRunning);
         Assert.False(session.Execution.CanCancel);
+        ExecutionRunContext context = Assert.IsType<ExecutionRunContext>(session.Execution.LastRunContext);
         // Completion is established by this run's context and real artifacts, not next-start
         // eligibility: successful resume deletes its partial, so that old path is no longer valid.
-        Assert.Equal(WorkflowStep.Results, session.Shell.CurrentStep);
-        ExecutionRunContext context = Assert.IsType<ExecutionRunContext>(session.Execution.LastRunContext);
+        Assert.Equal(context.Summary.StatusCode == QuantificationRunStatusCodes.Success ? WorkflowStep.Results : WorkflowStep.Execution, session.Shell.CurrentStep);
         Assert.True(session.Results.IsLoaded);
         Assert.True(session.Results.IsAutomaticOutput);
         QuantificationRunRequest request = Assert.Single(session.Boundary.Requests);

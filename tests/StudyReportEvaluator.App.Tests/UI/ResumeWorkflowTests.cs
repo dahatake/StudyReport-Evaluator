@@ -269,6 +269,88 @@ public sealed class ResumeWorkflowTests
             U04TestSupport.RuntimeIdentity())),
         runner);
 
+    [Fact]
+    public async Task Drain_with_an_unbounded_timeout_still_returns_within_the_finite_bound()
+    {
+        using Fixture fixture = new();
+        ControlledRunBoundary runner = new(fixture.Summary);
+        using ExecutionViewModel vm = fixture.CreateExecution(runner);
+        await vm.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+        Task running = vm.StartAsync(TestContext.Current.CancellationToken);
+        await runner.Started.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        try
+        {
+            // The run ignores cancellation until released; close must not wait for it indefinitely.
+            System.Diagnostics.Stopwatch elapsed = System.Diagnostics.Stopwatch.StartNew();
+            await vm.StopAndDrainAsync(Timeout.InfiniteTimeSpan)
+                .WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
+            Assert.InRange(elapsed.Elapsed, TimeSpan.FromSeconds(9), TimeSpan.FromSeconds(15));
+            Assert.False(running.IsCompleted);
+        }
+        finally
+        {
+            runner.Release();
+            await running.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Window_close_during_an_unresponsive_run_closes_after_the_ten_second_bound()
+    {
+        using Fixture fixture = new();
+        InputViewModel input = new();
+        await input.SetFilePathAsync(fixture.Workbook.Path, TestContext.Current.CancellationToken);
+        ControlledRunBoundary runner = new(fixture.Summary);
+        using MainWindowViewModel shell = new(new WorkflowNavigator(), input,
+            new QuantificationDesignViewModel(input.DefinitionDraft, input.AvailableColumnNames),
+            fixture.CreateExecution(runner), new ResultsOutputViewModel(new RecordingOutputBoundary()));
+        shell.NextCommand.Execute(null);
+        shell.NextCommand.Execute(null);
+        MainWindow window = new(shell);
+        TaskCompletionSource closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        window.Closed += (_, _) => closed.TrySetResult();
+        window.Show();
+        Task? running = null;
+        try
+        {
+            await shell.ExecutionViewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+            running = shell.ExecutionViewModel.StartAsync(TestContext.Current.CancellationToken);
+            await runner.Started.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            System.Diagnostics.Stopwatch elapsed = System.Diagnostics.Stopwatch.StartNew();
+            window.Close();
+            await closed.Task.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
+            Assert.InRange(elapsed.Elapsed, TimeSpan.FromSeconds(9), TimeSpan.FromSeconds(15));
+            Assert.False(running.IsCompleted);
+        }
+        finally
+        {
+            runner.Release();
+            if (running is not null)
+                await running.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Window_close_without_a_run_closes_immediately()
+    {
+        using Fixture fixture = new();
+        InputViewModel input = new();
+        await input.SetFilePathAsync(fixture.Workbook.Path, TestContext.Current.CancellationToken);
+        using MainWindowViewModel shell = new(new WorkflowNavigator(), input,
+            new QuantificationDesignViewModel(input.DefinitionDraft, input.AvailableColumnNames),
+            fixture.CreateExecution(), new ResultsOutputViewModel(new RecordingOutputBoundary()));
+        MainWindow window = new(shell);
+        bool closed = false;
+        window.Closed += (_, _) => closed = true;
+        window.Show();
+
+        window.Close();
+
+        Assert.True(closed);
+        Assert.Equal(0, fixture.Runner.CallCount);
+    }
+
     [AvaloniaFact]
     public async Task Repeated_window_close_waits_for_run_completion()
     {

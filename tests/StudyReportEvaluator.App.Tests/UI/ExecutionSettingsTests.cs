@@ -4,6 +4,8 @@ using StudyReportEvaluator.App.Settings;
 using StudyReportEvaluator.App.Tests.Workflow;
 using StudyReportEvaluator.App.ViewModels;
 using StudyReportEvaluator.App.Workflow;
+using StudyReportEvaluator.App.Workbooks.Checkpoint;
+using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.App.Workbooks.Reading;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
@@ -216,7 +218,10 @@ public sealed class ExecutionSettingsTests
         {
             // Only the existing VM file/path gate is exercised; checkpoint admission belongs to the boundary.
             await File.WriteAllBytesAsync(checkpoint, [1], TestContext.Current.CancellationToken);
+            harness.ResumeInspection.Admit(harness, checkpoint);
             viewModel.ResumePartialPath = checkpoint;
+            await viewModel.PrepareResumeAsync(TestContext.Current.CancellationToken);
+            Assert.True(viewModel.ResumeReport?.CanResume);
             Assert.True(viewModel.CanStart);
             await viewModel.StartAsync(TestContext.Current.CancellationToken);
             QuantificationRunRequest request = Assert.IsType<QuantificationRunRequest>(harness.Runner.LastRequest);
@@ -1127,8 +1132,8 @@ public sealed class ExecutionSettingsTests
             if (resume)
             {
                 Directory.CreateDirectory(harness.Root);
-                // Only VM path validation is under test; admission remains the run boundary's job.
                 await File.WriteAllBytesAsync(requestedPartial, [1], TestContext.Current.CancellationToken);
+                harness.ResumeInspection.Admit(harness, requestedPartial);
             }
 
             viewModel.ApplySettings(new ApplicationSettings
@@ -1140,6 +1145,11 @@ public sealed class ExecutionSettingsTests
             viewModel.IsResumeMode = resume;
             viewModel.ResumePartialPath = resume ? requestedPartial : string.Empty;
             await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+            if (resume)
+            {
+                await viewModel.PrepareResumeAsync(TestContext.Current.CancellationToken);
+                Assert.True(viewModel.ResumeReport?.CanResume);
+            }
             Assert.True(viewModel.CanStart);
             Task run = viewModel.StartAsync(TestContext.Current.CancellationToken);
             try
@@ -1400,7 +1410,7 @@ public sealed class ExecutionSettingsTests
                 FactoryCallCount++;
                 return Process;
             });
-            ViewModel = new ExecutionViewModel(Authentication, Runner, login);
+            ViewModel = new ExecutionViewModel(Authentication, Runner, login, ResumeInspection);
         }
 
         public string Root { get; } = Path.Combine(Path.GetTempPath(), "StudyReportEvaluator-T06-" + Guid.NewGuid().ToString("N"));
@@ -1410,6 +1420,7 @@ public sealed class ExecutionSettingsTests
         public QuantificationDefinition Definition { get; } = U04TestSupport.Definition(2, 3);
         public WorkbookMetadata Metadata { get; }
         public MutableAuthenticationBoundary Authentication { get; } = new();
+        public AdmittingResumeInspectionBoundary ResumeInspection { get; } = new();
         public RecordingRunBoundary Runner { get; }
         public LoginResolver Resolver { get; } = new();
         public LoginProcess Process { get; } = new();
@@ -1421,6 +1432,51 @@ public sealed class ExecutionSettingsTests
         public void Configure(string? inputPath = null) => ViewModel.Configure(Definition, Metadata, inputPath ?? InputPath);
 
         public void Dispose() => ViewModel.Dispose();
+    }
+
+    private sealed class AdmittingResumeInspectionBoundary : IResumeInspectionBoundary
+    {
+        private readonly InputSnapshot input = new(new string('A', 64), 123, DateTimeOffset.UnixEpoch);
+        private CheckpointEnvelope? checkpoint;
+
+        public void Admit(SettingsHarness harness, string partialPath)
+        {
+            QuantificationSnapshot snapshot = QuantificationSnapshot.Create(harness.Definition);
+            CopilotRuntimeIdentity runtime = U04TestSupport.RuntimeIdentity();
+            checkpoint = new CheckpointEnvelope
+            {
+                InputPath = harness.InputPath,
+                Input = input,
+                DefinitionCanonicalJson = snapshot.CanonicalJson,
+                DefinitionSha256 = snapshot.Sha256,
+                NormalModelId = harness.ViewModel.SelectedModelId ?? "model-a",
+                Runtime = new CheckpointRuntimeIdentity
+                {
+                    ApplicationIdentity = QuantificationRunBoundary.ApplicationIdentity(),
+                    CliVersion = runtime.CliVersion,
+                    CliSha256 = runtime.CliSha256,
+                    SdkInformationalVersion = runtime.SdkInformationalVersion,
+                },
+                FinalPath = Path.Combine(harness.Root, "admitted.xlsx"),
+                PartialPath = partialPath,
+                StartedAtUtc = DateTimeOffset.UnixEpoch,
+                SavedAtUtc = DateTimeOffset.UnixEpoch,
+            };
+        }
+
+        public Task<CheckpointLoadResult> LoadAsync(string partialPath, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return checkpoint is { } envelope && string.Equals(envelope.PartialPath, partialPath, StringComparison.Ordinal)
+                ? Task.FromResult(CheckpointLoadResult.Succeeded(envelope))
+                : Task.FromResult(CheckpointLoadResult.Failed(CheckpointStatusCodes.Invalid));
+        }
+
+        public Task<InputSnapshot> CaptureInputAsync(string inputPath, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(input);
+        }
     }
 
     private sealed class MutableAuthenticationBoundary : IExecutionAuthenticationBoundary

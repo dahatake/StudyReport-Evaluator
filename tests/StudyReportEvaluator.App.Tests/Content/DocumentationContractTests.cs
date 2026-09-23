@@ -1342,9 +1342,10 @@ public sealed class DocumentationContractTests
             options).Cast<Match>());
         AssertPublicPaths(ParsePublicDocumentationLiterals(publishHelper.Groups["paths"].Value));
 
+        // The profile also has an ILLink pin ItemGroup; select the allowlist by any Content child.
         XElement itemGroup = Assert.Single(XDocument.Parse(Read(
             "src/StudyReportEvaluator.App/Properties/PublishProfiles/WindowsSingleFile.pubxml"))
-            .Descendants("ItemGroup"));
+            .Descendants("ItemGroup"), group => group.Elements("Content").Any());
         AssertPublicPaths(itemGroup.Elements().Select(item =>
         {
             Assert.Equal("Content", item.Name.ToString()); // Do not filter away unknown item types.

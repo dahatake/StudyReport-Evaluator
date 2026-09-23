@@ -1,7 +1,7 @@
 # 画面・ジョブログへのコスト情報表示 — 詳細実装プラン
 
 - 作成日: 2026-09-17
-- 状態: **観測値の画面・JSONL表示は実装あり。計画全体の完了ではない。クレジット数値の換算と実SDK／native検証は未完了。最新状況は[実行状況と残タスク](20260917-job-cost-execution-audit.md)を参照。**
+- 状態: **観測値の画面・JSONL表示は実装あり。計画全体の完了ではない。クレジット数値の換算と実SDK／native検証は未完了。§10.1の25ケースを既存テストと突き合わせた結果（2026-09-24、RT-10）は、COVERED 12・PARTIAL 10・追加 1・NOT_RUN 2。対応表と外部前提は[実行記録](20260924-0335-RemainTaskExecutionRecord.md)を参照。最新状況は[実行状況と残タスク](20260917-job-cost-execution-audit.md)を参照。**
 - 当初の計画作成基準: commit `8400f3f50a835b36370fb654ff07204578247fd8`。2026-09-17の再監査基準はHEAD `730a225`と未コミットの作業ツリー。以下の計画・当初調査の記述を実装完了証拠として扱わない。
 - 要求: Excelを開かなくても、アプリ画面とジョブログでトークン消費量・クレジット等のコスト情報を確認できるようにする。
 - 読み方: §1と§12は確認した事実・出典。§2〜11のクラス名、仕様、数値、工数は**提案**であり、既存実装・実測結果ではない。
@@ -311,6 +311,8 @@
 5. 文書・実装・テストの整合と既存採点／Excel／checkpoint回帰を確認して完了とする。外部検証が未実施なら `NOT_RUN`／`BLOCKED` を残す。
 
 **実装後の検証:** 最新の限定実行は12ケース中11成功・1スキップ・失敗0。対象は集計・ログ・安全なジョブヘッダー・観測値訂正の変更箇所。`TestResults/job-cost-audit-20260917/job-cost-audit-final.trx`に記録。以前の33成功の報告には、シンボリックリンク権限不足でreturnした未検証ケースが含まれていたため、その保護機能を実証したことにはしない。今回実AI・課金照合・native UI・全体テスト・公開操作は実施していない。
+
+**2026-09-24の再検証（RT-10／RT-11）:** コスト系9クラスと実行系3クラス（計12クラス）で、102件中101成功・1スキップ・失敗0。スキップは`Symlink_is_not_followed_by_reader_or_retention_when_creation_is_available`だけで、理由はシンボリックリンクを作るWindows特権がないこと。TRXのSHA-256は[実行記録](20260924-0335-RemainTaskExecutionRecord.md)に書いた。§10.1で提案したテストクラス名（`JobCostLoggerCanaryTests`、`CopilotUsageAdapterTests`、`JobLogWriterTests`、`JobCostPresentationTests`、`JobCostWorkflowTests`）は提案名で、実際のクラスとの対応は実行記録の対応表にある。
 
 ## 12. 出典一覧
 

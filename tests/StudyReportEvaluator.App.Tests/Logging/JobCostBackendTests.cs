@@ -191,6 +191,58 @@ public sealed class JobCostBackendTests
         Assert.DoesNotContain("PRIVATE_", status, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Parallel_trackers_create_unique_complete_logs_with_terminal_totals()
+    {
+        using var temp = new TemporaryDirectory();
+        const int count = 3;
+        var trackers = Enumerable.Range(1, count)
+            .Select(_ => new JobUsageTracker(logDirectory: temp.Path))
+            .ToArray();
+        try
+        {
+            using Barrier start = new(count);
+            await Task.WhenAll(trackers.Select((tracker, index) => Task.Run(async () =>
+            {
+                Guid id = tracker.BeginAttempt(UsageOperation.Normal);
+                Assert.True(start.SignalAndWait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+                tracker.ReplaceAttempt(new(id, UsageOperation.Normal, 1,
+                    new(InputTokens: index + 1), UsageSource.Events));
+                await tracker.CompleteAsync("SUCCESS");
+            })));
+
+            string[] paths = trackers.Select(tracker => Assert.IsType<string>(tracker.Snapshot.LogPath)).ToArray();
+            Assert.Equal(count, paths.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.All(paths, path => Assert.True(File.Exists(path)));
+            for (int i = 0; i < trackers.Length; i++)
+            {
+                string[] lines = await File.ReadAllLinesAsync(paths[i], TestContext.Current.CancellationToken);
+                long previousRevision = 0;
+                foreach (string line in lines)
+                {
+                    using JsonDocument entry = JsonDocument.Parse(line);
+                    JsonElement root = entry.RootElement;
+                    Assert.Equal(trackers[i].Snapshot.JobId, root.GetProperty("JobId").GetGuid());
+                    long revision = root.GetProperty("Revision").GetInt64();
+                    Assert.True(revision > previousRevision);
+                    previousRevision = revision;
+                    Assert.Equal(JsonValueKind.Null, root.GetProperty("Metrics").GetProperty("OutputTokens").ValueKind);
+                }
+                using JsonDocument final = JsonDocument.Parse(lines[^1]);
+                Assert.Equal(1, final.RootElement.GetProperty("Completion").GetInt32());
+                Assert.Equal(i + 1, final.RootElement.GetProperty("Metrics").GetProperty("InputTokens").GetInt64());
+                Assert.Equal(trackers[i].Snapshot.JobId, final.RootElement.GetProperty("JobId").GetGuid());
+            }
+        }
+        finally
+        {
+            foreach (JobUsageTracker tracker in trackers)
+            {
+                await tracker.DisposeAsync();
+            }
+        }
+    }
+
     private static async Task<string> WriteOldLogAsync(string directory, string template)
     {
         Guid id = Guid.NewGuid();

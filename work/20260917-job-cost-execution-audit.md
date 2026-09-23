@@ -58,6 +58,15 @@
 - 破損した過去ログの再取込UI、ログ保存失敗の同一ジョブ内の再保存UIはない。最新ジョブのメモリ履歴と既定アプリでファイルを開く導線を提供する。
 - SDKセッションを通す全ライフサイクルE2E、全レイアウト／アクセシビリティ条件の検証は未実施。今回の限定テストをその代替とはしない。
 
+### 残る差分の分類（2026-09-24追記）
+
+| 分類 | 項目 | 根拠 |
+|---|---|---|
+| 非目標（ADR-0018） | 過去ログの再取込UI、再開前からの通算、予算超過での停止 | [ADR-0018](../dev/docs/adr/0018-job-cost-observability.md)の25行目「過去ジョブの累計表示、再開前からの通算、ログの再取込UI、予算超過による停止は本決定に含めない」 |
+| 非目標（本書の方針） | 保持の上限でモデル内訳を切り詰めたとき、どの識別子が落ちたかは示さない | 上の3つ目の項目（匿名化した識別子でも、上限を超えた列挙はしない） |
+| 現状のとおりと記録 | 過去ファイルの読込結果を画面に出す導線（readerは内部機能） | §1のT05行 |
+| `OWNER`の判断待ち | 同じジョブの中でログの保存をやり直すUI | [元プラン](20260917-job-cost-observability-implementation-plan.md)の§7.3では「画面からの明示保存再試行を提供する場合も」と任意の扱い。実装するかどうかは所有者が判断する |
+
 ## 4a. R09（再試行番号・相関ID・評価結果ログ）の実行結果
 対象: `CostAttemptLifecycleTests`、`AttemptOutcomeLoggingTests`（新規）、既存回帰の`RetryAndCleanupCoordinatorTests`・`EphemeralEvaluationRunnerTests`・`AuxiliaryEvaluationRunnerTests`・`JobUsageTrackerTests`・`JobCostBackendTests`。実AI・実認証は使用していない（すべてfake transport/attempt）。
 
@@ -86,14 +95,6 @@
 - コスト系限定テスト: **58件中57成功・1スキップ（Symlink、権限不足）・失敗0件**。
 - 途中で`MetricObservation`へ不変辞書を追加した際、recordの既定等価が参照比較になり`AttemptOutcomeLoggingTests`が2件失敗。値としての等価を定義して解消。
 - 回帰確認（`EphemeralEvaluationRunnerTests`・`AuxiliaryEvaluationRunnerTests`・`RetryAndCleanupCoordinatorTests`・`ExecutionViewTests`）: 72件中70成功・**2失敗**。失敗は`ExecutionViewTests`の取消ボタン文言（`cancel` 期待に対し実際は「中断」）と中断時の状態文言で、並行する中断・再開機能が`ExecutionView.axaml`・`ExecutionViewModel.cs`を変更した一方で同機能のテストが未追従なもの。コスト機能の変更とは無関係であり、他機能の実装中コードへは手を入れていない。
-
-## 4c. R11（文書契約への反映）の実行結果
-
-対象: `DocumentationContractTests`のみ（実行時間を最小化するため、他のsuiteは再実行していない）。
-
-- 結果: **22件中21成功・1失敗**。
-- 残る1件は`Package_script_includes_every_public_document_image_and_license`。`WindowsSingleFile.pubxml`に`ItemGroup`が2つあるため`Assert.Single`が失敗するもので、該当fileはHEADから未変更。**本作業前（HEAD相当の状態）でも同じて1件失敗することを、文書変更を退避した状態で実測確認済み**（21成功・1失敗）。単一EXE同梱契約の既存破綻であり、本機能の対象外のため変更していない。
-- 途中で、並行する中断・再開機能が要求定義§19の必須記述「T01時点の未実装・試験NOT_RUNは履歴」を落とし、追跡表headerの要求版日付を`2026-09-07`から`2026-09-17`へ変え、AC-038行をAC-015の直後へID順外で挿入していたことを検出。いずれも同じ文書契約試験を壊し、AC-039の登録と同時には満たせないため、記述の復元と行順の修正だけを行った。再開機能の実装code・試験には手を入れていない。
 
 ## 4c. R11（文書契約への反映）の実行結果
 

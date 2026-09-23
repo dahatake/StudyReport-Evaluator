@@ -18,6 +18,8 @@ using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.App.ViewModels;
 using StudyReportEvaluator.App.Views;
 using StudyReportEvaluator.App.Workflow;
+using StudyReportEvaluator.App.Workbooks.Checkpoint;
+using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Serialization;
 using Xunit;
@@ -251,8 +253,14 @@ public sealed class WorkflowStateTests
         QuantificationRunRequest request = fixture.Runner.LastRequest!;
         Go(fixture, WorkflowStep.Execution);
         ExecutionView executionView = Current<ExecutionView>(fixture);
-        string partial = fixture.CreateExistenceOnlyPartial();
+        string partial = fixture.CreateCheckpointPartial();
         SetResume(fixture, partial, resume);
+        if (resume)
+        {
+            await fixture.Execution.PrepareResumeAsync(TestContext.Current.CancellationToken)
+                .WaitAsync(BoundaryWait, TestContext.Current.CancellationToken);
+            Assert.True(fixture.Execution.ResumeReport?.CanResume);
+        }
         var progress = (fixture.Execution.ProgressTotal, fixture.Execution.ProgressCompleted, fixture.Execution.ProgressStage);
         var metadata = fixture.Input.Metadata;
         var snapshot = fixture.Input.Snapshot;
@@ -551,8 +559,11 @@ public sealed class WorkflowStateTests
         ResultsCriterionViewModel[] previousResults = fixture.Results.Results.ToArray();
         ImportedPromptViewModel[] prompts = fixture.Design.ImportedPrompts.ToArray();
         Go(fixture, WorkflowStep.Execution);
-        string partial = fixture.CreateExistenceOnlyPartial();
+        string partial = fixture.CreateCheckpointPartial();
         SetResume(fixture, partial, true);
+        await fixture.Execution.PrepareResumeAsync(TestContext.Current.CancellationToken)
+            .WaitAsync(BoundaryWait, TestContext.Current.CancellationToken);
+        Assert.True(fixture.Execution.ResumeReport?.CanResume);
         QuantificationDefinition inputBefore = fixture.Input.DefinitionDraft;
         QuantificationDefinition designBefore = fixture.Design.Draft;
         var metadataBefore = fixture.Input.Metadata;
@@ -611,6 +622,12 @@ public sealed class WorkflowStateTests
             }
 
             AssertPassive(fixture, authenticationChecks: 1, runs: 1);
+            if (fixture.Execution.IsResumeMode)
+            {
+                await fixture.Execution.PrepareResumeAsync(TestContext.Current.CancellationToken)
+                    .WaitAsync(BoundaryWait, TestContext.Current.CancellationToken);
+                Assert.True(fixture.Execution.ResumeReport?.CanResume);
+            }
             ExecutionRunContext next = await RunAsync(fixture);
             AssertDefinition(expected, fixture.Runner.LastRequest!.DraftDefinition);
             Assert.Equal(failApply ? partial : null, fixture.Runner.LastRequest.ResumePartialPath);
@@ -865,7 +882,8 @@ public sealed class WorkflowStateTests
                 })); // In-memory synthetic launch inputs, never read through PromptFileLoader.
             Runner = new RecordingRunBoundary((request, progress, token) => RunHandler(request, progress, token));
             Execution = new ExecutionViewModel(Authentication, Runner, new BundledCopilotLoginService(
-                Login, _ => throw new InvalidOperationException("T24 must not create a login process.")));
+                Login, _ => throw new InvalidOperationException("T24 must not create a login process.")),
+                ResumeInspection);
             Results = new ResultsOutputViewModel(Output);
             Store = new SettingsFileStore(Path.Combine(workbook.Directory, "preferences", "setting.txt"));
             Shell = new MainWindowViewModel(new WorkflowNavigator(), Input, Design, Execution, Results, Store);
@@ -880,6 +898,7 @@ public sealed class WorkflowStateTests
         public RecordingAuthenticationBoundary Authentication { get; } = new(new ExecutionAuthenticationSnapshot(
             ExecutionAuthenticationState.Available,
             [U04TestSupport.Model("model-test"), U04TestSupport.Model("auto")], U04TestSupport.RuntimeIdentity()));
+        public AdmittingResumeInspectionBoundary ResumeInspection { get; } = new();
         public DeniedLoginResolver Login { get; } = new();
         public RecordingRunBoundary Runner { get; }
         public RecordingOutputBoundary Output { get; } = new();
@@ -932,6 +951,35 @@ public sealed class WorkflowStateTests
             return path;
         }
 
+        public string CreateCheckpointPartial()
+        {
+            QuantificationSnapshot snapshot = QuantificationSnapshot.Create(Input.DefinitionDraft);
+            CopilotRuntimeIdentity runtime = U04TestSupport.RuntimeIdentity();
+            string path = Path.Combine(Workbook.Directory, Guid.NewGuid().ToString("N") + ".partial.xlsx");
+            CheckpointEnvelope envelope = new()
+            {
+                InputPath = Workbook.Path,
+                Input = Input.Snapshot!,
+                DefinitionCanonicalJson = snapshot.CanonicalJson,
+                DefinitionSha256 = snapshot.Sha256,
+                NormalModelId = Execution.SelectedModelId ?? "model-test",
+                Runtime = new CheckpointRuntimeIdentity
+                {
+                    ApplicationIdentity = QuantificationRunBoundary.ApplicationIdentity(),
+                    CliVersion = runtime.CliVersion,
+                    CliSha256 = runtime.CliSha256,
+                    SdkInformationalVersion = runtime.SdkInformationalVersion,
+                },
+                FinalPath = Path.Combine(Workbook.Directory, "eval.xlsx"),
+                PartialPath = path,
+                StartedAtUtc = DateTimeOffset.UnixEpoch,
+                SavedAtUtc = DateTimeOffset.UnixEpoch,
+            };
+            File.Copy(Workbook.Path, path);
+            ResumeInspection.Admit(envelope);
+            return path;
+        }
+
         public void Dispose()
         {
             try
@@ -943,6 +991,30 @@ public sealed class WorkflowStateTests
             {
                 Workbook.Dispose();
             }
+        }
+    }
+
+    private sealed class AdmittingResumeInspectionBoundary : IResumeInspectionBoundary
+    {
+        private CheckpointEnvelope? checkpoint;
+
+        public void Admit(CheckpointEnvelope envelope) => checkpoint = envelope;
+
+        public Task<CheckpointLoadResult> LoadAsync(string partialPath, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return checkpoint is { } envelope && string.Equals(envelope.PartialPath, partialPath, StringComparison.Ordinal)
+                ? Task.FromResult(CheckpointLoadResult.Succeeded(envelope))
+                : Task.FromResult(CheckpointLoadResult.Failed(CheckpointStatusCodes.Invalid));
+        }
+
+        public Task<InputSnapshot> CaptureInputAsync(string inputPath, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return checkpoint is { } envelope
+                && string.Equals(envelope.InputPath, inputPath, StringComparison.OrdinalIgnoreCase)
+                ? Task.FromResult(envelope.Input)
+                : Task.FromResult(new InputSnapshot(new string('0', 64), 0, DateTimeOffset.UnixEpoch));
         }
     }
 

@@ -74,6 +74,7 @@ public sealed partial class RealDataSystemSmokeTests
             PathsEqual(inputPath, canonicalSamplePath),
             "The technical E2E input must be the canonical SampleReport.xlsx path.");
         string evidencePath = RequiredAbsolutePath(EvidenceEnvironmentVariable);
+        AssertEvidencePathDoesNotOverwriteInput(evidencePath, inputPath);
         string evidenceDirectory = Path.GetDirectoryName(evidencePath)
             ?? throw new InvalidOperationException("The evidence path has no parent directory.");
         Directory.CreateDirectory(evidenceDirectory);
@@ -427,6 +428,25 @@ public sealed partial class RealDataSystemSmokeTests
         Assert.True(File.Exists(evidencePath));
     }
 
+    [Fact]
+    public void Evidence_path_matching_input_path_is_rejected_before_smoke_writes()
+    {
+        string inputPath = Path.GetFullPath(Path.Combine("sample", "SampleReport.xlsx"));
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+            () => AssertEvidencePathDoesNotOverwriteInput(inputPath, inputPath.ToUpperInvariant()));
+        Assert.Contains("must not be the input workbook path", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Evidence_path_may_share_input_directory_when_file_name_differs()
+    {
+        string inputPath = Path.GetFullPath(Path.Combine("sample", "SampleReport.xlsx"));
+        string evidencePath = Path.Combine(
+            Path.GetDirectoryName(inputPath)!,
+            "real-data-evidence.json");
+        AssertEvidencePathDoesNotOverwriteInput(evidencePath, inputPath);
+    }
+
     private static CheckpointRuntimeIdentity RuntimeIdentity()
     {
         Assembly appAssembly = typeof(DurableQuantificationOrchestrator).Assembly;
@@ -492,27 +512,54 @@ public sealed partial class RealDataSystemSmokeTests
         process.StartInfo.ArgumentList.Add("--input");
         process.StartInfo.ArgumentList.Add(inputPath);
         Stopwatch watch = Stopwatch.StartNew();
-        bool started = process.Start();
-        Assert.True(started);
-        bool exitedDuringProbe = await WaitForExitAsync(
-            process,
-            TimeSpan.FromMilliseconds(2_000),
-            cancellationToken);
-        watch.Stop();
-        Assert.False(exitedDuringProbe,
-            exitedDuringProbe
-                ? $"The application exited during startup with code {process.ExitCode}."
-                : "The application must remain alive during startup.");
-        process.Refresh();
-        string[] moduleNames = process.Modules
-            .Cast<ProcessModule>()
-            .Select(module => module.ModuleName)
-            .ToArray();
-        int newCopilotProcessCount = CopilotProcessIds().Count(processId =>
-            !copilotProcessesBefore.Contains(processId));
-        Assert.DoesNotContain(moduleNames, IsOfficeRuntimeModule);
-        Assert.Equal(0, newCopilotProcessCount);
-        await EnsureStoppedAsync(process);
+        bool started = false;
+        bool bodyFailed = false;
+        bool controlledCleanup = false;
+        bool exitedDuringProbe = false;
+        string[] moduleNames = [];
+        int newCopilotProcessCount = 0;
+        try
+        {
+            started = process.Start();
+            Assert.True(started);
+            exitedDuringProbe = await WaitForExitAsync(
+                process,
+                TimeSpan.FromMilliseconds(2_000),
+                cancellationToken);
+            watch.Stop();
+            Assert.False(exitedDuringProbe,
+                exitedDuringProbe
+                    ? $"The application exited during startup with code {process.ExitCode}."
+                    : "The application must remain alive during startup.");
+            process.Refresh();
+            moduleNames = process.Modules
+                .Cast<ProcessModule>()
+                .Select(module => module.ModuleName)
+                .ToArray();
+            newCopilotProcessCount = CopilotProcessIds().Count(processId =>
+                !copilotProcessesBefore.Contains(processId));
+            Assert.DoesNotContain(moduleNames, IsOfficeRuntimeModule);
+            Assert.Equal(0, newCopilotProcessCount);
+        }
+        catch
+        {
+            bodyFailed = true;
+            throw;
+        }
+        finally
+        {
+            if (started)
+            {
+                try
+                {
+                    await EnsureStoppedAsync(process);
+                    controlledCleanup = process.HasExited;
+                }
+                catch when (bodyFailed)
+                {
+                }
+            }
+        }
 
         string resultStateAfter = DirectoryStateHash(resultDirectory);
         Assert.Equal(resultStateBefore, resultStateAfter);
@@ -523,7 +570,7 @@ public sealed partial class RealDataSystemSmokeTests
             ProcessStarted: started,
             StartupProbeMilliseconds: watch.Elapsed.TotalMilliseconds,
             ExitedDuringProbe: exitedDuringProbe,
-            ControlledCleanup: process.HasExited,
+            ControlledCleanup: controlledCleanup,
             OfficeRuntimeModuleCount: moduleNames.Count(IsOfficeRuntimeModule),
             ResultDirectoryStateUnchanged: resultStateBefore == resultStateAfter,
             NewCopilotProcessCount: newCopilotProcessCount,
@@ -873,6 +920,15 @@ public sealed partial class RealDataSystemSmokeTests
         }
 
         return Path.GetFullPath(value);
+    }
+
+    private static void AssertEvidencePathDoesNotOverwriteInput(string evidencePath, string inputPath)
+    {
+        if (PathsEqual(evidencePath, inputPath))
+        {
+            throw new InvalidOperationException(
+                "The evidence path must not be the input workbook path.");
+        }
     }
 
     private static void WriteEvidence(string path, object evidence, string inputPath)

@@ -189,7 +189,7 @@ public sealed partial class ExecutionViewModel
         SetResumeValidationText(message);
     }
 
-    private void InvalidateResumePreflight(bool clearCheckpoint = false)
+    private void InvalidateResumePreflight(bool clearCheckpoint = false, bool notifyValidationSummary = false)
     {
         resumeInspectionSequence++;
         CancellationTokenSource? previous = resumeInspectionCancellation;
@@ -201,19 +201,28 @@ public sealed partial class ExecutionViewModel
         TryCancel(previous);
         resumeFindingItems.Clear();
         SetResumeValidationText("再開元と現在の条件を確認してください。条件の変更後は再確認が必要です。");
-        RaiseResumeStates();
+        RaiseResumeStates(notifyValidationSummary);
     }
 
     private void SetResumeValidationText(string value)
     {
         resumeValidationText = value;
         OnPropertiesChanged(nameof(ResumeValidationText), nameof(ResumeReport));
+        if (IsResumeMode && !HasMatchingResumePreflight)
+        {
+            OnPropertyChanged(nameof(ValidationSummary));
+        }
     }
 
-    private void RaiseResumeStates()
+    private void RaiseResumeStates(bool notifyValidationSummary = false)
     {
         OnPropertiesChanged(nameof(IsPreparingResume), nameof(CanEditResume), nameof(CanPrepareResume),
-            nameof(CanStart), nameof(ValidationSummary), nameof(HasInterruptedRun), nameof(InterruptedRunSummaryText));
+            nameof(CanStart), nameof(HasInterruptedRun), nameof(InterruptedRunSummaryText));
+        if (notifyValidationSummary)
+        {
+            OnPropertyChanged(nameof(ValidationSummary));
+        }
+
         resumeInterruptedRunCommand.RaiseCanExecuteChanged();
         validateResumeCheckpointCommand.RaiseCanExecuteChanged();
         applyCheckpointInputCommand.RaiseCanExecuteChanged();
