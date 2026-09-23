@@ -1,5 +1,9 @@
 # Current implementation status
 
+## 2026-09-24 — CI復旧と実機確認（限定）
+
+`e152764`のCI run 35925523213はWindows jobの全ステップ（deterministic tests、ZIP、単一EXEのP06／P07、unsigned MSIX mechanism）が成功。開発用MSIX検証scriptのentry名の区切り（`\`→`/`）を修正した。symlink保護テストはWindows Sandboxの管理者userで1件PASS（SKIPではない）。合成入力とモデル`auto`で実アプリを操作し、通常・中断・同一sessionの再開・window close・保存定義を適用した再起動後の再開を確認した。全attemptがエラーなしで完了し（SDK例外によるretryは未観測）、画面で値を読んだjobではtokenの値がジョブログと一致した。125% DPIでのTab移動・ログ表示・ログ／保存先を開く操作を確認した。Narrator、OS shutdown、CH-01〜06、公開、AIクレジット換算は未実施のまま。記録は`work/20260924-0725-IncompleteTaskResolution.md`。
+
 ## 2026-09-18 — 実行コスト表示とジョブログ（限定検証完了）
 
 AC-039／TR-38: 実行・結果画面の共有コストView、ジョブ単位JSONLログ、全4 operationへのtracker注入、未取得と明示0の区別、項目別の取得元、試行番号・相関ID・終端結果、モデル内訳と総量の不一致、下方訂正を実装済み。単位はSDK報告の原単位のままで、AIクレジット・通貨へ換算しない（[ADR-0018](adr/0018-job-cost-observability.md)）。

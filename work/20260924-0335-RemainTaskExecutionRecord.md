@@ -1,6 +1,7 @@
 # `work/` 残タスク実行記録
 
 - 計画: [202609240300-RemainTaskExecutionPlan.md](202609240300-RemainTaskExecutionPlan.md)
+- 第2ラウンド（未完了タスクの解決）の記録: [20260924-0725-IncompleteTaskResolution.md](20260924-0725-IncompleteTaskResolution.md)。下の「実施しなかったタスク」の表は第1ラウンド時点のもので、各タスクの最新の状態は第2ラウンドの記録にある
 - 開始: 2026-09-24 03:35 JST。基準 HEAD `d27dc0ee03b05ddaadf060c9285e2517fb0f686a`（`origin/main` と一致）。ホスト `DAHATAKE-STD2`、.NET SDK 10.0.401（CI は 10.0.400）
 - 並行作業は、同じ HEAD から作った detached worktree（`C:\GitHub\sre-wt-*`）で行い、差分を patch にしてこの作業ツリーへ取り込んだ。同じ workspace を同時に編集していない
 - TRX はリポジトリの外（セッション領域 `files\trx\`）に保存し、SHA-256 をここに記録する

@@ -214,7 +214,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | TR-35 | 同入力／別header／不足sheet・列・行、明示適用成功と失敗・取消無変更、ID／canonical hash／Imported Prompt保持（AC-036） | SavedDefinitionApplicationTests／SettingsViewModelTests／SettingsViewTests／MainWindowTests／WorkflowStateTests／SettingsWorkflowSystemTests、ST-UC-28。read-only synthetic、最新216件の失敗時保持回帰。意味的適合・本人確認は別 | VERIFIED_SCOPED |
 | TR-36 | 往復・交互編集・model希望、no-auto、現在run固定・停止・設定中完了、前回結果／override、保存→再読込→明示適用→fake run／resume E2E（AC-035〜037） | MainWindowSettingsTests／WorkflowStateTests／ExecutionSettingsTests／ResultsPresentationTests／SettingsWorkflowSystemTests、ST-UC-29。T24の12ケースとT27の7ケースは各集合の内数。T39追加native FAIL、本人walkthroughはNOT_RUN_EXTERNAL_PREREQUISITE | VERIFIED_SCOPED |
 | TR-37 | 中断後の再開準備、partial picker取消、開始前の項目別検証、明示入力／model反映、有限close drain（AC-038） | ResumeWorkflowTests／ResumeAdmissionEvaluatorTests。実AI・別process・OS shutdownは別境界 | VERIFIED_SCOPED |
-| TR-38 | 使用量の取得成功／一部欠落／全欠落、明示0と未取得、イベント重複・順序逆転・final複数通知、再試行と4 operation、項目別取得元、内訳不一致、下方訂正、overflow／負数、JSONLのcanary非記録・容量上限・保存失敗時の観測値保持（AC-039） | JobUsageTrackerTests／SdkUsageAdapterTests／UsageProvenanceTests／AttemptOutcomeLoggingTests／JobCostBackendTests／JobCostViewTests／CostAttemptLifecycleTests。symlink保護は権限不足でSKIP、実AI・課金照合は別境界 | VERIFIED_SCOPED |
+| TR-38 | 使用量の取得成功／一部欠落／全欠落、明示0と未取得、イベント重複・順序逆転・final複数通知、再試行と4 operation、項目別取得元、内訳不一致、下方訂正、overflow／負数、JSONLのcanary非記録・容量上限・保存失敗時の観測値保持（AC-039） | JobUsageTrackerTests／SdkUsageAdapterTests／UsageProvenanceTests／AttemptOutcomeLoggingTests／JobCostBackendTests／JobCostViewTests／CostAttemptLifecycleTests。symlink保護は通常のhostでは権限不足でSKIP、Windows Sandboxの管理者userではPASS（2026-09-24）、実AI・課金照合は別境界 | VERIFIED_SCOPED |
 
 ## Mandatory safety surfaces
 
