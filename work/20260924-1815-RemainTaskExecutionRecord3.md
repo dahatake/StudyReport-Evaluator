@@ -155,3 +155,7 @@ rubber-duck のレビューで blocking の指摘は無かった（閉じ方が�
 ### RR-00 の敵対的レビュー
 
 rubber-duck のレビューで blocking の指摘は無かった（再実行は計画の上限の 2 回以内、テストと ci.yml は未変更、ci.yml 147〜150 行目の参照は正しい、CLI をキャッシュに置いた手順の逸脱は開示済みで再現を無効にしないことを確認）。blocking でない指摘 2 件を反映した: 「再現性のない失敗」は、P07 の失敗が attempt 1 と 2 で繰り返しているので言い過ぎであり、「P07 段階の断続的な失敗」に直した。存在しない「最後の節」への参照を、末尾の「push 後の CI」に直した。
+
+## push 後の CI
+
+- この記録を含む commit `2faa5a7` の CI run 35986843649 は、1 回目（再実行なし）で全 job が success（macOS 2 job、Windows job の P06／P07 単一 EXE と MSIX を含む）。RR-00 の DoD はこの最新 commit でも満たす
