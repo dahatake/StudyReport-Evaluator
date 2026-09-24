@@ -254,7 +254,7 @@ resultは`question_id`、`similarity`、`reason`だけとし、similarityを0〜
 
 ### 5.5 retry
 
-既存`RetryAndCleanupCoordinator`の有限attempt、timeout、cleanup順序を再利用する。operationごとにadapterを作るがretry engineを複製しない。`AttemptTimeout`の既定は60秒（SDK `SendAndWaitAsync`の既定待機と同じ）で、起動・認証確認・session作成・AIの応答待ちを含むattempt全体に掛かる。送信はSDKへ`timeout: null`で渡し、SDK側60秒とattempt側60秒の先に満了した方を`TimedOut`とする。attempt側は準備時間を含むため、応答待ちに使える時間は60秒から準備時間を引いた分になる。
+既存`RetryAndCleanupCoordinator`の有限attempt、timeout、cleanup順序を再利用する。operationごとにadapterを作るがretry engineを複製しない。AIの応答待ちは、送信をSDKへ`timeout: null`で渡してSDK `SendAndWaitAsync`の既定60秒に従う（SDKは`TimeoutException`を送出し、`TimedOut`として扱う）。`AttemptTimeout`の既定120秒は起動・認証確認・session作成を含むattempt全体の外側上限で、準備が異常に長い場合だけ先に満了する。送信中にCLIがAI呼び出しの通信失敗をsession errorとして返した場合（SDKは`InvalidOperationException`、messageに`error sending request for url`を含む）は`NetworkFailed`として再試行する。
 
 ## 6. Excel workbook設計
 

@@ -3,12 +3,13 @@
 ## 2026-09-24 — AIの応答待ちtimeoutとreasoning effort
 
 要求所有者の指示で、要求定義書の§7.6と§7.1を改訂した。
-- **応答待ち**: `DefaultAttemptTimeout`を120秒から60秒（SDK `SendAndWaitAsync`の既定と同じ）に変更した。60秒は起動・認証確認・session作成・応答待ちを含むattempt全体に掛かる。SDKの呼び出しは従来どおり`timeout: null`。この端末では送信前の準備に約20〜26秒かかるので、応答待ちに使えるのは実質約34〜40秒になる。応答待ちに60秒を丸ごと残したい場合は、別途所有者の判断が必要。
-- **reasoning effort**: 全operationで`medium`を指定する。ただし指定するのは、models.listが`supports.reasoningEffort=true`を示し、かつ対応effortに`medium`を列挙したmodelだけ。`auto`や非対応model（例：claude-haiku-4.5）に指定するとsession作成が失敗するため、これらには指定しない。
-- **確認**: 実際のCLIで、claude-sonnet-5は`medium`、`auto`とclaude-haiku-4.5は未指定のままsession作成と送信が成功した。
-- **未解決（範囲外）**: この端末では「Copilot 状態を確認」が15秒の確認timeoutを超えて失敗する。原因は、同梱CLIのSHA-256照合を含むclient作成に時間がかかること。そのためアプリ画面での通し実行はできていない。
+- **応答待ち**: AIの応答待ちはSDK `SendAndWaitAsync`の既定60秒に従う（SDKの呼び出しは従来どおり`timeout: null`）。いったん`DefaultAttemptTimeout`を60秒（attempt全体）にしたが、敵対的レビューの実機通し実行（1行・全operation）で、起動・session作成に約10〜25秒かかるためattempt側がSDKの60秒より先に満了し、参照回答が`AI_TIMEOUT`になった（応答の受信完了とほぼ同時の打切りを含む）。そのため`DefaultAttemptTimeout`は外側上限の120秒に戻し、SDKの60秒が実際の応答待ちになるようにした。
+- **reasoning effort**: 指定する場合は`medium`。models.listが`supports.reasoningEffort=true`を示し、対応effortに`medium`を列挙したmodelだけに指定する。`auto`や非対応model（例：claude-haiku-4.5）は指定するとsession作成が失敗するため指定しない。`auto`固定の参照回答生成・類似度評価には指定されず、その実効effortはSDKから観測できない。
+- **CLIの通信失敗**: 送信中の通信断で、CLIは`ETIMEDOUT`等をsession error（`errorType`は`query`）として返し、SDKは`InvalidOperationException`を送出する。従来はこれを`AI_RUNTIME_FAILED`として再試行しなかった（§7.6違反）。messageに`error sending request for url`を含む場合は通信失敗として新sessionで再試行するよう修正し、実機で1回目`NetworkFailed`→2回目成功を確認した。
+- **client作成の遅さ**: 同梱CLI（約159 MB）のSHA-256を既定4 KiBの非同期読込で2回計算しており、1回約5.7〜6.5秒（同期では約0.5秒）かかっていた。読込bufferを1 MiBにして1回約0.3〜0.4秒、client作成は約12.8秒→約0.4秒になった。「Copilot 状態を確認」（15秒）が約12〜16秒で不安定に失敗していた主因とみられる（修正後は約7秒で成功）。
+- **確認**: 実際のCLIで、claude-sonnet-5は`medium`、`auto`とclaude-haiku-4.5は未指定のままsession作成と送信が成功した。アプリ画面の通し実行（通常評価claude-sonnet-5、proxyなし）で15/15 operationが成功した。proxy経由の2回ではclaude-sonnet-5の通常評価でschema不正が多かった（15 attempt中7件）が、proxyなしでは0/5で、原因は特定していない。
 
-記録は`work/20260924-2140-TimeoutAndReasoningEffort.md`。
+記録は`work/20260924-2140-TimeoutAndReasoningEffort.md`と`work/20260925-0005-AdversarialReviewTimeoutEffort.md`。
 
 ## 2026-09-24 — 実際のSDK例外によるretryの観測
 

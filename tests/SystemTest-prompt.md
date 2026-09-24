@@ -735,7 +735,7 @@ normal、reference、special、similarityの各operationで単一原因ごとに
 - observer/progress callback例外はrun data、status、checkpoint payloadを変更しない。
 - cleanup failure後の追加retryは0。
 
-既定attempt timeoutは60秒（SDK `SendAndWaitAsync`の既定待機と同じ）だが、testはvirtual/controlled timeoutを使い実時間待機を行いません。attempt、session、send、abort、dispose、delete、checkpoint countをtest doubleから取得します。期待値に合わせてcountを書換えません。
+既定attempt timeoutは120秒（起動からの外側上限。AIの応答待ちはSDK `SendAndWaitAsync`の既定60秒）だが、testはvirtual/controlled timeoutを使い実時間待機を行いません。attempt、session、send、abort、dispose、delete、checkpoint countをtest doubleから取得します。期待値に合わせてcountを書換えません。
 
 全operation×failure/cancel caseが今回一致した場合だけPASS。不一致はFAIL、test fixture/tool不足はBLOCKEDです。
 

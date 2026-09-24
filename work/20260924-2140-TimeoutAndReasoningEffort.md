@@ -52,3 +52,10 @@
 | 4 | Non-blocking：`implementation-status.md`が120秒・所有者判断待ちのまま。作業記録が未完 | 反映。新しい状況欄と本記録§3を追記（過去欄は履歴として残す） |
 | 5 | （第2回）Blocking：「応答待ち60秒＋外側120秒」は§7.6のattempt timeoutの読み替えで、所有者の指示と矛盾する。また外側のtokenが送信にも渡るので、応答待ちの60秒も保証しない | 反映。attempt全体を60秒へ戻し、要求・設計・試験・文書を合わせた（D1の経緯） |
 | 6 | （第2回）Non-blocking：win-x64 buildで正規の`packages.lock.json`（App・Core）にRID節が追加された | 反映。両fileを`git checkout`で戻した |
+
+## 5. 敵対的レビュー後の訂正（2026-09-25）
+
+- D1（attempt全体60秒）は撤回した。実機の通し実行で、attempt側がSDKの60秒より先に満了し参照回答が`AI_TIMEOUT`になったため、`DefaultAttemptTimeout`は外側上限120秒に戻し、応答待ちはSDK既定60秒とした。詳細は`work/20260925-0005-AdversarialReviewTimeoutEffort.md`。
+- 「準備に約20〜26秒」「client作成が遅い原因はSHA-256照合」は、測定時点の値と推測を事実のように書いていた。実測では非同期4 KiB読込のSHA-256が1回約5.7〜6.5秒（同期約0.5秒）で、client作成に2回含まれる。bufferを1 MiBにしてclient作成は約0.4秒になった。
+- F9（RR-03の認証失敗は同じ原因）は推測だった。上記の測定で主因とみられるが、個々の失敗の原因は確認していない。
+- F1/F3の出典は削除済みの一時コピーだった。上流の`github/copilot-sdk` `dotnet/src/Session.cs`（`SendAndWaitAsync`の`effectiveTimeout = timeout ?? TimeSpan.FromSeconds(60)`、`SessionErrorEvent`で`InvalidOperationException`）を出典とする。

@@ -232,11 +232,11 @@ public sealed class EphemeralEvaluationRunnerTests
     }
 
     [Fact]
-    public void Defaults_are_finite_60_seconds_and_runner_remains_a_single_evaluator_surface()
+    public void Defaults_are_finite_120_seconds_and_runner_remains_a_single_evaluator_surface()
     {
         EphemeralEvaluationRunnerOptions options = new();
 
-        Assert.Equal(TimeSpan.FromSeconds(60), options.AttemptTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(120), options.AttemptTimeout);
         Assert.Equal(1, options.MaxConcurrency);
         Assert.InRange(options.CleanupTimeout, TimeSpan.FromMilliseconds(1), TimeSpan.FromMinutes(1));
         Assert.DoesNotContain(
@@ -272,6 +272,16 @@ public sealed class EphemeralEvaluationRunnerTests
         ];
 
         Assert.Equal(expected, SdkEphemeralCopilotTransport.ResolveReasoningEffort(models, modelId));
+    }
+
+    [Theory]
+    [InlineData("Session error: Execution failed: Error: error sending request for url (https://api.enterprise.githubcopilot.com/models): client error (Connect): operation timed out [ETIMEDOUT]", true)]
+    [InlineData("Session error: Execution failed: HTTP status client error (400 Bad Request) for url (https://example.invalid/)", false)]
+    [InlineData("Session error: session error", false)]
+    public void Cli_transport_session_errors_are_network_failures(string message, bool expected)
+    {
+        Assert.Equal(expected, SdkEphemeralCopilotSession.IsTransportSessionError(new InvalidOperationException(message)));
+        Assert.False(SdkEphemeralCopilotSession.IsTransportSessionError(new FormatException(message)));
     }
 
     [Theory]

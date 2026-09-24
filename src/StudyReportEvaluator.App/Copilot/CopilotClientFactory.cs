@@ -19,6 +19,7 @@ public interface ICopilotCliPathResolver
 public sealed class BundledCopilotCliPathResolver : ICopilotCliPathResolver
 {
     public const string ManifestFileName = "copilot-runtime.json";
+    internal const int CliHashBufferSize = 1 << 20;
 
     private static readonly JsonSerializerOptions ManifestJsonOptions = new()
     {
@@ -133,6 +134,8 @@ public sealed class BundledCopilotCliPathResolver : ICopilotCliPathResolver
                 Mode = FileMode.Open,
                 Access = FileAccess.Read,
                 Share = FileShare.Read,
+                // The default 4 KiB async reads make hashing the large CLI take seconds per call.
+                BufferSize = CliHashBufferSize,
                 Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
             }))
         {
@@ -449,6 +452,7 @@ public sealed class CopilotClientFactory : ICopilotClientFactory
                 Mode = FileMode.Open,
                 Access = FileAccess.Read,
                 Share = FileShare.Read,
+                BufferSize = BundledCopilotCliPathResolver.CliHashBufferSize,
                 Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
             }))
         {

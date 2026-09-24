@@ -284,7 +284,7 @@ $$
 - 上限が不明でも、app-owned requestの絶対上限とretry込みattempt上限は常に適用する。
 - 実効modelの上限が既知か不明かを実行画面に明示する。
 - 1 attemptごとにrestricted sessionを使用し、app-owned structured result toolだけを公開する。
-- 全operationのreasoning effort（SDK `SessionConfig.ReasoningEffort`）は`medium`とする。答案の定量化にhigh以上は使わない。SDKがreasoning effort対応と列挙したmodelで、対応effortに`medium`がある場合だけ指定する。`auto`と非対応modelは指定するとsession作成が失敗するため指定せず、runtime既定に任せる。これを理由にrunを拒否せず、別modelへfallbackしない。
+- reasoning effort（SDK `SessionConfig.ReasoningEffort`）は、指定する場合は`medium`とし、答案の定量化にhigh以上は指定しない。SDKがreasoning effort対応と列挙したmodelで、対応effortに`medium`がある場合だけ指定する。`auto`と非対応modelは指定するとsession作成が失敗するため指定せず、runtime既定に任せる。したがって`auto`固定の参照回答生成・類似度評価と、通常評価で`auto`または非対応modelを選んだ場合はeffortを指定せず、実際に使われたeffortはSDKから観測できない。これを理由にrunを拒否せず、別modelへfallbackしない。
 - shell、filesystem、Web、GitHub write、MCP、ambient memoryを公開しない。
 - finite timeout、有限retry、cancel、session cleanupを必須とする。
 
@@ -346,8 +346,8 @@ AIは次だけを返す。
 ### 7.6 retryとfailure
 
 - schema不正は新sessionで最大1回再試行する。
-- transient network errorとtimeoutは新sessionで最大2回再試行する。
-- attempt timeoutの既定は、Copilot SDKの`SendAndWaitAsync`既定の待機時間に従い60秒とする。この60秒は起動・認証確認・session作成・AIの応答待ちを含むattempt全体に適用する。AIの応答待ちはSDKの既定値のまま（アプリは値を指定しない）とし、SDK側とattempt側のどちらが先に満了してもtimeoutとして扱う。
+- transient network errorとtimeoutは新sessionで最大2回再試行する。Copilot CLIがAI呼び出しの通信失敗（接続・時間切れ）をsession errorとして返した場合もnetwork errorとして扱う。
+- AIの応答待ちtimeoutは、Copilot SDKの`SendAndWaitAsync`既定の60秒に従う（アプリは値を指定しない。SDK版を更新する場合はSDK既定を再確認する）。起動・認証確認・session作成を含むattempt全体には、この60秒の応答待ちを先取りしない外側の上限として120秒を掛ける。どちらが満了してもtimeoutとして扱う。
 - cleanup失敗後は追加retryを行わない。
 - cancel後に新規sessionを開始しない。
 - 技術的失敗を0へ変換しない。
@@ -943,7 +943,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 12. result path分単位命名、`-02` suffix、directory作成、no-overwrite、atomic fault test。
 13. partial作成、reference checkpoint、学生行checkpoint、atomic replace、強制終了相当fault test。
 14. checkpoint schema/input/definition/model/runtime mismatchと完了行skip test。
-15. auth、timeout、network、schema、cleanup、cancel、no-send-after-cancel test。
+15. auth、timeout、network（CLIが返す通信失敗のsession errorを含む）、schema、cleanup、cancel、no-send-after-cancel、reasoning effort指定条件test。
 16. selected-column／same-row isolation、literal string、no-content log test。
 17. 4-step＋設定、warning exact text/nonblock、progress、resume、completion、keyboard、200% scale test。1024×720／1180×800の通常shellは実ClientSize、Extent／Viewport、主要Control完全包含を実測して外側scroll不要とhorizontal overflowなしを確認する。多数項目のページ切替・元行移動・空一覧・最終ページ・選択保持・リサイズとvirtualization、長文／path／dropdownの局所scroll、760×600 standalone／200%表示のreflow後の本文縦scroll例外を分離し、全操作への到達を検証する。44 DIP、focus復帰、一意Automation ID、native DPI／Narratorをheadlessと分けて記録する。主回答列ComboBox操作後の可視設問text同期も維持する。
 18. CLI option parser、UTF-8 Prompt file、複数Prompt、明示適用、no-auto-run test。
@@ -1040,5 +1040,5 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | Latest version / changelog override | UIプランD17の当初上書きは全タスク後のUnreleased追記 → PATCH `0.8.4` → `0.8.5`だった。さらに要求所有者の利用者不在時の自律続行指示により、T39をBLOCKEDのまま承認済みF01／F02を進める。F01はREVIEWED、親担当が製品版正本を0.8.5へ一度だけ更新済み。T01では製品版・CHANGELOGを変更しないという履歴は維持する。要求v4.6・製品版・公開版は独立し、最終bytes変更後の再検証・clean-host公開条件を省略しない |
 | Implementation / validation status | 要求承認済み。T01は要求・契約・追跡・要求版metadataの同期で、当時のUI／設定は未実装・試験NOT_RUNだった。T01〜T35はREVIEWEDだった履歴を維持し、現在は2026-09-07の[実行記録](../dev/docs/archive/work/20260907-ui-settings-execution-record.md)と後続引継ぎでT01〜T38がREVIEWED、T39はBLOCKED。実装と局所試験の対応はVERIFIED_SCOPED。T35の対象文書試験は4/4成功・敵対的レビュー済みで、別scopeのT36は自身のt36-current.trxで21/21成功。製品`0.8.6`は未公開候補、公開済みは`v0.8.1` ZIPのまま。0.8.4のT37実ZIP・T38実EXE・T39自動回帰／MSIX成功と追加native FAILを分離する。F02最終再検証は本同期時点では親担当で未完了、以後は実行記録の最新F02欄へ接続する。本人確認／隔離利用者保存／CH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITEで、G4・全タスク完了・新EXE公開は未達 |
 | Auto model selection source | 2026-09-15の要求所有者指示「`auto`を通常評価modelとして選択できるように必要なら要求定義から変更」。同梱CLIを実測し、`auto`はrouterでtoken上限を公開しないことを確認した上で§7.1・§10.3・§10.4・§11・§15・§16を改訂した。上限不明modelを拒否せず、model相対のcontext budget検査だけを適用外とし、既定値の推定と別modelへのfallbackは行わない。要求版はv4.6のままで、製品版・公開版とは独立 |
-| Timeout / reasoning effort source | 2026-09-24の要求所有者指示「7.6節のattempt timeoutはSDKの60秒に従う」「Thinking Effortはmedium。答案の定量化なのでHighは不要」。§7.6のattempt timeout既定を120秒からSDK既定と同じ60秒へ改め、§7.1へreasoning effort `medium`を追加した。同梱CLIの実測で、`auto`と非対応modelへeffortを指定するとsession作成が失敗することを確認し、対応modelだけに指定する。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Timeout / reasoning effort source | 2026-09-24の要求所有者指示「7.6節のattempt timeoutはSDKの60秒に従う」「Thinking Effortはmedium。答案の定量化なのでHighは不要」。当初はattempt全体を60秒としたが、実機の通し実行で起動・session作成に約10〜25秒かかり、SDKの60秒の応答待ちより先にattempt側が満了してAI_TIMEOUTとなった（応答完了直前の打切りを含む）ため、§7.6は応答待ちをSDK既定の60秒とし、attempt全体の外側上限120秒は維持した。§7.1へreasoning effort `medium`を追加した。同梱CLIの実測で、`auto`と非対応modelへeffortを指定するとsession作成が失敗することを確認し、対応modelだけに指定する。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Meaning | repository要求baselineの承認記録。実装完了・試験成功・release存在・tag／push／draft／公開操作の承認、組織の法務・教育・security承認または電子署名を意味しない |

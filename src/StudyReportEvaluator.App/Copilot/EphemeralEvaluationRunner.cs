@@ -12,8 +12,9 @@ namespace StudyReportEvaluator.App.Copilot;
 
 public sealed class EphemeralEvaluationRunnerOptions
 {
-    // Owner decision: the attempt timeout follows the SDK SendAndWaitAsync default (60 s); it covers start, auth, session create and send.
-    public static TimeSpan DefaultAttemptTimeout { get; } = TimeSpan.FromSeconds(60);
+    // Owner decision "follow the SDK's 60 s": the AI response wait is the SDK SendAndWaitAsync default (60 s, the app passes
+    // no timeout). This outer bound also covers start, auth and session create, so it must not preempt that wait. Re-check on SDK upgrade.
+    public static TimeSpan DefaultAttemptTimeout { get; } = TimeSpan.FromSeconds(120);
 
     public static TimeSpan DefaultCleanupTimeout { get; } = TimeSpan.FromSeconds(15);
 
@@ -650,6 +651,10 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
         {
             throw new EvaluationNetworkException();
         }
+        catch (InvalidOperationException exception) when (IsTransportSessionError(exception))
+        {
+            throw new EvaluationNetworkException();
+        }
         catch (EvaluationAttemptException)
         {
             throw;
@@ -666,6 +671,12 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
             }
         }
     }
+
+    // The CLI reports an upstream connect/timeout failure as a session error (errorType "query") whose
+    // message carries reqwest's transport wording; HTTP status failures use different wording.
+    internal static bool IsTransportSessionError(Exception exception) =>
+        exception is InvalidOperationException
+        && exception.Message.Contains("error sending request for url", StringComparison.Ordinal);
 
     public Task AbortAsync(CancellationToken cancellationToken)
     {
