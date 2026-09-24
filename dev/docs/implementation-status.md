@@ -1,5 +1,9 @@
 # Current implementation status
 
+## 2026-09-24 — 残タスク第3回（限定）
+
+`d4c1eaa`のCI run 35933450815はP07（`P07_TRX_TEST_NOT_PASSED`）で2回失敗し、3回目の再実行で全job成功した（flakyと判断。失敗scenarioはraw TRX非uploadのため未特定）。明示モデル`claude-sonnet-5`で15 attempt完了し、ジョブログのモデル識別子が選択モデルと一致した。実行中にCopilot CLI子processを終了すると該当attemptはCleanupFailedとなりretryされず（`RetryAndCleanupCoordinator.cs`の設計どおり）、ジョブは完了・結果は技術エラーとして保存された。ネットワーク遮断による一時障害retry、RIDあり公開テスト（npm registryへのTLS失敗でBLOCKED）、Sandboxでのログイン、Narrator、CH-01〜06、公開、AIクレジット換算は未実施のまま。記録は`work/20260924-1815-RemainTaskExecutionRecord3.md`。
+
 ## 2026-09-24 — CI復旧と実機確認（限定）
 
 `e152764`のCI run 35925523213はWindows jobの全ステップ（deterministic tests、ZIP、単一EXEのP06／P07、unsigned MSIX mechanism）が成功。開発用MSIX検証scriptのentry名の区切り（`\`→`/`）を修正した。symlink保護テストはWindows Sandboxの管理者userで1件PASS（SKIPではない）。合成入力とモデル`auto`で実アプリを操作し、通常・中断・同一sessionの再開・window close・保存定義を適用した再起動後の再開を確認した。全attemptがエラーなしで完了し（SDK例外によるretryは未観測）、画面で値を読んだjobではtokenの値がジョブログと一致した。125% DPIでのTab移動・ログ表示・ログ／保存先を開く操作を確認した。Narrator、OS shutdown、CH-01〜06、公開、AIクレジット換算は未実施のまま。記録は`work/20260924-0725-IncompleteTaskResolution.md`。

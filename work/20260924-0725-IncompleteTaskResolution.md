@@ -104,7 +104,7 @@ RT-07 の前提（計画の 191 行目）として記録する条件:
 | 2 再起動後に picker で partial を選んで再開 | PASS。ただし**保存定義を適用する導線だけ**（`f0bb299d` → `637616df`。6 項目の検証がすべて SUCCESS）。設計を保存せずに再起動すると Definition が MISMATCH になり、開始できない（所見 F1） |
 | 3 設計を変えてから再開 | PASS。類似度の重みを 0.1→0.2 に変えると Definition が MISMATCH、CheckpointShape が「要確認 CHECKPOINT_INVALID」になり、開始ボタンは無効のまま。partial の hash（`D84A995D…`）は変わらなかった |
 | 4 実行中に window を閉じ、再起動後に再開 | PASS。`eb3105a3` と `f0bb299d` は 0.2〜0.4 秒で終了し、partial は壊れず、プロセスも残らなかった。`f0bb299d` の partial から、再起動後に `637616df` で再開して完了した |
-| 5 Narrator・native DPI・OS shutdown | native DPI は RT-08 で確認（125%）。Narrator と OS shutdown は **NOT_RUN**。Narrator は上と同じ理由。OS shutdown には使い捨ての VM と、その中での本人の Copilot login が要る。Windows Sandbox の中では本人の login を行えない |
+| 5 Narrator・native DPI・OS shutdown | native DPI は RT-08 で確認（125%）。Narrator と OS shutdown は **NOT_RUN**。Narrator は上と同じ理由。OS shutdown には使い捨ての VM と、その中での本人の Copilot login が要る。Windows Sandbox の中で本人の login を行えるかは**未検証**（第3ラウンドでも確かめられなかった。[20260924-1815-RemainTaskExecutionRecord3.md](20260924-1815-RemainTaskExecutionRecord3.md) の RR-04） |
 
 停止の方法: 監視していた PowerShell を止めたときに、そこから起動したアプリのプロセスも一緒に終了した（通常の window close ではない）。そのため `cab02c5f` のジョブログには終端の記録がない。partial（`eval-20260924-0744.partial.xlsx`、27,273 bytes、SHA-256 `45F934292B0B5446C99A021E64677905B6D2608FBBC2AB86755B0C36838E0C62`）は停止の 10 秒前に更新されており、ZIP として開けた（10 entries）。
 
