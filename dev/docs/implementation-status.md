@@ -2,7 +2,7 @@
 
 ## 2026-09-24 — 残タスク第3回（限定）
 
-`d4c1eaa`のCI run 35933450815はP07（`P07_TRX_TEST_NOT_PASSED`）で2回失敗し、3回目の再実行で全job成功した（flakyと判断。失敗scenarioはraw TRX非uploadのため未特定）。明示モデル`claude-sonnet-5`で15 attempt完了し、ジョブログのモデル識別子が選択モデルと一致した。実行中にCopilot CLI子processを終了すると該当attemptはCleanupFailedとなりretryされず（`RetryAndCleanupCoordinator.cs`の設計どおり）、ジョブは完了・結果は技術エラーとして保存された。ネットワーク遮断による一時障害retry、RIDあり公開テスト（npm registryへのTLS失敗でBLOCKED）、Sandboxでのログイン、Narrator、CH-01〜06、公開、AIクレジット換算は未実施のまま。記録は`work/20260924-1815-RemainTaskExecutionRecord3.md`。
+`d4c1eaa`のCI run 35933450815はP07（`P07_TRX_TEST_NOT_PASSED`）で2回失敗し、3回目の再実行で全job成功したが、後続の記録のみのcommitでも同じcodeで失敗しており、P07の断続的な失敗として未解決（失敗scenarioはraw TRX非uploadのため未特定）。明示モデル`claude-sonnet-5`で15 attempt完了し、ジョブログのモデル識別子が選択モデルと一致した。実行中にCopilot CLI子processを終了すると該当attemptはCleanupFailedとなりretryされず（`RetryAndCleanupCoordinator.cs`の設計どおり）、ジョブは完了・結果は技術エラーとして保存された。ネットワーク遮断による一時障害retry、RIDあり公開テスト（npm registryへのTLS失敗でBLOCKED）、Sandboxでのログイン、Narrator、CH-01〜06、公開、AIクレジット換算は未実施のまま。記録は`work/20260924-1815-RemainTaskExecutionRecord3.md`。
 
 ## 2026-09-24 — CI復旧と実機確認（限定）
 

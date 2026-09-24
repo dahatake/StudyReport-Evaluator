@@ -5,7 +5,7 @@
 - ホスト: `DAHATAKE-STD2`（Windows 11 Enterprise Insider、非管理者）
 - 利用者の `setting.txt`（`%LOCALAPPDATA%\StudyReportEvaluator\setting.txt`、8,479 bytes）は開始時にセッション領域へ退避した。開始時の SHA-256 は `4C9785CB47280C4E546C518964E85F43CF1F0F4C9069F93D30F58F7C34728F3A`（計画 5 章の値と一致）
 
-## RR-00 CI の P07 失敗: flaky と判断（`d4c1eaa` の CI は 3 回目で全 job success）
+## RR-00 CI の P07 失敗: `d4c1eaa` の時点では flaky と判断（3 回目で全 job success）。その後の commit で再び失敗し、現在は BLOCKED（末尾の「push 後の CI」）
 
 - CI run [35933450815](https://github.com/dahatake/StudyReport-Evaluator/actions/runs/35933450815)（`d4c1eaa`）の Windows job の結果:
 
@@ -159,3 +159,5 @@ rubber-duck のレビューで blocking の指摘は無かった（再実行は�
 ## push 後の CI
 
 - この記録を含む commit `2faa5a7` の CI run 35986843649 は、1 回目（再実行なし）で全 job が success（macOS 2 job、Windows job の P06／P07 単一 EXE と MSIX を含む）。RR-00 の DoD はこの最新 commit でも満たす
+- その後の commit `9aab53f`（上の 1 行を追記しただけで、work/ 以外の変更なし）の CI run 35989026434 は、Windows job の単一 EXE の step で同じ `P07_FAIL stage=p06-trx code=P07_TRX_TEST_NOT_PASSED` により失敗した（macOS 2 job は success）。RR-00 の再実行の上限（2 回）を使い切っているので再実行しない。製品もテストも同じ内容の commit で、これまでの 5 回の実行のうち 3 回が同じ code で失敗している（35933450815 の attempt 1・2 と 35989026434）。失敗したシナリオは raw TRX が残らないため分からない。**RR-00 は、最新 commit の CI 全 success という DoD を満たさない。再実行の上限（2 回）は守ったが、計画の閉じ方（2 回の再実行が 2 回とも失敗）にそのまま当てはまる状況ではない（再実行の 2 回目は成功し、今回の失敗は新しい push による実行）。DoD を満たさず再実行の上限も使い切ったので、BLOCKED（P07 の断続的な失敗、シナリオ不明）とする**。テストは弱めず、ci.yml も変えない。原因の特定には、所有者の判断で P06 の TRX をローカルで繰り返し取得するか、CI の証跡方針を見直す必要がある
+- この追記の敵対的レビュー: run ID・commit・「5 回中 3 回」は正しいと確認された。blocking の指摘 1 件（計画の閉じ方の条件にそのまま当てはまると書いていた）を直し、RR-00 の見出しに「`d4c1eaa` の時点」と現在の BLOCKED を書き足した
