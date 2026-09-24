@@ -56,3 +56,9 @@ claude-sonnet-5 が、結果 tool の root 必須項目 `EvaluatorId`（アプ�
 | 8 | 目的適合性 | Minor | reference／similarity の `QuestionId` | 同種の定数 ID | `auto` で失敗の観測なし（修正後の実機 3 run で参照回答・類似度 30 attempt 全件成功）。YAGNI で変更しない |
 
 サマリー: Critical 0 / Major 2（修正済み）/ Minor 6。合格判定: PASS
+
+## push 後の CI（`ff4ae22`）
+
+- CI run 36056059441: macOS 2 job は success。Windows job は deterministic tests が成功（TRX: 1881 passed、failed 0）したが、単一 EXE の step が `P07_FAIL stage=p06-trx code=P07_TRX_TEST_NOT_PASSED` で失敗した。1 回目と `gh run rerun --failed` 2 回の計 3 回とも同じ結果。P07 が失敗したため、後続の unsigned MSIX と repository integrity の step は実行されていない。
+- ローカル再現（detached worktree `C:\GitHub\sre-ci4`、`ff4ae22`）: ci.yml と同じ順序（restore --locked-mode → build Release → publish -SingleFile → package → test-windows-singlefile）で実行し `PASS_REQUIRED`（7/7、sourceStatusEntryCount 0）。`test-windows-msix-unsigned.ps1` は `PASS_MECHANISM`。`git diff --check HEAD~1 HEAD` の exit は 0。
+- 判断: P06 の 7 シナリオは起動・展開・cache に関するもので、今回の変更（評価 tool の schema と parser、ジョブログの項目）は通らない。記録だけの commit `9aab53f` でも同じ code で失敗していた（`work/20260924-1815-RemainTaskExecutionRecord3.md` の RR-00、BLOCKED）。以上から、既知の P07 の断続的な失敗と判断した。ただし CI は P06 の生 TRX を残さないため、失敗したシナリオは分からない。テストも ci.yml も変えていない。

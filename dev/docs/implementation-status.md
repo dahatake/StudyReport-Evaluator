@@ -7,7 +7,7 @@
 - **effortの記録**: ジョブログの各attemptに`RequestedReasoningEffort`（アプリが指定した`medium`、未指定は`null`）を記録する。SDKの現在model照会（`session.Rpc.Model.GetCurrentAsync`）は指定値をそのまま返し、`auto`や未指定では`null`だったため、指定値以上の実効effortは観測できない。
 - **観測（未対応）**: 利用者の`~\.copilot\installed-plugins`にあるplugin hook（例: azure-skills）が、評価sessionでも`userPromptSubmitted`・`preToolUse`・`postToolUse`として実行されていた（hookの入力にPromptとtool引数を含む）。`EnableFileHooks=false`・`PluginDirectories=[]`でも実行された。今回の対象外で、所有者判断事項とする。
 
-記録は`work/20260925-0420-SchemaInvalidRootCauseAndEffortLog.md`。
+記録は`work/20260925-0420-SchemaInvalidRootCauseAndEffortLog.md`。`ff4ae22`のCI run 36056059441はdeterministic testsが成功したが、単一EXEのP07が`P07_TRX_TEST_NOT_PASSED`で3回とも失敗した。同じcommitのローカル実行ではP07が`PASS_REQUIRED`（7/7）、unsigned MSIXが`PASS_MECHANISM`だった。既知のP07の断続的な失敗（下記の`d4c1eaa`以降の記録を参照。未解決）として扱う。
 
 ## 2026-09-24 — AIの応答待ちtimeoutとreasoning effort
 
