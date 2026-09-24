@@ -23,7 +23,7 @@ StudyReport Evaluatorの利用者に影響する変更をこのファイルへ�
 - 利用者ガイドと[8枚の説明画像](images/README.md)を更新し、[Fluent System Iconsの出典・固定revision・LICENSE／NOTICE](docs/third-party-notices.md)を明記。画像は合成／fake状態で、実認証・実保存・実機検証の証拠ではない。
 - 要求定義書（v4.6）を改訂し、「SDKがmodelのtoken上限を公開しない」をerrorではなく正規の状態として扱うように変更。通常評価modelは`auto`を含む列挙された全modelから選択でき、上限不明modelではmodel相対の容量検査だけを適用外とします。app所有の絶対上限とattempt上限、送信後の失敗扱い、`auto`では実際のrouting先modelを記録しないことを明記しました。
 - [はじめに](docs/getting-started.md)の「checkpointから再開」に、アプリを再起動した後に再開する場合の手順を追記。中断前に設計を**設定を保存**で保存しておき、再起動後に保存定義タブの**現在の入力に適用**を選んでから再開元を指定します。保存していない設計の編集は、再起動後に同じ設計として判定されません。
-- [開発者向けの実装状況](dev/docs/implementation-status.md)に実機確認の結果を追記（製品の動作は変更なし）。明示選択したモデル（`claude-sonnet-5`）で全attemptが完了し、ジョブログのモデル識別子が選択と一致すること、実行中にCopilot CLIが終了した場合は該当attemptを後始末失敗としてretryせず、結果を技術エラーとして保存することを確認しました。ネットワーク遮断時の再試行とRIDあり公開テストは未確認です。
+- [開発者向けの実装状況](dev/docs/implementation-status.md)に実機確認の結果を追記（製品の動作は変更なし）。明示選択したモデル（`claude-sonnet-5`）で全attemptが完了し、ジョブログのモデル識別子が選択と一致すること、実行中にCopilot CLIが終了した場合は該当attemptを後始末失敗としてretryせず、結果を技術エラーとして保存することを確認しました。また、Copilot CLIの通信が止まって送信が時間切れになった場合に、同じ評価を新しいsessionで再試行して成功すること、schema不正の後に1回再試行することも確認しました。
 - 利用者の手動SHA-256比較を任意の推奨とし、sidecar公開とCI／公開判定での最終bytes照合は必須のまま維持。単一EXE候補の公開前にfresh Windows 11 x64標準userでCH-01〜CH-06を実測し、candidate run／source／version／bytes／hashへ拘束する手順へ変更。
 
 ### Fixed

@@ -25,6 +25,8 @@
 
 ## RR-01 ST-UC-20 の CLI 解決（F4）: `BLOCKED_ENVIRONMENT`
 
+> 2026-09-24 20:40 の所有者の指示でタスクから削除した（[計画](202609240830-RemainTaskExecutionPlan.md) の 8 章）。以下はその時点の記録
+
 - detached worktree `C:\GitHub\sre-rr01`（`d4c1eaa`）で計画どおりのコマンドを実行した: `$env:STUDY_REPORT_EVALUATOR_COPILOT_LIVE_SMOKE='1'; dotnet test tests\StudyReportEvaluator.App.Tests -c Release -r win-x64 --filter FullyQualifiedName~AuthenticatedSyntheticSmokeTests`
 - 観測:
   - restore は 3 プロジェクトとも成功し、worktree の `packages.lock.json` 3 つ（App、Core、App.Tests）が書き換わった（`git status --short` で ` M`）。`main` の作業ツリーは変わっていない
@@ -56,6 +58,8 @@
 
 ## RR-03 RT-07 実際の SDK 例外による retry の観測
 
+> 2026-09-24 20:40 の所有者の指示で根本原因を調べ、方法 3（ローカルの proxy で通信を止める）で **PASS** した。根本原因・解決策・実行の記録は [20260924-2045-RR03RetryRootCause.md](20260924-2045-RR03RetryRootCause.md)。以下は第3ラウンドの時点の記録
+
 ### 方法 1（ホストで子プロセスの `copilot.exe` を止める）: 実行。**retry は起きなかった**
 
 - 手順: RR-02 と同じ EXE・入力・環境変数の扱い（`COPILOT_*` を消し、既定の `COPILOT_HOME`）。モデルは既定の設定（RR-02 の後に `setting.txt` を戻した状態）。最終データ行 2 で 1 行だけ。script はセッション領域の `rr03-run.ps1`、出力は `rr03.log`
@@ -84,6 +88,8 @@
 - 後始末: `setting.txt` を戻した（SHA-256 `4C9785CB…3A`）。ジョブログはセッション領域へ移し、`%TEMP%\sre-rt07`（入力のコピーと出力）を削除した。アプリは window を閉じて終了した（`exited=True`）
 
 ## RR-04 RT-15 OS shutdown: **NOT_RUN**
+
+> 2026-09-24 20:40 の所有者の指示でタスクから削除した（[計画](202609240830-RemainTaskExecutionPlan.md) の 8 章）。以下はその時点の記録
 
 - 手順 1（実現性の確認）の前提となる本人の login は、所有者が操作できない自動実行（autopilot）なので行えない。そこで login の手前まで（Sandbox の Edge の有無、`github.com/login/device` と `api.githubcopilot.com` への TLS、EXE の起動、「GitHubにログイン」を押したときにブラウザーが起動するか）を、ネットワーク有効の Sandbox で観測しようとした
   - EXE: RR-00 のローカル再現で作った `d4c1eaa` の単一 EXE（`StudyReportEvaluator-win-x64.exe`、SHA-256 `5CFCF0A897CBBDCAB633780E741E70DB666AE8E5C6EDC00736D145946808551D`、sidecar と一致）。設定はセッション領域の `sandbox04\rr04.wsb` と `run.ps1`（資格情報は扱わない）
@@ -132,6 +138,8 @@
 - 所有者が到達点を B／C にすると決めていないので、到達点 A のまま。要求定義（[requirements-definition.md](../docs/requirements-definition.md) の 757 行目など）も変えていない
 
 ## RR-11 RT-06 の再確認: **BLOCKED のまま**（確認日 2026-09-24）
+
+> 2026-09-24 20:40 の所有者の指示でタスクから削除した（[計画](202609240830-RemainTaskExecutionPlan.md) の 8 章）。以下はその時点の記録
 
 計画ではリリースの直前に行う作業だが、費用がかからないので今回も確認した。2026-09-24 に次の 4 つを取得した。
 

@@ -93,6 +93,8 @@
 
 ### RR-01 ST-UC-20 の CLI 解決（F4）
 
+> **削除（2026-09-24 20:40、所有者の指示）**。§8 を参照
+
 - 出典: [StudyReportEvaluator.App.csproj](../src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj) の 22〜47 行目（`WriteBundledCopilotManifest` は `_CopilotRid` が設定されたとき、つまり RID を指定したビルドのときだけ `copilot-runtime.json` を書く）。[AuthenticatedSyntheticSmokeTests.cs](../tests/StudyReportEvaluator.App.Tests/Copilot/AuthenticatedSyntheticSmokeTests.cs) の 83〜91 行目（Available 以外の状態をすべて NotAuthenticated として扱う）
 - 手順:
   1. コードを変えずに、RID を指定してテストを実行する。RID を指定すると implicit restore で追跡対象の `packages.lock.json`（App、Core、App.Tests の 3 つ）が書き換わり、同梱 CLI 1.0.79 のダウンロードも走る（`StudyReportEvaluator.App.csproj` の 7〜8・22〜26 行目で、RID があると `CopilotSkipCliDownload` が false になる。今回のレビューでこのコマンドを実行した際に lock ファイル 3 つが書き換わり、CLI のダウンロードが TLS のエラーで失敗したと報告された。その後の `git status` では差分は残っていない）。そのため **detached worktree**（例 `C:\GitHub\sre-rr01`、`d4c1eaa`）で実行し、`main` の作業ツリーは汚さない: `$env:STUDY_REPORT_EVALUATOR_COPILOT_LIVE_SMOKE='1'; dotnet test tests\StudyReportEvaluator.App.Tests -c Release -r win-x64 --filter FullyQualifiedName~AuthenticatedSyntheticSmokeTests`
@@ -135,6 +137,8 @@
 - 閉じ方: retry が起きない場合も、それ自体が観測結果。製品の retry 規則は変えない
 
 ### RR-04 RT-15 OS shutdown
+
+> **削除（2026-09-24 20:40、所有者の指示）**。§8 を参照
 
 - 出典: 前回の計画の 265 行目（手順 5）、第2ラウンドの記録 107 行目
 - 第2ラウンドの記録は「Windows Sandbox の中では本人の login を行えない」と書いたが、**これは試していない判断**だった。この計画では未検証の前提として扱い、最初に確かめる
@@ -216,6 +220,8 @@
 
 ### RR-11 RT-06 の再確認
 
+> **削除（2026-09-24 20:40、所有者の指示）**。§8 を参照
+
 - 手順: リリースの直前に W1〜W4 の公式資料をもう一度取得し、`TotalNanoAiu` を AI クレジットに換算する規則が書かれたかを確かめる。出典の URL と取得日を記録する
 - DoD: 規則があれば出典つきで表示の実装を計画する。なければ BLOCKED のままにして、確認日を記録する
 
@@ -295,3 +301,8 @@ rubber-duck によるレビューの指摘 10 件を、引用元を確かめた�
 | 行番号の誤り（6 か所） | 直した |
 | T39 の画面の数の書き方 | 4 画面のうち 1180×800 の Input が FAIL、ほかは NOT_RUN と書き直した |
 | 作業ツリーが clean という記述 | 計画ファイルの作成前と限定した |
+
+## 8. 所有者の指示による変更（2026-09-24 20:40）
+
+- RR-01、RR-04、RR-11 をタスクから削除した。第3ラウンドの記録にある結果（BLOCKED／NOT_RUN）は、その時点の観測として残す
+- RR-03 は、根本原因を調べて解決策を立て、PASS するまで実行する。根本原因・解決策（方法 3: ローカルの proxy）・実行の記録は [20260924-2045-RR03RetryRootCause.md](20260924-2045-RR03RetryRootCause.md) に書く。RR-04 の削除により、RR-03 方法 2（RR-04 の Sandbox を使う）も行わない

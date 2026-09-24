@@ -1,5 +1,9 @@
 # Current implementation status
 
+## 2026-09-24 — 実際のSDK例外によるretryの観測
+
+Copilot CLIの外向き通信をローカルproxy（`HTTPS_PROXY`、自分が起動したアプリだけ）で止めると、送信中のattemptはSDKの`SendAndWaitAsync`の既定60秒で`TimedOut`となり、後始末に成功した後、同じoperationの2回目のattemptが新しいsessionで成功した（ジョブログで`AttemptNumber=2`を確認）。同じ実行で、fault注入なしのschema不正による1回のretryも観測した。製品・テスト・retry規則は変更していない。SDKの既定60秒が要求定義書7.6節のattempt timeout既定120秒より先に効く点は、所有者の判断待ち。記録は`work/20260924-2045-RR03RetryRootCause.md`。
+
 ## 2026-09-24 — 残タスク第3回（限定）
 
 `d4c1eaa`のCI run 35933450815はP07（`P07_TRX_TEST_NOT_PASSED`）で2回失敗し、3回目の再実行で全job成功したが、後続の記録のみのcommitでも同じcodeで失敗しており、P07の断続的な失敗として未解決（失敗scenarioはraw TRX非uploadのため未特定）。明示モデル`claude-sonnet-5`で15 attempt完了し、ジョブログのモデル識別子が選択モデルと一致した。実行中にCopilot CLI子processを終了すると該当attemptはCleanupFailedとなりretryされず（`RetryAndCleanupCoordinator.cs`の設計どおり）、ジョブは完了・結果は技術エラーとして保存された。ネットワーク遮断による一時障害retry、RIDあり公開テスト（npm registryへのTLS失敗でBLOCKED）、Sandboxでのログイン、Narrator、CH-01〜06、公開、AIクレジット換算は未実施のまま。記録は`work/20260924-1815-RemainTaskExecutionRecord3.md`。
