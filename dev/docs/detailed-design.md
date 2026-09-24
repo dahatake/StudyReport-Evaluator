@@ -203,7 +203,9 @@ AllocationValidationResult Validate(
 
 各sessionへ公開するtoolは表の1件だけとする。permission requestは全拒否する。
 
-session作成の直前に、要求modelが`auto`以外なら同じclientの`ListModelsAsync`で要求modelを探す。`Capabilities.Supports.ReasoningEffort`がtrueで、`SupportedReasoningEfforts`が`medium`を含む場合だけ`SessionConfig.ReasoningEffort = "medium"`とする。`auto`（一覧を取得しない）・非対応model・effort未列挙model・一覧にないmodelには指定しない（非対応modelへ指定するとruntimeがsession作成を拒否する）。model一覧の取得失敗は、session作成失敗と同じ分類でattempt失敗とする。
+session作成の直前に、要求modelが`auto`以外なら同じclientの`ListModelsAsync`で要求modelを探す。`Capabilities.Supports.ReasoningEffort`がtrueで、`SupportedReasoningEfforts`が`medium`を含む場合だけ`SessionConfig.ReasoningEffort = "medium"`とする。`auto`（一覧を取得しない）・非対応model・effort未列挙model・一覧にないmodelには指定しない（非対応modelへ指定するとruntimeがsession作成を拒否する）。model一覧の取得失敗は、session作成失敗と同じ分類でattempt失敗とする。指定した値（未指定はnull）は、そのattemptのジョブログ`Attempt.RequestedReasoningEffort`へ記録する。tracker境界では`medium`以外の文字列を保存しない。
+
+`submit_quantification`のroot `EvaluatorId`はschema上の任意項目とする。claude-sonnet-5が定数のevaluator IDをtool引数から省略し、必須のままではschema不正（`ROOT_MISSING_PROPERTY`）になった（2026-09-25実測）。省略時はpayloadの値を補い、返された場合は従来どおり期待値との一致を検証する。未知項目・重複項目の拒否は変えない。Promptの「expected evaluator IDを返す」指示は変えない（返された場合も受理して検証するため、変更は不要）。固有評価の`SpecialEvaluationId`は同じ条件（claude-sonnet-5・`medium`）で30/30返されたため必須のままとする。
 
 ### 5.2 Reference Prompt
 

@@ -61,6 +61,11 @@ public sealed class SubmitQuantificationTool
         "Criteria",
     ];
 
+    private static readonly string[] RootRequiredProperties =
+    [
+        "Criteria",
+    ];
+
     private static readonly string[] CriterionProperties =
     [
         "CriterionId",
@@ -129,7 +134,7 @@ public sealed class SubmitQuantificationTool
             {
                 errorCodes = ["UNEXPECTED_TOOL_NAME"];
             }
-            else if (!TryParseArguments(invocation.Arguments, out QuantificationResult? submitted, out errorCodes))
+            else if (!TryParseArguments(invocation.Arguments, ExpectedPayload.EvaluatorId, out QuantificationResult? submitted, out errorCodes))
             {
                 // The strict wire parser already produced fixed, content-free error codes.
             }
@@ -215,6 +220,7 @@ public sealed class SubmitQuantificationTool
 
     private static bool TryParseArguments(
         JsonElement? arguments,
+        string expectedEvaluatorId,
         [NotNullWhen(true)] out QuantificationResult? result,
         out ImmutableArray<string> errorCodes)
     {
@@ -230,6 +236,7 @@ public sealed class SubmitQuantificationTool
         Dictionary<string, JsonElement>? rootValues = ReadClosedObject(
             root,
             RootProperties,
+            RootRequiredProperties,
             "ROOT",
             errors);
         if (rootValues is null)
@@ -238,12 +245,15 @@ public sealed class SubmitQuantificationTool
             return false;
         }
 
-        bool evaluatorRead = TryReadString(
-            rootValues,
-            "EvaluatorId",
-            MaximumCellCharacters,
-            errors,
-            out string evaluatorId);
+        // Models omit this app-known constant (observed with claude-sonnet-5); a returned value is still validated.
+        string evaluatorId = expectedEvaluatorId;
+        bool evaluatorRead = !rootValues.ContainsKey("EvaluatorId")
+            || TryReadString(
+                rootValues,
+                "EvaluatorId",
+                MaximumCellCharacters,
+                errors,
+                out evaluatorId);
 
         ImmutableArray<CriterionQuantificationResult>.Builder criteria =
             ImmutableArray.CreateBuilder<CriterionQuantificationResult>();
@@ -289,6 +299,7 @@ public sealed class SubmitQuantificationTool
         criterion = null;
         Dictionary<string, JsonElement>? values = ReadClosedObject(
             element,
+            CriterionProperties,
             CriterionProperties,
             "CRITERION",
             errors);
@@ -351,6 +362,7 @@ public sealed class SubmitQuantificationTool
 
     private static Dictionary<string, JsonElement>? ReadClosedObject(
         JsonElement element,
+        string[] allowedProperties,
         string[] requiredProperties,
         string scope,
         ImmutableArray<string>.Builder errors)
@@ -364,7 +376,7 @@ public sealed class SubmitQuantificationTool
         Dictionary<string, JsonElement> values = new(StringComparer.Ordinal);
         foreach (JsonProperty property in element.EnumerateObject())
         {
-            if (!requiredProperties.Contains(property.Name, StringComparer.Ordinal))
+            if (!allowedProperties.Contains(property.Name, StringComparer.Ordinal))
             {
                 errors.Add($"{scope}_UNKNOWN_PROPERTY");
                 continue;

@@ -63,7 +63,7 @@ application loggerはclosedな項目だけを扱います。
 
 AI処理を開始すると、アプリは今回のジョブだけの観測値を画面の**コスト詳細／ジョブログ**と、利用者別の`%LOCALAPPDATA%\StudyReportEvaluator\jobs\<job-id>.jsonl`へ記録します。JSON LinesはUTF-8の平文で、同じ入力・checkpointを再開した場合も開始操作ごとに別のjob ID・別ファイルです。既存Excelの`Quantification_Run`シートは残りますが、画面・ジョブログの表示はExcelを読む必要がありません。
 
-記録するのは、生成したjob／attempt ID、UTC時刻、閉じた状態コード、試行数、入力・出力・推論・キャッシュのtoken数、SDKが報告した`nano-AI units`とpremium request消費量、項目ごとの観測状態と取得元（イベント／最終RPC／最後の呼び出しのみ）の試行数、モデル内訳とセッション総量が一致しなかった試行数です。**記録しない**ものは、回答、Prompt、Reference、reason、evidence、学生識別子、設問本文・名称、入力／出力の実path、credential・PAT・account識別子、SDK応答全文、例外本文・stack traceです。モデル内訳は実モデル名を保存せず、匿名化した識別子だけを記録します。
+記録するのは、生成したjob／attempt ID、UTC時刻、閉じた状態コード、試行数、入力・出力・推論・キャッシュのtoken数、SDKが報告した`nano-AI units`とpremium request消費量、項目ごとの観測状態と取得元（イベント／最終RPC／最後の呼び出しのみ）の試行数、モデル内訳とセッション総量が一致しなかった試行数、試行ごとにアプリが指定したreasoning effort（`RequestedReasoningEffort`。`medium`、未指定は`null`）です。**記録しない**ものは、回答、Prompt、Reference、reason、evidence、学生識別子、設問本文・名称、入力／出力の実path、credential・PAT・account識別子、SDK応答全文、例外本文・stack traceです。モデル内訳は実モデル名を保存せず、匿名化した識別子だけを記録します。
 
 数値はGitHub Copilot SDKから観測できた範囲であり、請求確定額、アカウント全体の利用量、すべての実消費を保証しません。未取得は`—（未取得）`で表示し、0へ置き換えません。再試行、失敗、取消、checkpointへ保存されなかった途中行で観測できた値は今回ジョブに含み得ます。`nano-AI units`はSDK報告値で、アプリは通貨やAIクレジットへ換算しません。
 

@@ -27,7 +27,7 @@ public sealed class EvaluationSchemaFactoryTests
         Assert.Equal("object", schema.GetProperty("type").GetString());
         Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
         Assert.Equal(
-            ["Criteria", "EvaluatorId"],
+            ["Criteria"],
             Required(schema).Order(StringComparer.Ordinal).ToArray());
 
         JsonElement rootProperties = schema.GetProperty("properties");

@@ -16,9 +16,9 @@ public sealed class EvaluationSchemaFactory
 
     private const int MaximumCellCharacters = 32_767;
 
+    // EvaluatorId stays in the closed schema but is optional: the app already knows it and fills it when omitted.
     private static readonly string[] RootRequiredProperties =
     [
-        "EvaluatorId",
         "Criteria",
     ];
 

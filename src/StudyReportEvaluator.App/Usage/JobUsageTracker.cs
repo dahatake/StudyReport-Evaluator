@@ -109,6 +109,8 @@ public sealed class JobUsageTracker : IAsyncDisposable
                 ModelsTruncated = modelsTruncated,
                 RequestedModelKey = observation.RequestedModelKey is null ? null
                     : ModelUsageSnapshot.SafeKey(observation.RequestedModelKey),
+                // Persist only the effort value the app sends, never arbitrary caller text.
+                RequestedReasoningEffort = observation.RequestedReasoningEffort is "medium" ? "medium" : null,
                 // Null stays null: an absent map identifies a legacy caller, not a complete one.
                 MetricProvenance = observation.MetricProvenance is null ? null
                     : UsageProvenance.Sanitize(metrics, observation.MetricProvenance),

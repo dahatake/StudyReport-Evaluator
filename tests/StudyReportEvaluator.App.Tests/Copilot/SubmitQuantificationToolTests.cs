@@ -141,6 +141,26 @@ public sealed class SubmitQuantificationToolTests
         Assert.True(tool.TryGetAcceptedResult(out _));
     }
 
+    [Fact]
+    public async Task Omitted_evaluator_id_is_filled_from_the_payload_but_a_wrong_one_is_rejected()
+    {
+        string criteria = $"[{CriterionJson("C1", 4m)}, {CriterionJson("C2", 1.5m)}]";
+        SubmitQuantificationTool omitted = new(CreatePayload());
+        SubmitQuantificationTool wrong = new(CreatePayload());
+
+        await omitted.InvokeAsync(
+            Invocation($$"""{ "Criteria": {{criteria}} }"""),
+            TestContext.Current.CancellationToken);
+        await wrong.InvokeAsync(
+            Invocation($$"""{ "EvaluatorId": "E2", "Criteria": {{criteria}} }"""),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(omitted.TryGetAcceptedResult(out QuantificationResult? accepted));
+        Assert.Equal("E1", accepted.EvaluatorId);
+        Assert.False(wrong.TryGetAcceptedResult(out _));
+        Assert.Contains("EVALUATOR_ID_MISMATCH", wrong.GetOutcome().ErrorCodes);
+    }
+
     [Theory]
     [MemberData(nameof(ClosedWirePayloads))]
     public async Task Unknown_missing_duplicate_and_wrong_type_fields_are_rejected_by_the_wire_parser(

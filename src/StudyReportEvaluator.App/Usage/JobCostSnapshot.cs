@@ -113,6 +113,8 @@ public sealed record AttemptUsageSnapshot(
     public bool ModelsTruncated { get; init; }
     public string? RequestedModelKey { get; init; }
     public bool? RequestedModelIsAuto { get; init; }
+    // "medium" when the app set SessionConfig.ReasoningEffort; null when it left the runtime default (or a legacy record).
+    public string? RequestedReasoningEffort { get; init; }
     // Null identifies legacy callers. An empty or incomplete map is NOT evidence of completion.
     public ImmutableDictionary<UsageMetric, MetricProvenance>? MetricProvenance { get; init; }
     public ModelCostComparison ModelCostComparison { get; init; }

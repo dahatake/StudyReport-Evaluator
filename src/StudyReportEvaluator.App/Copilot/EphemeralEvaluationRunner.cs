@@ -427,7 +427,7 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
             CopilotSession session = await client
                 .CreateSessionAsync(config, cancellationToken)
                 .ConfigureAwait(false);
-            SdkEphemeralCopilotSession usageSession = new(session, _usageTracker, _operation, config.Model);
+            SdkEphemeralCopilotSession usageSession = new(session, _usageTracker, _operation, config.Model, config.ReasoningEffort);
             Volatile.Write(ref _usageSession, usageSession);
             return usageSession;
         });
@@ -547,6 +547,7 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
     private readonly Dictionary<string, List<UsageMetrics>> _modelEvents = new(StringComparer.Ordinal);
     private readonly string? _requestedModelKey;
     private readonly bool? _requestedModelIsAuto;
+    private readonly string? _requestedReasoningEffort;
     private ImmutableArray<ModelUsageSnapshot> _models = [];
     private bool _modelsTruncated;
     private Guid _attemptId;
@@ -572,12 +573,14 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
         CopilotSession session,
         JobUsageTracker? usageTracker = null,
         UsageOperation operation = UsageOperation.Normal,
-        string? requestedModel = null)
+        string? requestedModel = null,
+        string? requestedReasoningEffort = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _usageTracker = usageTracker;
         _operation = operation;
+        _requestedReasoningEffort = requestedReasoningEffort;
         _requestedModelKey = requestedModel is null ? null : ModelUsageSnapshot.CreateModelKey(requestedModel);
         _requestedModelIsAuto = requestedModel is null ? null : string.Equals(requestedModel, "auto", StringComparison.Ordinal);
         if (usageTracker is not null)
@@ -889,6 +892,7 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
                 ModelsTruncated = _modelsTruncated,
                 RequestedModelKey = _requestedModelKey,
                 RequestedModelIsAuto = _requestedModelIsAuto,
+                RequestedReasoningEffort = _requestedReasoningEffort,
                 MetricProvenance = _metricProvenance,
                 ModelCostComparison = _modelCostComparison,
             });

@@ -119,6 +119,39 @@ public sealed class JobUsageTrackerTests
     }
 
     [Fact]
+    public async Task Requested_reasoning_effort_is_recorded_per_attempt_and_caller_text_is_not()
+    {
+        using var temp = new TemporaryDirectory();
+        await using var tracker = new JobUsageTracker(logDirectory: temp.Path);
+        Guid medium = tracker.BeginAttempt(UsageOperation.Normal);
+        Guid unset = tracker.BeginAttempt(UsageOperation.Reference);
+        Guid canary = tracker.BeginAttempt(UsageOperation.Normal);
+        tracker.ReplaceAttempt(new(medium, UsageOperation.Normal, 1, new(), UsageSource.Events) { RequestedReasoningEffort = "medium" });
+        tracker.ReplaceAttempt(new(unset, UsageOperation.Reference, 1, new(), UsageSource.Events));
+        tracker.ReplaceAttempt(new(canary, UsageOperation.Normal, 1, new(), UsageSource.Events) { RequestedReasoningEffort = "PRIVATE_CANARY" });
+        await tracker.CompleteAsync("SUCCESS");
+
+        string path = Assert.IsType<string>(tracker.Snapshot.LogPath);
+        Dictionary<Guid, string?> recorded = [];
+        foreach (string line in await File.ReadAllLinesAsync(path, TestContext.Current.CancellationToken))
+        {
+            using JsonDocument entry = JsonDocument.Parse(line);
+            if (entry.RootElement.GetProperty("Attempt") is { ValueKind: JsonValueKind.Object } attempt
+                && attempt.GetProperty("Revision").GetInt64() == 1)
+            {
+                JsonElement effort = attempt.GetProperty("RequestedReasoningEffort");
+                recorded[attempt.GetProperty("AttemptId").GetGuid()] =
+                    effort.ValueKind == JsonValueKind.Null ? null : effort.GetString();
+            }
+        }
+
+        Assert.Equal("medium", recorded[medium]);
+        Assert.Null(recorded[unset]);
+        Assert.Null(recorded[canary]);
+        Assert.DoesNotContain("PRIVATE_CANARY", await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Writer_failure_does_not_erase_observations_or_throw()
     {
         using var temp = new TemporaryDirectory();

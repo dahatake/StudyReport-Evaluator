@@ -1,5 +1,14 @@
 # Current implementation status
 
+## 2026-09-25 — schema不正の根本原因とreasoning effortの記録
+
+- **schema不正の原因**: 通常評価のtool引数を一時的な診断（commitしない）で記録したところ、schema不正はすべて`ROOT_MISSING_PROPERTY`で、claude-sonnet-5がroot `EvaluatorId`（アプリが知っている定数）を省略していた。同じPromptを直接SDKで送ると、省略は`medium`で10/30、effort未指定で2/30だった（`medium`で増えるが、未指定でも起きる）。proxyは関係なかった（proxyなしのアプリ通し実行でも7 attempt中3件）。
+- **修正**: `EvaluatorId`をschema上の任意項目にし、省略時はpayloadの値を補う。返された場合の一致検証、未知・重複項目の拒否は変えない。修正後、同じPromptの`medium`で30/30受理（全件`EvaluatorId`を省略）、アプリ通し実行3回（通常評価claude-sonnet-5・`medium`）で45/45 attemptが1回目で成功した。
+- **effortの記録**: ジョブログの各attemptに`RequestedReasoningEffort`（アプリが指定した`medium`、未指定は`null`）を記録する。SDKの現在model照会（`session.Rpc.Model.GetCurrentAsync`）は指定値をそのまま返し、`auto`や未指定では`null`だったため、指定値以上の実効effortは観測できない。
+- **観測（未対応）**: 利用者の`~\.copilot\installed-plugins`にあるplugin hook（例: azure-skills）が、評価sessionでも`userPromptSubmitted`・`preToolUse`・`postToolUse`として実行されていた（hookの入力にPromptとtool引数を含む）。`EnableFileHooks=false`・`PluginDirectories=[]`でも実行された。今回の対象外で、所有者判断事項とする。
+
+記録は`work/20260925-0420-SchemaInvalidRootCauseAndEffortLog.md`。
+
 ## 2026-09-24 — AIの応答待ちtimeoutとreasoning effort
 
 要求所有者の指示で、要求定義書の§7.6と§7.1を改訂した。
@@ -7,7 +16,7 @@
 - **reasoning effort**: 指定する場合は`medium`。models.listが`supports.reasoningEffort=true`を示し、対応effortに`medium`を列挙したmodelだけに指定する。`auto`や非対応model（例：claude-haiku-4.5）は指定するとsession作成が失敗するため指定しない。`auto`固定の参照回答生成・類似度評価には指定されず、その実効effortはSDKから観測できない。
 - **CLIの通信失敗**: 送信中の通信断で、CLIは`ETIMEDOUT`等をsession error（`errorType`は`query`）として返し、SDKは`InvalidOperationException`を送出する。従来はこれを`AI_RUNTIME_FAILED`として再試行しなかった（§7.6違反）。messageに`error sending request for url`を含む場合は通信失敗として新sessionで再試行するよう修正し、実機で1回目`NetworkFailed`→2回目成功を確認した。
 - **client作成の遅さ**: 同梱CLI（約159 MB）のSHA-256を既定4 KiBの非同期読込で2回計算しており、1回約5.7〜6.5秒（同期では約0.5秒）かかっていた。読込bufferを1 MiBにして1回約0.3〜0.4秒、client作成は約12.8秒→約0.4秒になった。「Copilot 状態を確認」（15秒）が約12〜16秒で不安定に失敗していた主因とみられる（修正後は約7秒で成功）。
-- **確認**: 実際のCLIで、claude-sonnet-5は`medium`、`auto`とclaude-haiku-4.5は未指定のままsession作成と送信が成功した。アプリ画面の通し実行（通常評価claude-sonnet-5、proxyなし）で15/15 operationが成功した。proxy経由の2回ではclaude-sonnet-5の通常評価でschema不正が多かった（15 attempt中7件）が、proxyなしでは0/5で、原因は特定していない。
+- **確認**: 実際のCLIで、claude-sonnet-5は`medium`、`auto`とclaude-haiku-4.5は未指定のままsession作成と送信が成功した。アプリ画面の通し実行（通常評価claude-sonnet-5、proxyなし）で15/15 operationが成功した。proxy経由の2回ではclaude-sonnet-5の通常評価でschema不正が多かった（15 attempt中7件）が、proxyなしでは0/5だった（原因は2026-09-25に特定。上記）。
 
 記録は`work/20260924-2140-TimeoutAndReasoningEffort.md`と`work/20260925-0005-AdversarialReviewTimeoutEffort.md`。
 
