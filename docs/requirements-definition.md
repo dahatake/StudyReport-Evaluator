@@ -284,6 +284,7 @@ $$
 - 上限が不明でも、app-owned requestの絶対上限とretry込みattempt上限は常に適用する。
 - 実効modelの上限が既知か不明かを実行画面に明示する。
 - 1 attemptごとにrestricted sessionを使用し、app-owned structured result toolだけを公開する。
+- 全operationのreasoning effort（SDK `SessionConfig.ReasoningEffort`）は`medium`とする。答案の定量化にhigh以上は使わない。SDKがreasoning effort対応と列挙したmodelで、対応effortに`medium`がある場合だけ指定する。`auto`と非対応modelは指定するとsession作成が失敗するため指定せず、runtime既定に任せる。これを理由にrunを拒否せず、別modelへfallbackしない。
 - shell、filesystem、Web、GitHub write、MCP、ambient memoryを公開しない。
 - finite timeout、有限retry、cancel、session cleanupを必須とする。
 
@@ -346,7 +347,7 @@ AIは次だけを返す。
 
 - schema不正は新sessionで最大1回再試行する。
 - transient network errorとtimeoutは新sessionで最大2回再試行する。
-- attempt timeoutの既定は120秒とする。
+- attempt timeoutの既定は、Copilot SDKの`SendAndWaitAsync`既定の待機時間に従い60秒とする。この60秒は起動・認証確認・session作成・AIの応答待ちを含むattempt全体に適用する。AIの応答待ちはSDKの既定値のまま（アプリは値を指定しない）とし、SDK側とattempt側のどちらが先に満了してもtimeoutとして扱う。
 - cleanup失敗後は追加retryを行わない。
 - cancel後に新規sessionを開始しない。
 - 技術的失敗を0へ変換しない。
@@ -1039,4 +1040,5 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | Latest version / changelog override | UIプランD17の当初上書きは全タスク後のUnreleased追記 → PATCH `0.8.4` → `0.8.5`だった。さらに要求所有者の利用者不在時の自律続行指示により、T39をBLOCKEDのまま承認済みF01／F02を進める。F01はREVIEWED、親担当が製品版正本を0.8.5へ一度だけ更新済み。T01では製品版・CHANGELOGを変更しないという履歴は維持する。要求v4.6・製品版・公開版は独立し、最終bytes変更後の再検証・clean-host公開条件を省略しない |
 | Implementation / validation status | 要求承認済み。T01は要求・契約・追跡・要求版metadataの同期で、当時のUI／設定は未実装・試験NOT_RUNだった。T01〜T35はREVIEWEDだった履歴を維持し、現在は2026-09-07の[実行記録](../dev/docs/archive/work/20260907-ui-settings-execution-record.md)と後続引継ぎでT01〜T38がREVIEWED、T39はBLOCKED。実装と局所試験の対応はVERIFIED_SCOPED。T35の対象文書試験は4/4成功・敵対的レビュー済みで、別scopeのT36は自身のt36-current.trxで21/21成功。製品`0.8.6`は未公開候補、公開済みは`v0.8.1` ZIPのまま。0.8.4のT37実ZIP・T38実EXE・T39自動回帰／MSIX成功と追加native FAILを分離する。F02最終再検証は本同期時点では親担当で未完了、以後は実行記録の最新F02欄へ接続する。本人確認／隔離利用者保存／CH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITEで、G4・全タスク完了・新EXE公開は未達 |
 | Auto model selection source | 2026-09-15の要求所有者指示「`auto`を通常評価modelとして選択できるように必要なら要求定義から変更」。同梱CLIを実測し、`auto`はrouterでtoken上限を公開しないことを確認した上で§7.1・§10.3・§10.4・§11・§15・§16を改訂した。上限不明modelを拒否せず、model相対のcontext budget検査だけを適用外とし、既定値の推定と別modelへのfallbackは行わない。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Timeout / reasoning effort source | 2026-09-24の要求所有者指示「7.6節のattempt timeoutはSDKの60秒に従う」「Thinking Effortはmedium。答案の定量化なのでHighは不要」。§7.6のattempt timeout既定を120秒からSDK既定と同じ60秒へ改め、§7.1へreasoning effort `medium`を追加した。同梱CLIの実測で、`auto`と非対応modelへeffortを指定するとsession作成が失敗することを確認し、対応modelだけに指定する。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Meaning | repository要求baselineの承認記録。実装完了・試験成功・release存在・tag／push／draft／公開操作の承認、組織の法務・教育・security承認または電子署名を意味しない |

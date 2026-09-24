@@ -1,5 +1,15 @@
 # Current implementation status
 
+## 2026-09-24 — AIの応答待ちtimeoutとreasoning effort
+
+要求所有者の指示で、要求定義書の§7.6と§7.1を改訂した。
+- **応答待ち**: `DefaultAttemptTimeout`を120秒から60秒（SDK `SendAndWaitAsync`の既定と同じ）に変更した。60秒は起動・認証確認・session作成・応答待ちを含むattempt全体に掛かる。SDKの呼び出しは従来どおり`timeout: null`。この端末では送信前の準備に約20〜26秒かかるので、応答待ちに使えるのは実質約34〜40秒になる。応答待ちに60秒を丸ごと残したい場合は、別途所有者の判断が必要。
+- **reasoning effort**: 全operationで`medium`を指定する。ただし指定するのは、models.listが`supports.reasoningEffort=true`を示し、かつ対応effortに`medium`を列挙したmodelだけ。`auto`や非対応model（例：claude-haiku-4.5）に指定するとsession作成が失敗するため、これらには指定しない。
+- **確認**: 実際のCLIで、claude-sonnet-5は`medium`、`auto`とclaude-haiku-4.5は未指定のままsession作成と送信が成功した。
+- **未解決（範囲外）**: この端末では「Copilot 状態を確認」が15秒の確認timeoutを超えて失敗する。原因は、同梱CLIのSHA-256照合を含むclient作成に時間がかかること。そのためアプリ画面での通し実行はできていない。
+
+記録は`work/20260924-2140-TimeoutAndReasoningEffort.md`。
+
 ## 2026-09-24 — 実際のSDK例外によるretryの観測
 
 Copilot CLIの外向き通信をローカルproxy（`HTTPS_PROXY`、自分が起動したアプリだけ）で止めると、送信中のattemptはSDKの`SendAndWaitAsync`の既定60秒で`TimedOut`となり、後始末に成功した後、同じoperationの2回目のattemptが新しいsessionで成功した（ジョブログで`AttemptNumber=2`を確認）。同じ実行で、fault注入なしのschema不正による1回のretryも観測した。製品・テスト・retry規則は変更していない。SDKの既定60秒が要求定義書7.6節のattempt timeout既定120秒より先に効く点は、所有者の判断待ち。記録は`work/20260924-2045-RR03RetryRootCause.md`。

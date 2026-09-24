@@ -203,6 +203,8 @@ AllocationValidationResult Validate(
 
 各sessionへ公開するtoolは表の1件だけとする。permission requestは全拒否する。
 
+session作成の直前に、要求modelが`auto`以外なら同じclientの`ListModelsAsync`で要求modelを探す。`Capabilities.Supports.ReasoningEffort`がtrueで、`SupportedReasoningEfforts`が`medium`を含む場合だけ`SessionConfig.ReasoningEffort = "medium"`とする。`auto`（一覧を取得しない）・非対応model・effort未列挙model・一覧にないmodelには指定しない（非対応modelへ指定するとruntimeがsession作成を拒否する）。model一覧の取得失敗は、session作成失敗と同じ分類でattempt失敗とする。
+
 ### 5.2 Reference Prompt
 
 app-owned固定Prompt:
@@ -252,7 +254,7 @@ resultは`question_id`、`similarity`、`reason`だけとし、similarityを0〜
 
 ### 5.5 retry
 
-既存`RetryAndCleanupCoordinator`の有限attempt、timeout、cleanup順序を再利用する。operationごとにadapterを作るがretry engineを複製しない。
+既存`RetryAndCleanupCoordinator`の有限attempt、timeout、cleanup順序を再利用する。operationごとにadapterを作るがretry engineを複製しない。`AttemptTimeout`の既定は60秒（SDK `SendAndWaitAsync`の既定待機と同じ）で、起動・認証確認・session作成・AIの応答待ちを含むattempt全体に掛かる。送信はSDKへ`timeout: null`で渡し、SDK側60秒とattempt側60秒の先に満了した方を`TimedOut`とする。attempt側は準備時間を含むため、応答待ちに使える時間は60秒から準備時間を引いた分になる。
 
 ## 6. Excel workbook設計
 

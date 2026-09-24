@@ -12,7 +12,8 @@ namespace StudyReportEvaluator.App.Copilot;
 
 public sealed class EphemeralEvaluationRunnerOptions
 {
-    public static TimeSpan DefaultAttemptTimeout { get; } = TimeSpan.FromSeconds(120);
+    // Owner decision: the attempt timeout follows the SDK SendAndWaitAsync default (60 s); it covers start, auth, session create and send.
+    public static TimeSpan DefaultAttemptTimeout { get; } = TimeSpan.FromSeconds(60);
 
     public static TimeSpan DefaultCleanupTimeout { get; } = TimeSpan.FromSeconds(15);
 
@@ -345,6 +346,8 @@ internal sealed class SdkEphemeralCopilotTransportFactory : IEphemeralCopilotTra
 
 internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
 {
+    internal const string MediumReasoningEffort = "medium";
+
     private readonly ICopilotClientFactory _clientFactory;
     private readonly JobUsageTracker? _usageTracker;
     private readonly UsageOperation _operation;
@@ -414,7 +417,13 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
         ArgumentNullException.ThrowIfNull(config);
         return TranslateAsync<IEphemeralCopilotSession>(async () =>
         {
-            CopilotSession session = await GetClient()
+            CopilotClient client = GetClient();
+            config.ReasoningEffort = string.Equals(config.Model, "auto", StringComparison.Ordinal)
+                ? null
+                : ResolveReasoningEffort(
+                    await client.ListModelsAsync(cancellationToken).ConfigureAwait(false),
+                    config.Model);
+            CopilotSession session = await client
                 .CreateSessionAsync(config, cancellationToken)
                 .ConfigureAwait(false);
             SdkEphemeralCopilotSession usageSession = new(session, _usageTracker, _operation, config.Model);
@@ -450,6 +459,17 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
     private CopilotClient GetClient() =>
         Volatile.Read(ref _client)
         ?? throw new EvaluationFatalException();
+
+    // The runtime rejects session creation when a reasoning effort is sent to `auto` or to a model without support.
+    internal static string? ResolveReasoningEffort(IEnumerable<ModelInfo>? models, string? modelId)
+    {
+        ModelInfo? model = models?.FirstOrDefault(
+            candidate => candidate is not null && string.Equals(candidate.Id, modelId, StringComparison.Ordinal));
+        return model?.Capabilities?.Supports?.ReasoningEffort == true
+            && model.SupportedReasoningEfforts?.Contains(MediumReasoningEffort, StringComparer.Ordinal) == true
+            ? MediumReasoningEffort
+            : null;
+    }
 
     private static async Task TranslateAsync(Func<Task> operation)
     {

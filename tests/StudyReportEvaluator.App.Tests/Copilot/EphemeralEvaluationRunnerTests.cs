@@ -232,17 +232,46 @@ public sealed class EphemeralEvaluationRunnerTests
     }
 
     [Fact]
-    public void Defaults_are_finite_120_seconds_and_runner_remains_a_single_evaluator_surface()
+    public void Defaults_are_finite_60_seconds_and_runner_remains_a_single_evaluator_surface()
     {
         EphemeralEvaluationRunnerOptions options = new();
 
-        Assert.Equal(TimeSpan.FromSeconds(120), options.AttemptTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(60), options.AttemptTimeout);
         Assert.Equal(1, options.MaxConcurrency);
         Assert.InRange(options.CleanupTimeout, TimeSpan.FromMilliseconds(1), TimeSpan.FromMinutes(1));
         Assert.DoesNotContain(
             typeof(EphemeralEvaluationRunner).GetMethods(),
             method => method.Name.Contains("Batch", StringComparison.Ordinal)
                 || method.Name.Contains("Schedule", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("claude-sonnet-5", "medium")]
+    [InlineData("gpt-5.5", "medium")]
+    [InlineData("auto", null)]
+    [InlineData("claude-haiku-4.5", null)]
+    [InlineData("listless", null)]
+    [InlineData("high-only", null)]
+    [InlineData("not-listed", null)]
+    public void Reasoning_effort_is_medium_only_for_models_that_support_it(string modelId, string? expected)
+    {
+        static ModelInfo Model(string id, bool supports, params string[]? efforts) => new()
+        {
+            Id = id,
+            Capabilities = new ModelCapabilities { Supports = new ModelSupports { ReasoningEffort = supports } },
+            SupportedReasoningEfforts = efforts,
+        };
+        ModelInfo[] models =
+        [
+            Model("claude-sonnet-5", true, "low", "medium", "high"),
+            Model("gpt-5.5", true, "low", "medium", "high", "xhigh"),
+            Model("auto", false, null),
+            Model("claude-haiku-4.5", false, null),
+            Model("listless", true, null),
+            Model("high-only", true, "high"),
+        ];
+
+        Assert.Equal(expected, SdkEphemeralCopilotTransport.ResolveReasoningEffort(models, modelId));
     }
 
     [Theory]

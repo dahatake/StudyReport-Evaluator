@@ -73,7 +73,7 @@
 ## 4. 副次的な所見
 
 - 1.3 のとおり、アプリの attempt timeout の既定は 120 秒（要求定義書 7.6 節 349 行目、[EphemeralEvaluationRunner.cs](../src/StudyReportEvaluator.App/Copilot/EphemeralEvaluationRunner.cs) の 15 行目）だが、送信の待ちには SDK の既定の 60 秒が別にかかる。このため、送信（`SendAsync`）から 60 秒以内に `session.idle` が来ないと、120 秒の前に `TimeoutException` になる（3.2 で、送信の開始から約 60.3 秒での `TimedOut` を観測した）。要求定義書の「attempt timeoutの既定は120秒」との関係は所有者の判断が必要であり、この RR-03 では製品を変えない
-
+- 追記（2026-09-24 21:38）: 所有者が「attempt timeout は SDK の 60 秒に従う」と決めた。要求定義書 7.6 節を改訂した。記録は [TimeoutAndReasoningEffort](20260924-2140-TimeoutAndReasoningEffort.md)
 ## 5. 敵対的レビュー
 
 rubber-duck のレビューで blocking の指摘は無かった（ジョブログと proxy のログの SHA-256、同じ operation ID の AttemptNumber=2、SDK 1.0.11 の 60 秒の既定、製品のフックを加えていないことを確認）。blocking でない指摘 3 件と提案 1 件を反映した: TimedOut の時刻を AttemptFinished の行（21:00:22.343、約 60.3 秒）に直した。方法 1 が「決して」retry に届かないという書き方、proxy が「原因ではない」という書き方、PID とトンネルの対応の書き方を、観測の範囲に弱めた。setting.txt の実行直前の SHA-256 を確かめていないことを明記した。4 章の 60 秒の説明を SDK の動作（session.idle を待つ）に合わせた
