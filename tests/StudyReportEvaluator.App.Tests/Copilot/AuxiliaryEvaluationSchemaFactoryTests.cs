@@ -45,32 +45,15 @@ public sealed class AuxiliaryEvaluationSchemaFactoryTests
     }
 
     [Fact]
-    public void Similarity_schema_is_closed_to_question_similarity_and_reason()
-    {
-        JsonElement schema = factory.CreateSimilaritySchema(CreateSimilarityPayload());
-        JsonElement properties = schema.GetProperty("properties");
-
-        Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
-        Assert.Equal(["QuestionId", "Similarity", "Reason"], Required(schema));
-        Assert.Equal(["Q1"], Strings(properties.GetProperty("QuestionId").GetProperty("enum")));
-        Assert.Equal(0m, properties.GetProperty("Similarity").GetProperty("minimum").GetDecimal());
-        Assert.Equal(1m, properties.GetProperty("Similarity").GetProperty("maximum").GetDecimal());
-        Assert.False(properties.TryGetProperty("Misconduct", out _));
-        Assert.False(properties.TryGetProperty("Penalty", out _));
-    }
-
-    [Fact]
     public void Auxiliary_sessions_expose_exactly_one_terminal_tool_and_reject_permissions()
     {
         SessionConfig reference = factory.CreateReferenceSessionConfig(
             new SafeReferenceAnswerPayload("Q1", "prompt"),
             out _);
         SessionConfig special = factory.CreateSpecialSessionConfig(CreateSpecialPayload(), out _);
-        SessionConfig similarity = factory.CreateSimilaritySessionConfig(CreateSimilarityPayload(), out _);
 
         AssertRestricted(reference, AuxiliaryEvaluationSchemaFactory.ReferenceToolName);
         AssertRestricted(special, AuxiliaryEvaluationSchemaFactory.SpecialToolName);
-        AssertRestricted(similarity, AuxiliaryEvaluationSchemaFactory.SimilarityToolName);
     }
 
     private static void AssertRestricted(SessionConfig config, string expectedToolName)
@@ -91,12 +74,6 @@ public sealed class AuxiliaryEvaluationSchemaFactoryTests
         "prompt",
         new EvaluationSourceCell(EvaluationSourceKind.PrimaryAnswer, "G", "primary evidence"),
         [new EvaluationSourceCell(EvaluationSourceKind.SupportingColumn, "K", "support evidence")]);
-
-    internal static SafeSimilarityPayload CreateSimilarityPayload() => new(
-        "Q1",
-        "private prompt",
-        "student answer",
-        "reference answer");
 
     private static string[] Required(JsonElement schema) =>
         schema.GetProperty("required").EnumerateArray().Select(item => item.GetString()!).ToArray();

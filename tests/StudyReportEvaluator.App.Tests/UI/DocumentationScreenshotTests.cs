@@ -548,7 +548,7 @@ public sealed class DocumentationScreenshotTests
             {
                 Assert.Equal(ResultsRowStatus.Success, row.Status);
                 // Real preview arithmetic over fake raw 8: 60 + 16 + 16 - .4 - .4.
-                Assert.Equal(91.2m, row.FinalScore);
+                Assert.Equal(92.0m, row.FinalScore);
             });
             ResetScroll(Required<ScrollViewer>(window, "ShellScrollViewer"));
             ResetScroll(Required<ScrollViewer>(resultsView, "ResultsOutputScrollViewer"));
@@ -571,7 +571,7 @@ public sealed class DocumentationScreenshotTests
             Assert.Equal("9", firstResult.OverrideText);
             Assert.Equal(8m, firstResult.AiRawScore);
             Assert.Equal(9m, firstResult.EffectiveRaw);
-            Assert.Equal(93.2m, results.SelectedRow?.FinalScore);
+            Assert.Equal(94.0m, results.SelectedRow?.FinalScore);
             Assert.True(results.HasUnsavedOverrides);
             Assert.False(results.HasOverrideErrors);
             Assert.Equal(SafeReviewedPath, results.OutputPath);
@@ -666,7 +666,6 @@ public sealed class DocumentationScreenshotTests
             normalRunner,
             new ScreenshotReferenceRunner(),
             new ScreenshotSpecialRunner(),
-            new ScreenshotSimilarityRunner(),
             new ScriptedInputSnapshots(U01TestSupport.InputSnapshot()),
             new ScreenshotCheckpointStore(),
             new ScreenshotPathPlanner(),
@@ -725,24 +724,6 @@ public sealed class DocumentationScreenshotTests
                 }));
         }
     }
-
-    private sealed class ScreenshotSimilarityRunner : ISimilarityEvaluationOperationRunner
-    {
-        public Task<AuxiliaryOperationResult<SimilarityQuantificationResult>> EvaluateAsync(
-            SafeSimilarityPayload payload,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(AuxiliaryOperationResult<SimilarityQuantificationResult>.Succeeded(
-                new SimilarityQuantificationResult
-                {
-                    QuestionId = payload.QuestionId,
-                    Similarity = 0.2m,
-                    Reason = "合成類似度",
-                }));
-        }
-    }
-
     private sealed class ScreenshotCheckpointStore : ICheckpointStore
     {
         private CheckpointEnvelope? current;

@@ -985,7 +985,6 @@ public sealed class ResultsPresentationTests
     [Theory]
     [InlineData("normal")]
     [InlineData("special")]
-    [InlineData("similarity")]
     [InlineData("row-read")]
     public async Task Durable_row_status_includes_auxiliary_and_row_read_failures_not_score_inference(string operation)
     {
@@ -993,13 +992,12 @@ public sealed class ResultsPresentationTests
         {
             NormalStatusCode = operation == "normal" ? ResultsStatusCodes.NetworkFailed : ResultsStatusCodes.Success,
             SpecialStatusCode = operation == "special" ? ResultsStatusCodes.AiTimeout : ResultsStatusCodes.Success,
-            SimilarityStatusCode = operation == "similarity" ? ResultsStatusCodes.NetworkFailed : ResultsStatusCodes.Success,
             FailRowRead = operation == "row-read",
         };
         ExecutionRunContext context = await fixture.RunAsync(specialPoints: 10m);
         Assert.Single(context.Summary.CompletedRows);
         Assert.False(context.Summary.IsPartial);
-        if (operation is "special" or "similarity")
+        if (operation is "special")
         {
             Assert.Equal(ResultsStatusCodes.Success, Assert.Single(context.Summary.Units).StatusCode);
         }
@@ -1177,7 +1175,7 @@ public sealed class ResultsPresentationTests
         Assert.Equal(84m, Assert.Single(viewModel.RowScores).FinalScore);
         Assert.Equal(identity, viewModel.RunIdentityText);
         Assert.Equal(canonicalDefinition, context.Summary.Snapshot.CanonicalJson);
-        Assert.Equal([10], fixture.ReadRows);
+        Assert.Equal([10, 10], fixture.ReadRows);
         Assert.Equal(1, fixture.FinalizerCalls);
         Assert.Equal(0, output.ExportCount);
     }
@@ -1348,7 +1346,7 @@ public sealed class ResultsPresentationTests
 // Real orchestrator/scheduler and summary projection; AI, checkpoint, and final output
 // boundaries return synthetic receipts. Only the existing metadata helper creates a temp workbook.
 internal sealed class ResultsDurableFixture : IEvaluationRowSource, IEvaluationRunner,
-    IReferenceAnswerOperationRunner, ISpecialEvaluationOperationRunner, ISimilarityEvaluationOperationRunner,
+    IReferenceAnswerOperationRunner, ISpecialEvaluationOperationRunner,
     ICheckpointStore, IOutputPathPlanner, IDurableRunFinalizer, IPartialCheckpointCleaner
 {
     private string primary = string.Empty;
@@ -1363,8 +1361,6 @@ internal sealed class ResultsDurableFixture : IEvaluationRowSource, IEvaluationR
     internal string NormalStatusCode { get; init; } = ResultsStatusCodes.Success;
 
     internal string SpecialStatusCode { get; init; } = ResultsStatusCodes.Success;
-
-    internal string SimilarityStatusCode { get; init; } = ResultsStatusCodes.Success;
 
     internal string FinalizationCode { get; init; } = ResultsOutputStatusCodes.Success;
 
@@ -1426,7 +1422,7 @@ internal sealed class ResultsDurableFixture : IEvaluationRowSource, IEvaluationR
         try
         {
             RunSummary summary = await new DurableQuantificationOrchestrator(
-                this, this, this, this, this, InputSnapshots, this, this, this, this, new FixtureClock()).RunAsync(
+                this, this, this, this, InputSnapshots, this, this, this, this, new FixtureClock()).RunAsync(
                     new DurableQuantificationRunRequest
                     {
                         Run = new QuantificationRunRequest
@@ -1474,7 +1470,7 @@ internal sealed class ResultsDurableFixture : IEvaluationRowSource, IEvaluationR
 
     public Task<AuxiliaryOperationResult<ReferenceAnswerResult>> EvaluateAsync(SafeReferenceAnswerPayload payload, CancellationToken cancellationToken) =>
         Task.FromResult(AuxiliaryOperationResult<ReferenceAnswerResult>.Succeeded(
-            new ReferenceAnswerResult { QuestionId = payload.QuestionId, Answer = "synthetic reference" }));
+            new ReferenceAnswerResult { QuestionId = payload.QuestionId, Answer = "参照" }));
 
     public Task<AuxiliaryOperationResult<SpecialQuantificationResult>> EvaluateAsync(SafeSpecialEvaluationPayload payload, string modelId, CancellationToken cancellationToken) =>
         Task.FromResult(SpecialStatusCode == ResultsStatusCodes.Success
@@ -1489,15 +1485,6 @@ internal sealed class ResultsDurableFixture : IEvaluationRowSource, IEvaluationR
             })
             : AuxiliaryOperationResult<SpecialQuantificationResult>.Failed(SpecialStatusCode));
 
-    public Task<AuxiliaryOperationResult<SimilarityQuantificationResult>> EvaluateAsync(SafeSimilarityPayload payload, CancellationToken cancellationToken) =>
-        Task.FromResult(SimilarityStatusCode == ResultsStatusCodes.Success
-            ? AuxiliaryOperationResult<SimilarityQuantificationResult>.Succeeded(new SimilarityQuantificationResult
-            {
-                QuestionId = payload.QuestionId,
-                Similarity = 0m,
-                Reason = "synthetic reason",
-            })
-            : AuxiliaryOperationResult<SimilarityQuantificationResult>.Failed(SimilarityStatusCode));
 
     public CheckpointSaveResult Create(CheckpointEnvelope envelope, CancellationToken cancellationToken = default)
     {

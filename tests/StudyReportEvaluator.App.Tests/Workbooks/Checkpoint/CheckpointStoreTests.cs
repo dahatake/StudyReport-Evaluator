@@ -293,7 +293,7 @@ public sealed class CheckpointStoreTests
         Assert.True(store.Create(envelope, TestContext.Current.CancellationToken).IsSuccess);
         Mutate(envelope.PartialPath, worksheet => SetInline(
             Cell(worksheet.Descendants<Row>().Single(row => row.RowIndex?.Value == 2), "C2"),
-            "2"));
+            "1"));
 
         CheckpointLoadResult result = store.Load(envelope.PartialPath, TestContext.Current.CancellationToken);
 

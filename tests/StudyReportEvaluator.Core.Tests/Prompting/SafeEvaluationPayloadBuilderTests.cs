@@ -181,35 +181,6 @@ public sealed class SafeEvaluationPayloadBuilderTests
     }
 
     [Fact]
-    public void Similarity_payload_keeps_student_and_reference_values_opaque_and_forbids_misconduct_judgment()
-    {
-        const string student = "STUDENT {設問} {{opaque}}";
-        const string reference = "REFERENCE {回答} } opaque";
-        QuantificationSnapshot snapshot = QuantificationSnapshot.Create(C02TestDefinitions.CreateValid());
-
-        SafeSimilarityPayload payload = _builder.BuildSimilarity(snapshot, "Q1", student, reference);
-
-        Assert.Equal(student, payload.StudentAnswer);
-        Assert.Equal(reference, payload.ReferenceAnswer);
-        Assert.Equal(1, Count(payload.RenderedPrompt, student));
-        Assert.Equal(1, Count(payload.RenderedPrompt, reference));
-        Assert.Contains("submit_similarity", payload.RenderedPrompt, StringComparison.Ordinal);
-        Assert.Contains("不正行為や回答品質を判定せず", payload.RenderedPrompt, StringComparison.Ordinal);
-        Assert.DoesNotContain(student, payload.ToString(), StringComparison.Ordinal);
-        Assert.DoesNotContain(reference, payload.ToString(), StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData("", "reference")]
-    [InlineData("student", "  ")]
-    public void Similarity_payload_rejects_empty_inputs_before_dispatch(string student, string reference)
-    {
-        QuantificationSnapshot snapshot = QuantificationSnapshot.Create(C02TestDefinitions.CreateValid());
-
-        Assert.Throws<ArgumentException>(() => _builder.BuildSimilarity(snapshot, "Q1", student, reference));
-    }
-
-    [Fact]
     public void Special_payload_uses_only_its_selected_same_row_sources_and_closed_contract()
     {
         const string otherColumnCanary = "OTHER-COLUMN-MUST-NOT-APPEAR";

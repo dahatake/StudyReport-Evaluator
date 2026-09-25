@@ -152,7 +152,6 @@ public sealed partial class RealDataSystemSmokeTests
             LocalNormalRunner normal = new(concurrency);
             LocalReferenceRunner references = new(concurrency);
             NoCallSpecialRunner specials = new();
-            LocalSimilarityRunner similarities = new(concurrency);
             CountingRowSource rowSource = new(new OpenXmlEvaluationRowSource(inputPath));
             TracingCheckpointFileOperations checkpointFiles = new();
             CountingCheckpointStore checkpoints = new(new CheckpointStore(checkpointFiles));
@@ -164,7 +163,6 @@ public sealed partial class RealDataSystemSmokeTests
                 normal,
                 references,
                 specials,
-                similarities,
                 new PhysicalInputSnapshotBoundary(),
                 checkpoints,
                 new OutputPathPlanner(),
@@ -225,9 +223,8 @@ public sealed partial class RealDataSystemSmokeTests
             Assert.Equal(0, summary.OperationCancelledCount);
             Assert.Equal(4, references.CallCount);
             Assert.Equal(summary.SucceededCount, normal.CallCount);
-            Assert.Equal(summary.SucceededCount, similarities.CallCount);
             Assert.Equal(0, specials.CallCount);
-            Assert.Equal(530, rowSource.ReadCount);
+            Assert.Equal(1_060, rowSource.ReadCount);
             Assert.Equal(1, checkpoints.CreateCount);
             // One update after each of 4 references and each of 530 completed rows.
             Assert.Equal(534, checkpoints.UpdateCount);
@@ -383,7 +380,6 @@ public sealed partial class RealDataSystemSmokeTests
                     reference_runner_calls = references.CallCount,
                     normal_runner_calls = normal.CallCount,
                     special_runner_calls = specials.CallCount,
-                    similarity_runner_calls = similarities.CallCount,
                     source_row_reads = rowSource.ReadCount,
                     checkpoint_creates = checkpoints.CreateCount,
                     checkpoint_updates = checkpoints.UpdateCount,
@@ -1270,32 +1266,6 @@ public sealed partial class RealDataSystemSmokeTests
             throw new InvalidOperationException("The default zero special budget must not dispatch a special operation.");
         }
     }
-
-    private sealed class LocalSimilarityRunner(SharedConcurrencyTracker concurrency)
-        : ISimilarityEvaluationOperationRunner
-    {
-        private int calls;
-
-        internal int CallCount => Volatile.Read(ref calls);
-
-        public async Task<AuxiliaryOperationResult<SimilarityQuantificationResult>> EvaluateAsync(
-            SafeSimilarityPayload payload,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            using IDisposable scope = concurrency.Enter();
-            await Task.Yield();
-            Interlocked.Increment(ref calls);
-            return AuxiliaryOperationResult<SimilarityQuantificationResult>.Succeeded(
-                new SimilarityQuantificationResult
-                {
-                    QuestionId = payload.QuestionId,
-                    Similarity = 0.25m,
-                    Reason = "LOCAL_TECHNICAL_TEST_NOT_FOR_GRADING",
-                });
-        }
-    }
-
     private sealed class SharedConcurrencyTracker
     {
         private int inFlight;

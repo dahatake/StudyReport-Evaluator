@@ -71,32 +71,6 @@ public sealed class AuxiliaryEvaluationRunnerTests
     }
 
     [Fact]
-    public async Task Similarity_runner_is_fixed_to_auto_and_returns_only_similarity_result()
-    {
-        RecordingFactory factory = new(
-            AuxiliaryEvaluationSchemaFactory.SimilarityToolName,
-            """{"QuestionId":"Q1","Similarity":0.75,"Reason":"semantic overlap"}""");
-        SimilarityEvaluationRunner runner = new(
-            factory,
-            new EphemeralEvaluationRunnerOptions(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)));
-
-        EphemeralEvaluationResult<SimilarityQuantificationResult> result = await runner.EvaluateAsync(
-            AuxiliaryEvaluationSchemaFactoryTests.CreateSimilarityPayload(),
-            TestContext.Current.CancellationToken);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(0.75m, result.AcceptedResult!.Similarity);
-        RecordingTransport transport = Assert.Single(factory.Transports);
-        SessionConfig config = Assert.Single(transport.Configs);
-        Assert.Equal("auto", config.Model);
-        Assert.StartsWith("similarity-", config.SessionId, StringComparison.Ordinal);
-        Assert.Equal([AuxiliaryEvaluationSchemaFactory.SimilarityToolName], config.AvailableTools);
-        Assert.Equal(
-            ["start", "auth", "create", "send", "session-dispose", "delete", "stop", "transport-dispose"],
-            transport.Operations);
-    }
-
-    [Fact]
     public async Task Cancellation_before_auxiliary_run_creates_no_transport()
     {
         RecordingFactory factory = new(AuxiliaryEvaluationSchemaFactory.ReferenceToolName, ReferenceJson());

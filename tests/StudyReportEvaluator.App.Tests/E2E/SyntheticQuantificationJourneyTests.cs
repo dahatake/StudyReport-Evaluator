@@ -261,14 +261,12 @@ public sealed class SyntheticQuantificationJourneyTests
         FakeCopilotTransport baselineNormal = new(workbook);
         DurableReferenceRunner baselineReferences = new();
         DurableSpecialRunner baselineSpecials = new(workbook);
-        DurableSimilarityRunner baselineSimilarities = new();
         DurableCountingCheckpointStore baselineStore = new(new CheckpointStore());
         RunSummary baseline = await DurableOrchestrator(
             workbook,
             baselineNormal,
             baselineReferences,
             baselineSpecials,
-            baselineSimilarities,
             baselineStore).RunAsync(
                 DurableRequest(definition, metadata, workbook.Path, baselineDirectory),
                 cancellationToken: cancellationToken);
@@ -280,7 +278,6 @@ public sealed class SyntheticQuantificationJourneyTests
         Assert.Equal(expectedNormalCalls, baselineNormal.Calls.Length);
         Assert.Equal(2, baselineReferences.CallCount);
         Assert.Equal(expectedSpecialCalls, baselineSpecials.CallCount);
-        Assert.Equal(expectedNormalCalls, baselineSimilarities.CallCount);
         Assert.Equal(1, baselineStore.CreateCount);
         Assert.Equal(532, baselineStore.UpdateCount);
         Assert.Equal(0, baselineStore.LoadCount);
@@ -289,7 +286,6 @@ public sealed class SyntheticQuantificationJourneyTests
         FakeCopilotTransport interruptedNormal = new(workbook);
         DurableReferenceRunner interruptedReferences = new();
         DurableSpecialRunner interruptedSpecials = new(workbook);
-        DurableSimilarityRunner interruptedSimilarities = new();
         DurableCountingCheckpointStore interruptedStore = new(
             new CheckpointStore(),
             envelope =>
@@ -304,7 +300,6 @@ public sealed class SyntheticQuantificationJourneyTests
             interruptedNormal,
             interruptedReferences,
             interruptedSpecials,
-            interruptedSimilarities,
             interruptedStore).RunAsync(
                 DurableRequest(definition, metadata, workbook.Path, resumeDirectory),
                 cancellationToken: interruption.Token);
@@ -318,7 +313,6 @@ public sealed class SyntheticQuantificationJourneyTests
         string partialPath = Assert.IsType<string>(interrupted.PartialPath);
         Assert.True(File.Exists(partialPath));
         Assert.Equal(2, interruptedReferences.CallCount);
-        Assert.Equal(interruptedNormal.Calls.Length, interruptedSimilarities.CallCount);
         Assert.Equal(1, interruptedStore.CreateCount);
         Assert.Equal(267, interruptedStore.UpdateCount);
         Assert.Equal(0, interruptedStore.LoadCount);
@@ -326,14 +320,12 @@ public sealed class SyntheticQuantificationJourneyTests
         FakeCopilotTransport resumedNormal = new(workbook);
         DurableReferenceRunner resumedReferences = new(throwOnCall: true);
         DurableSpecialRunner resumedSpecials = new(workbook);
-        DurableSimilarityRunner resumedSimilarities = new();
         DurableCountingCheckpointStore resumedStore = new(new CheckpointStore());
         RunSummary resumed = await DurableOrchestrator(
             workbook,
             resumedNormal,
             resumedReferences,
             resumedSpecials,
-            resumedSimilarities,
             resumedStore).RunAsync(
                 DurableRequest(definition, metadata, workbook.Path, resumeDirectory) with
                 {
@@ -345,7 +337,6 @@ public sealed class SyntheticQuantificationJourneyTests
         Assert.Equal(expectedNormalCalls - interruptedNormal.Calls.Length, resumedNormal.Calls.Length);
         Assert.Equal(0, resumedReferences.CallCount);
         Assert.Equal(expectedSpecialCalls - interruptedSpecials.CallCount, resumedSpecials.CallCount);
-        Assert.Equal(expectedNormalCalls - interruptedSimilarities.CallCount, resumedSimilarities.CallCount);
         Assert.Equal(0, resumedStore.CreateCount);
         Assert.Equal(265, resumedStore.UpdateCount);
         Assert.Equal(1, resumedStore.LoadCount);
@@ -390,14 +381,12 @@ public sealed class SyntheticQuantificationJourneyTests
         IEvaluationRunner normal,
         IReferenceAnswerOperationRunner references,
         ISpecialEvaluationOperationRunner specials,
-        ISimilarityEvaluationOperationRunner similarities,
         ICheckpointStore checkpoints) =>
         new(
             new SyntheticEvaluationRowSource(workbook),
             normal,
             references,
             specials,
-            similarities,
             new PhysicalInputSnapshotBoundary(),
             checkpoints,
             new OutputPathPlanner(),
@@ -1065,29 +1054,6 @@ public sealed class SyntheticQuantificationJourneyTests
                 }));
         }
     }
-
-    private sealed class DurableSimilarityRunner : ISimilarityEvaluationOperationRunner
-    {
-        private int calls;
-
-        internal int CallCount => Volatile.Read(ref calls);
-
-        public Task<AuxiliaryOperationResult<SimilarityQuantificationResult>> EvaluateAsync(
-            SafeSimilarityPayload payload,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            Interlocked.Increment(ref calls);
-            return Task.FromResult(AuxiliaryOperationResult<SimilarityQuantificationResult>.Succeeded(
-                new SimilarityQuantificationResult
-                {
-                    QuestionId = payload.QuestionId,
-                    Similarity = 0.25m,
-                    Reason = "SYNTHETIC-DURABLE-SIMILARITY",
-                }));
-        }
-    }
-
     private sealed class DurableCountingCheckpointStore(
         ICheckpointStore inner,
         Action<CheckpointEnvelope>? afterSuccessfulUpdate = null) : ICheckpointStore
@@ -1138,3 +1104,5 @@ public sealed class SyntheticQuantificationJourneyTests
         }
     }
 }
+
+

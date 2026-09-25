@@ -106,21 +106,6 @@ public sealed class EvaluationRequestCapacityValidator
             maximumContextWindowTokens);
     }
 
-    public EvaluationRequestCapacityResult Validate(
-        SafeSimilarityPayload payload,
-        int? maximumPromptTokens,
-        int? maximumContextWindowTokens)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        return ValidateCore(
-            payload.RenderedPrompt,
-            auxiliarySchemaFactory.CreateSimilaritySchema(payload).GetRawText(),
-            AuxiliaryEvaluationSchemaFactory.SimilarityToolName,
-            AuxiliaryEvaluationSchemaFactory.SimilarityToolDescription,
-            maximumPromptTokens,
-            maximumContextWindowTokens);
-    }
-
     private static EvaluationRequestCapacityResult ValidateCore(
         string renderedPrompt,
         string schema,

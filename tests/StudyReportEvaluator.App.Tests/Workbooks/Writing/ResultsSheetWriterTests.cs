@@ -52,7 +52,7 @@ public sealed class ResultsSheetWriterTests
         Assert.Equal(names.ResultsSheetName, writeResult.SheetName);
         Assert.Equal(1, writeResult.HeaderRow);
         Assert.Equal(1, writeResult.DataRowCount);
-        Assert.Equal(34, writeResult.ColumnCount);
+        Assert.Equal(36, writeResult.ColumnCount);
         Assert.Equal(13, writeResult.FormulaCells.Length);
         Assert.Equal(
             writeResult.FormulaCells.Length,
@@ -97,6 +97,8 @@ public sealed class ResultsSheetWriterTests
             "Q1.Similarity_Reason",
             "Q1.Similarity_Status",
             "Q1.Similarity_Penalty",
+            "Q1.Similarity_Peer_Max",
+            "Q1.Similarity_Peer_Row",
             "Base_Points",
             "Special_Earned",
             "Final_Raw",
@@ -314,7 +316,7 @@ public sealed class ResultsSheetWriterTests
 
         using SpreadsheetDocument reopened = SpreadsheetDocument.Open(input.Path, false);
         Worksheet worksheet = GetWorksheet(reopened, names.ResultsSheetName);
-        Assert.Equal(37, result.ColumnCount);
+        Assert.Equal(39, result.ColumnCount);
         AssertNumber(CellByHeader(worksheet, "Q1.S1.Special_AI_Raw", 2), "0.8");
         AssertNumber(CellByHeader(worksheet, "Q1.S2.Special_AI_Raw", 2), "0.6");
         AssertFormulaCache(CellByHeader(worksheet, "Q1.Special_Question_Rate", 2), "0.7");
@@ -435,7 +437,7 @@ public sealed class ResultsSheetWriterTests
             () => new ResultsSheetWriter().Write(document, snapshot, names, config, []));
 
         ResultsSheetValidationError error = Assert.Single(exception.Errors, item => item.Code == "COLUMN_LIMIT_EXCEEDED");
-        Assert.Equal((criterionCount * 10 + 14).ToString(CultureInfo.InvariantCulture), error.SafeOffendingValue);
+        Assert.Equal((criterionCount * 10 + 16).ToString(CultureInfo.InvariantCulture), error.SafeOffendingValue);
         Assert.Equal(before, document.WorkbookPart?.WorksheetParts.Count() ?? 0);
         Assert.DoesNotContain(Workbook(document).Descendants<Sheet>(), sheet => sheet.Name?.Value == names.ResultsSheetName);
     }

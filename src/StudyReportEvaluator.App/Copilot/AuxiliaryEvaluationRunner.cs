@@ -113,59 +113,6 @@ public sealed class SpecialEvaluationRunner
     }
 }
 
-public sealed class SimilarityEvaluationRunner
-{
-    public const string ModelId = "auto";
-
-    private readonly IEphemeralCopilotTransportFactory transportFactory;
-    private readonly AuxiliaryEvaluationSchemaFactory schemaFactory = new();
-    private readonly RetryAndCleanupCoordinator coordinator;
-    private readonly EphemeralEvaluationRunnerOptions options;
-
-    public SimilarityEvaluationRunner()
-        : this(new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory()))
-    {
-    }
-
-    public SimilarityEvaluationRunner(
-        IEphemeralCopilotTransportFactory transportFactory,
-        EphemeralEvaluationRunnerOptions? options = null,
-        SafeLogger? logger = null)
-    {
-        this.transportFactory = transportFactory
-            ?? throw new ArgumentNullException(nameof(transportFactory));
-        this.options = options ?? new EphemeralEvaluationRunnerOptions();
-        coordinator = new RetryAndCleanupCoordinator(logger);
-    }
-
-    public Task<EphemeralEvaluationResult<SimilarityQuantificationResult>> EvaluateAsync(
-        SafeSimilarityPayload payload,
-        CancellationToken cancellationToken = default)
-    {
-        AuxiliaryEvaluationSchemaFactory.ValidateSimilarityPayload(payload);
-        return coordinator.ExecuteAuxiliaryAsync(
-            _ => CreateAttempt(payload),
-            options.AttemptTimeout,
-            options.CleanupTimeout,
-            options.MaxConcurrency,
-            cancellationToken);
-    }
-
-    private IEphemeralEvaluationAttempt<SimilarityQuantificationResult> CreateAttempt(
-        SafeSimilarityPayload payload)
-    {
-        SessionConfig config = schemaFactory.CreateSimilaritySessionConfig(payload, out SubmitSimilarityTool collector);
-        return new CopilotAuxiliaryAttempt<SimilarityQuantificationResult>(
-            transportFactory.Create()
-                ?? throw new InvalidOperationException("The transport factory returned no transport."),
-            config,
-            payload.RenderedPrompt,
-            ModelId,
-            $"similarity-{Guid.NewGuid():N}",
-            () => collector.TryGetAcceptedResult(out SimilarityQuantificationResult? result) ? result : null);
-    }
-}
-
 internal sealed class CopilotAuxiliaryAttempt<TResult> : IEphemeralEvaluationAttempt<TResult>
     where TResult : class
 {

@@ -79,13 +79,6 @@ public interface ISpecialEvaluationOperationRunner
         CancellationToken cancellationToken);
 }
 
-public interface ISimilarityEvaluationOperationRunner
-{
-    Task<AuxiliaryOperationResult<SimilarityQuantificationResult>> EvaluateAsync(
-        SafeSimilarityPayload payload,
-        CancellationToken cancellationToken);
-}
-
 public sealed class ReferenceAnswerOperationRunnerAdapter : IReferenceAnswerOperationRunner
 {
     private readonly ReferenceAnswerEvaluationRunner runner;
@@ -128,30 +121,6 @@ public sealed class SpecialEvaluationOperationRunnerAdapter : ISpecialEvaluation
             .EvaluateAsync(payload, modelId, cancellationToken)
             .ConfigureAwait(false);
         return new AuxiliaryOperationResult<SpecialQuantificationResult>(
-            result.StatusCode,
-            result.AcceptedResult,
-            result.AttemptCount,
-            result.TokenUsage);
-    }
-}
-
-public sealed class SimilarityEvaluationOperationRunnerAdapter : ISimilarityEvaluationOperationRunner
-{
-    private readonly SimilarityEvaluationRunner runner;
-
-    public SimilarityEvaluationOperationRunnerAdapter(SimilarityEvaluationRunner runner)
-    {
-        this.runner = runner ?? throw new ArgumentNullException(nameof(runner));
-    }
-
-    public async Task<AuxiliaryOperationResult<SimilarityQuantificationResult>> EvaluateAsync(
-        SafeSimilarityPayload payload,
-        CancellationToken cancellationToken)
-    {
-        EphemeralEvaluationResult<SimilarityQuantificationResult> result = await runner
-            .EvaluateAsync(payload, cancellationToken)
-            .ConfigureAwait(false);
-        return new AuxiliaryOperationResult<SimilarityQuantificationResult>(
             result.StatusCode,
             result.AcceptedResult,
             result.AttemptCount,

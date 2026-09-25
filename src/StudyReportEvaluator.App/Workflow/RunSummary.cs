@@ -109,6 +109,20 @@ public sealed class RunOutputPreparation
         $"{nameof(RunOutputPreparation)} {{ IsExportReady = {IsExportReady}, IsPartial = {IsPartial}, RowCount = {Rows.Length.ToString(CultureInfo.InvariantCulture)}, Content = <redacted> }}";
 }
 
+public sealed record RunPeerSimilarityResult
+{
+    public int SourceRowNumber { get; init; }
+
+    public required string QuestionId { get; init; }
+
+    public decimal PeerMax { get; init; }
+
+    public int? PeerRow { get; init; }
+
+    public override string ToString() =>
+        $"{nameof(RunPeerSimilarityResult)} {{ SourceRowNumber = {SourceRowNumber.ToString(CultureInfo.InvariantCulture)}, QuestionId = {QuestionId}, PeerMax = {PeerMax.ToString(CultureInfo.InvariantCulture)}, PeerRow = {PeerRow?.ToString(CultureInfo.InvariantCulture) ?? "<none>"}, Content = <redacted> }}";
+}
+
 public sealed class RunSummary
 {
     private const NumberStyles OverrideNumberStyles =
@@ -128,6 +142,39 @@ public sealed class RunSummary
         bool wasResumed = false,
         string? finalizationCode = null,
         bool partialCleanupFailed = false)
+        : this(
+            schedule,
+            inputSnapshot,
+            statusCode,
+            startedAtUtc,
+            endedAtUtc,
+            isDurable,
+            references,
+            completedRows,
+            finalPath,
+            partialPath,
+            wasResumed,
+            finalizationCode,
+            partialCleanupFailed,
+            default)
+    {
+    }
+
+    internal RunSummary(
+        EvaluationScheduleResult schedule,
+        InputSnapshot inputSnapshot,
+        string statusCode,
+        DateTimeOffset startedAtUtc,
+        DateTimeOffset endedAtUtc,
+        bool isDurable,
+        ImmutableArray<CheckpointReference> references,
+        ImmutableArray<CheckpointCompletedRow> completedRows,
+        string? finalPath,
+        string? partialPath,
+        bool wasResumed,
+        string? finalizationCode,
+        bool partialCleanupFailed,
+        ImmutableArray<RunPeerSimilarityResult> peerSimilarities)
     {
         ArgumentNullException.ThrowIfNull(schedule);
         ArgumentNullException.ThrowIfNull(inputSnapshot);
@@ -160,6 +207,7 @@ public sealed class RunSummary
         WasResumed = wasResumed;
         FinalizationCode = finalizationCode;
         PartialCleanupFailed = partialCleanupFailed;
+        PeerSimilarities = peerSimilarities.IsDefault ? [] : peerSimilarities;
     }
 
     public EvaluationScheduleResult Schedule { get; }
@@ -197,6 +245,8 @@ public sealed class RunSummary
     public string? FinalizationCode { get; }
 
     public bool PartialCleanupFailed { get; }
+
+    public ImmutableArray<RunPeerSimilarityResult> PeerSimilarities { get; }
 
     public int PlannedEvaluationCount => Units.Length;
 
@@ -447,6 +497,9 @@ public sealed class RunSummary
             ImmutableArray.CreateBuilder<ResultsSheetRowInput>();
         Dictionary<int, CheckpointCompletedRow> durableRows = CompletedRows.ToDictionary(
             row => row.SourceRowNumber);
+        Dictionary<(int SourceRowNumber, string QuestionId), RunPeerSimilarityResult> peers = PeerSimilarities.ToDictionary(
+            item => (item.SourceRowNumber, item.QuestionId),
+            item => item);
         for (int sourceRow = Snapshot.Definition.FirstDataRow;
              sourceRow <= Snapshot.Definition.LastDataRow;
              sourceRow++)
@@ -505,7 +558,8 @@ public sealed class RunSummary
                     : [];
                 SimilarityResultInput? similarity = IsDurable
                     ? ToSimilarityResult(durableRow?.SimilarityResults.SingleOrDefault(result =>
-                        string.Equals(result.QuestionId, question.Id, StringComparison.Ordinal)))
+                        string.Equals(result.QuestionId, question.Id, StringComparison.Ordinal)),
+                        peers.GetValueOrDefault((sourceRow, question.Id)))
                     : null;
                 questions.Add(new QuestionResultInput
                 {
@@ -547,7 +601,9 @@ public sealed class RunSummary
         };
     }
 
-    private static SimilarityResultInput ToSimilarityResult(CheckpointSimilarityResult? result) =>
+    private static SimilarityResultInput ToSimilarityResult(
+        CheckpointSimilarityResult? result,
+        RunPeerSimilarityResult? peer) =>
         new()
         {
             AiRaw = result?.AcceptedResult?.Similarity ?? (string.Equals(
@@ -556,6 +612,8 @@ public sealed class RunSummary
                 StringComparison.Ordinal) ? 0m : null),
             Reason = result?.AcceptedResult?.Reason ?? string.Empty,
             Status = result?.StatusCode ?? ResultsStatusCodes.Cancelled,
+            PeerMax = peer?.PeerMax,
+            PeerRow = peer?.PeerRow,
         };
 
     private static string EvidenceSourceName(EvidenceSourceKind source) => source switch

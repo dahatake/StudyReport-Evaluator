@@ -161,30 +161,6 @@ public sealed class SafeEvaluationPayloadBuilder
             supporting);
     }
 
-    public SafeSimilarityPayload BuildSimilarity(
-        QuantificationSnapshot snapshot,
-        string questionId,
-        string studentAnswer,
-        string referenceAnswer)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(studentAnswer);
-        ArgumentException.ThrowIfNullOrWhiteSpace(referenceAnswer);
-        QuestionDefinition question = FindEnabledQuestion(snapshot, questionId);
-        StringBuilder prompt = new(
-            question.QuestionText.Length + studentAnswer.Length + referenceAnswer.Length + 768);
-        prompt.AppendLine(BuiltInPromptTemplates.SimilarityInstruction.Trim());
-        prompt.AppendLine().AppendLine("### 設問").AppendLine(question.QuestionText);
-        prompt.AppendLine().AppendLine("### 学生回答").AppendLine(studentAnswer);
-        prompt.AppendLine().AppendLine("### 比較用LLM生成回答").AppendLine(referenceAnswer);
-        prompt.AppendLine().AppendLine(BuiltInPromptTemplates.SimilarityOutputInstruction.Trim());
-        prompt.Append("ExpectedQuestionId: ").Append(question.Id);
-        return new SafeSimilarityPayload(
-            question.Id,
-            prompt.ToString(),
-            studentAnswer,
-            referenceAnswer);
-    }
-
     private static QuestionDefinition FindEnabledQuestion(
         QuantificationSnapshot snapshot,
         string questionId)

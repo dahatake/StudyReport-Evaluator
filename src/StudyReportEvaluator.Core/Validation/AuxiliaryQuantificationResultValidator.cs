@@ -74,24 +74,6 @@ public sealed class AuxiliaryQuantificationResultValidator
         return Outcome(errors, submitted with { });
     }
 
-    public AuxiliaryResultValidationOutcome<SimilarityQuantificationResult> ValidateSimilarity(
-        SafeSimilarityPayload expected,
-        SimilarityQuantificationResult submitted)
-    {
-        ArgumentNullException.ThrowIfNull(expected);
-        ArgumentNullException.ThrowIfNull(submitted);
-        ImmutableArray<AuxiliaryResultValidationError>.Builder errors =
-            ImmutableArray.CreateBuilder<AuxiliaryResultValidationError>();
-        ValidateExactId(errors, expected.QuestionId, submitted.QuestionId, "QuestionId");
-        if (submitted.Similarity is < 0m or > 1m)
-        {
-            Add(errors, "SIMILARITY_OUT_OF_RANGE", expected.QuestionId, "Similarity", Invariant(submitted.Similarity));
-        }
-
-        ValidateBody(errors, expected.QuestionId, submitted.Reason, "Reason", required: true);
-        return Outcome(errors, submitted with { });
-    }
-
     private static AuxiliaryResultValidationOutcome<T> Outcome<T>(
         ImmutableArray<AuxiliaryResultValidationError>.Builder errors,
         T submitted)

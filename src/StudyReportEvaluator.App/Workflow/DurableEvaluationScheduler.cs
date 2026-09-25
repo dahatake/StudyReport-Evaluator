@@ -4,6 +4,7 @@ using StudyReportEvaluator.App.Workbooks.Checkpoint;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Prompting;
+using StudyReportEvaluator.Core.Similarity;
 using StudyReportEvaluator.Core.Validation;
 
 namespace StudyReportEvaluator.App.Workflow;
@@ -33,21 +34,19 @@ public sealed class DurableEvaluationScheduler
     private readonly IEvaluationRowSource rowSource;
     private readonly EvaluationScheduler normalScheduler;
     private readonly ISpecialEvaluationOperationRunner specialRunner;
-    private readonly ISimilarityEvaluationOperationRunner similarityRunner;
     private readonly SafeEvaluationPayloadBuilder payloadBuilder = new();
     private readonly AuxiliaryQuantificationResultValidator resultValidator = new();
     private readonly EvaluationRequestCapacityValidator requestCapacityValidator = new();
+    private readonly SurfaceTextSimilarityCalculator similarityCalculator = new();
 
     public DurableEvaluationScheduler(
         IEvaluationRowSource rowSource,
         IEvaluationRunner normalRunner,
-        ISpecialEvaluationOperationRunner specialRunner,
-        ISimilarityEvaluationOperationRunner similarityRunner)
+        ISpecialEvaluationOperationRunner specialRunner)
     {
         this.rowSource = rowSource ?? throw new ArgumentNullException(nameof(rowSource));
         ArgumentNullException.ThrowIfNull(normalRunner);
         this.specialRunner = specialRunner ?? throw new ArgumentNullException(nameof(specialRunner));
-        this.similarityRunner = similarityRunner ?? throw new ArgumentNullException(nameof(similarityRunner));
         normalScheduler = new EvaluationScheduler(rowSource, normalRunner);
     }
 
@@ -171,8 +170,6 @@ public sealed class DurableEvaluationScheduler
                     question,
                     row,
                     references,
-                    maximumPromptTokens,
-                    maximumContextWindowTokens,
                     cancellationToken).ConfigureAwait(false);
             });
         }
@@ -330,24 +327,22 @@ public sealed class DurableEvaluationScheduler
         }
     }
 
-    private async Task<CheckpointSimilarityResult> EvaluateSimilarityAsync(
+    private Task<CheckpointSimilarityResult> EvaluateSimilarityAsync(
         QuantificationSnapshot snapshot,
         QuestionDefinition question,
         EvaluationRowData row,
         IReadOnlyDictionary<string, CheckpointReference> references,
-        int? maximumPromptTokens,
-        int? maximumContextWindowTokens,
         CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested)
         {
-            return SimilarityFailure(question.Id, ResultsStatusCodes.Cancelled);
+            return Task.FromResult(SimilarityFailure(question.Id, ResultsStatusCodes.Cancelled));
         }
 
         string studentAnswer = ReadCell(row, question.PrimarySourceColumn);
         if (string.IsNullOrWhiteSpace(studentAnswer))
         {
-            return SimilarityFailure(question.Id, ResultsStatusCodes.Empty);
+            return Task.FromResult(SimilarityFailure(question.Id, ResultsStatusCodes.Empty));
         }
 
         if (!references.TryGetValue(question.Id, out CheckpointReference? reference)
@@ -357,71 +352,33 @@ public sealed class DurableEvaluationScheduler
             string status = reference is not null && ResultsStatusCodes.IsDefined(reference.StatusCode)
                 ? reference.StatusCode
                 : ResultsStatusCodes.AiRuntimeFailed;
-            return SimilarityFailure(question.Id, status);
-        }
-
-        SafeSimilarityPayload payload;
-        try
-        {
-            payload = payloadBuilder.BuildSimilarity(
-                snapshot,
-                question.Id,
-                studentAnswer,
-                reference.Answer);
-        }
-        catch
-        {
-            return SimilarityFailure(question.Id, ResultsStatusCodes.AiRuntimeFailed);
+            return Task.FromResult(SimilarityFailure(question.Id, status));
         }
 
         try
         {
-            if (!requestCapacityValidator.Validate(
-                    payload,
-                    maximumPromptTokens,
-                    maximumContextWindowTokens).IsValid)
+            SurfaceSimilarityResult result = similarityCalculator.Calculate(studentAnswer, reference.Answer);
+            return Task.FromResult(new CheckpointSimilarityResult
             {
-                return SimilarityFailure(question.Id, ResultsStatusCodes.AiOutputInvalid);
-            }
-
-            AuxiliaryOperationResult<SimilarityQuantificationResult> result = await similarityRunner
-                .EvaluateAsync(payload, cancellationToken)
-                .ConfigureAwait(false);
-            if (!result.IsSuccess)
-            {
-                return SimilarityFailure(
-                    question.Id,
-                    result.StatusCode,
-                    result.AttemptCount,
-                    result.TokenUsage);
-            }
-
-            AuxiliaryResultValidationOutcome<SimilarityQuantificationResult> validation =
-                resultValidator.ValidateSimilarity(payload, result.AcceptedResult!);
-            return validation.IsValid
-                ? new CheckpointSimilarityResult
+                QuestionId = question.Id,
+                StatusCode = ResultsStatusCodes.Success,
+                AttemptCount = 1,
+                AcceptedResult = new SimilarityQuantificationResult
                 {
                     QuestionId = question.Id,
-                    StatusCode = ResultsStatusCodes.Success,
-                    AttemptCount = result.AttemptCount,
-                    AcceptedResult = validation.AcceptedResult,
-                    TokenUsage = DurableOperationConversions.ToCheckpointUsage(result.TokenUsage),
-                }
-                : SimilarityFailure(
-                    question.Id,
-                    ResultsStatusCodes.AiOutputInvalid,
-                    result.AttemptCount,
-                    result.TokenUsage);
+                    Similarity = result.Score,
+                    Reason = result.ToReason(),
+                },
+                TokenUsage = DurableOperationConversions.ToCheckpointUsage(EvaluationTokenUsage.Unavailable),
+            });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return SimilarityFailure(question.Id, ResultsStatusCodes.Cancelled);
+            return Task.FromResult(SimilarityFailure(question.Id, ResultsStatusCodes.Cancelled));
         }
-        catch (Exception exception)
+        catch
         {
-            return SimilarityFailure(
-                question.Id,
-                DurableOperationConversions.ClassifyException(exception));
+            return Task.FromResult(SimilarityFailure(question.Id, ResultsStatusCodes.AiRuntimeFailed));
         }
     }
 

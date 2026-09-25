@@ -233,26 +233,13 @@ structured toolは`question_id`と`answer`だけを受ける。answerは1〜32,7
 指定ID、score、短い理由、同じ行の連続substring根拠とsourceだけをsubmit_special_quantificationへ1回送信してください。
 ```
 
-### 5.4 Similarity Prompt
+### 5.4 Local surface similarity
 
-Similarity Promptは利用者templateではなく、次の固定sectionへ検証済み値を`StringBuilder`で直接追加する。以下の`<...>`は説明用であり、`PromptTemplateRenderer`が解釈するplaceholderではない。
+SimilarityはLLMへ送らない。Reference answer生成だけは従来どおり`auto`モデルで1問1回行い、各学生回答との類似度はCoreの決定的なローカル計算で求める。比較前にNFKC正規化、invariant小文字化、空白・句読点・記号除去を行う。tokenizerは使わず、日本語にも適用しやすい文字n-gramを使う。
 
-```text
-設問に対する二つの回答の意味内容と表現の類似度を評価してください。
-0は類似しない、1は同一または実質同一です。
-不正行為や回答品質を判定せず、類似度だけを返してください。
+基本は3-gram、短文は2-gram／1-gramへfallbackする。学生回答n-gram集合`S`、参照回答n-gram集合`R`、共通数`I`から、`containment=I/|S|`（学生回答が参照に含まれる非対称指標）、`dice=2I/(|S|+|R|)`、`jaccard=I/|S∪R|`を出す。さらにsuffix automatonで最長共通substring長`LCS`をO(n+m)で求め、`lcsCoverage=LCS/学生回答長`とする（n未満の偶然一致は0扱い）。最終値は`max(0.70*containment + 0.20*dice + 0.10*jaccard, lcsCoverage)`を0〜1へ丸め、既定4桁で固定する。理由欄は学生本文を含めず、指標値だけを機械生成する。
 
-### 設問
-<question.QuestionText>
-
-### 学生回答
-<studentAnswer>
-
-### 比較用LLM生成回答
-<referenceAnswer>
-```
-
-resultは`question_id`、`similarity`、`reason`だけとし、similarityを0〜1でclosed validateする。`{参照回答}`を利用者向けplaceholderへ追加しない。通常Custom／Specialだけをsingle-pass rendererで検証し、app-owned Reference／Similarityはそれぞれ上記の限定置換／固定section構築を使う。
+同一question内の学生間類似度もfinalization時に全回答が読める状態で計算する。各学生回答について、同じquestionの他行との最大ローカル類似度と相手source rowを出力する。これは情報提供のみで、Similarity_PenaltyやFinal_Rawには使わない。Similarityは不正行為の証明ではなく、低いSimilarityも回答品質を保証しない。
 
 ### 5.5 retry
 
@@ -357,6 +344,8 @@ enabled special itemを1件以上持つquestionの末尾だけに`.Special_Quest
 - `.Similarity_Reason` literal
 - `.Similarity_Status` literal
 - `.Similarity_Penalty` formula
+- `.Similarity_Peer_Max` literal 0〜1またはblank（他学生回答との最大類似度、採点には未使用）
+- `.Similarity_Peer_Row` literal（最大類似度の相手source row、採点には未使用）
 
 #### Row totals
 
