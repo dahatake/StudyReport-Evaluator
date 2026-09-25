@@ -123,10 +123,11 @@ permission requestはrejectします。該当custom toolだけは`SkipPermission
 
 | Operation | model | 公開tool | Appが渡す主なdata |
 |---|---|---|---|
-| Reference | `auto` | `submit_reference_answer` | 設問文 |
+| Reference | UIで確認済みの選択model（Normalと同じ） | `submit_reference_answer` | 設問文 |
 | Normal | UIで確認済みの選択model | `submit_quantification` | current rowの主回答・選択補助列、設問、criterion |
 | Special | UIで確認済みの選択model | `submit_special_quantification` | current rowの固有評価用主値・選択補助列、設問 |
-| Similarity | `auto` | `submit_similarity` | current rowの主回答、保存済みReference、設問 |
+
+SimilarityはLLMを呼ばず、current rowの主回答と保存済みReferenceからアプリ内で表層類似度を計算します。Reference／Normal／Specialはrun開始時に解決した同じreasoning effortを使います。
 
 modelが返したtool argumentsは信頼しません。JSON Schemaに加え、`SubmitQuantificationTool`／各`Submit*Tool`のclosed parserと、Coreの`QuantificationResultValidator`／`AuxiliaryQuantificationResultValidator`で再検証します。未知・重複・欠落property、ID不一致、範囲外数値、未送信source、元文字列の連続部分列でないevidence、2回目のtool callは拒否されます。通常assistant本文は採点結果として採用しません。
 

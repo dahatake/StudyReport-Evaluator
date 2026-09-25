@@ -217,8 +217,8 @@ public sealed class DurableEvaluationSchedulerTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(9)]
-    public async Task Concurrency_outside_one_through_eight_is_rejected(int concurrency)
+    [InlineData(17)]
+    public async Task Concurrency_outside_one_through_sixteen_is_rejected(int concurrency)
     {
         EvaluationPlan plan = Plan(specialPoints: 10m);
         DurableEvaluationScheduler scheduler = new(

@@ -385,7 +385,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         "ログイン処理の終了を確認できませんでした。終了を待って再試行するか、アプリを終了して開き直してください。";
 
     private static readonly IReadOnlyList<int> ClosedConcurrencyOptions =
-        Array.AsReadOnly([1, 2, 3, 4, 5, 6, 7, 8]);
+        Array.AsReadOnly(Enumerable.Range(1, EvaluationSchedulerOptions.MaximumMaxConcurrency).ToArray());
 
     private readonly IExecutionAuthenticationBoundary authenticationBoundary;
     private readonly IQuantificationRunBoundary runBoundary;
@@ -621,7 +621,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
     }
 
     public string ConcurrencyText =>
-        $"最大 {MaxConcurrency.ToString(CultureInfo.InvariantCulture)} 件を並列実行（許可範囲 1～8）";
+        $"最大 {MaxConcurrency.ToString(CultureInfo.InvariantCulture)} 件を並列実行（許可範囲 1～16）";
 
     /// <summary>An explicit next-run directory, or null to derive it from the current input.</summary>
     public string? OutputDirectoryOverride
@@ -2047,7 +2047,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
             AddError(errors, new ExecutionTechnicalError(
                 "CONCURRENCY_OUT_OF_RANGE",
                 "Concurrency",
-                "並列度は 1～8 にしてください。"));
+                "並列度は 1～16 にしてください。"));
         }
 
         if (IsResumeMode)

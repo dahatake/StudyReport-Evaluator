@@ -240,7 +240,7 @@ public sealed class ExecutionViewTests
             metadata,
             new RecordingRunBoundary((_, _, _) => throw new IOException(exceptionCanary)));
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
-        viewModel.MaxConcurrency = 9;
+        viewModel.MaxConcurrency = 17;
 
         Assert.False(viewModel.CanStart);
         Assert.Contains(viewModel.TechnicalErrors, error => error.Code == "CONCURRENCY_OUT_OF_RANGE");
@@ -1240,7 +1240,7 @@ public sealed class ExecutionViewTests
     public async Task Technical_errors_keep_selection_virtualize_long_lists_and_hide_when_resolved()
     {
         using LoginViewHarness harness = new();
-        harness.ViewModel.MaxConcurrency = 9;
+        harness.ViewModel.MaxConcurrency = 17;
         Render();
         ListBox list = Required<ListBox>(harness.View, "TechnicalErrorsList");
         TextBox detail = Required<TextBox>(harness.View, "SelectedTechnicalErrorDetail");

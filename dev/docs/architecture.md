@@ -71,10 +71,10 @@ run開始後のdraft変更は次runだけへ反映する。current run、checkpo
 
 | Operation | Model | Workbook由来input | Tool |
 |---|---|---|---|
-| Reference | `auto` | なし。question textのみ | `submit_reference_answer` |
+| Reference | user-selected（Normalと同じ） | なし。question textのみ | `submit_reference_answer` |
 | Normal | user-selected | current rowのnormal primary/supporting | `submit_quantification` |
 | Special | user-selected | current rowのspecial primary/supporting | `submit_special_quantification` |
-| Similarity | `auto` | current row primary + stored reference | `submit_similarity` |
+| Similarity | なし（ローカル計算） | current row primary + stored reference | なし |
 
 各attemptはrestricted sessionを新規作成する。公開toolは該当operationの1件だけで、shell、filesystem、Web、GitHub write、MCP、ambient memoryを公開しない。normal assistant bodyはresultとして採用しない。tool call exactly once、closed property set、expected ID、finite range、same-row evidenceをvalidationする。
 

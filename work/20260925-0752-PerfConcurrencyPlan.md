@@ -45,3 +45,11 @@
 - fake transport単体テストで、共有poolが`Start`/`ListModels`をattemptごとに繰り返さないこと、rate limitがbackoff付きretryとdistinct statusになること、quotaが非retryになることを確認する。
 - durable orchestrator testで複数行がin-flightになり、checkpoint更新はsource row prefix順になることを確認する。
 - `dotnet build .\StudyReportEvaluator.slnx -c Release`、`dotnet test .\StudyReportEvaluator.slnx -c Release`を実行し、失敗は修正または既知flakyとして証跡を残す。
+
+## 統合時の改訂（2026-09-26）
+
+- reasoning effortはrun開始時に1回だけ解決する方式（`work/20260925-0828-UniformReasoningEffortPlan.md`）になったため、attemptごとの`ListModelsAsync`は不要になった。共有poolのmodel一覧cacheは使われなくなったので削除した。
+- 類似度はローカル計算になり、共有clientを使うLLM operationは参照回答・通常評価・固有評価の3種になった。
+- 行pipelineの窓は「実行中の行＋完了済みだがcheckpoint未保存の行」の合計で並列度以下に制限した（当初は実行中の行だけを数えており、前の行が遅いと未保存の行が際限なく増えた）。crash時の再実行は最大で並列度分の行に収まる。
+- 並列度は合成Promptの実測（`work/20260926-0020-ConcurrencyAndEffortMeasurement.md`）で、並列8でスループットが頭打ちになったため、**既定8・上限16**へ改めた（上記「並列度の既定値と上限」の既定4・上限8を置き換える）。
+

@@ -97,7 +97,7 @@
                           HorizontalAlignment="Stretch" TabIndex="11"
                           AutomationProperties.AutomationId="ExecutionConcurrency"
                           AutomationProperties.Name="最大並列度"
-                          ToolTip.Tip="次回実行の最大並列度を1～8から選択します。実行中の条件は変わりません。" />
+                          ToolTip.Tip="次回実行の最大並列度を1～16から選択します。実行中の条件は変わりません。" />
               </Grid>
               <Grid Grid.Row="1" ColumnDefinitions="90,*" ColumnSpacing="8">
                 <TextBlock Text="指定出力先" Classes="settings-label" />

@@ -313,7 +313,7 @@ public sealed class SettingsCompositionTests
         Assert.Null(harness.Shell.Settings.StoredDefinition);
         Assert.Null(harness.Shell.Settings.LastSaveTask);
         Assert.Null(harness.Execution.PreferredModelId);
-        Assert.Equal(4, harness.Execution.MaxConcurrency);
+        Assert.Equal(8, harness.Execution.MaxConcurrency);
         Assert.Equal(original, File.ReadAllBytes(directory.SettingsPath));
         Assert.Equal(0, harness.Loader.CallCount);
         AssertNoRuntimeActivity(harness);

@@ -781,7 +781,7 @@ public sealed class SettingsViewModelTests
             case "name": harness.Design.DefinitionName = string.Empty; break;
             case "allocation": harness.Design.BasePoints += 0.0001m; break;
             case "prompt": harness.Design.Questions[0].Evaluators[0].CustomPromptTemplate = "{" + PrivateCanary + "}"; break;
-            case "concurrency": harness.Execution.MaxConcurrency = 9; break;
+            case "concurrency": harness.Execution.MaxConcurrency = 17; break;
             case "output": harness.Execution.OutputDirectoryOverride = "relative/" + PrivateCanary; break;
             case "unicode": harness.Design.DefinitionName = PrivateCanary + "\uD800"; break;
             default: throw new ArgumentOutOfRangeException(nameof(invalid));

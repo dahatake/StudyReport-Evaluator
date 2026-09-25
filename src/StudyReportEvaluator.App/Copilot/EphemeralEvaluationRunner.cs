@@ -19,8 +19,8 @@ public sealed class EphemeralEvaluationRunnerOptions
     public static TimeSpan DefaultCleanupTimeout { get; } = TimeSpan.FromSeconds(15);
 
     public const int MinimumMaxConcurrency = 1;
-    public const int DefaultMaxConcurrency = 4;
-    public const int MaximumMaxConcurrency = 8;
+    public const int DefaultMaxConcurrency = 8;
+    public const int MaximumMaxConcurrency = 16;
 
     public EphemeralEvaluationRunnerOptions(
         TimeSpan? attemptTimeout = null,
@@ -38,7 +38,7 @@ public sealed class EphemeralEvaluationRunnerOptions
         {
             throw new ArgumentOutOfRangeException(
                 nameof(maxConcurrency),
-                "Evaluation concurrency must be between 1 and 8.");
+                "Evaluation concurrency must be between 1 and 16.");
         }
 
         MaxConcurrency = maxConcurrency;

@@ -297,8 +297,8 @@ public sealed class EvaluationSchedulerTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(9)]
-    public async Task Concurrency_outside_one_through_eight_is_rejected(int maxConcurrency)
+    [InlineData(17)]
+    public async Task Concurrency_outside_one_through_sixteen_is_rejected(int maxConcurrency)
     {
         EvaluationPlan plan = U01TestSupport.Plan(OneQuestionDefinition(2, 2));
         EvaluationScheduler scheduler = new(

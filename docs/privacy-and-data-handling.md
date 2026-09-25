@@ -99,7 +99,7 @@ EXE配置先や抽出cacheを既定の出力先にせず、配布・展開・起
 |---|---|
 | `schemaVersion` | 設定形式の整数`1` |
 | `preferredModelId` | 通常評価modelの希望ID、または未指定の`null`。認証済み・利用可能という保証ではない |
-| `maxConcurrency` | 最大並列度1〜8、既定4 |
+| `maxConcurrency` | 最大並列度1〜16、既定8 |
 | `outputDirectoryOverride` | 利用者が明示した絶対出力path、または未指定の`null`。自動算出した`result`は保存しない |
 | `definition` | 任意の採点定義1件、または`null`。複数profileや結果の保管庫ではない |
 | `cachedModels` | 任意の最後に取得成功したmodel一覧。要素は`id`、`maximumPromptTokens`、`maximumContextWindowTokens`（各上限は正の整数または`null`）。省略／`null`はキャッシュなし、空配列`[]`も有効 |

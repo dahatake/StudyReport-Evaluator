@@ -147,7 +147,7 @@ top level/itemとも`additionalProperties=false`、全property required、`null`
 | 1 request | 65,536 Unicode scalars以下、かつmodel contextの80%以下 | input/context admission |
 | 1 tool arguments | 32,767 Unicode scalars以下 | result protocol admission |
 | 1 run | 20,000 outbound attempts | resource/cost admission |
-| concurrency | default 4、maximum 8 | isolation/resource admission。run内は共有Copilot CLI clientの上でsessionをattemptごとに分離し、rate limit時はadaptive limiterが有効並列度を下げる |
+| concurrency | default 8、maximum 16 | isolation/resource admission。run内は共有Copilot CLI clientの上でsessionをattemptごとに分離し、rate limit時はadaptive limiterが有効並列度を下げる |
 
 hard ceilingだけはruntime設定で増やせない。SDK/CLIの実測上限がこれより小さい場合はG-15で小さい方を採用し、要求を再評価する。教育用途の設定値を製品が自動縮小しない。
 

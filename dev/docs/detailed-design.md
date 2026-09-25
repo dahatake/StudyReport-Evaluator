@@ -199,7 +199,7 @@ AllocationValidationResult Validate(
 | Reference | run開始時のuser-selected model | question text | `submit_reference_answer` |
 | Normal | run開始時のuser-selected model | question、primary、supporting、criteria | `submit_quantification` |
 | Special | run開始時のuser-selected model | question、special primary/supporting、Prompt | `submit_special_quantification` |
-| Similarity | `auto` | question、student answer、reference | `submit_similarity` |
+| Similarity | なし（ローカル計算、5.4節） | student answer、reference | なし |
 
 各sessionへ公開するtoolは表の1件だけとする。permission requestは全拒否する。
 
@@ -235,7 +235,7 @@ structured toolは`question_id`と`answer`だけを受ける。answerは1〜32,7
 
 ### 5.4 Local surface similarity
 
-SimilarityはLLMへ送らない。Reference answer生成だけは従来どおり`auto`モデルで1問1回行い、各学生回答との類似度はCoreの決定的なローカル計算で求める。比較前にNFKC正規化、invariant小文字化、空白・句読点・記号除去を行う。tokenizerは使わず、日本語にも適用しやすい文字n-gramを使う。
+SimilarityはLLMへ送らない。Reference answer生成だけはrunの選択modelで1問1回行い、各学生回答との類似度はCoreの決定的なローカル計算で求める。比較前にNFKC正規化、invariant小文字化、空白・句読点・記号除去を行う。tokenizerは使わず、日本語にも適用しやすい文字n-gramを使う。
 
 基本は3-gram、短文は2-gram／1-gramへfallbackする。学生回答n-gram集合`S`、参照回答n-gram集合`R`、共通数`I`から、`containment=I/|S|`（学生回答が参照に含まれる非対称指標）、`dice=2I/(|S|+|R|)`、`jaccard=I/|S∪R|`を出す。さらにsuffix automatonで最長共通substring長`LCS`をO(n+m)で求め、`lcsCoverage=LCS/学生回答長`とする（n未満の偶然一致は0扱い）。最終値は`max(0.70*containment + 0.20*dice + 0.10*jaccard, lcsCoverage)`を0〜1へ丸め、既定4桁で固定する。理由欄は学生本文を含めず、指標値だけを機械生成する。
 
@@ -517,7 +517,7 @@ sequenceDiagram
 
 ### 8.2 Row scheduling
 
-学生行はsource row昇順の決定的な出力順を維持しながら、複数行をin-flightにできる。run開始時の最大並列度は既定4／最大8で、normal evaluator、special item、similarityの全operationがrun共通のadaptive limiterを共有する。少問・多行のworkloadで1行内のoperation数が少なくても、後続行を先行して読み出し、空いたslotへ投入する。
+学生行はsource row昇順の決定的な出力順を維持しながら、複数行をin-flightにできる。run開始時の最大並列度は既定8／最大16で、normal evaluator、special item、similarityの全operationがrun共通のadaptive limiterを共有する。少問・多行のworkloadで1行内のoperation数が少なくても、後続行を先行して読み出し、空いたslotへ投入する。
 
 理由:
 
@@ -670,7 +670,7 @@ lock fileやglobal reservation serviceは追加しない。
 |---|---|
 | `schemaVersion` | 必須の整数`1` |
 | `preferredModelId` | 通常model希望IDまたは`null`。利用可能性の確認状態ではない |
-| `maxConcurrency` | 1〜8、既定4 |
+| `maxConcurrency` | 1〜16、既定8 |
 | `outputDirectoryOverride` | fully qualifiedな明示出力先または`null`。自動算出resultは含めない |
 | `definition` | 任意の`QuantificationDefinition`1件。ID・順序・decimal・設問文・mapping・配点・evaluator／criterion／special・適用済みPrompt・丸めを保持 |
 
@@ -744,7 +744,6 @@ checkpointとRun sheetへ次を保存する。
 - CLI executable SHA-256
 - normal/reference model ID（同一ID）
 - run-level reasoning effort（未指定はnull）
-- similarity model ID `auto`
 
 ### 12.3 runtime配置cacheとcredential storeの分離
 

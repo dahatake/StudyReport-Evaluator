@@ -275,7 +275,7 @@ public sealed class ExecutionSettingsTests
         Assert.Equal("model-b", viewModel.PreferredModelId);
         Assert.Null(viewModel.SelectedModelId);
         Assert.Equal(concurrency, viewModel.MaxConcurrency);
-        Assert.Equal(new[] { 1, 2, 3, 4, 5, 6, 7, 8 }, viewModel.ConcurrencyOptions);
+        Assert.Equal(Enumerable.Range(1, 16).ToArray(), viewModel.ConcurrencyOptions);
         Assert.Equal(harness.ExplicitOutput, viewModel.OutputDirectoryOverride);
         Assert.False(viewModel.IsConfigured);
         Assert.Equal(0, viewModel.PlannedEvaluationCount);
@@ -309,9 +309,9 @@ public sealed class ExecutionSettingsTests
     [Theory]
     [InlineData(-1)]
     [InlineData(0)]
-    [InlineData(9)]
+    [InlineData(17)]
     [InlineData(int.MaxValue)]
-    public async Task Restored_concurrency_outside_one_to_eight_is_blocked_without_clamping(int concurrency)
+    public async Task Restored_concurrency_outside_one_to_sixteen_is_blocked_without_clamping(int concurrency)
     {
         using SettingsHarness harness = new();
         harness.Configure();
@@ -918,7 +918,7 @@ public sealed class ExecutionSettingsTests
         Assert.Equal("前回run 新規出力先: " + harness.ExplicitOutput, viewModel.CurrentRunOutputSummary);
         Assert.Contains("開始できます", viewModel.ValidationSummary, StringComparison.Ordinal);
         Assert.True(viewModel.CanStart);
-        viewModel.MaxConcurrency = 9;
+        viewModel.MaxConcurrency = 17;
         await viewModel.StartAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, harness.Runner.CallCount);
         Assert.Equal("model-a", viewModel.CurrentRunModelId);

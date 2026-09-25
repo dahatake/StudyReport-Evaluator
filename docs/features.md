@@ -76,7 +76,7 @@ AIへBase points、Question earned、Special earned、Similarity penalty、Final
 
 ## 実行設定と出力先
 
-通常モデル、並列度（1〜8）、指定出力先の利用者編集は**設定 → 共通**で行います。実行画面には次回の実効値と、今回／前回runの開始時に固定した値を分けて表示します。Reference／Normal／Specialはrun開始時の通常モデルと同じreasoning effort（既定希望`low`、非対応時は未指定）を使います。Similarityはローカル計算です。
+通常モデル、並列度（1〜16）、指定出力先の利用者編集は**設定 → 共通**で行います。実行画面には次回の実効値と、今回／前回runの開始時に固定した値を分けて表示します。Reference／Normal／Specialはrun開始時の通常モデルと同じreasoning effort（既定希望`low`、非対応時は未指定）を使います。Similarityはローカル計算です。
 
 - 共通設定は、今回の明示編集、保存済み設定、既定値の順で使います。**Copilot 状態を確認**で利用可能modelを確認し、保存希望IDが使えない場合は別modelへ自動変更せず、共通設定で選び直します。
 - 明示した出力先は別の入力Excelへ変更しても保持します。保存済みなら再起動後も復元します。入力が未選択になっても明示指定は失われません。
@@ -221,7 +221,7 @@ partial削除だけが失敗した場合、validなfinalは無効になりませ
 ## 上限
 
 - selected rows: 20,000以下
-- concurrency: 1〜8
+- concurrency: 1〜16
 - retry込みattempt budget: 20,000以下
 - app-owned request: 65,536 Unicode scalars以下かつmodel容量の安全margin内
 - Excel column、cell、formula、function argumentの媒体上限をwrite前に検証

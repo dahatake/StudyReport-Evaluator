@@ -529,7 +529,7 @@ public sealed class DocumentationContractTests
         ApplicationSettings defaults = new();
         Assert.Equal(1, ApplicationSettings.CurrentSchemaVersion);
         Assert.Equal(1, defaults.SchemaVersion);
-        Assert.Equal(4, defaults.MaxConcurrency);
+        Assert.Equal(8, defaults.MaxConcurrency);
         Assert.Null(defaults.PreferredModelId);
         Assert.Null(defaults.OutputDirectoryOverride);
         Assert.Null(defaults.Definition);
@@ -541,7 +541,7 @@ public sealed class DocumentationContractTests
         [
             ("schemaVersion", "必須の整数`1`"),
             ("preferredModelId", "通常modelの希望ID、または`null`。利用可能と確認した実行状態ではない"),
-            ("maxConcurrency", "1〜8、既定4"),
+            ("maxConcurrency", "1〜16、既定8"),
             ("outputDirectoryOverride", "明示した完全修飾の絶対出力path、または`null`。自動算出`result`は保存しない"),
             ("definition", "任意の採点定義**1件**、または`null`"),
             ("cachedModels", "任意の最後に取得成功したmodel一覧。省略／`null`はキャッシュなし、空配列`[]`も有効"),
@@ -648,7 +648,7 @@ public sealed class DocumentationContractTests
             "別modelへfallbackしません",
             "確認失敗だけでは希望IDを消しません",
             "それだけで暗黙の希望IDを保存しません",
-            "通常modelが使えても`auto`不在なら開始できません",
+            "参照回答・通常評価・固有評価はrunで選んだ同じmodelとreasoning effortを使います",
             "再起動後や別Excelへ変更した後もその絶対pathを保持",
             "指定出力先を空欄にする操作は未指定（`null`）への明示変更",
             "以前の保存指定へ勝手に戻りません",

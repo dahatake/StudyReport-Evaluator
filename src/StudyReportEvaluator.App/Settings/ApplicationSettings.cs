@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json.Serialization;
+using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.Core.Domain;
 
 namespace StudyReportEvaluator.App.Settings;
@@ -21,9 +22,9 @@ public sealed record ApplicationSettings
     [JsonPropertyName("preferredModelId")]
     public string? PreferredModelId { get; init; }
 
-    /// <summary>The requested concurrency, validated as 1 through 8 by the settings store.</summary>
+    /// <summary>The requested concurrency, validated as 1 through 16 by the settings store.</summary>
     [JsonPropertyName("maxConcurrency")]
-    public int MaxConcurrency { get; init; } = 4;
+    public int MaxConcurrency { get; init; } = EphemeralEvaluationRunnerOptions.DefaultMaxConcurrency;
 
     /// <summary>An explicitly selected absolute directory, or null for the input-adjacent default.</summary>
     [JsonPropertyName("outputDirectoryOverride")]

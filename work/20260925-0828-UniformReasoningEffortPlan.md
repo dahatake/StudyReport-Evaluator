@@ -47,3 +47,10 @@
 - 新規partial checkpointは`ReferenceModelId`がrun modelになり、`ReasoningEffort`がnull以外なら保存される。古いcheckpointの扱いはresume admissionで明示的なmodel／effort一致条件に従う。
 - SDKの値はmodel-definedであり、将来`minimal`やBYOK固有値が出ても、safeな文字列として記録できる。ただしfallback順序にない値は希望値と完全一致する場合だけ優先し、それ以外は順序内の値から決定する。
 - `auto`を選んだrunではeffortはnullで統一されるが、routerの実効model・実効effortは引き続き観測できない。
+
+## 統合時の改訂（2026-09-26）
+
+- 実model一覧を測定できた（`work/20260926-0020-ConcurrencyAndEffortMeasurement.md`）。reasoning effort対応modelはすべて`low`を列挙しており、希望`low`はそのまま`low`に解決される。
+- 類似度はローカル計算になったため、固定`auto`を使うoperationはなくなった。実行開始前の`AUTO_MODEL_UNAVAILABLE`検査と実行画面の「固定 auto」表示を削除し、同じ位置に次回runのreasoning effortを表示する。
+- Reference sheetのreasoning effort列は、既存列の位置を変えないよう末尾（H列）に追加した。
+

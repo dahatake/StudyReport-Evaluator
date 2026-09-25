@@ -4,7 +4,7 @@
 
 - **方針**: run開始時に選択modelの対応effortから1つだけ解決し、Reference／通常評価／固有評価へ同じ値を指定する。既定希望は`low`。`none`はreasoningを無効化するため既定にはせず、非対応・`auto`・一覧にないmodelではrun全体を未指定（`null`）にする。
 - **実装**: effort解決を`ModelInfo`列挙＋希望値のpure functionへ分離した。参照回答は固定`auto`ではなくrunの選択modelを使い、checkpointの`ReferenceModelId`と`ReasoningEffort`、Run sheet、Reference sheet、ジョブログcontext／attemptへ記録する。再開時はmodel、ReferenceModelId、reasoning effortの一致を同じmodel条件として確認する。
-- **SDK確認**: SDK 1.0.11のREADMEは`SessionConfig.ReasoningEffort`を`low`/`medium`/`high`/`xhigh`/`max`等として記載し、`ListModelsAsync()`で対応可否を確認するよう説明している。XML docsはCAPI値がmodel-definedで、`none`はreasoningを無効化し、未指定ならoverrideしないこと、`ModelInfo.SupportedReasoningEfforts`と`DefaultReasoningEffort`を公開することを記載している。ローカルCLI probeは`CopilotClientFactory`が`CliUnavailable`を返したため、この環境では実model一覧の測定はできなかった。
+- **SDK確認**: SDK 1.0.11のREADMEは`SessionConfig.ReasoningEffort`を`low`/`medium`/`high`/`xhigh`/`max`等として記載し、`ListModelsAsync()`で対応可否を確認するよう説明している。XML docsはCAPI値がmodel-definedで、`none`はreasoningを無効化し、未指定ならoverrideしないこと、`ModelInfo.SupportedReasoningEfforts`と`DefaultReasoningEffort`を公開することを記載している。その後の実測（`work/20260926-0020-ConcurrencyAndEffortMeasurement.md`）で、reasoning effort対応modelはすべて`low`を列挙していた。
 
 ## 2026-09-25 — 類似度評価のローカル決定化
 
@@ -19,7 +19,7 @@
 - **共有client**: run内で`SharedCopilotClientPool`を使い、通常／参照／固有operationが1つの検証済みCopilot CLI processを共有するようにした。attemptごとのsession ID、tool制約、session削除、usage記録は維持し。reasoning effortは認証確認時のmodel一覧からrun開始時に1回だけ解決するため、attemptごとの`ListModelsAsync`は行わない。CLI process死亡が疑われるtransport障害ではpoolをinvalidateし、既存retry規則の次attemptで再作成する。
 - **rate limit / quota**: SDK `SessionErrorEvent`の`errorType=rate_limit`／`quota`と既知codeを分類し、`RATE_LIMITED`／`QUOTA_EXHAUSTED`を追加した。rate limitは最大3attempt内で指数backoff＋jitter（retry-after seamあり）を使い、adaptive limiterがAIMDで有効並列度を下げる。quota exhaustedは再試行せず、partialを残して停止する。
 - **行pipeline**: durable workflowで複数student rowをin-flightにし、全行・全operationがrun共通のglobal limiterを共有する。checkpointはsource row順の連続prefixだけを保存し、後続行が先に完了した場合はmemoryに保持する。crash時の再実行範囲は最大pipeline幅へ広がるが、resume admissionのprefix検証と出力順序は維持する。
-- **並列度**: 既定4、選択上限8へ変更。典型workload（40〜200名×3〜5問）では共有CLIによりattemptごとの10〜25秒程度の準備重複を避け、4並列でrate limitリスクとslot利用率の均衡を取る。8は明示選択時の上限で、rate limit時は4→2→1のように縮退する。実CLIでの合成測定は今回未実施。
+- **並列度**: 既定8、選択上限16へ変更。合成Prompt（`claude-sonnet-5`・`low`）の実測で、1 attemptはclientを毎回作る方式の11〜14秒から共有clientの約5秒になり、スループットは並列1／4／8／16で10.9／29.8／46.4／49.2件/分だった。8で頭打ちになり、16は1件の待ちが約2倍になるため既定は8とした。rate limit時は有効並列度を半減する（8→4→2→1）。記録は`work/20260926-0020-ConcurrencyAndEffortMeasurement.md`。
 - **確認**: `dotnet build .\StudyReportEvaluator.slnx -c Release --no-restore`成功。関連単体（Retry/設定/実行設定/ durable orchestrator / documentation contract）288件成功。
 
 ## 2026-09-25 — schema不正の根本原因とreasoning effortの記録
@@ -138,7 +138,7 @@ T27は実`InputWorkbookLoader`、`SettingsFileStore`、`DurableQuantificationOrc
 
 | 境界 | 確認した実装 |
 |---|---|
-| 保存共通値／任意定義 | `ApplicationSettings`はschema整数1、通常model希望ID・並列度1〜3・absoluteな明示出力先またはnull・任意定義1件。strict JSON／UTF-8、同directory tempのwrite／flush／close後の置換。自動保存／移行／mergeはなく、失敗時は旧fileとdraftを保持 |
+| 保存共通値／任意定義 | `ApplicationSettings`はschema整数1、通常model希望ID・並列度1〜16・absoluteな明示出力先またはnull・任意定義1件。strict JSON／UTF-8、同directory tempのwrite／flush／close後の置換。自動保存／移行／mergeはなく、失敗時は旧fileとdraftを保持 |
 | productionとtest構成 | `Program.BuildAvaloniaApp` → `ServiceRegistration.FromStartup`でOS LocalApplicationDataを解決し、`App.CreateMainWindow`経由のwindow構築後だけ初期読込を接続。従来の既定constructorはnull storeで設定I/Oなし。testのread／writeは一時absolute pathに限定 |
 | 最新採点draft | Input／Designが既存draftを所有し、Settingsは`latestEditor`から一方向に同期して保存する。Design VMと残る子editorを再利用。共通値の変更で採点編集元を切り替えず、入力未読込時は保存済み定義を保持 |
 | 保存値と適用値 | model希望と確認済み実効選択、明示出力先とnull時だけの入力隣接resultを分離。保存定義は起動時に保持するだけで、header metadata・入力identity・mapping検証後の明示操作でだけ適用。run中は一括適用不可 |

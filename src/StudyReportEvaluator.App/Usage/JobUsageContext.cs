@@ -18,7 +18,7 @@ public sealed class JobUsageContext
         RequestedReasoningEffort = ReasoningEffortPolicy.IsSafeReasoningEffort(requestedReasoningEffort)
             ? requestedReasoningEffort
             : null;
-        MaxConcurrency = maxConcurrency is >= 1 and <= 8 ? maxConcurrency : null;
+        MaxConcurrency = maxConcurrency is >= 1 and <= EphemeralEvaluationRunnerOptions.MaximumMaxConcurrency ? maxConcurrency : null;
         IsResume = isResume;
     }
 

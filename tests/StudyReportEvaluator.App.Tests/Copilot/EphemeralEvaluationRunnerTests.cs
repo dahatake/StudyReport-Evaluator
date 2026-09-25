@@ -237,7 +237,7 @@ public sealed class EphemeralEvaluationRunnerTests
         EphemeralEvaluationRunnerOptions options = new();
 
         Assert.Equal(TimeSpan.FromSeconds(120), options.AttemptTimeout);
-        Assert.Equal(4, options.MaxConcurrency);
+        Assert.Equal(8, options.MaxConcurrency);
         Assert.InRange(options.CleanupTimeout, TimeSpan.FromMilliseconds(1), TimeSpan.FromMinutes(1));
         Assert.DoesNotContain(
             typeof(EphemeralEvaluationRunner).GetMethods(),
@@ -299,8 +299,8 @@ public sealed class EphemeralEvaluationRunnerTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(9)]
-    public void Concurrency_outside_one_through_eight_is_rejected(int concurrency)
+    [InlineData(17)]
+    public void Concurrency_outside_one_through_sixteen_is_rejected(int concurrency)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new EphemeralEvaluationRunnerOptions(maxConcurrency: concurrency));

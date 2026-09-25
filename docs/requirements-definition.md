@@ -9,7 +9,7 @@
 | 出力 | 入力を変更せず作成する別の標準 `.xlsx` 1ファイル |
 | 対応環境 | Windows 11 x64。macOS、Linux、Windows Arm64は現版の正式公開対象外 |
 | UI / Runtime | Avalonia `12.1.1` / .NET `10.0.11` self-contained。build SDK `10.0.400`を固定 |
-| AI | GitHub Copilot SDK for .NET `1.0.11` / bundled CLI `1.0.79`を固定。通常評価は利用者選択model、参照回答と類似度は `auto` |
+| AI | GitHub Copilot SDK for .NET `1.0.11` / bundled CLI `1.0.79`を固定。参照回答・通常評価・固有評価は利用者選択modelと同じrun-level reasoning effort。類似度はローカル計算 |
 | 旧版 | v4.5の業務・入力・採点・数式・checkpoint・privacy・delivery境界をcarry forwardし、承認されたUI簡素化・設定保存・復元の差分だけを追加。v3.0はv4.0により全面的にsupersede済み |
 
 > 本版は、要求所有者が2026-09-07に[UI・設定保存プランv2](../dev/docs/archive/work/20260907-ui-settings-redesign-plan-v2.md)のD01〜D20デフォルト・全実装を明示承認した差分を反映する。元プランの承認待ち表記は履歴であり、後続指示を優先する。最小実装契約と測定範囲は[UI layout contract](../dev/docs/ui-layout-contract.md)へ分離する。D17の当初上書き「全タスク完了後だけUnreleased追記、続いて製品PATCH `0.8.4` → `0.8.5`」と「T01では製品版・CHANGELOGを変更しない」は履歴として保持する。さらに後続の利用者不在時の自律続行指示により、T39をBLOCKEDのままF01／F02を進める。F01はREVIEWED、親担当による製品PATCHは反映済みだが、G4・全タスク完了・公開PASSを意味しない。以後のF02最終再検証は[実行記録](../dev/docs/archive/work/20260907-ui-settings-execution-record.md)の最新欄を正本とする。
@@ -277,14 +277,14 @@ $$
 
 - GitHub Copilot SDK for .NETの固定versionを使う。
 - 通常評価のmodelは、SDKが実行時に列挙したmodelから利用者が選択する。`auto`を含む列挙された全modelを選択できる。
-- 参照回答生成と類似度評価にはmodel ID `auto`を使う。
-- `auto`が列挙されない場合はrunを開始せず、別modelへ黙ってfallbackしない。
+- 参照回答生成・通常評価・固有評価は、runで選択した同じmodelを使う。類似度評価はLLMを使わない（7.5節）。
+- 保存希望modelが列挙されない場合は未選択とし、別modelへ黙ってfallbackしない。
 - SDKがmodelのprompt／context上限を公開しない場合がある。`auto`はrouterであり上限を公開しない。
 - 上限が不明なmodelでは、model相対のcontext budget検査を適用しない。上限不明を理由にrunを拒否せず、既定値を推定せず、別modelへfallbackしない。
 - 上限が不明でも、app-owned requestの絶対上限とretry込みattempt上限は常に適用する。
 - 実効modelの上限が既知か不明かを実行画面に明示する。
 - 1 attemptごとにrestricted sessionを使用し、app-owned structured result toolだけを公開する。
-- reasoning effort（SDK `SessionConfig.ReasoningEffort`）は、指定する場合は`medium`とし、答案の定量化にhigh以上は指定しない。SDKがreasoning effort対応と列挙したmodelで、対応effortに`medium`がある場合だけ指定する。`auto`と非対応modelは指定するとsession作成が失敗するため指定せず、runtime既定に任せる。したがって`auto`固定の参照回答生成・類似度評価と、通常評価で`auto`または非対応modelを選んだ場合はeffortを指定しない。このとき実際に使われたeffortはSDKから観測できない（SDKの現在model照会も未指定を返す）。これを理由にrunを拒否せず、別modelへfallbackしない。attemptごとの指定値（`medium`または未指定）はジョブログへ記録する（11.9節）。
+- reasoning effort（SDK `SessionConfig.ReasoningEffort`）は、run開始時に選択modelの対応値から1つだけ解決し、同じrunの参照回答生成・通常評価・固有評価のすべてへ同じ値を指定する（採点の一貫性のため）。希望値は`low`とし、非対応なら`none < minimal < low < medium < high < xhigh < max`の順序で最も近い対応値（同距離は高い側）を選ぶ。`none`はreasoningを無効化するため既定にしない。`auto`、reasoning effort非対応、対応値未列挙のmodelでは、すべてのoperationで未指定とする（指定するとsession作成が失敗するため）。このとき実際に使われたeffortはSDKから観測できない。これを理由にrunを拒否せず、別modelへfallbackしない。解決した値（または未指定）はcheckpoint、Run sheet、Reference sheet、ジョブログへ記録し、再開時は同じmodelと値を要求する（11.9節）。
 - shell、filesystem、Web、GitHub write、MCP、ambient memoryを公開しない。
 - finite timeout、有限retry、cancel、session cleanupを必須とする。
 
@@ -337,13 +337,14 @@ AIは次だけを返す。
 
 ### 7.5 類似度評価
 
-各回答行の各有効設問について、学生回答と、その設問の参照回答の類似度を`auto`へPromptとして送り、0〜1で返す。
+各回答行の各有効設問について、学生回答と、その設問の参照回答の表層類似度を、LLMを使わずアプリ内の決定的な計算で0〜1として求める。目的は、生成AIの出力をそのまま貼り付けた回答の検出材料であり、意味の近さ（正答どうしの類似）を測らない。
 
-- 0は類似しない、1は同一または実質同一を表す。
-- 文字列距離をアプリ側でAI値の代替として計算しない。
-- 学生回答が空の場合はAIへ送らず0とする。
-- 参照回答がblank、または類似度AIが技術的に失敗した場合はblankとする。
-- 範囲外、NaN、Infinity、複数提出、unknown fieldを拒否する。
+- 比較前にNFKC正規化、invariant小文字化、空白・句読点・記号除去を行い、文字n-gram（原則3、短文は2／1）を使う。
+- 値は`max(0.70×学生n-gram包含率 + 0.20×Dice + 0.10×Jaccard, 最長共通部分文字列の被覆率)`を4桁に丸めたもの。0は類似しない、1は同一を表す。
+- 学生回答が空の場合は0とする。参照回答がblankの場合はblankとする。
+- reasonは指標値だけの機械生成文とし、学生本文を含めない。
+- 同じ設問の他学生回答との最大類似度と相手行を情報列として出力する。採点式・減点には使わない。
+- 類似度は不正行為の証明ではない。
 
 ### 7.6 retryとfailure
 
@@ -500,7 +501,7 @@ run開始時、完成名に対応する次のfileを作る。
 - input identity
 - definition canonical snapshotとSHA-256
 - final/partial path
-- 通常評価model ID、参照／類似度model ID `auto`
+- 通常評価model ID、参照回答model ID（通常評価と同じ）、run-level reasoning effort
 - 通常評価modelに`auto`を選んだ場合、記録されるのは`auto`であり、routerが実際に選んだmodelは記録されない。同じcheckpointから再開しても同一modelへroutingされる保証はない。
 - app、SDK、CLI runtime identity
 - 参照回答とstatus
@@ -516,7 +517,7 @@ run開始時、完成名に対応する次のfileを作る。
 - input SHA-256、size、last-write time
 - definition SHA-256
 - 通常評価model ID
-- reference/similarity model ID `auto`
+- reference model ID（通常評価と同じ）とrun-level reasoning effort
 - app major schema compatibility
 - Copilot CLI runtime identity
 
@@ -625,7 +626,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 ### 11.6 設定fileの読込と明示保存
 
 - 保存先はOSのLocalApplicationData配下`StudyReportEvaluator/setting.txt`とする。Windowsでは通常`%LOCALAPPDATA%`配下であり、EXE、入力、出力、抽出cache、CLI credential storeと分離する。新しい製品CLI引数・必須環境変数を追加しない。
-- UTF-8 JSON、設定schema整数1で、共通設定（通常model希望ID、並列度1〜8・既定4、absoluteな明示出力先または`null`）と任意の採点定義1件だけを保存する。設定schemaはcanonical schema・要求版・製品版とは独立する。
+- UTF-8 JSON、設定schema整数1で、共通設定（通常model希望ID、並列度1〜16・既定8、absoluteな明示出力先または`null`）と任意の採点定義1件だけを保存する。設定schemaはcanonical schema・要求版・製品版とは独立する。
 - 採点定義はID・name・revision、sheet／header／行範囲、base／special／similarity係数、設問text・mapping・Points・enabled、evaluator／criterion／range／weight、固有評価、適用済みPrompt、丸めを含む。ID・順序・decimal・Unicode・改行・Promptとcanonical hashの往復一致を要求する。
 - 保存しないものは入力xlsxのpath・bytes、回答行を自動収集した本文、AI結果・reason・evidence・参照回答、run／checkpoint状態、credential・login状態・CLI hash、warning承認状態、未適用Prompt一覧・本文、Control・Command・選択ID・表示ページ・操作履歴とする。平文に含まれ得る内容は§14に従う。
 - 有効な編集は次回用draftへ反映するが、diskへの書込は利用者の明示保存だけとする。起動・読込・主列変更・画面遷移・終了で自動保存しない。fileなしは既定値で継続し、最初の明示保存までfileを作らない。設定読込完了前に未読の保存定義を空で上書きできないようにする。
@@ -661,7 +662,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 - 単位はSDK報告の原単位を保持し、AIクレジット・通貨へ換算しない。換算根拠を確認できるまでAIクレジットの数値を表示しない。
 - 同一attemptの累計は置換で更新し、イベント合計とセッション累計、モデル別内訳とセッション総量を加算しない。内訳と総量が一致しない場合は不一致として示し、配賦・補正で一致させない。
 - 項目ごとに取得元（イベント／最終RPC／最後の呼び出しのみ）と部分取得を保持する。再試行は別attemptとして数え、試行番号・相関ID・終端結果を記録する。
-- ジョブ単位のUTF-8 JSON Linesログを利用者別のローカル領域へ作り、数値・生成ID・閉じたコードだけを記録する。回答・Prompt・reason・evidence・学生識別子・実path・credentialを記録せず、モデル名は匿名化した識別子だけを保存する。attemptごとに、アプリが指定したreasoning effort（`medium`、未指定はnull）を記録する。
+- ジョブ単位のUTF-8 JSON Linesログを利用者別のローカル領域へ作り、数値・生成ID・閉じたコードだけを記録する。回答・Prompt・reason・evidence・学生識別子・実path・credentialを記録せず、モデル名は匿名化した識別子だけを保存する。ジョブcontextとattemptごとに、アプリが指定したrun-level reasoning effort（例: `low`、未指定はnull）を記録する。
 - ログの保存失敗・記録欠落・容量上限は採点と分けて表示し、観測済みの画面表示を消さない。コスト取得の失敗だけでAIを再送しない。
 - 既存Excelの使用量出力とcheckpoint schemaは変更しない。過去ジョブの累計表示・再取込は本版の対象外とする。
 
@@ -799,7 +800,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 ## 15. performance・capacity
 
 - 回答行上限は20,000とする。
-- concurrencyは既定4、最大8とする。
+- concurrencyは既定8、最大16とする。
 - Excel row、column、cell、formula、function argument上限をwrite前に検査する。
 - Promptとschemaのapp-owned request上限を測定し、AI送信前に検査する。この検査はmodel上限の既知／不明にかかわらず常に適用する。
 - model contextの安全marginは、SDKが当該modelの上限を公開している場合だけAI送信前に検査する。上限不明のmodelでは検査せず、検査していないことを画面に明示する。
@@ -1043,5 +1044,6 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | Implementation / validation status | 要求承認済み。T01は要求・契約・追跡・要求版metadataの同期で、当時のUI／設定は未実装・試験NOT_RUNだった。T01〜T35はREVIEWEDだった履歴を維持し、現在は2026-09-07の[実行記録](../dev/docs/archive/work/20260907-ui-settings-execution-record.md)と後続引継ぎでT01〜T38がREVIEWED、T39はBLOCKED。実装と局所試験の対応はVERIFIED_SCOPED。T35の対象文書試験は4/4成功・敵対的レビュー済みで、別scopeのT36は自身のt36-current.trxで21/21成功。製品`0.8.6`は未公開候補、公開済みは`v0.8.1` ZIPのまま。0.8.4のT37実ZIP・T38実EXE・T39自動回帰／MSIX成功と追加native FAILを分離する。F02最終再検証は本同期時点では親担当で未完了、以後は実行記録の最新F02欄へ接続する。本人確認／隔離利用者保存／CH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITEで、G4・全タスク完了・新EXE公開は未達 |
 | Auto model selection source | 2026-09-15の要求所有者指示「`auto`を通常評価modelとして選択できるように必要なら要求定義から変更」。同梱CLIを実測し、`auto`はrouterでtoken上限を公開しないことを確認した上で§7.1・§10.3・§10.4・§11・§15・§16を改訂した。上限不明modelを拒否せず、model相対のcontext budget検査だけを適用外とし、既定値の推定と別modelへのfallbackは行わない。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Timeout / reasoning effort source | 2026-09-24の要求所有者指示「7.6節のattempt timeoutはSDKの60秒に従う」「Thinking Effortはmedium。答案の定量化なのでHighは不要」。当初はattempt全体を60秒としたが、実機の通し実行で起動・session作成に約10〜25秒かかり、SDKの60秒の応答待ちより先にattempt側が満了してAI_TIMEOUTとなった（応答完了直前の打切りを含む）ため、§7.6は応答待ちをSDK既定の60秒とし、attempt全体の外側上限120秒は維持した。§7.1へreasoning effort `medium`を追加した。同梱CLIの実測で、`auto`と非対応modelへeffortを指定するとsession作成が失敗することを確認し、対応modelだけに指定する。2026-09-25の要求所有者指示「effortを記録する」により、attemptごとの指定値をジョブログへ記録する（§7.1、§11.9）。同日の指示「schema不正の根本原因を調査・修正する」により、claude-sonnet-5がtool引数から定数のevaluator IDを省略することが原因と確認し（`medium`で10/30、未指定で2/30）、§7.3でアプリが補う。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Similarity / effort / concurrency source | 2026-09-25の要求所有者指示「類似度判定を最適化する」「並列度をSDKが許容する最大値まで設定できるようにする（最速実行時間・LLM回答の高い一貫性・Tokenコスト最小化）」「全ての評価・回答で同じreasoning effortにする（採点の一貫性のため、最低でよい）」。§7.5を生成AI出力の貼り付け検出向けのローカル表層類似度へ改訂し、§7.1のreasoning effortを`medium`からrun-level統一（希望`low`）へ改訂、参照回答を固定`auto`から通常評価と同じmodelへ変更した。SDKには並列session数の上限がないため、並列度はapp判断として合成Promptの実測で頭打ちとなった8を既定、16を最大とし、rate limitは専用statusでbackoff付き再試行と有効並列度の縮退を行う。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Meaning | repository要求baselineの承認記録。実装完了・試験成功・release存在・tag／push／draft／公開操作の承認、組織の法務・教育・security承認または電子署名を意味しない |
 
