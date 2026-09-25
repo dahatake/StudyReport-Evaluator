@@ -1,5 +1,13 @@
 # Current implementation status
 
+## 2026-09-25 — 類似度評価のローカル決定化
+
+- **SimilarityのLLM呼び出し廃止**: 参照回答生成は従来どおり`auto`で1問1回実行するが、学生回答とのSimilarityはCoreのローカル計算へ移した。NFKC正規化、invariant小文字化、空白・句読点・記号除去、文字n-gram、Dice/Jaccard、最長共通substring被覆率を使い、4桁丸めの決定的な0〜1値を保存する。
+- **コピー検知寄りの式**: `max(0.70*学生n-gram包含率 + 0.20*Dice + 0.10*Jaccard, 最長一致被覆率)`。学生回答が参照回答の一部を貼り付けた場合を拾うため、包含率は学生→参照の非対称指標にした。reasonは指標値だけで、学生本文は出力しない。
+- **学生間Similarity**: finalization時に全行の主回答を読み直し、同じ設問の他学生回答との最大ローカル類似度と相手source rowを`.Similarity_Peer_Max`、`.Similarity_Peer_Row`へ情報列として出す。採点式と減点には使わない。
+- **checkpoint互換性**: LLM Similarity結果を含む旧schema `1`は再開時に`SCHEMA_UNSUPPORTED`として拒否する。新schema `2`はローカルSimilarity結果を再計算して検証する。列名`.Similarity_AI_Raw`は既存workbook互換のため維持する。
+- **注意**: Similarityは不正行為の証明ではなく、低いSimilarityも回答品質を保証しない。採点者の確認材料として扱う。
+
 ## 2026-09-25 — schema不正の根本原因とreasoning effortの記録
 
 - **schema不正の原因**: 通常評価のtool引数を一時的な診断（commitしない）で記録したところ、schema不正はすべて`ROOT_MISSING_PROPERTY`で、claude-sonnet-5がroot `EvaluatorId`（アプリが知っている定数）を省略していた。同じPromptを直接SDKで送ると、省略は`medium`で10/30、effort未指定で2/30だった（`medium`で増えるが、未指定でも起きる）。proxyは関係なかった（proxyなしのアプリ通し実行でも7 attempt中3件）。

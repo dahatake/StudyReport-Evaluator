@@ -95,34 +95,6 @@ public sealed class AuxiliaryQuantificationResultValidatorTests
         Assert.True(validator.ValidateSpecial(expected, none).IsValid);
     }
 
-    [Theory]
-    [InlineData("0")]
-    [InlineData("0.25")]
-    [InlineData("1")]
-    public void Similarity_accepts_only_exact_id_zero_to_one_and_nonempty_reason(string similarityText)
-    {
-        decimal similarity = decimal.Parse(similarityText, System.Globalization.CultureInfo.InvariantCulture);
-        SafeSimilarityPayload expected = new("Q1", "<redacted>", "student", "reference");
-        SimilarityQuantificationResult result = new()
-        {
-            QuestionId = "Q1",
-            Similarity = similarity,
-            Reason = "semantic overlap",
-        };
-
-        Assert.True(validator.ValidateSimilarity(expected, result).IsValid);
-        AuxiliaryResultValidationOutcome<SimilarityQuantificationResult> invalid =
-            validator.ValidateSimilarity(expected, result with
-            {
-                QuestionId = "q1",
-                Similarity = 1.01m,
-                Reason = "",
-            });
-        Assert.Contains(invalid.Errors, error => error.Code == "ID_MISMATCH");
-        Assert.Contains(invalid.Errors, error => error.Code == "SIMILARITY_OUT_OF_RANGE");
-        Assert.Contains(invalid.Errors, error => error.Code == "REASON_REQUIRED");
-    }
-
     [Fact]
     public void Auxiliary_results_redact_content_from_string_representations()
     {

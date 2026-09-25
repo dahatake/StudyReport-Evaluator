@@ -7,6 +7,7 @@ using StudyReportEvaluator.App.Workbooks.Mapping;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Prompting;
+using StudyReportEvaluator.Core.Similarity;
 using StudyReportEvaluator.Core.Validation;
 
 namespace StudyReportEvaluator.App.Workflow;
@@ -131,19 +132,18 @@ public sealed class DurableQuantificationOrchestrator
     private readonly AuxiliaryQuantificationResultValidator auxiliaryValidator = new();
     private readonly QuantificationResultValidator normalResultValidator = new();
     private readonly EvaluationRequestCapacityValidator requestCapacityValidator = new();
+    private readonly SurfaceTextSimilarityCalculator similarityCalculator = new();
 
     public DurableQuantificationOrchestrator(
         IEvaluationRowSource rowSource,
         IEvaluationRunner normalRunner,
         IReferenceAnswerOperationRunner referenceRunner,
-        ISpecialEvaluationOperationRunner specialRunner,
-        ISimilarityEvaluationOperationRunner similarityRunner)
+        ISpecialEvaluationOperationRunner specialRunner)
         : this(
             rowSource,
             normalRunner,
             referenceRunner,
             specialRunner,
-            similarityRunner,
             new PhysicalInputSnapshotBoundary(),
             new CheckpointStore(),
             new OutputPathPlanner(),
@@ -158,7 +158,6 @@ public sealed class DurableQuantificationOrchestrator
         IEvaluationRunner normalRunner,
         IReferenceAnswerOperationRunner referenceRunner,
         ISpecialEvaluationOperationRunner specialRunner,
-        ISimilarityEvaluationOperationRunner similarityRunner,
         IInputSnapshotBoundary inputSnapshots,
         ICheckpointStore checkpointStore,
         IOutputPathPlanner outputPathPlanner,
@@ -170,7 +169,6 @@ public sealed class DurableQuantificationOrchestrator
         ArgumentNullException.ThrowIfNull(normalRunner);
         this.referenceRunner = referenceRunner ?? throw new ArgumentNullException(nameof(referenceRunner));
         ArgumentNullException.ThrowIfNull(specialRunner);
-        ArgumentNullException.ThrowIfNull(similarityRunner);
         this.inputSnapshots = inputSnapshots ?? throw new ArgumentNullException(nameof(inputSnapshots));
         this.checkpointStore = checkpointStore ?? throw new ArgumentNullException(nameof(checkpointStore));
         this.outputPathPlanner = outputPathPlanner ?? throw new ArgumentNullException(nameof(outputPathPlanner));
@@ -180,8 +178,7 @@ public sealed class DurableQuantificationOrchestrator
         rowScheduler = new DurableEvaluationScheduler(
             rowSource,
             normalRunner,
-            specialRunner,
-            similarityRunner);
+            specialRunner);
     }
 
     public async Task<RunSummary> RunAsync(
@@ -417,7 +414,8 @@ public sealed class DurableQuantificationOrchestrator
             }
         }
 
-        EvaluationScheduleResult schedule = BuildSchedule(plan, completedRows.ToImmutable());
+        ImmutableArray<CheckpointCompletedRow> completedRowsSnapshot = completedRows.ToImmutable();
+        EvaluationScheduleResult schedule = BuildSchedule(plan, completedRowsSnapshot);
         string runStatus = terminalCode switch
         {
             CheckpointStatusCodes.InputChanged => QuantificationRunStatusCodes.InputChanged,
@@ -426,6 +424,10 @@ public sealed class DurableQuantificationOrchestrator
             _ when !SafeInputRecheck(run.InputPath, currentInput) => QuantificationRunStatusCodes.InputChanged,
             _ => QuantificationRunStatusCodes.Success,
         };
+        ImmutableArray<RunPeerSimilarityResult> peerSimilarities =
+            string.Equals(runStatus, QuantificationRunStatusCodes.Success, StringComparison.Ordinal)
+                ? await CalculatePeerSimilaritiesAsync(snapshot, plan, cancellationToken).ConfigureAwait(false)
+                : [];
         DateTimeOffset endedAtUtc = UtcNow(checkpoint.StartedAtUtc);
         RunSummary summary = CreateSummary(
             schedule,
@@ -433,12 +435,13 @@ public sealed class DurableQuantificationOrchestrator
             runStatus,
             checkpoint,
             references.ToImmutable(),
-            completedRows.ToImmutable(),
+            completedRowsSnapshot,
             endedAtUtc,
             wasResumed,
             finalPath: null,
             finalizationCode: terminalCode,
-            partialCleanupFailed: false);
+            partialCleanupFailed: false,
+            peerSimilarities);
 
         if (!string.Equals(runStatus, QuantificationRunStatusCodes.Success, StringComparison.Ordinal))
         {
@@ -484,12 +487,13 @@ public sealed class DurableQuantificationOrchestrator
             finalStatus,
             checkpoint,
             references.ToImmutable(),
-            completedRows.ToImmutable(),
+            completedRowsSnapshot,
             endedAtUtc,
             wasResumed,
             finalPath,
             finalized.Code,
-            cleanupFailed);
+            cleanupFailed,
+            peerSimilarities);
         ReportCurrent(boundProgress, DurableEvaluationStage.Completed, references.Count, referenceTotal, completedRows.Count, rowTotal, completed.CompletedOperationCount, operationTotal, 0, finalStatus);
         return completed;
     }
@@ -787,21 +791,12 @@ public sealed class DurableQuantificationOrchestrator
 
                 if (saved.AcceptedResult is not null)
                 {
-                    SafeSimilarityPayload payload;
-                    try
-                    {
-                        payload = payloadBuilder.BuildSimilarity(
-                            snapshot,
-                            question.Id,
-                            studentAnswer,
-                            reference.Answer!);
-                    }
-                    catch
-                    {
-                        return false;
-                    }
-
-                    if (!auxiliaryValidator.ValidateSimilarity(payload, saved.AcceptedResult).IsValid)
+                    SurfaceSimilarityResult expected = similarityCalculator.Calculate(
+                        studentAnswer,
+                        reference.Answer);
+                    if (!string.Equals(saved.AcceptedResult.QuestionId, question.Id, StringComparison.Ordinal)
+                        || saved.AcceptedResult.Similarity != expected.Score
+                        || !string.Equals(saved.AcceptedResult.Reason, expected.ToReason(), StringComparison.Ordinal))
                     {
                         return false;
                     }
@@ -860,7 +855,8 @@ public sealed class DurableQuantificationOrchestrator
         bool wasResumed,
         string? finalPath,
         string? finalizationCode,
-        bool partialCleanupFailed) =>
+        bool partialCleanupFailed,
+        ImmutableArray<RunPeerSimilarityResult> peerSimilarities) =>
         new(
             schedule,
             input,
@@ -874,7 +870,67 @@ public sealed class DurableQuantificationOrchestrator
             checkpoint.PartialPath,
             wasResumed,
             finalizationCode,
-            partialCleanupFailed);
+            partialCleanupFailed,
+            peerSimilarities);
+
+    private async Task<ImmutableArray<RunPeerSimilarityResult>> CalculatePeerSimilaritiesAsync(
+        QuantificationSnapshot snapshot,
+        EvaluationPlan plan,
+        CancellationToken cancellationToken)
+    {
+        ImmutableArray<QuestionDefinition> questions = snapshot.Definition.Questions
+            .Where(question => question.Enabled)
+            .ToImmutableArray();
+        string[] selectedColumns = questions
+            .Select(question => question.PrimarySourceColumn)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        ImmutableArray<SimilarityPeerInput>.Builder answers =
+            ImmutableArray.CreateBuilder<SimilarityPeerInput>(checked(plan.Mapping.SelectedRowCount * questions.Length));
+        try
+        {
+            for (int sourceRow = plan.Mapping.FirstDataRow; sourceRow <= plan.Mapping.LastDataRow; sourceRow++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                EvaluationRowData row = await rowSource.ReadAsync(
+                    new EvaluationRowRequest(
+                        snapshot.Definition.SourceSheet,
+                        sourceRow,
+                        selectedColumns),
+                    cancellationToken).ConfigureAwait(false);
+                if (row.SourceRowNumber != sourceRow)
+                {
+                    return [];
+                }
+
+                foreach (QuestionDefinition question in questions)
+                {
+                    answers.Add(new SimilarityPeerInput(
+                        sourceRow,
+                        question.Id,
+                        ReadCell(row, question.PrimarySourceColumn)));
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return [];
+        }
+
+        return similarityCalculator.CalculatePeerMaximums(answers).Results
+            .Select(result => new RunPeerSimilarityResult
+            {
+                SourceRowNumber = result.SourceRowNumber,
+                QuestionId = result.QuestionId,
+                PeerMax = result.PeerMax,
+                PeerRow = result.PeerRow,
+            })
+            .ToImmutableArray();
+    }
 
     private static void ValidateStaticCapacity(
         QuantificationRunRequest request,
@@ -896,7 +952,7 @@ public sealed class DurableQuantificationOrchestrator
         try
         {
             int referenceCount = plan.Snapshot.Definition.Questions.Count(question => question.Enabled);
-            long operationCount = checked(referenceCount + ((long)plan.Mapping.SelectedRowCount * OperationsPerRow(plan)));
+            long operationCount = checked(referenceCount + ((long)plan.Mapping.SelectedRowCount * LlmOperationsPerRow(plan)));
             worstCaseAttempts = checked(operationCount * RetryAndCleanupCoordinator.MaximumTransientAttempts);
         }
         catch (OverflowException)
@@ -940,6 +996,11 @@ public sealed class DurableQuantificationOrchestrator
         + plan.Snapshot.Definition.Questions.Where(question => question.Enabled)
             .Sum(question => question.SpecialEvaluations.Count(special => special.Enabled))
         + plan.Snapshot.Definition.Questions.Count(question => question.Enabled));
+
+    private static int LlmOperationsPerRow(EvaluationPlan plan) => checked(
+        plan.Items.Count(item => item.SourceRowNumber == plan.Mapping.FirstDataRow)
+        + plan.Snapshot.Definition.Questions.Where(question => question.Enabled)
+            .Sum(question => question.SpecialEvaluations.Count(special => special.Enabled)));
 
     private static Dictionary<string, string?> SelectCells(
         EvaluationRowData row,

@@ -161,14 +161,12 @@ public sealed class TenPersonSystemSmokeTests
             DeterministicNormalRunner baselineNormal = new();
             DeterministicReferenceRunner baselineReferences = new();
             NoCallSpecialRunner baselineSpecials = new();
-            DeterministicSimilarityRunner baselineSimilarities = new();
             CountingCheckpointStore baselineStore = new(new CheckpointStore());
             RunSummary baseline = await Orchestrator(
                 fixturePath,
                 baselineNormal,
                 baselineReferences,
                 baselineSpecials,
-                baselineSimilarities,
                 baselineStore).RunAsync(
                     Request(definition, metadata, fixturePath, baselineDirectory),
                     cancellationToken: TestContext.Current.CancellationToken);
@@ -177,7 +175,6 @@ public sealed class TenPersonSystemSmokeTests
             Assert.Equal(45, baselineNormal.CallCount);
             Assert.Equal(5, baselineReferences.CallCount);
             Assert.Equal(0, baselineSpecials.CallCount);
-            Assert.Equal(45, baselineSimilarities.CallCount);
             Assert.Equal(1, baselineStore.CreateCount);
             Assert.Equal(15, baselineStore.UpdateCount);
             Assert.Equal(0, baselineStore.LoadCount);
@@ -186,7 +183,6 @@ public sealed class TenPersonSystemSmokeTests
             DeterministicNormalRunner firstNormal = new();
             DeterministicReferenceRunner firstReferences = new();
             NoCallSpecialRunner firstSpecials = new();
-            DeterministicSimilarityRunner firstSimilarities = new();
             CountingCheckpointStore firstStore = new(
                 new CheckpointStore(),
                 envelope =>
@@ -201,7 +197,6 @@ public sealed class TenPersonSystemSmokeTests
                 firstNormal,
                 firstReferences,
                 firstSpecials,
-                firstSimilarities,
                 firstStore).RunAsync(
                     Request(definition, metadata, fixturePath, resumeDirectory),
                     cancellationToken: interruption.Token);
@@ -217,21 +212,18 @@ public sealed class TenPersonSystemSmokeTests
             Assert.Equal(22, firstNormal.CallCount);
             Assert.Equal(5, firstReferences.CallCount);
             Assert.Equal(0, firstSpecials.CallCount);
-            Assert.Equal(22, firstSimilarities.CallCount);
             Assert.Equal(1, firstStore.CreateCount);
             Assert.Equal(10, firstStore.UpdateCount);
 
             DeterministicNormalRunner resumedNormal = new();
             DeterministicReferenceRunner resumedReferences = new(throwOnCall: true);
             NoCallSpecialRunner resumedSpecials = new();
-            DeterministicSimilarityRunner resumedSimilarities = new();
             CountingCheckpointStore resumedStore = new(new CheckpointStore());
             RunSummary resumed = await Orchestrator(
                 fixturePath,
                 resumedNormal,
                 resumedReferences,
                 resumedSpecials,
-                resumedSimilarities,
                 resumedStore).RunAsync(
                     Request(definition, metadata, fixturePath, resumeDirectory) with
                     {
@@ -243,7 +235,6 @@ public sealed class TenPersonSystemSmokeTests
             Assert.Equal(23, resumedNormal.CallCount);
             Assert.Equal(0, resumedReferences.CallCount);
             Assert.Equal(0, resumedSpecials.CallCount);
-            Assert.Equal(23, resumedSimilarities.CallCount);
             Assert.Equal(0, resumedStore.CreateCount);
             Assert.Equal(5, resumedStore.UpdateCount);
             Assert.Equal(1, resumedStore.LoadCount);
@@ -277,14 +268,12 @@ public sealed class TenPersonSystemSmokeTests
         IEvaluationRunner normal,
         IReferenceAnswerOperationRunner references,
         ISpecialEvaluationOperationRunner specials,
-        ISimilarityEvaluationOperationRunner similarities,
         ICheckpointStore checkpoints) =>
         new(
             new OpenXmlEvaluationRowSource(inputPath),
             normal,
             references,
             specials,
-            similarities,
             new PhysicalInputSnapshotBoundary(),
             checkpoints,
             new OutputPathPlanner(),
@@ -538,29 +527,6 @@ public sealed class TenPersonSystemSmokeTests
             throw new InvalidOperationException("A zero special budget must not dispatch a special operation.");
         }
     }
-
-    private sealed class DeterministicSimilarityRunner : ISimilarityEvaluationOperationRunner
-    {
-        private int calls;
-
-        internal int CallCount => Volatile.Read(ref calls);
-
-        public Task<AuxiliaryOperationResult<SimilarityQuantificationResult>> EvaluateAsync(
-            SafeSimilarityPayload payload,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            Interlocked.Increment(ref calls);
-            return Task.FromResult(AuxiliaryOperationResult<SimilarityQuantificationResult>.Succeeded(
-                new SimilarityQuantificationResult
-                {
-                    QuestionId = payload.QuestionId,
-                    Similarity = 0.25m,
-                    Reason = "SYNTHETIC_TECHNICAL_TEST",
-                }));
-        }
-    }
-
     private sealed class CountingCheckpointStore(
         ICheckpointStore inner,
         Action<CheckpointEnvelope>? afterSuccessfulUpdate = null) : ICheckpointStore
@@ -617,3 +583,5 @@ file static class TenPersonStringExtensions
     internal static bool StartsWithAny(this string value, params char[] candidates) =>
     value.Length > 0 && candidates.Contains(value[0]);
 }
+
+

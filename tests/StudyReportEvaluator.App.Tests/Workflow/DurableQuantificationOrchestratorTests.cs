@@ -41,7 +41,6 @@ public sealed class DurableQuantificationOrchestratorTests
                 new ReferenceAnswerResult { QuestionId = payload.QuestionId, Answer = "reference answer" }));
         });
         RecordingSpecialRunner specials = SpecialSuccess(events);
-        RecordingSimilarityRunner similarities = SimilaritySuccess(events);
         RecordingCheckpointStore checkpoint = new(events);
         RecordingPathPlanner paths = new();
         RecordingFinalizer finalizer = new((summary, envelope, _) =>
@@ -60,7 +59,6 @@ public sealed class DurableQuantificationOrchestratorTests
             normal,
             references,
             specials,
-            similarities,
             input,
             checkpoint,
             paths,
@@ -88,11 +86,10 @@ public sealed class DurableQuantificationOrchestratorTests
         Assert.Equal(1, references.CallCount);
         Assert.Equal(2, normal.Payloads.Count);
         Assert.Equal(2, specials.CallCount);
-        Assert.Equal(2, similarities.CallCount);
         Assert.Equal(1, finalizer.CallCount);
         Assert.Equal(1, cleaner.CallCount);
         Assert.True(events.IndexOf("reference:Q1") < events.FindIndex(item => item.StartsWith("row:", StringComparison.Ordinal)));
-        Assert.Equal([2, 3], rows.Requests.Select(item => item.SourceRowNumber));
+        Assert.Equal([2, 3, 2, 3], rows.Requests.Select(item => item.SourceRowNumber));
         Assert.Contains(progress, item => item.Stage == DurableEvaluationStage.GeneratingReferences);
         Assert.Contains(progress, item => item.Stage == DurableEvaluationStage.SavingCheckpoint);
         Assert.Contains(progress, item => item.Stage == DurableEvaluationStage.FinalizingWorkbook);
@@ -102,7 +99,7 @@ public sealed class DurableQuantificationOrchestratorTests
         {
             QuestionResultInput question = Assert.Single(row.Questions);
             Assert.Equal(0.8m, Assert.Single(question.SpecialResults).AiRaw);
-            Assert.Equal(0.25m, question.Similarity!.AiRaw);
+            Assert.Equal(0.8571m, question.Similarity!.AiRaw);
         });
         ResultsOutputViewModel results = new(
             new RecordingOutputBoundary(),
@@ -113,9 +110,9 @@ public sealed class DurableQuantificationOrchestratorTests
         Assert.All(results.RowScores, row =>
         {
             Assert.Equal(8m, row.SpecialEarned);
-            Assert.Equal(0.1m, row.SimilarityPenalty);
-            Assert.Equal(97.3m, row.FinalRaw);
-            Assert.Equal(97.3m, row.FinalScore);
+            Assert.Equal(0.2m, row.SimilarityPenalty);
+            Assert.Equal(97.2m, row.FinalRaw);
+            Assert.Equal(97.2m, row.FinalScore);
             Assert.Contains("Q1: 1.4", row.QuestionEarnedText, StringComparison.Ordinal);
         });
     }
@@ -143,7 +140,6 @@ public sealed class DurableQuantificationOrchestratorTests
             NormalSuccess(),
             firstReferences,
             SpecialSuccess(),
-            SimilaritySuccess(),
             input,
             checkpoint,
             paths,
@@ -169,7 +165,6 @@ public sealed class DurableQuantificationOrchestratorTests
             resumedNormal,
             resumedReferences,
             SpecialSuccess(),
-            SimilaritySuccess(),
             input,
             checkpoint,
             paths,
@@ -184,7 +179,7 @@ public sealed class DurableQuantificationOrchestratorTests
         Assert.Equal(QuantificationRunStatusCodes.Success, resumed.StatusCode);
         Assert.True(resumed.WasResumed);
         Assert.Equal(0, resumedReferences.CallCount);
-        Assert.Equal([2, 3], resumedRows.Requests.Select(item => item.SourceRowNumber));
+        Assert.Equal([2, 3, 2, 3], resumedRows.Requests.Select(item => item.SourceRowNumber));
         Assert.Single(resumedNormal.Payloads);
         Assert.Equal("answer-3", resumedNormal.Payloads[0].PrimarySource.Value);
         Assert.Equal([2, 3], resumed.CompletedRows.Select(row => row.SourceRowNumber));
@@ -228,7 +223,6 @@ public sealed class DurableQuantificationOrchestratorTests
                 normal,
                 references,
                 new RecordingSpecialRunner((_, _, _) => throw new InvalidOperationException("must not run")),
-                new RecordingSimilarityRunner((_, _) => throw new InvalidOperationException("must not run")),
                 new ScriptedInputSnapshots(currentInput),
                 checkpoint,
                 new RecordingPathPlanner(),
@@ -272,7 +266,6 @@ public sealed class DurableQuantificationOrchestratorTests
             NormalSuccess(),
             references,
             SpecialSuccess(),
-            SimilaritySuccess(),
             new PhysicalInputSnapshotBoundary(),
             new CheckpointStore(),
             new OutputPathPlanner(),
@@ -341,7 +334,6 @@ public sealed class DurableQuantificationOrchestratorTests
             firstNormal,
             firstReferences,
             SpecialSuccess(),
-            SimilaritySuccess(),
             new PhysicalInputSnapshotBoundary(),
             new CheckpointStore(),
             new OutputPathPlanner(),
@@ -367,7 +359,6 @@ public sealed class DurableQuantificationOrchestratorTests
             resumedNormal,
             resumedReferences,
             SpecialSuccess(),
-            SimilaritySuccess(),
             new PhysicalInputSnapshotBoundary(),
             new CheckpointStore(),
             new OutputPathPlanner(),
@@ -408,7 +399,6 @@ public sealed class DurableQuantificationOrchestratorTests
             NormalSuccess(),
             ReferenceSuccess(),
             SpecialSuccess(),
-            SimilaritySuccess(),
             new ScriptedInputSnapshots(U01TestSupport.InputSnapshot()),
             checkpoint,
             new RecordingPathPlanner(),
@@ -440,7 +430,6 @@ public sealed class DurableQuantificationOrchestratorTests
             new ScriptedRunner((_, _, _) => throw new InvalidOperationException("must not run")),
             ReferenceSuccess(),
             new RecordingSpecialRunner((_, _, _) => throw new InvalidOperationException("must not run")),
-            new RecordingSimilarityRunner((_, _) => throw new InvalidOperationException("must not run")),
             new ScriptedInputSnapshots(U01TestSupport.InputSnapshot()),
             new RecordingCheckpointStore(),
             new RecordingPathPlanner(),
@@ -458,8 +447,6 @@ public sealed class DurableQuantificationOrchestratorTests
             ReferenceSuccess(),
             new RecordingSpecialRunner((_, _, _) => Task.FromResult(
                 AuxiliaryOperationResult<SpecialQuantificationResult>.Failed(ResultsStatusCodes.AiTimeout))),
-            new RecordingSimilarityRunner((_, _) => Task.FromResult(
-                AuxiliaryOperationResult<SimilarityQuantificationResult>.Failed(ResultsStatusCodes.NetworkFailed))),
             new ScriptedInputSnapshots(U01TestSupport.InputSnapshot()),
             new RecordingCheckpointStore(),
             new RecordingPathPlanner(),
@@ -469,7 +456,8 @@ public sealed class DurableQuantificationOrchestratorTests
                 cancellationToken: TestContext.Current.CancellationToken);
         QuestionResultInput failedQuestion = Assert.Single(Assert.Single(failed.PrepareOutput().Rows).Questions);
         Assert.Null(Assert.Single(failedQuestion.SpecialResults).AiRaw);
-        Assert.Null(failedQuestion.Similarity!.AiRaw);
+        Assert.Equal(ResultsStatusCodes.Success, failedQuestion.Similarity!.Status);
+        Assert.Equal(0.8571m, failedQuestion.Similarity.AiRaw);
     }
 
     [Fact]
@@ -483,7 +471,6 @@ public sealed class DurableQuantificationOrchestratorTests
             NormalSuccess(),
             ReferenceSuccess(),
             SpecialSuccess(),
-            SimilaritySuccess(),
             new ScriptedInputSnapshots(U01TestSupport.InputSnapshot()),
             new RecordingCheckpointStore(),
             new RecordingPathPlanner(),
@@ -503,7 +490,6 @@ public sealed class DurableQuantificationOrchestratorTests
             NormalSuccess(),
             ReferenceSuccess(),
             SpecialSuccess(),
-            SimilaritySuccess(),
             new ScriptedInputSnapshots(U01TestSupport.InputSnapshot()),
             new RecordingCheckpointStore(),
             new RecordingPathPlanner(),
@@ -617,7 +603,6 @@ public sealed class DurableQuantificationOrchestratorTests
                 normal,
                 new RecordingReferenceRunner((_, _) => throw new InvalidOperationException("must not dispatch")),
                 new RecordingSpecialRunner((_, _, _) => throw new InvalidOperationException("must not dispatch")),
-                new RecordingSimilarityRunner((_, _) => throw new InvalidOperationException("must not dispatch")),
                 new ScriptedInputSnapshots(U01TestSupport.InputSnapshot()),
                 checkpoint,
                 new RecordingPathPlanner(),
@@ -637,7 +622,6 @@ public sealed class DurableQuantificationOrchestratorTests
         IEvaluationRunner normal,
         IReferenceAnswerOperationRunner references,
         ISpecialEvaluationOperationRunner specials,
-        ISimilarityEvaluationOperationRunner similarities,
         IInputSnapshotBoundary input,
         ICheckpointStore checkpoint,
         IOutputPathPlanner paths,
@@ -648,7 +632,6 @@ public sealed class DurableQuantificationOrchestratorTests
             normal,
             references,
             specials,
-            similarities,
             input,
             checkpoint,
             paths,
@@ -784,21 +767,6 @@ public sealed class DurableQuantificationOrchestratorTests
                 },
                 tokenUsage: Usage()));
         });
-
-    private static RecordingSimilarityRunner SimilaritySuccess(List<string>? events = null) =>
-        new((payload, _) =>
-        {
-            events?.Add("similarity:" + payload.StudentAnswer);
-            return Task.FromResult(AuxiliaryOperationResult<SimilarityQuantificationResult>.Succeeded(
-                new SimilarityQuantificationResult
-                {
-                    QuestionId = payload.QuestionId,
-                    Similarity = 0.25m,
-                    Reason = "similarity reason",
-                },
-                tokenUsage: Usage()));
-        });
-
     private static EvaluationTokenUsage Usage() => new(true, 10, 2, 1, 3, 4);
 
     private static Worksheet Worksheet(SpreadsheetDocument document, string name)
@@ -875,22 +843,6 @@ public sealed class DurableQuantificationOrchestratorTests
             return evaluate(payload, modelId, cancellationToken);
         }
     }
-
-    private sealed class RecordingSimilarityRunner(
-        Func<SafeSimilarityPayload, CancellationToken, Task<AuxiliaryOperationResult<SimilarityQuantificationResult>>> evaluate)
-        : ISimilarityEvaluationOperationRunner
-    {
-        internal int CallCount { get; private set; }
-
-        public Task<AuxiliaryOperationResult<SimilarityQuantificationResult>> EvaluateAsync(
-            SafeSimilarityPayload payload,
-            CancellationToken cancellationToken)
-        {
-            CallCount++;
-            return evaluate(payload, cancellationToken);
-        }
-    }
-
     private sealed class RecordingCheckpointStore(IList<string>? events = null) : ICheckpointStore
     {
         internal CheckpointEnvelope? Current { get; set; }

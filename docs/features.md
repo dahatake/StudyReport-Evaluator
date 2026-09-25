@@ -51,18 +51,20 @@
 
 保存対象には見出しから取り込んだ設問文と適用済みPrompt、利用者が貼り付けた内容が平文で含まれ得ます。入力xlsxのpath・bytes、回答本文の自動収集、AI結果・参照回答、final／partialの状態、認証情報、未適用Promptのfile一覧は保存対象外です。保存場所・制約は[設定の保存と適用](settings.md)を確認してください。
 
-## 4つのAI処理
+## 3つのAI処理とローカルSimilarity
 
 | 処理 | 入力 | Model | 出力 |
 |---|---|---|---|
 | Reference | 設問text | `auto` | 設問ごとの参照回答 |
 | Normal | 同じrowの主回答・選択済み補助列 | 利用者選択 | criterion別raw、reason、evidence、source |
 | Special | 同じrowの固有評価主値・選択済み補助列 | 利用者選択 | 0〜1、reason、evidence、source |
-| Similarity | 同じrowの主回答と同じ設問の参照回答 | `auto` | 0〜1の類似度とreason |
+| Similarity | 同じrowの主回答と同じ設問の参照回答 | ローカル決定的計算 | 0〜1の表層類似度と機械生成reason |
 
 Referenceは1Questionにつき1runで1回生成し、同じrunの全rowで共有します。checkpointから再開すると保存済みReferenceを再利用します。
 
 NormalとSpecialの「利用者選択」には`auto`も選べます。`auto`はrouterのためSDKがtoken上限を公開せず、その場合はmodel相対の容量検査を行いません。実際にroutingされたmodelは通常の実行記録には保存されません。コスト内訳でSDKが報告したモデルは匿名化した識別子だけを表示・記録します。
+
+SimilarityはLLM呼び出しではありません。NFKC正規化、空白・句読点・記号除去、文字n-gram包含率、Dice/Jaccard、最長共通substring被覆率を組み合わせ、コピー＆ペースト寄りの表層一致を決定的に算出します。出力workbookには互換性のため`.Similarity_AI_Raw`を維持し、同じ設問の他学生回答との最大類似度`.Similarity_Peer_Max`と相手行`.Similarity_Peer_Row`も情報として追加します。これらは不正行為の証明ではなく、採点者の確認材料です。
 
 ## ジョブごとのコスト観測
 

@@ -1435,6 +1435,9 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         // still uses the ResultsSheetWriter's WeightedScoreCalculator path above.
         CheckpointSimilarityResult? similarity = completedRow?.SimilarityResults.SingleOrDefault(result =>
             string.Equals(result.QuestionId, question.Id, StringComparison.Ordinal));
+        RunPeerSimilarityResult? peer = summary.PeerSimilarities.SingleOrDefault(result =>
+            result.SourceRowNumber == sourceRowNumber
+            && string.Equals(result.QuestionId, question.Id, StringComparison.Ordinal));
         return new QuestionResultInput
         {
             QuestionId = question.Id,
@@ -1460,6 +1463,8 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
                     AiRaw = similarity?.AcceptedResult?.Similarity
                         ?? (similarity?.StatusCode == ResultsStatusCodes.Empty ? 0m : null),
                     Status = similarity?.StatusCode ?? ResultsStatusCodes.Cancelled,
+                    PeerMax = peer?.PeerMax,
+                    PeerRow = peer?.PeerRow,
                 }
                 : null,
         };

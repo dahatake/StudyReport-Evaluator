@@ -112,16 +112,6 @@ public sealed class SafeSpecialEvaluationPayload
         $"{nameof(SafeSpecialEvaluationPayload)} {{ QuestionId = {QuestionId}, SpecialEvaluationId = {SpecialEvaluationId}, Content = <redacted>, Sources = {1 + SupportingSources.Length} }}";
 }
 
-public sealed record SafeSimilarityPayload(
-    string QuestionId,
-    string RenderedPrompt,
-    string StudentAnswer,
-    string ReferenceAnswer)
-{
-    public override string ToString() =>
-        $"{nameof(SafeSimilarityPayload)} {{ QuestionId = {QuestionId}, Content = <redacted> }}";
-}
-
 public class PromptConfigurationException : Exception
 {
     public PromptConfigurationException(string code, string message, int? position = null)

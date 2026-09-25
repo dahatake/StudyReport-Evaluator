@@ -92,6 +92,10 @@ public sealed record SimilarityResultInput
 
     public required string Status { get; init; }
 
+    public decimal? PeerMax { get; init; }
+
+    public int? PeerRow { get; init; }
+
     public override string ToString() =>
         $"{nameof(SimilarityResultInput)} {{ Status = {Status}, Content = <redacted> }}";
 }
@@ -245,6 +249,8 @@ public sealed class ResultsSheetWriter
     public const string SimilarityReasonSuffix = "Similarity_Reason";
     public const string SimilarityStatusSuffix = "Similarity_Status";
     public const string SimilarityPenaltySuffix = "Similarity_Penalty";
+    public const string SimilarityPeerMaxSuffix = "Similarity_Peer_Max";
+    public const string SimilarityPeerRowSuffix = "Similarity_Peer_Row";
     public const string BasePointsHeader = "Base_Points";
     public const string SpecialEarnedHeader = "Special_Earned";
     public const string FinalRawHeader = "Final_Raw";
@@ -257,7 +263,7 @@ public sealed class ResultsSheetWriter
 
     private const int CriterionColumnCount = 10;
     private const int SpecialColumnCount = 6;
-    private const int QuestionFixedColumnCount = 8;
+    private const int QuestionFixedColumnCount = 10;
     private const int RowTotalColumnCount = 4;
     private const NumberStyles OverrideNumberStyles =
         NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent;
@@ -565,7 +571,9 @@ public sealed class ResultsSheetWriter
                 Column(nextColumn++, questionPrefix + SimilarityAiRawSuffix),
                 Column(nextColumn++, questionPrefix + SimilarityReasonSuffix),
                 Column(nextColumn++, questionPrefix + SimilarityStatusSuffix),
-                Column(nextColumn++, questionPrefix + SimilarityPenaltySuffix));
+                Column(nextColumn++, questionPrefix + SimilarityPenaltySuffix),
+                Column(nextColumn++, questionPrefix + SimilarityPeerMaxSuffix),
+                Column(nextColumn++, questionPrefix + SimilarityPeerRowSuffix));
             questions.Add(new QuestionLayout(
                 question,
                 evaluators.ToImmutable(),
@@ -813,6 +821,16 @@ public sealed class ResultsSheetWriter
             if (similarity.AiRaw is decimal raw && raw is < 0m or > 1m)
             {
                 AddError(errors, "SIMILARITY_OUT_OF_RANGE", sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.AiRaw", raw.ToString("G29", CultureInfo.InvariantCulture));
+            }
+
+            if (similarity.PeerMax is decimal peerMax && peerMax is < 0m or > 1m)
+            {
+                AddError(errors, "SIMILARITY_PEER_OUT_OF_RANGE", sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.PeerMax", peerMax.ToString("G29", CultureInfo.InvariantCulture));
+            }
+
+            if (similarity.PeerRow is <= 0)
+            {
+                AddError(errors, "SIMILARITY_PEER_ROW_INVALID", sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.PeerRow", similarity.PeerRow.Value.ToString(CultureInfo.InvariantCulture));
             }
 
             if (!ResultsStatusCodes.IsDefined(similarity.Status))
@@ -1177,7 +1195,9 @@ public sealed class ResultsSheetWriter
                         similarityInput.AiRaw,
                         similarityInput.Reason,
                         similarityInput.Status,
-                        similarityPenalty)));
+                        similarityPenalty,
+                        similarityInput.PeerMax,
+                        similarityInput.PeerRow)));
             }
 
             ImmutableArray<PreparedQuestion> preparedQuestions = questions.ToImmutable();
@@ -1469,6 +1489,13 @@ public sealed class ResultsSheetWriter
             stringCellWriter.Write(row, CellReference(question.Similarity.Layout.Reason, prepared.SourceRowNumber), question.Similarity.Reason);
             stringCellWriter.Write(row, CellReference(question.Similarity.Layout.Status, prepared.SourceRowNumber), question.Similarity.Status);
             AppendFormula(row, formulas, sheetNames, question.Similarity.Layout.Penalty, prepared.SourceRowNumber, question.Similarity.Penalty, writtenFormulaCells);
+            row.Append(CreateOptionalNumberCell(
+                question.Similarity.Layout.PeerMax,
+                prepared.SourceRowNumber,
+                question.Similarity.PeerMax));
+            row.Append(question.Similarity.PeerRow is int peerRow
+                ? SpreadsheetLiteral.CreateNumberCell(CellReference(question.Similarity.Layout.PeerRow, prepared.SourceRowNumber), peerRow)
+                : new Cell { CellReference = CellReference(question.Similarity.Layout.PeerRow, prepared.SourceRowNumber) });
         }
 
         AppendFormula(row, formulas, sheetNames, layout.BasePoints, prepared.SourceRowNumber, prepared.BasePoints, writtenFormulaCells);
@@ -1688,9 +1715,11 @@ public sealed class ResultsSheetWriter
         ColumnLayout AiRaw,
         ColumnLayout Reason,
         ColumnLayout Status,
-        ColumnLayout Penalty)
+        ColumnLayout Penalty,
+        ColumnLayout PeerMax,
+        ColumnLayout PeerRow)
     {
-        internal IEnumerable<ColumnLayout> AllColumns => [AiRaw, Reason, Status, Penalty];
+        internal IEnumerable<ColumnLayout> AllColumns => [AiRaw, Reason, Status, Penalty, PeerMax, PeerRow];
     }
 
     private sealed record QuestionLayout(
@@ -1769,7 +1798,9 @@ public sealed class ResultsSheetWriter
         decimal? AiRaw,
         string Reason,
         string Status,
-        decimal? Penalty);
+        decimal? Penalty,
+        decimal? PeerMax,
+        int? PeerRow);
 
     private sealed record PreparedQuestion(
         QuestionLayout Layout,

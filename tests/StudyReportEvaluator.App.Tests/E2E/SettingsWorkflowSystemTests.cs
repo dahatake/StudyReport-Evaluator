@@ -116,7 +116,7 @@ public sealed class SettingsWorkflowSystemTests
         using LocalSession session = await OpenAdmittedAsync(settingsPath, workbook, new LocalAi { FailLastRow = true });
         await PrepareExecutionAsync(session);
         RunSummary summary = await RunAsync(session);
-        string finalPath = AssertSuccessfulFinal(session, workbook, summary, operationFailures: 3);
+        string finalPath = AssertSuccessfulFinal(session, workbook, summary, operationFailures: 2);
         Assert.Equal(2, summary.SucceededCount);
         Assert.Equal(1, summary.EmptyCount);
         Assert.Equal(1, summary.FailureCount);
@@ -151,7 +151,7 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Null(failed.AiRawScore);
         Assert.Null(failed.EffectiveRaw);
         Assert.Null(Score(session, 6).SpecialEarned);
-        Assert.Null(Score(session, 6).SimilarityPenalty);
+        Assert.Equal(0.1m, Score(session, 6).SimilarityPenalty);
         Assert.Null(Score(session, 6).FinalRaw);
         Assert.Null(Score(session, 6).FinalScore);
 
@@ -163,8 +163,8 @@ public sealed class SettingsWorkflowSystemTests
             AssertNumber(ResultCell(results, "Q1.S1.Special_AI_Raw", 4), 0m, formula: false);
             AssertNumber(ResultCell(results, "Q1.Similarity_AI_Raw", 4), 0m, formula: false);
             AssertNumber(ResultCell(results, "Q1.S1.Special_AI_Raw", 6), null, formula: false);
-            AssertNumber(ResultCell(results, "Q1.Similarity_AI_Raw", 6), null, formula: false);
-            Assert.Equal(ResultsStatusCodes.NetworkFailed, ResultCell(results, "Q1.Similarity_Status", 6).InnerText);
+            AssertNumber(ResultCell(results, "Q1.Similarity_AI_Raw", 6), 0.3m, formula: false);
+            Assert.Equal(ResultsStatusCodes.Success, ResultCell(results, "Q1.Similarity_Status", 6).InnerText);
         }
 
         AssertUnchanged(workbook.Path, before);
@@ -281,7 +281,6 @@ public sealed class SettingsWorkflowSystemTests
             Assert.Equal(6, partial.OperationCancelledCount);
             Assert.Equal([FirstAnswer, "0"], interrupted.Ai.NormalCalls.Select(call => call.Payload.PrimarySource.Value));
             Assert.Single(interrupted.Ai.SpecialCalls);
-            Assert.Single(interrupted.Ai.SimilarityCalls);
             Assert.Single(interrupted.Ai.ReferenceCalls);
             Assert.Equal(ResultsRowStatus.Unprocessed, Score(interrupted, 5).Status);
             Assert.Equal(ResultsRowStatus.Unprocessed, Score(interrupted, 6).Status);
@@ -349,8 +348,8 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Equal(JsonSerializer.Serialize(saved.References), JsonSerializer.Serialize(completed.References));
         Assert.Equal(JsonSerializer.Serialize(saved.CompletedRows), JsonSerializer.Serialize(completed.CompletedRows.Take(2)));
         Assert.Equal(JsonSerializer.Serialize(baseline.CompletedRows), JsonSerializer.Serialize(completed.CompletedRows));
-        Assert.Equal(10, completed.OperationUsageObservedCount);
-        Assert.Equal(100L, completed.OperationTokenUsage.InputTokens);
+        Assert.Equal(7, completed.OperationUsageObservedCount);
+        Assert.Equal(70L, completed.OperationTokenUsage.InputTokens);
         Assert.Equal(JsonSerializer.Serialize(baseline.OperationTokenUsage), JsonSerializer.Serialize(completed.OperationTokenUsage));
         Assert.Equal(ReadWorksheetXml(baseline.FinalPath!, AppOwnedSheetNameResolver.ResultsBaseName),
             ReadWorksheetXml(finalPath, AppOwnedSheetNameResolver.ResultsBaseName));
@@ -745,7 +744,7 @@ public sealed class SettingsWorkflowSystemTests
         ResultsSheetWriteResult results = new ResultsSheetWriter().Write(
             document, summary.Snapshot, names, config, preparation.Rows);
         Assert.Equal(4, results.DataRowCount);
-        Assert.Equal(31, results.ColumnCount);
+        Assert.Equal(33, results.ColumnCount);
         Assert.Equal(48, results.FormulaCells.Length);
         return OutputPackageValidationPlan.Capture(inputPath, names, config.FormulaCells.Concat(results.FormulaCells)
             .Select(cell => new ExpectedFormulaCell(cell.Definition, cell.CachedValue)));
@@ -871,7 +870,6 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Empty(session.Ai.ReferenceCalls);
         Assert.Empty(session.Ai.NormalCalls);
         Assert.Empty(session.Ai.SpecialCalls);
-        Assert.Empty(session.Ai.SimilarityCalls);
     }
 
     private static void AssertAiCalls(LocalAi ai, string[] normalAnswers, string[] specialAnswers, int referenceCalls)
@@ -881,7 +879,6 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Equal(specialAnswers, ai.SpecialCalls.Select(call => call.Payload.PrimarySource.Value));
         Assert.Equal(specialAnswers, ai.NormalCalls.Select(call => Assert.Single(call.Payload.SupportingSources).Value));
         Assert.Equal(normalAnswers, ai.SpecialCalls.Select(call => Assert.Single(call.Payload.SupportingSources).Value));
-        Assert.Equal(normalAnswers, ai.SimilarityCalls.Select(payload => payload.StudentAnswer));
         Assert.All(ai.ReferenceCalls, payload => Assert.Equal("Q1", payload.QuestionId));
         Assert.All(ai.NormalCalls, call =>
         {
@@ -899,11 +896,6 @@ public sealed class SettingsWorkflowSystemTests
             Assert.Equal("S1", call.Payload.SpecialEvaluationId);
             Assert.Equal(["B", "A"], call.Payload.Sources.Select(source => source.SourceColumnId));
             Assert.DoesNotContain(UnselectedText, call.Payload.RenderedPrompt, StringComparison.Ordinal);
-        });
-        Assert.All(ai.SimilarityCalls, payload =>
-        {
-            Assert.Equal("Q1", payload.QuestionId);
-            Assert.Equal(ReferenceAnswer, payload.ReferenceAnswer);
         });
     }
 
@@ -1054,7 +1046,7 @@ public sealed class SettingsWorkflowSystemTests
                 ?? throw new InvalidOperationException("A synthetic authenticated runtime is required."));
             Runtime = runtime;
             DurableQuantificationOrchestrator orchestrator = new(
-                new OpenXmlEvaluationRowSource(request.InputPath), ai, ai, ai, ai,
+                new OpenXmlEvaluationRowSource(request.InputPath), ai, ai, ai,
                 new PhysicalInputSnapshotBoundary(), new CheckpointStore(), new OutputPathPlanner(),
                 new WorkbookDurableRunFinalizer(), new PhysicalPartialCheckpointCleaner(), new FixedTimeProvider());
             return orchestrator.RunAsync(new DurableQuantificationRunRequest
@@ -1081,12 +1073,11 @@ public sealed class SettingsWorkflowSystemTests
     }
 
     private sealed class LocalAi : IEvaluationRunner, IReferenceAnswerOperationRunner,
-        ISpecialEvaluationOperationRunner, ISimilarityEvaluationOperationRunner
+        ISpecialEvaluationOperationRunner
     {
         internal ConcurrentQueue<(SafeEvaluationPayload Payload, string ModelId)> NormalCalls { get; } = new();
         internal ConcurrentQueue<(SafeSpecialEvaluationPayload Payload, string ModelId)> SpecialCalls { get; } = new();
         internal ConcurrentQueue<SafeReferenceAnswerPayload> ReferenceCalls { get; } = new();
-        internal ConcurrentQueue<SafeSimilarityPayload> SimilarityCalls { get; } = new();
         internal Action<SafeEvaluationPayload, CancellationToken>? BeforeNormal { get; set; }
         internal bool FailLastRow { get; init; }
         internal bool RejectReferenceCalls { get; init; }
@@ -1145,19 +1136,5 @@ public sealed class SettingsWorkflowSystemTests
             }, tokenUsage: Usage()));
         }
 
-        public Task<AuxiliaryOperationResult<SimilarityQuantificationResult>> EvaluateAsync(
-            SafeSimilarityPayload payload, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            SimilarityCalls.Enqueue(payload);
-            if (FailLastRow && payload.StudentAnswer == LastAnswer)
-                return Task.FromResult(AuxiliaryOperationResult<SimilarityQuantificationResult>.Failed(ResultsStatusCodes.NetworkFailed));
-            return Task.FromResult(AuxiliaryOperationResult<SimilarityQuantificationResult>.Succeeded(new SimilarityQuantificationResult
-            {
-                QuestionId = payload.QuestionId,
-                Similarity = payload.StudentAnswer == "0" ? 0m : 0.25m,
-                Reason = "T27 similarity reason",
-            }, tokenUsage: Usage()));
-        }
     }
 }

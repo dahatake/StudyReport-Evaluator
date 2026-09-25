@@ -168,13 +168,15 @@ Knowledgeの固定Promptは読取専用、Custom Promptは編集可能です。�
 実行画面の**モデル・並列度・実効出力先は読取専用**です。編集は**変更 → 設定の共通**で行います。認証確認・login、新規／再開、開始・cancelは実行画面に残っています。
 
 1. **Copilot 状態を確認**を明示的に選びます。未認証なら、候補版の**GitHubにログイン**で同梱native CLIのconsole／ブラウザーを開き、本人が対話loginします。完了・取消・失敗後は同じ状態確認buttonで再確認してください。processの起動・終了だけを認証成功とは扱いません。
-2. **変更 → 共通**で、列挙された通常モデル、並列度（1〜3、既定1）、指定出力先を確認・変更します。保存希望modelが利用不可なら未選択のままで、別modelへfallbackしません。Reference／Similarityの固定`auto`は通常モデルと別に利用可否を確認し、未確認・利用不可のまま開始しません。
+2. **変更 → 共通**で、列挙された通常モデル、並列度（1〜3、既定1）、指定出力先を確認・変更します。保存希望modelが利用不可なら未選択のままで、別modelへfallbackしません。Reference生成の固定`auto`は通常モデルと別に利用可否を確認し、未確認・利用不可のまま開始しません。
 3. **設定から戻る**で実効値と新規／checkpoint再開を確認します。再開する場合は既存の`.partial.xlsx`を指定します。
 4. 技術検証を通過したら**定量化を開始**を選びます。予約された出力pathの表示だけではfile作成・保存成功を意味しません。
 
 **公開`v0.8.1`にはlogin buttonがありません。** 同梱CLIで本人loginを行い、アプリの状態確認buttonで確認する手順は[はじめに](docs/getting-started.md)を参照してください。どちらの版でもアプリへpassword、PAT、token、device codeを入力しないでください。
 
 AI処理には、利用可能なGitHub Copilot account、本人認証、network接続、利用可能model、組織policy上の許可が別途必要です。GUI表示やlogin完了だけでAI利用可能とは判断しません。起動引数・Prompt適用・状態確認でloginやAI評価を暗黙に開始せず、login後もmodelを自動変更したりAI評価を自動開始したりしません。
+
+SimilarityはLLMへ送らず、NFKC正規化・空白／句読点／記号除去・文字n-gram・最長共通substringに基づくローカル決定的計算で求めます。Excel列名は互換性のため`.Similarity_AI_Raw`を維持します。結果には、参照回答との表層コピー傾向に加えて、同じ設問の他学生回答との最大類似度（`.Similarity_Peer_Max`、`.Similarity_Peer_Row`）も情報として出力します。Similarityは不正行為の証明ではなく、低いSimilarityも回答品質を保証しません。
 
 候補版の**ログインを取り消す**またはアプリ終了で終了するのは、このアプリが開始・所有した当該login CLI processだけです。ブラウザーや他のCLI、保存済みcredentialを終了・削除しません。loginの二重開始・評価中の開始を防ぎ、取消・失敗後もExcel読込、mapping、設計編集、checkpoint確認は利用できます。CLI欠落・不一致時は配布物の再取得／展開状態を確認し、PATH上の別CLI導入やhash検証の緩和で回避しません。
 

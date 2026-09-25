@@ -44,8 +44,7 @@ public sealed class BuiltInPromptTemplatesTests
         Assert.Contains("exactly once", BuiltInPromptTemplates.ReferenceAnswerTemplate, StringComparison.Ordinal);
         Assert.Contains("submit_special_quantification", BuiltInPromptTemplates.SpecialOutputInstruction, StringComparison.Ordinal);
         Assert.Contains("from 0 through 1", BuiltInPromptTemplates.SpecialOutputInstruction, StringComparison.Ordinal);
-        Assert.Contains("submit_similarity", BuiltInPromptTemplates.SimilarityOutputInstruction, StringComparison.Ordinal);
-        Assert.Contains("不正行為や回答品質を判定せず", BuiltInPromptTemplates.SimilarityInstruction, StringComparison.Ordinal);
-        Assert.Contains("Do not return a misconduct decision", BuiltInPromptTemplates.SimilarityOutputInstruction, StringComparison.Ordinal);
+        Assert.DoesNotContain("submit_similarity", BuiltInPromptTemplates.ReferenceAnswerTemplate, StringComparison.Ordinal);
+        Assert.DoesNotContain("submit_similarity", BuiltInPromptTemplates.SpecialOutputInstruction, StringComparison.Ordinal);
     }
 }

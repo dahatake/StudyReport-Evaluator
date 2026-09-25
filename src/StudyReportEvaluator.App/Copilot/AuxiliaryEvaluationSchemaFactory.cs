@@ -12,10 +12,8 @@ public sealed class AuxiliaryEvaluationSchemaFactory
 {
     public const string ReferenceToolName = "submit_reference_answer";
     public const string SpecialToolName = "submit_special_quantification";
-    public const string SimilarityToolName = "submit_similarity";
     public const string ReferenceToolDescription = "Submit one reference answer exactly once.";
     public const string SpecialToolDescription = "Submit one special quantification score from zero through one exactly once.";
-    public const string SimilarityToolDescription = "Submit one semantic similarity from zero through one exactly once.";
 
     private static readonly string[] ReferenceProperties = ["QuestionId", "Answer"];
     private static readonly string[] SpecialProperties =
@@ -27,7 +25,6 @@ public sealed class AuxiliaryEvaluationSchemaFactory
         "EvidenceSource",
         "EvidenceSourceColumnId",
     ];
-    private static readonly string[] SimilarityProperties = ["QuestionId", "Similarity", "Reason"];
 
     public JsonElement CreateReferenceSchema(SafeReferenceAnswerPayload payload)
     {
@@ -76,25 +73,6 @@ public sealed class AuxiliaryEvaluationSchemaFactory
         return JsonSerializer.SerializeToElement(schema);
     }
 
-    public JsonElement CreateSimilaritySchema(SafeSimilarityPayload payload)
-    {
-        ValidateSimilarityPayload(payload);
-        JsonObject schema = ClosedObject(
-            SimilarityProperties,
-            new JsonObject
-            {
-                ["QuestionId"] = StringEnum([payload.QuestionId]),
-                ["Similarity"] = new JsonObject
-                {
-                    ["type"] = "number",
-                    ["minimum"] = 0,
-                    ["maximum"] = 1,
-                },
-                ["Reason"] = BoundedString(requireNonEmpty: true),
-            });
-        return JsonSerializer.SerializeToElement(schema);
-    }
-
     public AIFunction CreateReferenceTool(SubmitReferenceAnswerTool collector)
     {
         ArgumentNullException.ThrowIfNull(collector);
@@ -112,16 +90,6 @@ public sealed class AuxiliaryEvaluationSchemaFactory
             SpecialToolName,
             SpecialToolDescription,
             CreateSpecialSchema(collector.ExpectedPayload),
-            collector.InvokeAsync);
-    }
-
-    public AIFunction CreateSimilarityTool(SubmitSimilarityTool collector)
-    {
-        ArgumentNullException.ThrowIfNull(collector);
-        return CreateTool(
-            SimilarityToolName,
-            SimilarityToolDescription,
-            CreateSimilaritySchema(collector.ExpectedPayload),
             collector.InvokeAsync);
     }
 
@@ -143,16 +111,6 @@ public sealed class AuxiliaryEvaluationSchemaFactory
         return EvaluationSchemaFactory.CreateRestrictedSessionConfig(
             CreateSpecialTool(collector),
             SpecialToolName);
-    }
-
-    public SessionConfig CreateSimilaritySessionConfig(
-        SafeSimilarityPayload payload,
-        out SubmitSimilarityTool collector)
-    {
-        collector = new SubmitSimilarityTool(payload);
-        return EvaluationSchemaFactory.CreateRestrictedSessionConfig(
-            CreateSimilarityTool(collector),
-            SimilarityToolName);
     }
 
     internal static void ValidateSpecialPayload(SafeSpecialEvaluationPayload payload)
@@ -184,18 +142,6 @@ public sealed class AuxiliaryEvaluationSchemaFactory
             {
                 throw new ArgumentException("The special-evaluation payload is invalid.", nameof(payload));
             }
-        }
-    }
-
-    internal static void ValidateSimilarityPayload(SafeSimilarityPayload payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        if (string.IsNullOrWhiteSpace(payload.QuestionId)
-            || string.IsNullOrWhiteSpace(payload.RenderedPrompt)
-            || string.IsNullOrWhiteSpace(payload.StudentAnswer)
-            || string.IsNullOrWhiteSpace(payload.ReferenceAnswer))
-        {
-            throw new ArgumentException("The similarity payload is invalid.", nameof(payload));
         }
     }
 

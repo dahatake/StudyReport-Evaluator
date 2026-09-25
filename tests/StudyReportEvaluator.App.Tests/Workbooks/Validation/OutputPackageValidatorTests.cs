@@ -624,10 +624,10 @@ public sealed class OutputPackageValidatorTests
             FormulaCellAddress questionEarned = Address(names.ResultsSheetName, "P", 2);
             FormulaCellAddress similarity = Address(names.ResultsSheetName, "Q", 2);
             FormulaCellAddress similarityPenalty = Address(names.ResultsSheetName, "T", 2);
-            FormulaCellAddress basePoints = Address(names.ResultsSheetName, "U", 2);
-            FormulaCellAddress specialEarned = Address(names.ResultsSheetName, "V", 2);
-            FormulaCellAddress finalRaw = Address(names.ResultsSheetName, "W", 2);
-            FormulaCellAddress finalScore = Address(names.ResultsSheetName, "X", 2);
+            FormulaCellAddress basePoints = Address(names.ResultsSheetName, "W", 2);
+            FormulaCellAddress specialEarned = Address(names.ResultsSheetName, "X", 2);
+            FormulaCellAddress finalRaw = Address(names.ResultsSheetName, "Y", 2);
+            FormulaCellAddress finalScore = Address(names.ResultsSheetName, "Z", 2);
             FormulaCellReference minimum = Ref(config.CriterionMinimumCells["C1"], absolute: true);
             FormulaCellReference maximum = Ref(config.CriterionMaximumCells["C1"], absolute: true);
             FormulaCellReference rounding = Ref(config.RoundingDigitsCell, absolute: true);

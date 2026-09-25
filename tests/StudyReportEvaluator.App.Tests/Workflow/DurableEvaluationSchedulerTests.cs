@@ -22,7 +22,7 @@ public sealed class DurableEvaluationSchedulerTests
                 ["B"] = "special answer",
                 ["C"] = "UNSENT-ROW-CANARY",
             })));
-        ConcurrentGate gate = new(expectedStarts: 3);
+        ConcurrentGate gate = new(expectedStarts: 2);
         ScriptedRunner normal = new(async (payload, _, token) =>
         {
             await gate.EnterAsync(token);
@@ -42,25 +42,13 @@ public sealed class DurableEvaluationSchedulerTests
                     EvidenceSourceColumnId = string.Empty,
                 });
         });
-        ScriptedSimilarityRunner similarity = new(async (payload, token) =>
-        {
-            await gate.EnterAsync(token);
-            return AuxiliaryOperationResult<SimilarityQuantificationResult>.Succeeded(
-                new SimilarityQuantificationResult
-                {
-                    QuestionId = payload.QuestionId,
-                    Similarity = 0.25m,
-                    Reason = "similarity reason",
-                });
-        });
         CheckpointReference reference = Reference("reference answer");
         List<int> inFlight = [];
 
         DurableRowEvaluationResult result = await new DurableEvaluationScheduler(
             rows,
             normal,
-            special,
-            similarity).EvaluateRowAsync(
+            special).EvaluateRowAsync(
                 plan,
                 2,
                 new Dictionary<string, CheckpointReference>(StringComparer.Ordinal)
@@ -84,17 +72,15 @@ public sealed class DurableEvaluationSchedulerTests
         CheckpointCompletedRow completed = Assert.IsType<CheckpointCompletedRow>(result.CompletedRow);
         Assert.Equal(7m, Assert.Single(Assert.Single(completed.NormalResults).AcceptedResult!.Criteria).RawScore);
         Assert.Equal(0.8m, Assert.Single(completed.SpecialResults).AcceptedResult!.Score);
-        Assert.Equal(0.25m, Assert.Single(completed.SimilarityResults).AcceptedResult!.Similarity);
-        Assert.Equal(3, gate.MaximumActive);
-        Assert.InRange(inFlight.Max(), 1, 3);
+        Assert.Equal(ResultsStatusCodes.Success, Assert.Single(completed.SimilarityResults).StatusCode);
+        Assert.Equal(2, gate.MaximumActive);
+        Assert.InRange(inFlight.Max(), 1, 2);
         Assert.Single(rows.Requests);
         Assert.Equal(["A", "B"], rows.Requests[0].SelectedColumns);
         Assert.Single(normal.Payloads);
         Assert.Single(special.Payloads);
-        Assert.Single(similarity.Payloads);
         Assert.DoesNotContain("UNSENT-ROW-CANARY", normal.Payloads[0].RenderedPrompt, StringComparison.Ordinal);
         Assert.DoesNotContain("UNSENT-ROW-CANARY", special.Payloads[0].RenderedPrompt, StringComparison.Ordinal);
-        Assert.DoesNotContain("UNSENT-ROW-CANARY", similarity.Payloads[0].RenderedPrompt, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -110,13 +96,11 @@ public sealed class DurableEvaluationSchedulerTests
             })));
         ScriptedRunner normal = new((_, _, _) => throw new InvalidOperationException("must not run"));
         ScriptedSpecialRunner special = new((_, _, _) => throw new InvalidOperationException("must not run"));
-        ScriptedSimilarityRunner similarity = new((_, _) => throw new InvalidOperationException("must not run"));
 
         DurableRowEvaluationResult result = await new DurableEvaluationScheduler(
             rows,
             normal,
-            special,
-            similarity).EvaluateRowAsync(
+            special).EvaluateRowAsync(
                 plan,
                 2,
                 new Dictionary<string, CheckpointReference>(StringComparer.Ordinal)
@@ -133,7 +117,6 @@ public sealed class DurableEvaluationSchedulerTests
         Assert.Equal(ResultsStatusCodes.Empty, Assert.Single(completed.SimilarityResults).StatusCode);
         Assert.Empty(normal.Payloads);
         Assert.Empty(special.Payloads);
-        Assert.Empty(similarity.Payloads);
     }
 
     [Fact]
@@ -143,7 +126,6 @@ public sealed class DurableEvaluationSchedulerTests
         ScriptedRowSource rows = Rows("student answer", "special answer");
         ScriptedRunner normal = NormalSuccess();
         ScriptedSpecialRunner special = SpecialSuccess();
-        ScriptedSimilarityRunner similarity = new((_, _) => throw new InvalidOperationException("must not run"));
         CheckpointReference failedReference = new()
         {
             QuestionId = "Q1",
@@ -155,8 +137,7 @@ public sealed class DurableEvaluationSchedulerTests
         DurableRowEvaluationResult result = await new DurableEvaluationScheduler(
             rows,
             normal,
-            special,
-            similarity).EvaluateRowAsync(
+            special).EvaluateRowAsync(
                 plan,
                 2,
                 new Dictionary<string, CheckpointReference> { ["Q1"] = failedReference },
@@ -168,7 +149,6 @@ public sealed class DurableEvaluationSchedulerTests
         Assert.Equal(
             ResultsStatusCodes.AiTimeout,
             Assert.Single(result.CompletedRow!.SimilarityResults).StatusCode);
-        Assert.Empty(similarity.Payloads);
     }
 
     [Fact]
@@ -190,24 +170,19 @@ public sealed class DurableEvaluationSchedulerTests
             cancellation.Cancel();
             return AuxiliaryOperationResult<SpecialQuantificationResult>.Failed(ResultsStatusCodes.Cancelled);
         });
-        ScriptedSimilarityRunner similarity = new((_, _) => Task.FromResult(
-            AuxiliaryOperationResult<SimilarityQuantificationResult>.Failed(ResultsStatusCodes.Cancelled)));
-
         DurableRowEvaluationResult result = await new DurableEvaluationScheduler(
             rows,
             normal,
-            special,
-            similarity).EvaluateRowAsync(
+            special).EvaluateRowAsync(
                 plan,
                 2,
                 new Dictionary<string, CheckpointReference> { ["Q1"] = Reference("reference") },
                 "model-test",
                 maxConcurrency: 2,
                 cancellationToken: cancellation.Token);
-
         Assert.False(result.IsComplete);
         Assert.Null(result.CompletedRow);
-        Assert.Empty(similarity.Payloads);
+        Assert.Null(result.CompletedRow);
     }
 
     [Fact]
@@ -218,13 +193,11 @@ public sealed class DurableEvaluationSchedulerTests
         ScriptedRowSource rows = Rows(oversized, oversized);
         ScriptedRunner normal = new((_, _, _) => throw new InvalidOperationException("must not run"));
         ScriptedSpecialRunner special = new((_, _, _) => throw new InvalidOperationException("must not run"));
-        ScriptedSimilarityRunner similarity = new((_, _) => throw new InvalidOperationException("must not run"));
 
         DurableRowEvaluationResult result = await new DurableEvaluationScheduler(
             rows,
             normal,
-            special,
-            similarity).EvaluateRowAsync(
+            special).EvaluateRowAsync(
                 plan,
                 2,
                 new Dictionary<string, CheckpointReference> { ["Q1"] = Reference(oversized) },
@@ -237,10 +210,9 @@ public sealed class DurableEvaluationSchedulerTests
         CheckpointCompletedRow completed = Assert.IsType<CheckpointCompletedRow>(result.CompletedRow);
         Assert.Equal(ResultsStatusCodes.AiOutputInvalid, Assert.Single(completed.NormalResults).StatusCode);
         Assert.Equal(ResultsStatusCodes.AiOutputInvalid, Assert.Single(completed.SpecialResults).StatusCode);
-        Assert.Equal(ResultsStatusCodes.AiOutputInvalid, Assert.Single(completed.SimilarityResults).StatusCode);
+        Assert.Equal(ResultsStatusCodes.Success, Assert.Single(completed.SimilarityResults).StatusCode);
         Assert.Empty(normal.Payloads);
         Assert.Empty(special.Payloads);
-        Assert.Empty(similarity.Payloads);
     }
 
     [Theory]
@@ -252,15 +224,7 @@ public sealed class DurableEvaluationSchedulerTests
         DurableEvaluationScheduler scheduler = new(
             Rows("answer", "special"),
             NormalSuccess(),
-            SpecialSuccess(),
-            new ScriptedSimilarityRunner((payload, _) => Task.FromResult(
-                AuxiliaryOperationResult<SimilarityQuantificationResult>.Succeeded(
-                    new SimilarityQuantificationResult
-                    {
-                        QuestionId = payload.QuestionId,
-                        Similarity = 0m,
-                        Reason = "none",
-                    }))));
+            SpecialSuccess());
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => scheduler.EvaluateRowAsync(
             plan,
@@ -353,57 +317,25 @@ public sealed class DurableEvaluationSchedulerTests
         }
     }
 
-    private sealed class ScriptedSimilarityRunner(
-        Func<SafeSimilarityPayload, CancellationToken, Task<AuxiliaryOperationResult<SimilarityQuantificationResult>>> evaluate)
-        : ISimilarityEvaluationOperationRunner
-    {
-        private readonly List<SafeSimilarityPayload> payloads = [];
-
-        internal IReadOnlyList<SafeSimilarityPayload> Payloads => payloads.AsReadOnly();
-
-        public Task<AuxiliaryOperationResult<SimilarityQuantificationResult>> EvaluateAsync(
-            SafeSimilarityPayload payload,
-            CancellationToken cancellationToken)
-        {
-            payloads.Add(payload);
-            return evaluate(payload, cancellationToken);
-        }
-    }
-
     private sealed class ConcurrentGate(int expectedStarts)
     {
-        private readonly TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private int active;
+        private readonly TaskCompletionSource ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int started;
-        private int maximumActive;
+        private int active;
 
-        internal int MaximumActive => maximumActive;
+        internal int MaximumActive { get; private set; }
 
         internal async Task EnterAsync(CancellationToken cancellationToken)
         {
             int current = Interlocked.Increment(ref active);
-            UpdateMaximum(ref maximumActive, current);
+            MaximumActive = Math.Max(MaximumActive, current);
             if (Interlocked.Increment(ref started) == expectedStarts)
             {
-                release.TrySetResult();
+                ready.TrySetResult();
             }
 
-            await release.Task.WaitAsync(cancellationToken);
+            await ready.Task.WaitAsync(cancellationToken);
             Interlocked.Decrement(ref active);
-        }
-
-        private static void UpdateMaximum(ref int maximum, int candidate)
-        {
-            int observed;
-            do
-            {
-                observed = Volatile.Read(ref maximum);
-                if (candidate <= observed)
-                {
-                    return;
-                }
-            }
-            while (Interlocked.CompareExchange(ref maximum, candidate, observed) != observed);
         }
     }
 }

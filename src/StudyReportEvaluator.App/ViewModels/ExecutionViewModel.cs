@@ -222,9 +222,6 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
                 runnerOptions)),
             new SpecialEvaluationOperationRunnerAdapter(new SpecialEvaluationRunner(
                 new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory(), usage, UsageOperation.Special),
-                runnerOptions)),
-            new SimilarityEvaluationOperationRunnerAdapter(new SimilarityEvaluationRunner(
-                new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory(), usage, UsageOperation.Similarity),
                 runnerOptions)));
         return durable.RunAsync(
             new DurableQuantificationRunRequest

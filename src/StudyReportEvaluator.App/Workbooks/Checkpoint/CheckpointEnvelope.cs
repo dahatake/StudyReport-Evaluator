@@ -127,7 +127,7 @@ public sealed record CheckpointCompletedRow
 
 public sealed record CheckpointEnvelope
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
