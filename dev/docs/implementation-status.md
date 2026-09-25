@@ -1,5 +1,14 @@
 # Current implementation status
 
+## 2026-09-26 — 類似度・並列化・reasoning effortの統合
+
+以下3件（2026-09-25）を1つのbranchへ統合し、統合時の不整合を修正した。
+- **不要になった`auto`の必須検査を削除**: 固定`auto`を使うoperationがなくなったため、実行開始前の`AUTO_MODEL_UNAVAILABLE`と実行画面の「固定 auto」表示を削除し、同じ位置に次回runのreasoning effortを表示する。
+- **レビュー指摘の修正**: 共有clientの即時破棄（上記）と、quota exhaustedの参照回答・行がcheckpointへ保存され、再開しても再実行されない問題を修正した。
+- **Reference sheet**: reasoning effort列は既存列の位置を変えないよう末尾（H列）へ追加した。
+- **実CLI確認**: 共有clientで通常評価8件を同時に実行し（合成payload、`claude-sonnet-5`・`low`）、8件とも成功した（CLI起動を含め約30秒。確認用の一時testはcommitしていない）。
+- **確認**: `dotnet build .\StudyReportEvaluator.slnx -c Release`成功（警告0）。`dotnet test .\StudyReportEvaluator.slnx -c Release`でCore 199/199、App 1873成功・9 skip（opt-in）・1失敗。失敗は`SampleWorkbookStructuralTests.Repository_sample_is_opened_read_only_and_only_structural_metadata_drives_mapping`で、git管理外のローカル`sample/SampleReport.xlsx`が期待と異なる寸法（`A1:L531`、期待`A1:J531`）のため。変更前の`main`（`0e431fe`）でも同じ失敗を確認した。
+
 ## 2026-09-25 — run-level reasoning effortの統一
 
 - **方針**: run開始時に選択modelの対応effortから1つだけ解決し、Reference／通常評価／固有評価へ同じ値を指定する。既定希望は`low`。`none`はreasoningを無効化するため既定にはせず、非対応・`auto`・一覧にないmodelではrun全体を未指定（`null`）にする。
@@ -18,9 +27,8 @@
 
 - **共有client**: run内で`SharedCopilotClientPool`を使い、通常／参照／固有operationが1つの検証済みCopilot CLI processを共有するようにした。attemptごとのsession ID、tool制約、session削除、usage記録は維持した。reasoning effortは認証確認時のmodel一覧からrun開始時に1回だけ解決するため、attemptごとの`ListModelsAsync`は行わない。CLIとのstdio接続が切れた（`IOException`）場合だけpoolから切り離し、次attemptで再作成する。切り離したclientは実行中の他attemptの後始末に使えるようrun終了時に破棄する（統合レビューで、即時破棄だと1回の通信失敗で同時実行中の全attemptが`CLEANUP_FAILED`になることを確認し修正）。
 - **rate limit / quota**: SDK `SessionErrorEvent`の`errorType=rate_limit`／`quota`と既知codeを分類し、`RATE_LIMITED`／`QUOTA_EXHAUSTED`を追加した。rate limitは最大3attempt内で指数backoff＋jitter（retry-after seamあり）を使い、adaptive limiterがAIMDで有効並列度を下げる。quota exhaustedは再試行せず、partialを残して停止する。quota exhaustedの参照回答・行はcheckpointへ保存せず、再開時に再実行する。
-- **行pipeline**: durable workflowで複数student rowをin-flightにし、全行・全operationがrun共通のglobal limiterを共有する。checkpointはsource row順の連続prefixだけを保存し、後続行が先に完了した場合はmemoryに保持する。crash時の再実行範囲は最大pipeline幅へ広がるが、resume admissionのprefix検証と出力順序は維持する。
+- **行pipeline**: durable workflowで複数student rowをin-flightにし、全行・全operationがrun共通のglobal limiterを共有する。checkpointはsource row順の連続prefixだけを保存し、後続行が先に完了した場合はmemoryに保持する。実行中と未保存の完了行の合計を並列度以下に制限するため、crash時の再実行範囲は最大で並列度分の行に広がるが、resume admissionのprefix検証と出力順序は維持する。
 - **並列度**: 既定8、選択上限16へ変更。合成Prompt（`claude-sonnet-5`・`low`）の実測で、1 attemptはclientを毎回作る方式の11〜14秒から共有clientの約5秒になり、スループットは並列1／4／8／16で10.9／29.8／46.4／49.2件/分だった。8で頭打ちになり、16は1件の待ちが約2倍になるため既定は8とした。rate limit時は有効並列度を半減する（8→4→2→1）。記録は`work/20260926-0020-ConcurrencyAndEffortMeasurement.md`。
-- **確認**: `dotnet build .\StudyReportEvaluator.slnx -c Release --no-restore`成功。関連単体（Retry/設定/実行設定/ durable orchestrator / documentation contract）288件成功。
 
 ## 2026-09-25 — schema不正の根本原因とreasoning effortの記録
 
