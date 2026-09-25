@@ -380,13 +380,14 @@ public sealed class DurableQuantificationOrchestrator
             object rowInFlightGate = new();
             int nextLaunchRowIndex = completedRows.Count;
             int nextCheckpointRowIndex = completedRows.Count;
+            // Bounds rows that are running or finished but not yet checkpointed, so a crash re-runs at most this many rows.
             int pipelineLimit = Math.Max(1, run.MaxConcurrency);
 
             while ((nextLaunchRowIndex < rowTotal || inFlightRows.Count > 0)
                 && terminalCode is null)
             {
                 while (nextLaunchRowIndex < rowTotal
-                    && inFlightRows.Count < pipelineLimit
+                    && inFlightRows.Count + readyRows.Count < pipelineLimit
                     && !rowCancellation.IsCancellationRequested)
                 {
                     int rowIndex = nextLaunchRowIndex++;

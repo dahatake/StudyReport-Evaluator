@@ -484,34 +484,6 @@ internal sealed class SharedCopilotClientPool : IAsyncDisposable
         }
     }
 
-    internal async Task<IReadOnlyList<ModelInfo>> ListModelsAsync(CancellationToken cancellationToken)
-    {
-        SharedCopilotClientState state = await GetStateAsync(cancellationToken).ConfigureAwait(false);
-        IReadOnlyList<ModelInfo>? models = Volatile.Read(ref state.Models);
-        if (models is not null)
-        {
-            return models;
-        }
-
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            models = state.Models;
-            if (models is not null)
-            {
-                return models;
-            }
-
-            models = (await state.Client.ListModelsAsync(cancellationToken).ConfigureAwait(false)).ToArray();
-            Volatile.Write(ref state.Models, models);
-            return models;
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
     internal async Task InvalidateAsync(CopilotClient? failedClient = null)
     {
         SharedCopilotClientState? toDispose = null;
@@ -579,8 +551,6 @@ internal sealed class SharedCopilotClientPool : IAsyncDisposable
         internal bool Started { get; init; }
 
         internal bool? Authenticated { get; set; }
-
-        internal IReadOnlyList<ModelInfo>? Models;
     }
 }
 

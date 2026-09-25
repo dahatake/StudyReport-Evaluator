@@ -285,15 +285,16 @@ formula参照mapへ次を追加する。
 
 ### 6.3 References sheet
 
-headerは次の7列とする。
+headerは次の8列とする。
 
 1. `QuestionId`
 2. `DisplayName`
 3. `QuestionText`
-4. `ModelId`
+4. `ModelId`（runの選択model）
 5. `ReferenceAnswer`
 6. `Status`
 7. `GeneratedAtUtc`
+8. `ReasoningEffort`（run-level値。未指定は`未指定`）
 
 すべてliteral stringであり、formulaへ昇格しない。token usageはRun sheetへ集計する。
 

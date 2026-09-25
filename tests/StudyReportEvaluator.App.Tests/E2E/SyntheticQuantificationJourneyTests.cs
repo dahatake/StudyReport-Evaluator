@@ -200,7 +200,7 @@ public sealed class SyntheticQuantificationJourneyTests
             }
 
             Assert.Equal(530, resultsWrite.DataRowCount);
-            Assert.Equal(53, resultsWrite.ColumnCount);
+            Assert.Equal(57, resultsWrite.ColumnCount);
             Assert.Equal(10_600, resultsWrite.FormulaCells.Length);
             ImmutableArray<ExpectedFormulaCell> expectedFormulas = configCells.FormulaCells
                 .Concat(resultsWrite.FormulaCells)
@@ -316,7 +316,7 @@ public sealed class SyntheticQuantificationJourneyTests
         Assert.True(File.Exists(partialPath));
         Assert.Equal(2, interruptedReferences.CallCount);
         Assert.Equal(1, interruptedStore.CreateCount);
-        Assert.Equal(267, interruptedStore.UpdateCount);
+        Assert.Equal(2 + interrupted.CompletedRows.Length, interruptedStore.UpdateCount);
         Assert.Equal(0, interruptedStore.LoadCount);
 
         FakeCopilotTransport resumedNormal = new(workbook);
@@ -740,7 +740,7 @@ public sealed class SyntheticQuantificationJourneyTests
 
         Worksheet results = GetWorksheet(document, sheetNames.ResultsSheetName);
         Dictionary<string, string> headers = ReadHeaders(results);
-        Assert.Equal(53, headers.Count);
+        Assert.Equal(57, headers.Count);
         Assert.Equal(531, results.Descendants<Row>().Count());
         Assert.Equal(10_600, results.Descendants<CellFormula>().Count());
         Assert.DoesNotContain(headers.Keys, header =>

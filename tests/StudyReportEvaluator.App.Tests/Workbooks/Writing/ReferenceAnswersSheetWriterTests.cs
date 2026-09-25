@@ -26,7 +26,8 @@ public sealed class ReferenceAnswersSheetWriterTests
                 new ReferenceAnswerSheetRow
                 {
                     QuestionId = "Q1",
-                    ModelId = "auto",
+                    ModelId = "model-a",
+                    ReasoningEffort = "low",
                     Answer = "=REFERENCE-CANARY",
                     StatusCode = "SUCCESS",
                     GeneratedAtUtc = new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.Zero),
@@ -39,9 +40,10 @@ public sealed class ReferenceAnswersSheetWriterTests
         Assert.Empty(sheet.Descendants<CellFormula>());
         Row row = sheet.Descendants<Row>().Single(item => item.RowIndex?.Value == 2);
         Assert.Equal("Q1", Text(row, "A"));
-        Assert.Equal("auto", Text(row, "D"));
+        Assert.Equal("model-a", Text(row, "D"));
         Assert.Equal("=REFERENCE-CANARY", Text(row, "E"));
         Assert.Equal("SUCCESS", Text(row, "F"));
+        Assert.Equal("low", Text(row, "H"));
         Assert.All(row.Elements<Cell>(), cell => Assert.Equal(CellValues.InlineString, cell.DataType?.Value));
     }
 
@@ -80,7 +82,7 @@ public sealed class ReferenceAnswersSheetWriterTests
                 new ReferenceAnswerSheetRow
                 {
                     QuestionId = "Q1",
-                    ModelId = "other",
+                    ModelId = " model-a",
                     Answer = "answer",
                     StatusCode = "SUCCESS",
                     GeneratedAtUtc = DateTimeOffset.UnixEpoch,

@@ -80,12 +80,12 @@ public sealed class ReferenceAnswersSheetWriter
                 SpreadsheetLiteral.CreateInlineStringCell("B" + rowText, question.DisplayName),
                 SpreadsheetLiteral.CreateInlineStringCell("C" + rowText, question.QuestionText),
                 SpreadsheetLiteral.CreateInlineStringCell("D" + rowText, source.ModelId),
-                SpreadsheetLiteral.CreateInlineStringCell("E" + rowText, source.ReasoningEffort ?? "未指定"),
-                SpreadsheetLiteral.CreateInlineStringCell("F" + rowText, source.Answer ?? string.Empty),
-                SpreadsheetLiteral.CreateInlineStringCell("G" + rowText, source.StatusCode),
+                SpreadsheetLiteral.CreateInlineStringCell("E" + rowText, source.Answer ?? string.Empty),
+                SpreadsheetLiteral.CreateInlineStringCell("F" + rowText, source.StatusCode),
                 SpreadsheetLiteral.CreateInlineStringCell(
-                    "H" + rowText,
-                    source.GeneratedAtUtc.ToString("O", CultureInfo.InvariantCulture)));
+                    "G" + rowText,
+                    source.GeneratedAtUtc.ToString("O", CultureInfo.InvariantCulture)),
+                SpreadsheetLiteral.CreateInlineStringCell("H" + rowText, source.ReasoningEffort ?? "未指定"));
             data.Append(row);
             rowNumber++;
         }
@@ -159,10 +159,10 @@ public sealed class ReferenceAnswersSheetWriter
         SpreadsheetLiteral.CreateInlineStringCell("B1", "DisplayName"),
         SpreadsheetLiteral.CreateInlineStringCell("C1", "QuestionText"),
         SpreadsheetLiteral.CreateInlineStringCell("D1", "ModelId"),
-        SpreadsheetLiteral.CreateInlineStringCell("E1", "ReasoningEffort"),
-        SpreadsheetLiteral.CreateInlineStringCell("F1", "ReferenceAnswer"),
-        SpreadsheetLiteral.CreateInlineStringCell("G1", "Status"),
-        SpreadsheetLiteral.CreateInlineStringCell("H1", "GeneratedAtUtc"))
+        SpreadsheetLiteral.CreateInlineStringCell("E1", "ReferenceAnswer"),
+        SpreadsheetLiteral.CreateInlineStringCell("F1", "Status"),
+        SpreadsheetLiteral.CreateInlineStringCell("G1", "GeneratedAtUtc"),
+        SpreadsheetLiteral.CreateInlineStringCell("H1", "ReasoningEffort"))
     {
         RowIndex = 1,
     };
