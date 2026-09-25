@@ -536,7 +536,7 @@ public sealed class SettingsViewModelTests
         question.QuestionText = questionText;
         harness.Execution.MaxConcurrency = 2;
         Assert.True(harness.Settings.HasUnsavedChanges);
-        harness.Execution.MaxConcurrency = 4;
+        harness.Execution.MaxConcurrency = 8;
         harness.Settings.SynchronizeDrafts();
         Assert.False(harness.Settings.HasUnsavedChanges);
         Assert.Equal(saved, File.ReadAllBytes(harness.SettingsPath));
@@ -661,7 +661,7 @@ public sealed class SettingsViewModelTests
         {
             draftField.SetValue(harness.Design, invalid);
             harness.Execution.MaxConcurrency = 2;
-            harness.Execution.MaxConcurrency = 4;
+            harness.Execution.MaxConcurrency = 8;
             Assert.True(harness.Settings.HasUnsavedChanges);
             Assert.Same(invalid, harness.Design.Draft);
             Assert.Same(saved, harness.Settings.StoredDefinition);
@@ -673,7 +673,7 @@ public sealed class SettingsViewModelTests
         }
 
         harness.Execution.MaxConcurrency = 2;
-        harness.Execution.MaxConcurrency = 4;
+        harness.Execution.MaxConcurrency = 8;
         Assert.False(harness.Settings.HasUnsavedChanges);
         AssertNoBackgroundActivity(harness);
     }
@@ -1140,7 +1140,7 @@ public sealed class SettingsViewModelTests
         Assert.Null(harness.Settings.StoredDefinition);
         Assert.Same(input, harness.Input.DefinitionDraft);
         Assert.Same(design, harness.Design.Draft);
-        Assert.Equal(4, harness.Execution.MaxConcurrency);
+        Assert.Equal(8, harness.Execution.MaxConcurrency);
         Assert.Null(harness.Execution.PreferredModelId);
         Assert.Contains("元ファイルは変更していません", harness.Settings.StatusText, StringComparison.Ordinal);
         AssertSafeStatus(harness);
@@ -1321,7 +1321,7 @@ public sealed class SettingsViewModelTests
         Assert.Equal(SettingsSaveStatus.Saved, harness.Settings.SaveStatus);
         ApplicationSettings saved = await harness.ReadSettingsAsync();
         AssertDefinition(frozen, saved.Definition);
-        Assert.Equal(4, saved.MaxConcurrency);
+        Assert.Equal(8, saved.MaxConcurrency);
         Assert.True(harness.Settings.HasUnsavedChanges);
         harness.Settings.SynchronizeDrafts();
         Assert.Equal(inputEdit ? "await 前の Input 編集" : frozen.Questions[0].QuestionText,

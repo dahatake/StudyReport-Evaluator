@@ -1410,7 +1410,7 @@ public sealed class ExecutionViewTests
         Render();
         Assert.Equal(0, ViewObserverCount(harness.ViewModel, harness.View));
         Assert.Equal(1, ViewObserverCount(next, harness.View));
-        Assert.Equal("次回 未選択 並列4 · effort: 未選択 · 希望: new-owner · 上限: 未選択", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+        Assert.Equal("次回 未選択 並列8 · effort: 未選択 · 希望: new-owner · 上限: 未選択", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
         Assert.Same(next.CheckAuthenticationCommand, Required<Button>(harness.View, "CheckAuthenticationButton").Command);
         Assert.Same(next.StartCommand, Required<Button>(harness.View, "StartRunButton").Command);
         Assert.Same(next.LoginCommand, Required<Button>(harness.View, "StartCopilotLogin").Command);

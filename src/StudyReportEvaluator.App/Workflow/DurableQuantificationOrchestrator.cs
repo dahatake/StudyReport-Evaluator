@@ -340,7 +340,9 @@ public sealed class DurableQuantificationOrchestrator
                 run.MaximumPromptTokens,
                 run.MaximumContextWindowTokens,
                 cancellationToken).ConfigureAwait(false);
-            if (string.Equals(reference.StatusCode, ResultsStatusCodes.Cancelled, StringComparison.Ordinal))
+            // Quota exhaustion is not persisted so that a resume regenerates the reference.
+            if (string.Equals(reference.StatusCode, ResultsStatusCodes.Cancelled, StringComparison.Ordinal)
+                || string.Equals(reference.StatusCode, ResultsStatusCodes.QuotaExhausted, StringComparison.Ordinal))
             {
                 break;
             }
@@ -358,11 +360,6 @@ public sealed class DurableQuantificationOrchestrator
                 references.RemoveAt(references.Count - 1);
                 checkpoint = checkpoint with { References = references.ToImmutable() };
                 terminalCode = saved.Code;
-                break;
-            }
-
-            if (string.Equals(reference.StatusCode, ResultsStatusCodes.QuotaExhausted, StringComparison.Ordinal))
-            {
                 break;
             }
         }
@@ -464,6 +461,13 @@ public sealed class DurableQuantificationOrchestrator
                 readyRows[completedRowIndex] = row.CompletedRow;
                 while (readyRows.Remove(nextCheckpointRowIndex, out CheckpointCompletedRow? ready))
                 {
+                    // A row with quota exhaustion is not persisted, so a resume re-runs it.
+                    if (HasQuotaExhausted(ready))
+                    {
+                        rowCancellation.Cancel();
+                        break;
+                    }
+
                     completedRows.Add(ready);
                     checkpoint = checkpoint with
                     {
@@ -477,12 +481,6 @@ public sealed class DurableQuantificationOrchestrator
                         completedRows.RemoveAt(completedRows.Count - 1);
                         checkpoint = checkpoint with { CompletedRows = completedRows.ToImmutable() };
                         terminalCode = saved.Code;
-                        rowCancellation.Cancel();
-                        break;
-                    }
-
-                    if (HasQuotaExhausted(ready))
-                    {
                         rowCancellation.Cancel();
                         break;
                     }
@@ -1098,8 +1096,7 @@ public sealed class DurableQuantificationOrchestrator
 
     private static bool HasQuotaExhausted(CheckpointCompletedRow row) =>
         row.NormalResults.Any(result => string.Equals(result.StatusCode, ResultsStatusCodes.QuotaExhausted, StringComparison.Ordinal))
-        || row.SpecialResults.Any(result => string.Equals(result.StatusCode, ResultsStatusCodes.QuotaExhausted, StringComparison.Ordinal))
-        || row.SimilarityResults.Any(result => string.Equals(result.StatusCode, ResultsStatusCodes.QuotaExhausted, StringComparison.Ordinal));
+        || row.SpecialResults.Any(result => string.Equals(result.StatusCode, ResultsStatusCodes.QuotaExhausted, StringComparison.Ordinal));
 
     private static Dictionary<string, string?> SelectCells(
         EvaluationRowData row,

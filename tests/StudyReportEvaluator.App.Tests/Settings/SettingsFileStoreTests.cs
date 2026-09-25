@@ -324,7 +324,7 @@ public sealed class SettingsFileStoreTests
 
     [Theory]
     [InlineData("maxConcurrency", "0")]
-    [InlineData("maxConcurrency", "9")]
+    [InlineData("maxConcurrency", "17")]
     [InlineData("maxConcurrency", "null")]
     [InlineData("maxConcurrency", "\"2\"")]
     [InlineData("maxConcurrency", "1.5")]

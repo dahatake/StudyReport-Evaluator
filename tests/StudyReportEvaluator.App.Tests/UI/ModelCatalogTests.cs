@@ -179,7 +179,7 @@ public sealed class ModelCatalogTests
         Assert.Equal(SettingsLoadStatus.JsonInvalid, loaded.Status);
         Assert.Null(loaded.Settings);
         Assert.Null(harness.Execution.CachedModels);
-        Assert.Equal(4, harness.Execution.MaxConcurrency);
+        Assert.Equal(8, harness.Execution.MaxConcurrency);
         Assert.Equal(0, harness.Authentication.CallCount);
         harness.AssertUnchanged(original);
         harness.AssertNoLoginOrRun();

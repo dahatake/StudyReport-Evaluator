@@ -392,6 +392,7 @@ internal sealed class SdkEphemeralCopilotTransportFactory : IEphemeralCopilotTra
 internal sealed class SharedCopilotClientPool : IAsyncDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly List<CopilotClient> _retired = [];
     private SharedCopilotClientState? _state;
     private bool _disposed;
 
@@ -484,26 +485,23 @@ internal sealed class SharedCopilotClientPool : IAsyncDisposable
         }
     }
 
-    internal async Task InvalidateAsync(CopilotClient? failedClient = null)
+    // Detaches a failed client so later attempts start a new CLI process. The old client is disposed only when the
+    // run ends, because other in-flight attempts may still need it to abort and delete their sessions.
+    internal async Task InvalidateAsync(CopilotClient failedClient)
     {
-        SharedCopilotClientState? toDispose = null;
+        ArgumentNullException.ThrowIfNull(failedClient);
         await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
-            if (failedClient is null
-                || (_state is { } state && ReferenceEquals(state.Client, failedClient)))
+            if (_state is { } state && ReferenceEquals(state.Client, failedClient))
             {
-                toDispose = Interlocked.Exchange(ref _state, null);
+                Volatile.Write(ref _state, null);
+                _retired.Add(failedClient);
             }
         }
         finally
         {
             _gate.Release();
-        }
-
-        if (toDispose is not null)
-        {
-            await DisposeClientAsync(toDispose.Client).ConfigureAwait(false);
         }
     }
 
@@ -516,6 +514,12 @@ internal sealed class SharedCopilotClientPool : IAsyncDisposable
             await DisposeClientAsync(state.Client).ConfigureAwait(false);
         }
 
+        foreach (CopilotClient retired in _retired)
+        {
+            await DisposeClientAsync(retired).ConfigureAwait(false);
+        }
+
+        _retired.Clear();
         _gate.Dispose();
     }
 
@@ -594,8 +598,7 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
         if (_sharedClientPool is not null)
         {
             _client = await TranslateAsync(
-                () => _sharedClientPool.GetStartedClientAsync(cancellationToken),
-                invalidateSharedClient: true).ConfigureAwait(false);
+                () => _sharedClientPool.GetStartedClientAsync(cancellationToken)).ConfigureAwait(false);
             return;
         }
 
@@ -716,16 +719,11 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
         }
         catch (TimeoutException)
         {
-            if (invalidateSharedClient)
-            {
-                await InvalidateSharedClientAsync().ConfigureAwait(false);
-            }
-
             throw new EvaluationAttemptTimeoutException();
         }
         catch (Exception exception) when (IsNetworkException(exception))
         {
-            if (invalidateSharedClient)
+            if (invalidateSharedClient && exception is IOException)
             {
                 await InvalidateSharedClientAsync().ConfigureAwait(false);
             }
@@ -754,16 +752,11 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
         }
         catch (TimeoutException)
         {
-            if (invalidateSharedClient)
-            {
-                await InvalidateSharedClientAsync().ConfigureAwait(false);
-            }
-
             throw new EvaluationAttemptTimeoutException();
         }
         catch (Exception exception) when (IsNetworkException(exception))
         {
-            if (invalidateSharedClient)
+            if (invalidateSharedClient && exception is IOException)
             {
                 await InvalidateSharedClientAsync().ConfigureAwait(false);
             }
@@ -786,8 +779,13 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
             or SocketException
             or WebSocketException;
 
-    private Task InvalidateSharedClientAsync(CopilotClient? failedClient = null) =>
-        _sharedClientPool?.InvalidateAsync(failedClient ?? Volatile.Read(ref _client)) ?? Task.CompletedTask;
+    private Task InvalidateSharedClientAsync(CopilotClient? failedClient = null)
+    {
+        CopilotClient? client = failedClient ?? Volatile.Read(ref _client);
+        return _sharedClientPool is not null && client is not null
+            ? _sharedClientPool.InvalidateAsync(client)
+            : Task.CompletedTask;
+    }
 }
 
 internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
@@ -915,16 +913,15 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
                 or SocketException
                 or WebSocketException)
         {
-            await NotifyProcessFailureAsync().ConfigureAwait(false);
-            throw new EvaluationNetworkException();
-        }
-        catch (InvalidOperationException exception) when (TryClassifySessionError(exception, out EvaluationAttemptException? sessionException))
-        {
-            if (sessionException is EvaluationNetworkException)
+            if (exception is IOException)
             {
                 await NotifyProcessFailureAsync().ConfigureAwait(false);
             }
 
+            throw new EvaluationNetworkException();
+        }
+        catch (InvalidOperationException exception) when (TryClassifySessionError(exception, out EvaluationAttemptException? sessionException))
+        {
             throw sessionException;
         }
         catch (EvaluationAttemptException)

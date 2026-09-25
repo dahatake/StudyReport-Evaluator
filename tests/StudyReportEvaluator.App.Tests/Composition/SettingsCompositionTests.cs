@@ -288,7 +288,7 @@ public sealed class SettingsCompositionTests
     [Theory]
     [InlineData("{PRIVATE-T23-SETTINGS", SettingsLoadStatus.JsonInvalid)]
     [InlineData("{\"schemaVersion\":99}", SettingsLoadStatus.UnsupportedVersion)]
-    [InlineData("{\"schemaVersion\":1,\"maxConcurrency\":9}", SettingsLoadStatus.JsonInvalid)]
+    [InlineData("{\"schemaVersion\":1,\"maxConcurrency\":17}", SettingsLoadStatus.JsonInvalid)]
     public async Task Invalid_settings_keep_the_original_file_and_offline_editors_with_safe_status(string json, SettingsLoadStatus expected)
     {
         using SettingsDirectory directory = new();

@@ -252,7 +252,7 @@ public sealed class SettingsViewTests
         Assert.Equal("not-available", harness.Execution.PreferredModelId);
         ApplicationSettings automaticallySaved = await harness.ReadSettingsAsync();
         Assert.Equal("not-available", automaticallySaved.PreferredModelId);
-        Assert.Equal(4, automaticallySaved.MaxConcurrency);
+        Assert.Equal(8, automaticallySaved.MaxConcurrency);
         Assert.Null(automaticallySaved.OutputDirectoryOverride);
         Assert.Null(automaticallySaved.Definition); // Loaded input draft is not automatically persisted.
         CachedCopilotModel[] expectedModels =

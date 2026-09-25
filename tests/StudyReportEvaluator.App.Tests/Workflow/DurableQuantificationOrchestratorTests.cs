@@ -171,6 +171,69 @@ public sealed class DurableQuantificationOrchestratorTests
     }
 
     [Fact]
+    public async Task Quota_exhausted_reference_is_not_checkpointed_so_resume_regenerates_it()
+    {
+        QuantificationDefinition definition = Definition(2, 3);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RecordingCheckpointStore checkpoint = new();
+        RecordingReferenceRunner references = new((_, _) => Task.FromResult(
+            AuxiliaryOperationResult<ReferenceAnswerResult>.Failed(ResultsStatusCodes.QuotaExhausted)));
+        ScriptedRunner normal = NormalSuccess();
+
+        RunSummary summary = await Orchestrator(
+            Rows(),
+            normal,
+            references,
+            SpecialSuccess(),
+            new ScriptedInputSnapshots(U01TestSupport.InputSnapshot()),
+            checkpoint,
+            new RecordingPathPlanner(),
+            new RecordingFinalizer(),
+            new RecordingCleaner()).RunAsync(
+                Request(definition, metadata),
+                cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(QuantificationRunStatusCodes.Cancelled, summary.StatusCode);
+        Assert.Empty(summary.References);
+        Assert.Empty(summary.CompletedRows);
+        Assert.Equal(1, references.CallCount);
+        Assert.Empty(normal.Payloads);
+        Assert.Equal(0, checkpoint.UpdateCount);
+    }
+
+    [Fact]
+    public async Task Quota_exhausted_row_is_not_checkpointed_and_stops_later_rows()
+    {
+        QuantificationDefinition definition = Definition(2, 4);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RecordingCheckpointStore checkpoint = new();
+        ScriptedRunner normal = new((payload, _, _) => Task.FromResult(
+            payload.PrimarySource.Value == "answer-3"
+                ? EvaluationRunnerResult.Failed(ResultsStatusCodes.QuotaExhausted)
+                : EvaluationRunnerResult.Succeeded(U01TestSupport.ValidResult(payload, _ => 7m))));
+
+        RunSummary summary = await Orchestrator(
+            Rows(),
+            normal,
+            ReferenceSuccess(),
+            SpecialSuccess(),
+            new ScriptedInputSnapshots(U01TestSupport.InputSnapshot()),
+            checkpoint,
+            new RecordingPathPlanner(),
+            new RecordingFinalizer(),
+            new RecordingCleaner()).RunAsync(
+                Request(definition, metadata),
+                cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(QuantificationRunStatusCodes.Cancelled, summary.StatusCode);
+        Assert.Equal([2], summary.CompletedRows.Select(row => row.SourceRowNumber));
+        Assert.DoesNotContain(
+            checkpoint.Updates.SelectMany(item => item.CompletedRows),
+            row => row.SourceRowNumber == 3);
+        Assert.DoesNotContain(normal.Payloads, payload => payload.PrimarySource.Value == "answer-4");
+    }
+
+    [Fact]
     public async Task Resume_reuses_reference_and_completed_rows_then_runs_only_the_first_unfinished_row()
     {
         QuantificationDefinition definition = Definition(2, 3);
