@@ -12,7 +12,7 @@ public sealed class JobUsageContext
         CliVersion = VersionNumber(cliVersion);
         RequestedModelKey = requestedModelKey is null ? null : ModelUsageSnapshot.SafeKey(requestedModelKey);
         RequestedModelIsAuto = requestedModelIsAuto ?? (requestedModelKey is null ? null : requestedModelKey == "auto");
-        MaxConcurrency = maxConcurrency is >= 1 and <= 3 ? maxConcurrency : null;
+        MaxConcurrency = maxConcurrency is >= 1 and <= 8 ? maxConcurrency : null;
         IsResume = isResume;
     }
 

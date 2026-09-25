@@ -59,7 +59,8 @@ public sealed class DurableEvaluationScheduler
         int? maximumPromptTokens = null,
         int? maximumContextWindowTokens = null,
         Action<int>? inFlightChanged = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        AdaptiveEvaluationConcurrencyLimiter? concurrencyLimiter = null)
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(references);
@@ -174,7 +175,9 @@ public sealed class DurableEvaluationScheduler
             });
         }
 
-        using SemaphoreSlim gate = new(maxConcurrency, maxConcurrency);
+        using SemaphoreSlim? gate = concurrencyLimiter is null
+            ? new SemaphoreSlim(maxConcurrency, maxConcurrency)
+            : null;
         int inFlight = 0;
         Task[] tasks = operations.Select(operation => RunBoundedAsync(operation)).ToArray();
         await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -198,9 +201,17 @@ public sealed class DurableEvaluationScheduler
 
         async Task RunBoundedAsync(Func<Task> operation)
         {
+            IAsyncDisposable? lease = null;
             try
             {
-                await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                if (concurrencyLimiter is not null)
+                {
+                    lease = await concurrencyLimiter.AcquireAsync(cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    await gate!.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -222,7 +233,14 @@ public sealed class DurableEvaluationScheduler
             {
                 int current = Interlocked.Decrement(ref inFlight);
                 ReportSafely(inFlightChanged, current);
-                gate.Release();
+                if (lease is not null)
+                {
+                    await lease.DisposeAsync().ConfigureAwait(false);
+                }
+                else
+                {
+                    gate!.Release();
+                }
             }
         }
     }

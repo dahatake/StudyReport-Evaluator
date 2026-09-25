@@ -18,27 +18,32 @@ public sealed class EphemeralEvaluationRunnerOptions
 
     public static TimeSpan DefaultCleanupTimeout { get; } = TimeSpan.FromSeconds(15);
 
-    public const int DefaultMaxConcurrency = 1;
-    public const int MaximumMaxConcurrency = 3;
+    public const int MinimumMaxConcurrency = 1;
+    public const int DefaultMaxConcurrency = 4;
+    public const int MaximumMaxConcurrency = 8;
 
     public EphemeralEvaluationRunnerOptions(
         TimeSpan? attemptTimeout = null,
         TimeSpan? cleanupTimeout = null,
-        int maxConcurrency = DefaultMaxConcurrency)
+        int maxConcurrency = DefaultMaxConcurrency,
+        IEvaluationConcurrencyObserver? concurrencyObserver = null,
+        IRetryDelayProvider? retryDelayProvider = null)
     {
         AttemptTimeout = attemptTimeout ?? DefaultAttemptTimeout;
         CleanupTimeout = cleanupTimeout ?? DefaultCleanupTimeout;
         RetryAndCleanupCoordinator.ValidateFiniteTimeout(AttemptTimeout, nameof(attemptTimeout));
         RetryAndCleanupCoordinator.ValidateFiniteTimeout(CleanupTimeout, nameof(cleanupTimeout));
 
-        if (maxConcurrency is < DefaultMaxConcurrency or > MaximumMaxConcurrency)
+        if (maxConcurrency is < MinimumMaxConcurrency or > MaximumMaxConcurrency)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(maxConcurrency),
-                "Evaluation concurrency must be between 1 and 3.");
+                "Evaluation concurrency must be between 1 and 8.");
         }
 
         MaxConcurrency = maxConcurrency;
+        ConcurrencyObserver = concurrencyObserver;
+        RetryDelayProvider = retryDelayProvider;
     }
 
     public TimeSpan AttemptTimeout { get; }
@@ -46,6 +51,10 @@ public sealed class EphemeralEvaluationRunnerOptions
     public TimeSpan CleanupTimeout { get; }
 
     public int MaxConcurrency { get; }
+
+    public IEvaluationConcurrencyObserver? ConcurrencyObserver { get; }
+
+    internal IRetryDelayProvider? RetryDelayProvider { get; }
 }
 
 public interface IEphemeralCopilotTransportFactory
@@ -130,7 +139,9 @@ public sealed class EphemeralEvaluationRunner
             _options.AttemptTimeout,
             _options.CleanupTimeout,
             _options.MaxConcurrency,
-            cancellationToken);
+            cancellationToken,
+            _options.ConcurrencyObserver,
+            _options.RetryDelayProvider);
     }
 
     private IEphemeralEvaluationAttempt CreateAttempt(
@@ -327,6 +338,7 @@ internal sealed class CopilotEvaluationAttempt : IEphemeralEvaluationAttempt
 internal sealed class SdkEphemeralCopilotTransportFactory : IEphemeralCopilotTransportFactory
 {
     private readonly ICopilotClientFactory _clientFactory;
+    private readonly SharedCopilotClientPool? _sharedClientPool;
     private readonly JobUsageTracker? _usageTracker;
     private readonly UsageOperation _operation;
 
@@ -341,8 +353,214 @@ internal sealed class SdkEphemeralCopilotTransportFactory : IEphemeralCopilotTra
         _operation = operation;
     }
 
+    internal SdkEphemeralCopilotTransportFactory(
+        SharedCopilotClientPool sharedClientPool,
+        JobUsageTracker? usageTracker = null,
+        UsageOperation operation = UsageOperation.Normal)
+    {
+        _sharedClientPool = sharedClientPool ?? throw new ArgumentNullException(nameof(sharedClientPool));
+        _clientFactory = sharedClientPool.ClientFactory;
+        _usageTracker = usageTracker;
+        _operation = operation;
+    }
+
     public IEphemeralCopilotTransport Create() =>
-        new SdkEphemeralCopilotTransport(_clientFactory, _usageTracker, _operation);
+        new SdkEphemeralCopilotTransport(_clientFactory, _usageTracker, _operation, _sharedClientPool);
+}
+
+internal sealed class SharedCopilotClientPool : IAsyncDisposable
+{
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private SharedCopilotClientState? _state;
+    private bool _disposed;
+
+    internal SharedCopilotClientPool(ICopilotClientFactory clientFactory)
+    {
+        ClientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+    }
+
+    internal ICopilotClientFactory ClientFactory { get; }
+
+    internal async Task<CopilotClient> GetStartedClientAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        SharedCopilotClientState? state = Volatile.Read(ref _state);
+        if (state is { Started: true })
+        {
+            return state.Client;
+        }
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ThrowIfDisposed();
+            state = _state;
+            if (state is { Started: true })
+            {
+                return state.Client;
+            }
+
+            CopilotClientCreationResult creation = await ClientFactory
+                .CreateAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (creation.Status == CopilotClientCreationStatus.Cancelled
+                && cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            if (creation.Status != CopilotClientCreationStatus.Created
+                || creation.Client is null)
+            {
+                throw new EvaluationFatalException();
+            }
+
+            try
+            {
+                await creation.Client.StartAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                await DisposeClientAsync(creation.Client).ConfigureAwait(false);
+                throw;
+            }
+
+            state = new SharedCopilotClientState(creation.Client) { Started = true };
+            Volatile.Write(ref _state, state);
+            return state.Client;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    internal async Task<bool> IsAuthenticatedAsync(CancellationToken cancellationToken)
+    {
+        SharedCopilotClientState state = await GetStateAsync(cancellationToken).ConfigureAwait(false);
+        if (state.Authenticated is bool cachedAuthenticated)
+        {
+            return cachedAuthenticated;
+        }
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (state.Authenticated is bool authenticated)
+            {
+                return authenticated;
+            }
+
+            GetAuthStatusResponse response = await state.Client
+                .GetAuthStatusAsync(cancellationToken)
+                .ConfigureAwait(false);
+            state.Authenticated = response.IsAuthenticated;
+            return response.IsAuthenticated;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    internal async Task<IReadOnlyList<ModelInfo>> ListModelsAsync(CancellationToken cancellationToken)
+    {
+        SharedCopilotClientState state = await GetStateAsync(cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<ModelInfo>? models = Volatile.Read(ref state.Models);
+        if (models is not null)
+        {
+            return models;
+        }
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            models = state.Models;
+            if (models is not null)
+            {
+                return models;
+            }
+
+            models = (await state.Client.ListModelsAsync(cancellationToken).ConfigureAwait(false)).ToArray();
+            Volatile.Write(ref state.Models, models);
+            return models;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    internal async Task InvalidateAsync(CopilotClient? failedClient = null)
+    {
+        SharedCopilotClientState? toDispose = null;
+        await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+        try
+        {
+            if (failedClient is null
+                || (_state is { } state && ReferenceEquals(state.Client, failedClient)))
+            {
+                toDispose = Interlocked.Exchange(ref _state, null);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        if (toDispose is not null)
+        {
+            await DisposeClientAsync(toDispose.Client).ConfigureAwait(false);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        SharedCopilotClientState? state = Interlocked.Exchange(ref _state, null);
+        if (state is not null)
+        {
+            await DisposeClientAsync(state.Client).ConfigureAwait(false);
+        }
+
+        _gate.Dispose();
+    }
+
+    private async Task<SharedCopilotClientState> GetStateAsync(CancellationToken cancellationToken)
+    {
+        CopilotClient client = await GetStartedClientAsync(cancellationToken).ConfigureAwait(false);
+        SharedCopilotClientState? state = Volatile.Read(ref _state);
+        return state is not null && ReferenceEquals(state.Client, client)
+            ? state
+            : throw new EvaluationNetworkException();
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(SharedCopilotClientPool));
+        }
+    }
+
+    private static async ValueTask DisposeClientAsync(CopilotClient client)
+    {
+        try { await client.StopAsync().ConfigureAwait(false); }
+        catch { /* Best effort invalidation. */ }
+        try { await client.DisposeAsync().ConfigureAwait(false); }
+        catch { /* Best effort invalidation. */ }
+    }
+
+    private sealed class SharedCopilotClientState(CopilotClient client)
+    {
+        internal CopilotClient Client { get; } = client;
+
+        internal bool Started { get; init; }
+
+        internal bool? Authenticated { get; set; }
+
+        internal IReadOnlyList<ModelInfo>? Models;
+    }
 }
 
 internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
@@ -352,6 +570,7 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
     private readonly ICopilotClientFactory _clientFactory;
     private readonly JobUsageTracker? _usageTracker;
     private readonly UsageOperation _operation;
+    private readonly SharedCopilotClientPool? _sharedClientPool;
     private CopilotClient? _client;
     private SdkEphemeralCopilotSession? _usageSession;
     private int _usageAttemptNumber;
@@ -360,12 +579,14 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
     internal SdkEphemeralCopilotTransport(
         ICopilotClientFactory clientFactory,
         JobUsageTracker? usageTracker = null,
-        UsageOperation operation = UsageOperation.Normal)
+        UsageOperation operation = UsageOperation.Normal,
+        SharedCopilotClientPool? sharedClientPool = null)
     {
         ArgumentNullException.ThrowIfNull(clientFactory);
         _clientFactory = clientFactory;
         _usageTracker = usageTracker;
         _operation = operation;
+        _sharedClientPool = sharedClientPool;
     }
 
     public void SetUsageAttemptContext(int attemptNumber, Guid operationId)
@@ -381,6 +602,14 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (_sharedClientPool is not null)
+        {
+            _client = await TranslateAsync(
+                () => _sharedClientPool.GetStartedClientAsync(cancellationToken),
+                invalidateSharedClient: true).ConfigureAwait(false);
+            return;
+        }
+
         CopilotClientCreationResult creation = await _clientFactory
             .CreateAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -404,6 +633,13 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
     public Task<bool> IsAuthenticatedAsync(CancellationToken cancellationToken) =>
         TranslateAsync(async () =>
         {
+            if (_sharedClientPool is not null)
+            {
+                return await _sharedClientPool
+                    .IsAuthenticatedAsync(cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             CopilotClient client = GetClient();
             GetAuthStatusResponse response = await client
                 .GetAuthStatusAsync(cancellationToken)
@@ -422,21 +658,32 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
             config.ReasoningEffort = string.Equals(config.Model, "auto", StringComparison.Ordinal)
                 ? null
                 : ResolveReasoningEffort(
-                    await client.ListModelsAsync(cancellationToken).ConfigureAwait(false),
+                    _sharedClientPool is null
+                        ? await client.ListModelsAsync(cancellationToken).ConfigureAwait(false)
+                        : await _sharedClientPool.ListModelsAsync(cancellationToken).ConfigureAwait(false),
                     config.Model);
             CopilotSession session = await client
                 .CreateSessionAsync(config, cancellationToken)
                 .ConfigureAwait(false);
-            SdkEphemeralCopilotSession usageSession = new(session, _usageTracker, _operation, config.Model, config.ReasoningEffort);
+            SdkEphemeralCopilotSession usageSession = new(
+                session,
+                _usageTracker,
+                _operation,
+                config.Model,
+                config.ReasoningEffort,
+                onProcessFailure: () => InvalidateSharedClientAsync(client));
             Volatile.Write(ref _usageSession, usageSession);
             return usageSession;
-        });
+        }, invalidateSharedClient: true);
     }
 
     public Task DeleteSessionAsync(string sessionId, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
-        return GetClient().DeleteSessionAsync(sessionId, cancellationToken);
+        CopilotClient client = GetClient();
+        return TranslateAsync(
+            () => client.DeleteSessionAsync(sessionId, cancellationToken),
+            invalidateSharedClient: true);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -444,14 +691,17 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
         CopilotClient? client = Volatile.Read(ref _client);
         if (client is not null)
         {
-            await client.StopAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (_sharedClientPool is null)
+            {
+                await client.StopAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 
     public async ValueTask DisposeAsync()
     {
         CopilotClient? client = Interlocked.Exchange(ref _client, null);
-        if (client is not null)
+        if (client is not null && _sharedClientPool is null)
         {
             await client.DisposeAsync().ConfigureAwait(false);
         }
@@ -472,7 +722,7 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
             : null;
     }
 
-    private static async Task TranslateAsync(Func<Task> operation)
+    private async Task TranslateAsync(Func<Task> operation, bool invalidateSharedClient = false)
     {
         try
         {
@@ -484,10 +734,20 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
         }
         catch (TimeoutException)
         {
+            if (invalidateSharedClient)
+            {
+                await InvalidateSharedClientAsync().ConfigureAwait(false);
+            }
+
             throw new EvaluationAttemptTimeoutException();
         }
         catch (Exception exception) when (IsNetworkException(exception))
         {
+            if (invalidateSharedClient)
+            {
+                await InvalidateSharedClientAsync().ConfigureAwait(false);
+            }
+
             throw new EvaluationNetworkException();
         }
         catch (EvaluationAttemptException)
@@ -500,7 +760,7 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
         }
     }
 
-    private static async Task<T> TranslateAsync<T>(Func<Task<T>> operation)
+    private async Task<T> TranslateAsync<T>(Func<Task<T>> operation, bool invalidateSharedClient = false)
     {
         try
         {
@@ -512,10 +772,20 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
         }
         catch (TimeoutException)
         {
+            if (invalidateSharedClient)
+            {
+                await InvalidateSharedClientAsync().ConfigureAwait(false);
+            }
+
             throw new EvaluationAttemptTimeoutException();
         }
         catch (Exception exception) when (IsNetworkException(exception))
         {
+            if (invalidateSharedClient)
+            {
+                await InvalidateSharedClientAsync().ConfigureAwait(false);
+            }
+
             throw new EvaluationNetworkException();
         }
         catch (EvaluationAttemptException)
@@ -533,6 +803,9 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
             or HttpRequestException
             or SocketException
             or WebSocketException;
+
+    private Task InvalidateSharedClientAsync(CopilotClient? failedClient = null) =>
+        _sharedClientPool?.InvalidateAsync(failedClient ?? Volatile.Read(ref _client)) ?? Task.CompletedTask;
 }
 
 internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
@@ -542,6 +815,8 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
     private readonly JobUsageTracker? _usageTracker;
     private readonly UsageOperation _operation;
     private readonly IDisposable? _usageSubscription;
+    private readonly IDisposable? _errorSubscription;
+    private readonly Func<Task>? _onProcessFailure;
     private readonly HashSet<Guid> _eventIds = [];
     private readonly List<UsageMetrics> _eventMetrics = [];
     private readonly Dictionary<string, List<UsageMetrics>> _modelEvents = new(StringComparer.Ordinal);
@@ -568,18 +843,21 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
     private Task<EvaluationTokenUsage>? _captureTask;
     private Task? _abortTask;
     private Task? _disposeTask;
+    private EvaluationAttemptException? _sessionErrorException;
 
     internal SdkEphemeralCopilotSession(
         CopilotSession session,
         JobUsageTracker? usageTracker = null,
         UsageOperation operation = UsageOperation.Normal,
         string? requestedModel = null,
-        string? requestedReasoningEffort = null)
+        string? requestedReasoningEffort = null,
+        Func<Task>? onProcessFailure = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _usageTracker = usageTracker;
         _operation = operation;
+        _onProcessFailure = onProcessFailure;
         _requestedReasoningEffort = requestedReasoningEffort;
         _requestedModelKey = requestedModel is null ? null : ModelUsageSnapshot.CreateModelKey(requestedModel);
         _requestedModelIsAuto = requestedModel is null ? null : string.Equals(requestedModel, "auto", StringComparison.Ordinal);
@@ -588,6 +866,9 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
             try { _usageSubscription = session.On<AssistantUsageEvent>(OnUsage); }
             catch { _usageStatus = UsageObservationStatus.EventsUnavailable; }
         }
+
+        try { _errorSubscription = session.On<SessionErrorEvent>(OnSessionError); }
+        catch { /* Classification falls back to the SDK exception message. */ }
     }
 
     public string SessionId => _session.SessionId;
@@ -652,11 +933,17 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
                 or SocketException
                 or WebSocketException)
         {
+            await NotifyProcessFailureAsync().ConfigureAwait(false);
             throw new EvaluationNetworkException();
         }
-        catch (InvalidOperationException exception) when (IsTransportSessionError(exception))
+        catch (InvalidOperationException exception) when (TryClassifySessionError(exception, out EvaluationAttemptException? sessionException))
         {
-            throw new EvaluationNetworkException();
+            if (sessionException is EvaluationNetworkException)
+            {
+                await NotifyProcessFailureAsync().ConfigureAwait(false);
+            }
+
+            throw sessionException;
         }
         catch (EvaluationAttemptException)
         {
@@ -681,12 +968,106 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
         exception is InvalidOperationException
         && exception.Message.Contains("error sending request for url", StringComparison.Ordinal);
 
+    private bool TryClassifySessionError(
+        InvalidOperationException exception,
+        out EvaluationAttemptException failure)
+    {
+        EvaluationAttemptException? observed = Volatile.Read(ref _sessionErrorException);
+        if (observed is not null)
+        {
+            failure = observed;
+            return true;
+        }
+
+        string message = exception.Message;
+        if (ContainsAny(
+                message,
+                "rate_limit",
+                "rate limited",
+                "rate_limited",
+                "user_model_rate_limited",
+                "user_global_rate_limited",
+                "integration_rate_limited"))
+        {
+            failure = new EvaluationRateLimitException();
+            return true;
+        }
+
+        if (ContainsAny(
+                message,
+                "quota",
+                "quota_exceeded",
+                "session_quota_exceeded",
+                "billing_not_configured"))
+        {
+            failure = new EvaluationQuotaExhaustedException();
+            return true;
+        }
+
+        if (IsTransportSessionError(exception))
+        {
+            failure = new EvaluationNetworkException();
+            return true;
+        }
+
+        failure = new EvaluationFatalException();
+        return false;
+    }
+
     public Task AbortAsync(CancellationToken cancellationToken)
     {
         lock (_usageGate)
         {
             return _abortTask ??= _session.AbortAsync(cancellationToken);
         }
+    }
+
+    private void OnSessionError(SessionErrorEvent error)
+    {
+        SessionErrorData? data = error.Data;
+        if (data is null)
+        {
+            return;
+        }
+
+        string? errorType = data.ErrorType;
+        string? errorCode = data.ErrorCode;
+        if (string.Equals(errorType, "rate_limit", StringComparison.OrdinalIgnoreCase)
+            || ContainsAny(
+                errorCode,
+                "user_weekly_rate_limited",
+                "user_global_rate_limited",
+                "rate_limited",
+                "user_model_rate_limited",
+                "integration_rate_limited"))
+        {
+            Volatile.Write(ref _sessionErrorException, new EvaluationRateLimitException());
+            return;
+        }
+
+        if (string.Equals(errorType, "quota", StringComparison.OrdinalIgnoreCase)
+            || ContainsAny(
+                errorCode,
+                "quota_exceeded",
+                "session_quota_exceeded",
+                "billing_not_configured"))
+        {
+            Volatile.Write(ref _sessionErrorException, new EvaluationQuotaExhaustedException());
+        }
+    }
+
+    private static bool ContainsAny(string? value, params string[] needles) =>
+        value is not null && needles.Any(needle => value.Contains(needle, StringComparison.OrdinalIgnoreCase));
+
+    private async Task NotifyProcessFailureAsync()
+    {
+        if (_onProcessFailure is null)
+        {
+            return;
+        }
+
+        try { await _onProcessFailure().ConfigureAwait(false); }
+        catch { /* Recovery invalidation must not replace the original failure. */ }
     }
 
     public Task<EvaluationTokenUsage> GetUsageAsync(
@@ -824,6 +1205,8 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
             _modelEvents.Clear();
         }
 
+        try { _errorSubscription?.Dispose(); }
+        catch { /* Observation teardown is advisory. */ }
         try { _usageSubscription?.Dispose(); }
         catch { /* Observation teardown is advisory. */ }
         await _session.DisposeAsync().ConfigureAwait(false);

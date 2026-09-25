@@ -529,7 +529,7 @@ public sealed class DocumentationContractTests
         ApplicationSettings defaults = new();
         Assert.Equal(1, ApplicationSettings.CurrentSchemaVersion);
         Assert.Equal(1, defaults.SchemaVersion);
-        Assert.Equal(1, defaults.MaxConcurrency);
+        Assert.Equal(4, defaults.MaxConcurrency);
         Assert.Null(defaults.PreferredModelId);
         Assert.Null(defaults.OutputDirectoryOverride);
         Assert.Null(defaults.Definition);
@@ -541,7 +541,7 @@ public sealed class DocumentationContractTests
         [
             ("schemaVersion", "必須の整数`1`"),
             ("preferredModelId", "通常modelの希望ID、または`null`。利用可能と確認した実行状態ではない"),
-            ("maxConcurrency", "1〜3、既定1"),
+            ("maxConcurrency", "1〜8、既定4"),
             ("outputDirectoryOverride", "明示した完全修飾の絶対出力path、または`null`。自動算出`result`は保存しない"),
             ("definition", "任意の採点定義**1件**、または`null`"),
             ("cachedModels", "任意の最後に取得成功したmodel一覧。省略／`null`はキャッシュなし、空配列`[]`も有効"),

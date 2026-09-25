@@ -117,16 +117,17 @@ public sealed class EphemeralEvaluationRunnerAdapter : IEvaluationRunner
 
 public sealed class EvaluationSchedulerOptions
 {
-    public const int DefaultMaxConcurrency = 1;
-    public const int MaximumMaxConcurrency = 3;
+    public const int MinimumMaxConcurrency = 1;
+    public const int DefaultMaxConcurrency = 4;
+    public const int MaximumMaxConcurrency = 8;
 
     public EvaluationSchedulerOptions(int maxConcurrency = DefaultMaxConcurrency)
     {
-        if (maxConcurrency is < DefaultMaxConcurrency or > MaximumMaxConcurrency)
+        if (maxConcurrency is < MinimumMaxConcurrency or > MaximumMaxConcurrency)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(maxConcurrency),
-                "Evaluation concurrency must be between 1 and 3.");
+                "Evaluation concurrency must be between 1 and 8.");
         }
 
         MaxConcurrency = maxConcurrency;
@@ -653,6 +654,8 @@ public sealed class EvaluationScheduler
                 EvaluationAttemptFailureKind.SchemaInvalid => ResultsStatusCodes.AiOutputInvalid,
                 EvaluationAttemptFailureKind.Network => ResultsStatusCodes.NetworkFailed,
                 EvaluationAttemptFailureKind.Timeout => ResultsStatusCodes.AiTimeout,
+                EvaluationAttemptFailureKind.RateLimited => ResultsStatusCodes.RateLimited,
+                EvaluationAttemptFailureKind.QuotaExhausted => ResultsStatusCodes.QuotaExhausted,
                 EvaluationAttemptFailureKind.Authentication => ResultsStatusCodes.AuthRequired,
                 EvaluationAttemptFailureKind.Cancelled => ResultsStatusCodes.Cancelled,
                 EvaluationAttemptFailureKind.Cleanup => ResultsStatusCodes.CleanupFailed,

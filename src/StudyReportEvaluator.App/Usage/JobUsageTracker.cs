@@ -150,7 +150,8 @@ public sealed class JobUsageTracker : IAsyncDisposable
                 "Cancelled" or "Canceled" or "cancelled" or "canceled" or "CANCELLED" or "CANCELED" => JobCostCompletion.Cancelled,
                 "TimedOut" or "Timeout" or "timeout" or "AI_TIMEOUT" or "TIMEOUT" => JobCostCompletion.TimedOut,
                 "Failed" or "failed" or "FAILED" or "AI_RUNTIME_FAILED" or "OUTPUT_FAILED" or "CLEANUP_FAILED"
-                    or "NETWORK_FAILED" or "AUTH_REQUIRED" or "AI_OUTPUT_INVALID"
+                    or "NETWORK_FAILED" or "RATE_LIMITED" or "QUOTA_EXHAUSTED"
+                    or "AUTH_REQUIRED" or "AI_OUTPUT_INVALID"
                     or "RUN_FAILED" or "OUTPUT_INVALID" or "CHECKPOINT_SAVE_FAILED" or "INPUT_CHANGED" => JobCostCompletion.Failed,
                 "Disposed" => JobCostCompletion.Disposed,
                 _ => JobCostCompletion.Unknown,

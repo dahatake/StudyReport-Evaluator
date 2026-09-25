@@ -8,6 +8,8 @@ public enum UsageAttemptOutcome
     SchemaInvalid,
     NetworkFailed,
     TimedOut,
+    RateLimited,
+    QuotaExhausted,
     AuthRequired,
     Cancelled,
     CleanupFailed,

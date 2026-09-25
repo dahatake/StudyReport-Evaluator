@@ -276,9 +276,9 @@ public sealed class SettingsWorkflowSystemTests
             Assert.False(partial.WasResumed);
             Assert.Null(partial.FinalPath);
             Assert.Null(partial.FinalizationCode);
-            Assert.Equal([3, 4], partial.CompletedRows.Select(row => row.SourceRowNumber));
-            Assert.Equal(7, partial.CompletedOperationCount);
-            Assert.Equal(6, partial.OperationCancelledCount);
+            Assert.Equal([3], partial.CompletedRows.Select(row => row.SourceRowNumber));
+            Assert.Equal(4, partial.CompletedOperationCount);
+            Assert.Equal(9, partial.OperationCancelledCount);
             Assert.Equal([FirstAnswer, "0"], interrupted.Ai.NormalCalls.Select(call => call.Payload.PrimarySource.Value));
             Assert.Single(interrupted.Ai.SpecialCalls);
             Assert.Single(interrupted.Ai.ReferenceCalls);
@@ -346,7 +346,9 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Equal(saved.PartialPath, request.ResumePartialPath);
         AssertAiCalls(resumed.Ai, ["0", LastAnswer], ["0", LastSpecial], referenceCalls: 0);
         Assert.Equal(JsonSerializer.Serialize(saved.References), JsonSerializer.Serialize(completed.References));
-        Assert.Equal(JsonSerializer.Serialize(saved.CompletedRows), JsonSerializer.Serialize(completed.CompletedRows.Take(2)));
+        Assert.Equal(
+            JsonSerializer.Serialize(saved.CompletedRows),
+            JsonSerializer.Serialize(completed.CompletedRows.Take(saved.CompletedRows.Length)));
         Assert.Equal(JsonSerializer.Serialize(baseline.CompletedRows), JsonSerializer.Serialize(completed.CompletedRows));
         Assert.Equal(7, completed.OperationUsageObservedCount);
         Assert.Equal(70L, completed.OperationTokenUsage.InputTokens);

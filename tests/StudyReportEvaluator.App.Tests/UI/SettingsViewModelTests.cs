@@ -536,7 +536,7 @@ public sealed class SettingsViewModelTests
         question.QuestionText = questionText;
         harness.Execution.MaxConcurrency = 2;
         Assert.True(harness.Settings.HasUnsavedChanges);
-        harness.Execution.MaxConcurrency = 1;
+        harness.Execution.MaxConcurrency = 4;
         harness.Settings.SynchronizeDrafts();
         Assert.False(harness.Settings.HasUnsavedChanges);
         Assert.Equal(saved, File.ReadAllBytes(harness.SettingsPath));
@@ -661,7 +661,7 @@ public sealed class SettingsViewModelTests
         {
             draftField.SetValue(harness.Design, invalid);
             harness.Execution.MaxConcurrency = 2;
-            harness.Execution.MaxConcurrency = 1;
+            harness.Execution.MaxConcurrency = 4;
             Assert.True(harness.Settings.HasUnsavedChanges);
             Assert.Same(invalid, harness.Design.Draft);
             Assert.Same(saved, harness.Settings.StoredDefinition);
@@ -673,7 +673,7 @@ public sealed class SettingsViewModelTests
         }
 
         harness.Execution.MaxConcurrency = 2;
-        harness.Execution.MaxConcurrency = 1;
+        harness.Execution.MaxConcurrency = 4;
         Assert.False(harness.Settings.HasUnsavedChanges);
         AssertNoBackgroundActivity(harness);
     }
@@ -781,7 +781,7 @@ public sealed class SettingsViewModelTests
             case "name": harness.Design.DefinitionName = string.Empty; break;
             case "allocation": harness.Design.BasePoints += 0.0001m; break;
             case "prompt": harness.Design.Questions[0].Evaluators[0].CustomPromptTemplate = "{" + PrivateCanary + "}"; break;
-            case "concurrency": harness.Execution.MaxConcurrency = 4; break;
+            case "concurrency": harness.Execution.MaxConcurrency = 9; break;
             case "output": harness.Execution.OutputDirectoryOverride = "relative/" + PrivateCanary; break;
             case "unicode": harness.Design.DefinitionName = PrivateCanary + "\uD800"; break;
             default: throw new ArgumentOutOfRangeException(nameof(invalid));
@@ -1141,7 +1141,7 @@ public sealed class SettingsViewModelTests
         Assert.Null(harness.Settings.StoredDefinition);
         Assert.Same(input, harness.Input.DefinitionDraft);
         Assert.Same(design, harness.Design.Draft);
-        Assert.Equal(1, harness.Execution.MaxConcurrency);
+        Assert.Equal(4, harness.Execution.MaxConcurrency);
         Assert.Null(harness.Execution.PreferredModelId);
         Assert.Contains("元ファイルは変更していません", harness.Settings.StatusText, StringComparison.Ordinal);
         AssertSafeStatus(harness);
@@ -1322,7 +1322,7 @@ public sealed class SettingsViewModelTests
         Assert.Equal(SettingsSaveStatus.Saved, harness.Settings.SaveStatus);
         ApplicationSettings saved = await harness.ReadSettingsAsync();
         AssertDefinition(frozen, saved.Definition);
-        Assert.Equal(1, saved.MaxConcurrency);
+        Assert.Equal(4, saved.MaxConcurrency);
         Assert.True(harness.Settings.HasUnsavedChanges);
         harness.Settings.SynchronizeDrafts();
         Assert.Equal(inputEdit ? "await 前の Input 編集" : frozen.Questions[0].QuestionText,

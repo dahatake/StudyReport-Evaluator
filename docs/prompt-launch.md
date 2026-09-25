@@ -177,7 +177,7 @@ StudyReportEvaluator.App.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prom
 ### Execution
 
 - **Copilot 状態を確認**でlogin、通常モデルと固定`auto`の利用可否を確認した。必要な場合のみ**GitHubにログイン**し、完了後も自分で状態を再確認した
-- **変更 → 共通**で通常モデル・concurrency 1〜3・指定出力先を編集し、実行画面の読取専用表示で次回の実効値を確認した
+- **変更 → 共通**で通常モデル・concurrency 1〜8・指定出力先を編集し、実行画面の読取専用表示で次回の実効値を確認した
 - 明示出力先は入力Excelを変えても保持する。空欄（未指定）のときだけ入力隣接`result`となり、入力未選択なら「入力後に決定」。再開の場合は別途partial pathを確認した
 - 今回／前回runの固定条件と次回の設定を区別した。実行中の編集は進行中runへ反映しない
 - 利用者自身が**定量化を開始**を選んだ
@@ -211,3 +211,4 @@ checkpointのinput、definition、modelが一致しない場合、またはrunti
 起動依頼Promptへ学生の回答、氏名、email、credentialを貼らないでください。agentへworkbook本文を開かないよう明示してください。final/partialは入力全体と評価情報を含むため、入力と同等以上に機密です。
 
 詳しくは[データとprivacy](privacy-and-data-handling.md)を参照してください。
+

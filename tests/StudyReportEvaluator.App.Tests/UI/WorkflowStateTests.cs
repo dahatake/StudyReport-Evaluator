@@ -409,7 +409,7 @@ public sealed class WorkflowStateTests
             Assert.Equal(fixture.Workbook.Path, active.InputPath);
             Assert.Same(fixture.Input.Metadata, active.WorkbookMetadata);
             Assert.Equal("model-test", active.ModelId);
-            Assert.Equal(1, active.MaxConcurrency);
+            Assert.Equal(4, active.MaxConcurrency);
             Assert.Equal(Path.Combine(fixture.Workbook.Directory, "result"), active.OutputDirectory);
             Assert.Null(active.ResumePartialPath);
             Assert.Equal((7, 1, 1), (fixture.Execution.ProgressTotal, fixture.Execution.ProgressCompleted, fixture.Execution.ProgressInFlight));
@@ -491,7 +491,7 @@ public sealed class WorkflowStateTests
             Assert.False(stop.IsEffectivelyEnabled);
             Assert.Same(active, fixture.Runner.LastRequest);
             AssertDefinition(original, active.DraftDefinition);
-            Assert.Equal(1, active.MaxConcurrency);
+            Assert.Equal(4, active.MaxConcurrency);
             AssertPassive(fixture, authenticationChecks: 1, runs: 1);
 
             release.TrySetResult(cancelled);

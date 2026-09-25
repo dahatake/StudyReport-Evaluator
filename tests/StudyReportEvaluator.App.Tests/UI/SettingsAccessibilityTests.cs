@@ -48,7 +48,7 @@ public sealed class SettingsAccessibilityTests
             TextBox effective = ById<TextBox>(view, "SettingsEffectiveOutputDirectory");
             Assert.Same(execution.AvailableModelIds, model.ItemsSource);
             Assert.Same(execution.ConcurrencyOptions, concurrency.ItemsSource);
-            Assert.Equal(new[] { 1, 2, 3 }, concurrency.Items.Cast<int>());
+            Assert.Equal(new[] { 1, 2, 3, 4, 5, 6, 7, 8 }, concurrency.Items.Cast<int>());
             Assert.Equal(execution.SelectedModelId, model.SelectedItem);
             Assert.Equal(execution.MaxConcurrency, concurrency.SelectedItem);
             Assert.False(output.IsReadOnly);

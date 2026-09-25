@@ -18,6 +18,8 @@ namespace StudyReportEvaluator.App.Tests.Workflow;
 
 public sealed class DurableQuantificationOrchestratorTests
 {
+    private static readonly TimeSpan TestWait = TimeSpan.FromSeconds(10);
+
     [Fact]
     public async Task New_run_is_reference_first_row_ordered_checkpointed_and_auto_finalized()
     {
@@ -115,6 +117,57 @@ public sealed class DurableQuantificationOrchestratorTests
             Assert.Equal(97.2m, row.FinalScore);
             Assert.Contains("Q1: 1.4", row.QuestionEarnedText, StringComparison.Ordinal);
         });
+    }
+
+    [Fact]
+    public async Task Row_pipeline_starts_later_rows_before_checkpointing_only_contiguous_prefix()
+    {
+        QuantificationDefinition definition = Definition(2, 4);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        List<string> events = [];
+        ScriptedRowSource rows = new((request, _) =>
+        {
+            events.Add("row:" + request.SourceRowNumber);
+            return Task.FromResult(Row(request, $"answer-{request.SourceRowNumber}", $"special-{request.SourceRowNumber}"));
+        });
+        TaskCompletionSource allowFirstNormal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        ScriptedRunner normal = new(async (payload, _, token) =>
+        {
+            events.Add("normal:" + payload.PrimarySource.Value);
+            if (payload.PrimarySource.Value == "answer-2")
+            {
+                await allowFirstNormal.Task.WaitAsync(token);
+            }
+
+            return EvaluationRunnerResult.Succeeded(U01TestSupport.ValidResult(payload, _ => 7m));
+        });
+        RecordingCheckpointStore checkpoint = new(events);
+
+        Task<RunSummary> run = Orchestrator(
+            rows,
+            normal,
+            ReferenceSuccess(),
+            SpecialSuccess(events),
+            new ScriptedInputSnapshots(U01TestSupport.InputSnapshot(), unchanged: true, events),
+            checkpoint,
+            new RecordingPathPlanner(),
+            new RecordingFinalizer(),
+            new RecordingCleaner()).RunAsync(
+                Request(definition, metadata) with
+                {
+                    Run = RunRequest(definition, metadata) with { MaxConcurrency = 2 },
+                },
+                cancellationToken: TestContext.Current.CancellationToken);
+
+        await WaitUntilAsync(() => events.Contains("row:3"), TestContext.Current.CancellationToken);
+        Assert.DoesNotContain("checkpoint:update:1:1", events);
+        allowFirstNormal.SetResult();
+        RunSummary summary = await run.WaitAsync(TestWait, TestContext.Current.CancellationToken);
+
+        Assert.Equal(QuantificationRunStatusCodes.Success, summary.StatusCode);
+        Assert.Equal([2, 3, 4], summary.CompletedRows.Select(row => row.SourceRowNumber));
+        Assert.Equal([(1, 0), (1, 1), (1, 2), (1, 3)],
+            checkpoint.Updates.Select(item => (item.References.Length, item.CompletedRows.Length)));
     }
 
     [Fact]
@@ -663,6 +716,18 @@ public sealed class DurableQuantificationOrchestratorTests
             MaxConcurrency = 1,
         };
 
+    private static async Task WaitUntilAsync(Func<bool> predicate, CancellationToken cancellationToken)
+    {
+        using CancellationTokenSource timeout = new(TestWait);
+        using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            timeout.Token);
+        while (!predicate())
+        {
+            await Task.Delay(25, linked.Token).ConfigureAwait(false);
+        }
+    }
+
     private static CheckpointRuntimeIdentity Runtime() =>
         new()
         {
@@ -870,7 +935,7 @@ public sealed class DurableQuantificationOrchestratorTests
         public CheckpointSaveResult Update(CheckpointEnvelope envelope, CancellationToken cancellationToken = default)
         {
             UpdateCount++;
-            events?.Add("checkpoint:update");
+            events?.Add($"checkpoint:update:{envelope.References.Length}:{envelope.CompletedRows.Length}");
             CheckpointSaveResult result = UpdateResult?.Invoke(envelope)
                 ?? CheckpointSaveResult.Succeeded(createdNew: false);
             if (result.IsSuccess)
