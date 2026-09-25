@@ -69,9 +69,9 @@
                AutomationProperties.AutomationId="ExecutionEffectiveModel"
                AutomationProperties.Name="実行中または前回と次回のモデル・並列度・モデル上限・読取専用"
                ToolTip.Tip="実行中／前回runは開始時の固定値、次回は現在の設定の実効値です。希望IDが使えなくても別モデルへ自動変更しません。上限が「SDK未公開」のモデル（autoなど）では、実行前のモデル相対の容量検証を行いません。全文を選択・コピーできます。" />
-      <TextBlock x:Name="FixedAutoModelStatus" Grid.Column="2" Classes="label"
-                 AutomationProperties.AutomationId="ExecutionFixedAutoModel"
-                 AutomationProperties.Name="参照回答と類似度評価で固定使用するautoの利用可否" />
+      <TextBlock x:Name="ReasoningEffortStatus" Grid.Column="2" Classes="label"
+                 AutomationProperties.AutomationId="ExecutionReasoningEffort"
+                 AutomationProperties.Name="次回runで全評価に使うreasoning effort" />
       <TextBlock x:Name="ConcurrencySummary" Grid.Column="3" Classes="label"
                  Text="{Binding MaxConcurrency, StringFormat='次回並列&#10;{0} 件'}"
                  ToolTip.Tip="{Binding ConcurrencyText}"

@@ -291,7 +291,7 @@ flowchart LR
 | Design | definition、Prompt、allocation、special minimum |
 | CLI起動前（login／状態確認／AI共通） | bundled manifest／RID／SDK・CLI版／SHA-256／検証済み絶対path |
 | Login終了／取消後 | safe結果、所有processの終了確認、認証未確認の保持、利用者による明示再確認 |
-| Run admission | snapshot、mapping、formula layout、request/model capacity、auto availability、paths |
+| Run admission | snapshot、mapping、formula layout、request/model capacity、reasoning effort、paths |
 | Resume admission | checkpoint schema/hash/input/definition/model/runtime、completed row IDs |
 | AI callback | tool count、closed schema、ID、range、evidence |
 | Checkpoint save | package、checkpoint sheet、JSON chunk/hash、input identity |

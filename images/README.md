@@ -30,7 +30,7 @@ F02は版metadataと文書表記の更新です。UI実装と既存８枚のPNG 
 - displayed path: `C:\Synthetic\StudyReport-100x2.xlsx`
 - design state: Base 60、Special 0、Question points 20/20、Similarity penalty weight 0.1
 - Copilot state: bundled CLI 1.0.79を模した合成runtime identityとfake authentication boundary。実CLIプロセス・live login・network requestは実行していない
-- login UI state（05）: 状態確認前の`NotChecked`（認証未確認）・ログイン未開始。表示は「固定 auto／未確認」で、model未選択、認証確認・ログイン・runはいずれも未実施。ログインボタンとstatusは認証済み／live loginの証跡ではない
+- login UI state（05）: 状態確認前の`NotChecked`（認証未確認）・ログイン未開始。表示は「effort／未選択」で、model未選択、認証確認・ログイン・runはいずれも未実施。ログインボタンとstatusは認証済み／live loginの証跡ではない
 - run state（06/07のみ）: production durable orchestratorをfake row/AI/input-snapshot/checkpoint/path-planner/finalizer/output boundariesで実行。Reference 2 + 100行 ×（Normal 2 + Similarity 2）= 402 operations。認証と完了・final出力成功もfake応答であり、実入力fileの検証や実結果workbook作成の証跡ではない
 - result state: fake runnerのraw 8・similarity 0.2を実際の計算処理へ渡す。06はoverrideなしでFinal score 91.2。07は選択行の設問1のraw 8を保持したままoverride 9とし、Final score 93.2。AI品質や実データ結果を表さない
 - output state: final/partialは合成path。07の`C:\Synthetic\result\eval-20260902-1200-reviewed.xlsx`は元のfinalとは別名の**未保存候補**で、exportは未実行。出力可能表示はfake path判定であり、実file作成の証跡ではない

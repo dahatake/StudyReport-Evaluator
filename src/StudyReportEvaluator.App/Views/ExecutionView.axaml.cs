@@ -132,7 +132,6 @@ public sealed partial class ExecutionView : UserControl
                     or nameof(ExecutionViewModel.CurrentRunLimitText)
                     or nameof(ExecutionViewModel.IsRunning)
                     or nameof(ExecutionViewModel.CanEditResume)
-                    or nameof(ExecutionViewModel.IsAutoModelAvailable)
                     or nameof(ExecutionViewModel.OutputDirectoryOverride)
                     or nameof(ExecutionViewModel.HasTechnicalErrors))))
         {
@@ -160,10 +159,10 @@ public sealed partial class ExecutionView : UserControl
         this.FindControl<TextBox>("EffectiveModelTextBox")!.Text = owner is { HasCurrentRun: true } current
             ? $"{(current.IsRunning ? "実行中" : "前回run")} {current.CurrentRunModelId} 並列{current.CurrentRunMaxConcurrency?.ToString(CultureInfo.InvariantCulture)} · effort: {current.CurrentRunReasoningEffortText} · 上限: {current.CurrentRunLimitText} / {nextConditions}"
             : nextConditions;
-        string autoAvailability = owner?.IsAutoModelAvailable == true
-            ? "利用可能"
-            : owner?.IsAuthenticationAvailable == true ? "利用不可" : "未確認";
-        this.FindControl<TextBlock>("FixedAutoModelStatus")!.Text = $"固定 auto\n{autoAvailability}";
+        string reasoningEffort = owner?.SelectedModelId is null
+            ? "未選択"
+            : owner.SelectedModelReasoningEffort ?? "未指定";
+        this.FindControl<TextBlock>("ReasoningEffortStatus")!.Text = $"effort\n{reasoningEffort}";
         this.FindControl<TextBlock>("OutputDirectorySource")!.Text = owner?.OutputDirectoryOverride is null
             ? "次回新規出力\n（入力隣接）" : "次回新規出力\n（明示指定）";
 

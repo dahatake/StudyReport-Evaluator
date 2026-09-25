@@ -535,7 +535,6 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 OnPropertiesChanged(
                     nameof(AuthenticationStatusText),
                     nameof(IsAuthenticationAvailable),
-                    nameof(IsAutoModelAvailable),
                     nameof(ValidationSummary));
             }
         }
@@ -544,9 +543,6 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
     public bool IsAuthenticationAvailable =>
         AuthenticationState == ExecutionAuthenticationState.Available;
 
-    public bool IsAutoModelAvailable =>
-        AuthenticationState == ExecutionAuthenticationState.Available
-        && modelsById.ContainsKey("auto");
 
     /// null は SDK が選択中 model の上限を公開していないことを表す。
     public int? SelectedModelPromptTokenLimit =>
@@ -1748,7 +1744,6 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
             modelsById.Clear();
             OnPropertiesChanged(
                 nameof(AvailableModelIds),
-                nameof(IsAutoModelAvailable),
                 nameof(SelectedModelId),
                 nameof(SelectedModelPromptTokenLimit),
                 nameof(SelectedModelLimitText),
@@ -1800,7 +1795,6 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
             selectedModelId = ResolveSelectedModelId();
             OnPropertiesChanged(
                 nameof(AvailableModelIds),
-                nameof(IsAutoModelAvailable),
                 nameof(SelectedModelId),
                 nameof(SelectedModelPromptTokenLimit),
                 nameof(SelectedModelLimitText),
@@ -2160,13 +2154,6 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 break;
         }
 
-        if (AuthenticationState == ExecutionAuthenticationState.Available && !IsAutoModelAvailable)
-        {
-            AddError(errors, new ExecutionTechnicalError(
-                "AUTO_MODEL_UNAVAILABLE",
-                "Model",
-                "類似度評価に必要な model ID auto を利用できないため、run を開始できません。Copilot 状態を再確認してください。"));
-        }
 
         if (runtimeErrorCode is not null)
         {

@@ -281,7 +281,6 @@ public sealed class ExecutionSettingsTests
         Assert.Equal(0, viewModel.PlannedEvaluationCount);
         Assert.Equal(ExecutionAuthenticationState.NotChecked, viewModel.AuthenticationState);
         Assert.False(viewModel.IsAuthenticationAvailable);
-        Assert.False(viewModel.IsAutoModelAvailable);
         Assert.Equal(runtimeText, viewModel.RuntimeIdentityText);
         Assert.Empty(viewModel.AvailableModelIds);
         Assert.Contains(nameof(ExecutionViewModel.PreferredModelId), changed);
@@ -350,7 +349,6 @@ public sealed class ExecutionSettingsTests
         Assert.Equal(preference, viewModel.PreferredModelId);
         Assert.Equal(expectedSelection, viewModel.SelectedModelId);
         Assert.Equal(expectedSelection is not null, viewModel.CanStart);
-        Assert.True(viewModel.IsAutoModelAvailable);
         Assert.Equal(new[] { "model-a", "model-b", "auto" }, viewModel.AvailableModelIds);
         if (expectedSelection is null)
         {
@@ -363,14 +361,15 @@ public sealed class ExecutionSettingsTests
     }
 
     [Fact]
-    public async Task Missing_auto_blocks_start_without_changing_the_confirmed_normal_model()
+    public async Task Missing_auto_does_not_block_start_for_confirmed_selected_model()
     {
         using SettingsHarness harness = new();
         harness.Configure();
         ExecutionViewModel viewModel = harness.ViewModel;
         viewModel.ApplySettings(new ApplicationSettings { PreferredModelId = "model-b" });
         harness.Authentication.Snapshot = Available("model-a", "model-b");
-        Assert.False(viewModel.IsAutoModelAvailable);
+        RunSummary summary = await U04TestSupport.CreateSummaryAsync(harness.Definition, harness.Metadata);
+        harness.Run = (_, _, _) => Task.FromResult(summary);
 
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
 
@@ -378,148 +377,20 @@ public sealed class ExecutionSettingsTests
         Assert.Equal(new[] { "model-a", "model-b" }, viewModel.AvailableModelIds);
         Assert.Equal("model-b", viewModel.PreferredModelId);
         Assert.Equal("model-b", viewModel.SelectedModelId);
-        Assert.False(viewModel.IsAutoModelAvailable);
-        ExecutionTechnicalError error = Assert.Single(viewModel.TechnicalErrors);
-        Assert.Equal("AUTO_MODEL_UNAVAILABLE", error.Code);
-        Assert.Equal("Model", error.Field);
-        Assert.Contains("auto", error.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain(harness.Root, error.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.True(viewModel.HasTechnicalErrors);
-        Assert.False(viewModel.IsTechnicallyValid);
-        Assert.False(viewModel.CanStart);
-        Assert.False(viewModel.StartCommand.CanExecute(null));
-
-        viewModel.StartCommand.Execute(null);
-        await viewModel.StartAsync(TestContext.Current.CancellationToken);
-
-        Assert.Equal(1, harness.Authentication.CallCount);
-        Assert.Null(harness.Runner.LastRequest);
-        Assert.Null(viewModel.LastRunContext);
-        Assert.False(Directory.Exists(harness.Root));
-        AssertNoLoginOrRun(harness);
-    }
-
-    [Theory]
-    [InlineData("Auto")]
-    [InlineData("AUTO")]
-    [InlineData("aUtO")]
-    public async Task Auto_model_availability_requires_the_exact_lowercase_id(string modelId)
-    {
-        using SettingsHarness harness = new();
-        harness.Configure();
-        ExecutionViewModel viewModel = harness.ViewModel;
-        viewModel.ApplySettings(new ApplicationSettings { PreferredModelId = "model-b" });
-        harness.Authentication.Snapshot = Available("model-b", modelId);
-
-        await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
-
-        Assert.True(viewModel.IsAuthenticationAvailable);
-        Assert.Equal(new[] { "model-b", modelId }, viewModel.AvailableModelIds);
-        Assert.Equal("model-b", viewModel.PreferredModelId);
-        Assert.Equal("model-b", viewModel.SelectedModelId);
-        Assert.False(viewModel.IsAutoModelAvailable);
-        Assert.Equal("AUTO_MODEL_UNAVAILABLE", Assert.Single(viewModel.TechnicalErrors).Code);
-        Assert.False(viewModel.CanStart);
-        Assert.False(viewModel.StartCommand.CanExecute(null));
-        viewModel.StartCommand.Execute(null);
-        await viewModel.StartAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(1, harness.Authentication.CallCount);
-        AssertNoLoginOrRun(harness);
-
-        // Only a later explicit check listing the exact ID can clear the error.
-        harness.Authentication.Snapshot = Available("model-b", modelId, "auto");
-        await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
-
-        Assert.Equal(new[] { "model-b", modelId, "auto" }, viewModel.AvailableModelIds);
-        Assert.Equal("model-b", viewModel.PreferredModelId);
-        Assert.Equal("model-b", viewModel.SelectedModelId);
-        Assert.True(viewModel.IsAutoModelAvailable);
         Assert.Empty(viewModel.TechnicalErrors);
+        Assert.False(viewModel.HasTechnicalErrors);
+        Assert.True(viewModel.IsTechnicallyValid);
         Assert.True(viewModel.CanStart);
         Assert.True(viewModel.StartCommand.CanExecute(null));
-        Assert.Equal(2, harness.Authentication.CallCount);
-        AssertNoLoginOrRun(harness);
-    }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Auto_model_availability_notifications_follow_explicit_authentication_refresh(bool includeAuto)
-    {
-        using SettingsHarness harness = new();
-        harness.Configure();
-        ExecutionViewModel viewModel = harness.ViewModel;
-        viewModel.ApplySettings(new ApplicationSettings { PreferredModelId = "model-b" });
-        await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
-        Assert.True(viewModel.IsAutoModelAvailable);
-        Assert.True(viewModel.CanStart);
-        List<bool> autoNotifications = [];
-        viewModel.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(ExecutionViewModel.IsAutoModelAvailable))
-            {
-                autoNotifications.Add(viewModel.IsAutoModelAvailable);
-            }
-        };
-        TaskCompletionSource<ExecutionAuthenticationSnapshot> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        harness.Authentication.CheckOverride = token => completion.Task.WaitAsync(token);
+        await viewModel.StartAsync(TestContext.Current.CancellationToken);
 
-        Task checking = viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
-        try
-        {
-            Assert.True(viewModel.IsCheckingAuthentication);
-            Assert.Equal(ExecutionAuthenticationState.Checking, viewModel.AuthenticationState);
-            Assert.False(viewModel.IsAuthenticationAvailable);
-            Assert.False(viewModel.IsAutoModelAvailable);
-            Assert.Equal(new[] { "model-a", "model-b", "auto" }, viewModel.AvailableModelIds);
-            Assert.Equal("model-b", viewModel.PreferredModelId);
-            Assert.Null(viewModel.SelectedModelId);
-            Assert.False(viewModel.CanStart);
-            Assert.Empty(viewModel.TechnicalErrors);
-            Assert.False(viewModel.HasTechnicalErrors);
-            Assert.True(viewModel.IsTechnicallyValid);
-            Assert.Contains("確認中", viewModel.ValidationSummary, StringComparison.Ordinal);
-            Assert.DoesNotContain("開始できます", viewModel.ValidationSummary, StringComparison.Ordinal);
-            Assert.False(viewModel.StartCommand.CanExecute(null));
-            Assert.NotEmpty(autoNotifications);
-            Assert.All(autoNotifications, value => Assert.False(value));
-            viewModel.StartCommand.Execute(null);
-            await viewModel.StartAsync(TestContext.Current.CancellationToken);
-            Assert.Equal(2, harness.Authentication.CallCount);
-            AssertNoLoginOrRun(harness);
-            autoNotifications.Clear();
-        }
-        finally
-        {
-            completion.TrySetResult(includeAuto
-                ? Available("model-a", "model-b", "auto")
-                : Available("model-a", "model-b"));
-            await checking.WaitAsync(TestWait, TestContext.Current.CancellationToken);
-        }
-
-        Assert.False(viewModel.IsCheckingAuthentication);
-        Assert.True(viewModel.IsAuthenticationAvailable);
-        Assert.Equal(includeAuto, viewModel.IsAutoModelAvailable);
-        Assert.Equal(includeAuto, viewModel.CanStart);
-        Assert.Equal(includeAuto, viewModel.StartCommand.CanExecute(null));
-        Assert.Equal("model-b", viewModel.PreferredModelId);
-        Assert.Equal("model-b", viewModel.SelectedModelId);
-        Assert.Equal(includeAuto ? new[] { "model-a", "model-b", "auto" } : new[] { "model-a", "model-b" },
-            viewModel.AvailableModelIds);
-        Assert.NotEmpty(autoNotifications);
-        Assert.Equal(includeAuto, autoNotifications[^1]);
-        if (includeAuto)
-        {
-            Assert.Empty(viewModel.TechnicalErrors);
-        }
-        else
-        {
-            Assert.Equal("AUTO_MODEL_UNAVAILABLE", Assert.Single(viewModel.TechnicalErrors).Code);
-            await viewModel.StartAsync(TestContext.Current.CancellationToken);
-        }
-
-        Assert.Equal(2, harness.Authentication.CallCount);
-        AssertNoLoginOrRun(harness);
+        QuantificationRunRequest request = Assert.IsType<QuantificationRunRequest>(harness.Runner.LastRequest);
+        Assert.Equal("model-b", request.ModelId);
+        Assert.Same(summary, viewModel.LastRunContext?.Summary);
+        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Equal(1, harness.Runner.CallCount);
+        Assert.Null(viewModel.LastLoginTask);
     }
 
     [Fact]
@@ -537,7 +408,6 @@ public sealed class ExecutionSettingsTests
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
 
         Assert.True(viewModel.IsAuthenticationAvailable);
-        Assert.True(viewModel.IsAutoModelAvailable);
         Assert.Equal("auto", Assert.Single(viewModel.AvailableModelIds));
         Assert.Equal("model-b", viewModel.PreferredModelId);
         Assert.Null(viewModel.SelectedModelId);
@@ -553,7 +423,7 @@ public sealed class ExecutionSettingsTests
     }
 
     [Fact]
-    public async Task Fixed_auto_is_not_a_fallback_for_a_missing_preferred_normal_model()
+    public async Task Auto_model_is_not_a_fallback_for_a_missing_preferred_normal_model()
     {
         using SettingsHarness harness = new();
         harness.Configure();
@@ -564,12 +434,10 @@ public sealed class ExecutionSettingsTests
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("auto", Assert.Single(viewModel.AvailableModelIds));
-        Assert.True(viewModel.IsAutoModelAvailable);
         Assert.Equal("model-b", viewModel.PreferredModelId);
         Assert.Null(viewModel.SelectedModelId);
         Assert.False(viewModel.CanStart);
         Assert.Contains(viewModel.TechnicalErrors, error => error.Code == "MODEL_SELECTION_REQUIRED");
-        Assert.DoesNotContain(viewModel.TechnicalErrors, error => error.Code == "AUTO_MODEL_UNAVAILABLE");
         await viewModel.StartAsync(TestContext.Current.CancellationToken);
         AssertNoLoginOrRun(harness);
     }
@@ -598,7 +466,6 @@ public sealed class ExecutionSettingsTests
         {
             Assert.True(viewModel.IsCheckingAuthentication);
             Assert.Equal(ExecutionAuthenticationState.Checking, viewModel.AuthenticationState);
-            Assert.False(viewModel.IsAutoModelAvailable);
             Assert.Equal("model-b", viewModel.PreferredModelId);
             Assert.Null(viewModel.SelectedModelId);
             Assert.Equal(new[] { "model-a", "model-b", "auto" }, viewModel.AvailableModelIds);
@@ -611,7 +478,6 @@ public sealed class ExecutionSettingsTests
         }
 
         Assert.Equal(failure, viewModel.AuthenticationState);
-        Assert.False(viewModel.IsAutoModelAvailable);
         Assert.Equal("model-b", viewModel.PreferredModelId);
         Assert.Null(viewModel.SelectedModelId);
         Assert.False(viewModel.CanStart);
@@ -628,7 +494,6 @@ public sealed class ExecutionSettingsTests
         harness.Authentication.Snapshot = Available("model-a", "model-b", "auto");
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
         Assert.Equal("model-b", viewModel.SelectedModelId);
-        Assert.True(viewModel.IsAutoModelAvailable);
         Assert.True(viewModel.CanStart);
         Assert.Equal(4, harness.Authentication.CallCount);
         AssertNoLoginOrRun(harness);
@@ -661,7 +526,6 @@ public sealed class ExecutionSettingsTests
             viewModel.AuthenticationState);
         Assert.Equal("model-b", viewModel.PreferredModelId);
         Assert.Null(viewModel.SelectedModelId);
-        Assert.False(viewModel.IsAutoModelAvailable);
         Assert.False(viewModel.CanStart);
         Assert.DoesNotContain("PRIVATE-T06-AUTH-CANARY", viewModel.AuthenticationStatusText, StringComparison.Ordinal);
         Assert.All(viewModel.TechnicalErrors, error =>
@@ -670,7 +534,6 @@ public sealed class ExecutionSettingsTests
         harness.Authentication.CheckOverride = null;
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
         Assert.Equal("model-b", viewModel.SelectedModelId);
-        Assert.True(viewModel.IsAutoModelAvailable);
         Assert.True(viewModel.CanStart);
         AssertNoLoginOrRun(harness);
     }
@@ -783,15 +646,6 @@ public sealed class ExecutionSettingsTests
         ExecutionViewModel viewModel = harness.ViewModel;
         viewModel.ApplySettings(new ApplicationSettings { PreferredModelId = "model-b" });
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
-        Assert.True(viewModel.IsAutoModelAvailable);
-        List<bool> autoNotifications = [];
-        viewModel.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(ExecutionViewModel.IsAutoModelAvailable))
-            {
-                autoNotifications.Add(viewModel.IsAutoModelAvailable);
-            }
-        };
         ((INotifyCollectionChanged)viewModel.AvailableModelIds).CollectionChanged +=
             (_, _) => viewModel.SelectedModelId = null;
 
@@ -801,9 +655,6 @@ public sealed class ExecutionSettingsTests
             await harness.Process.Started.WaitAsync(TestWait, TestContext.Current.CancellationToken);
             Assert.True(viewModel.IsLoggingIn);
             Assert.Equal(ExecutionAuthenticationState.NotChecked, viewModel.AuthenticationState);
-            Assert.False(viewModel.IsAutoModelAvailable);
-            Assert.NotEmpty(autoNotifications);
-            Assert.All(autoNotifications, value => Assert.False(value));
             Assert.Equal("model-b", viewModel.PreferredModelId);
             Assert.Null(viewModel.SelectedModelId);
             Assert.Equal(new[] { "model-a", "model-b", "auto" }, viewModel.AvailableModelIds);
@@ -821,8 +672,6 @@ public sealed class ExecutionSettingsTests
 
         Assert.False(viewModel.IsLoggingIn);
         Assert.True(viewModel.IsAuthenticationAvailable);
-        Assert.True(viewModel.IsAutoModelAvailable);
-        Assert.True(autoNotifications[^1]);
         Assert.Equal("model-b", viewModel.PreferredModelId);
         Assert.Equal("model-b", viewModel.SelectedModelId);
         Assert.Equal(2, harness.Authentication.CallCount);
@@ -834,15 +683,12 @@ public sealed class ExecutionSettingsTests
 
         harness.Authentication.Snapshot = Available("model-a", "auto");
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
-        Assert.True(viewModel.IsAutoModelAvailable);
-        Assert.True(autoNotifications[^1]);
         Assert.Null(viewModel.SelectedModelId);
         Assert.Equal("model-b", viewModel.PreferredModelId);
         Assert.False(viewModel.CanStart);
         harness.Authentication.Snapshot = Available("model-a", "model-b", "auto");
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
         Assert.Equal("model-b", viewModel.SelectedModelId);
-        Assert.True(viewModel.IsAutoModelAvailable);
         Assert.True(viewModel.CanStart);
         Assert.Equal(4, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);

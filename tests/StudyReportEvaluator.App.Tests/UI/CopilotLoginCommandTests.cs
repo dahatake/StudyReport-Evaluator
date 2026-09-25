@@ -252,7 +252,6 @@ public sealed class CopilotLoginCommandTests
         Assert.True(viewModel.CanStart);
         Assert.Equal("model-a", viewModel.SelectedModelId);
         Assert.Equal("model-a", viewModel.PreferredModelId);
-        Assert.True(viewModel.IsAutoModelAvailable);
         string previousIdentity = viewModel.RuntimeIdentityText;
         harness.Authentication.Snapshot = AvailableSnapshot("model-b");
 
@@ -267,7 +266,6 @@ public sealed class CopilotLoginCommandTests
         Assert.False(viewModel.CanStart);
         Assert.Equal(ExecutionAuthenticationState.NotChecked, viewModel.AuthenticationState);
         Assert.False(viewModel.IsAuthenticationAvailable);
-        Assert.False(viewModel.IsAutoModelAvailable);
         Assert.Equal(["model-a", "auto"], viewModel.AvailableModelIds);
         Assert.Null(viewModel.SelectedModelId);
         Assert.Equal("model-a", viewModel.PreferredModelId);
@@ -290,7 +288,6 @@ public sealed class CopilotLoginCommandTests
         Assert.False(viewModel.CanCancelLogin);
         Assert.False(viewModel.CanStart);
         Assert.True(viewModel.IsAuthenticationAvailable);
-        Assert.True(viewModel.IsAutoModelAvailable);
         Assert.Equal(["model-b", "auto"], viewModel.AvailableModelIds);
         Assert.Null(viewModel.SelectedModelId);
         Assert.Equal("model-a", viewModel.PreferredModelId);
@@ -302,7 +299,6 @@ public sealed class CopilotLoginCommandTests
         // Automatic confirmation restores authentication, not an unavailable model preference.
         Assert.Equal(2, harness.Authentication.CallCount);
         Assert.True(viewModel.IsAuthenticationAvailable);
-        Assert.True(viewModel.IsAutoModelAvailable);
         Assert.Equal(["model-b", "auto"], viewModel.AvailableModelIds);
         Assert.Equal("model-a", viewModel.PreferredModelId);
         Assert.Null(viewModel.SelectedModelId);
@@ -1055,7 +1051,6 @@ public sealed class CopilotLoginCommandTests
             nameof(ExecutionViewModel.LastLoginTask), nameof(ExecutionViewModel.CanLogin),
             nameof(ExecutionViewModel.CanCancelLogin), nameof(ExecutionViewModel.CanCheckAuthentication),
             nameof(ExecutionViewModel.CanStart), nameof(ExecutionViewModel.AvailableModelIds),
-            nameof(ExecutionViewModel.IsAutoModelAvailable),
             nameof(ExecutionViewModel.SelectedModelId), nameof(ExecutionViewModel.RuntimeIdentityText),
         })
         {

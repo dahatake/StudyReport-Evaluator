@@ -872,7 +872,7 @@ checkpointとRun sheetへ次を保存する。
 - 同梱CLI欠落/不一致: `COPILOT_CLI_UNAVAILABLE`
 - runtime確認失敗: `COPILOT_RUNTIME_FAILED`
 - model未選択/未列挙: `MODEL_SELECTION_REQUIRED` / `MODEL_REQUIRED`
-- 固定`auto`未列挙: Execution preflightの`AUTO_MODEL_UNAVAILABLE`。Similarity用の固定modelとして通常modelとは別に開始を拒否する
+- model未列挙: Execution preflightの`MODEL_SELECTION_REQUIRED`。固定`auto`の別検証は行わず、runで選んだmodelとresolved reasoning effortを全AI評価へ適用する
 - login終了未確認やcleanup失敗は、login status文言で再確認要求を出し、自動run開始を抑止する。
 
 ### Settings（run statusとは独立）

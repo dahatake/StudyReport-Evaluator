@@ -653,7 +653,7 @@ public sealed class ResponsiveLayoutTests(ITestOutputHelper output)
                 State("DesignStatus", TextWrapping.NoWrap, ellipsis: true);
                 break;
             case ExecutionView:
-                State("ExecutionFixedAutoModel");
+                State("ExecutionReasoningEffort");
                 State("ExecutionConcurrencySummary");
                 AssertImportantTextFullyVisible(Required<TextBlock>(view, "OutputDirectorySource"));
                 State("ExecutionValidationStatus");
