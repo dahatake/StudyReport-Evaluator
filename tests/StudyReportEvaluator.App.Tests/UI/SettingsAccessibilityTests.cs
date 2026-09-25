@@ -104,7 +104,7 @@ public sealed class SettingsAccessibilityTests
                 id is "ExecutionModel" or "ExecutionConcurrency" or "ExecutionOutputDirectory");
             TextBox actualModel = ById<TextBox>(executionView, "ExecutionEffectiveModel");
             Assert.True(actualModel.IsReadOnly);
-            Assert.Equal("次回 model-other 並列3 · 希望: model-other · 上限: 64,000 tokens", actualModel.Text);
+            Assert.Equal("次回 model-other 並列3 · effort: 未指定（model非対応またはauto） · 希望: model-other · 上限: 64,000 tokens", actualModel.Text);
             TextBox actualOutput = ById<TextBox>(executionView, "ExecutionEffectiveOutputDirectory");
             Assert.True(actualOutput.IsReadOnly);
             Assert.Equal(explicitOutput, actualOutput.Text);

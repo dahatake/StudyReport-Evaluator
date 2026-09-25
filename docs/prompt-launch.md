@@ -176,7 +176,7 @@ StudyReportEvaluator.App.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prom
 
 ### Execution
 
-- **Copilot 状態を確認**でlogin、通常モデルと固定`auto`の利用可否を確認した。必要な場合のみ**GitHubにログイン**し、完了後も自分で状態を再確認した
+- **Copilot 状態を確認**でlogin、利用可能model、次回runのreasoning effortを確認した。必要な場合のみ**GitHubにログイン**し、完了後も自分で状態を再確認した
 - **変更 → 共通**で通常モデル・concurrency 1〜8・指定出力先を編集し、実行画面の読取専用表示で次回の実効値を確認した
 - 明示出力先は入力Excelを変えても保持する。空欄（未指定）のときだけ入力隣接`result`となり、入力未選択なら「入力後に決定」。再開の場合は別途partial pathを確認した
 - 今回／前回runの固定条件と次回の設定を区別した。実行中の編集は進行中runへ反映しない

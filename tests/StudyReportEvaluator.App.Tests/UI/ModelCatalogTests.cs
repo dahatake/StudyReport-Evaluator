@@ -607,7 +607,6 @@ public sealed class ModelCatalogTests
     private static void AssertUnauthorized(CatalogHarness harness)
     {
         Assert.False(harness.Execution.IsAuthenticationAvailable);
-        Assert.False(harness.Execution.IsAutoModelAvailable);
         Assert.Null(harness.Execution.SelectedModelId);
         Assert.False(harness.Execution.CanStart);
         Assert.False(harness.Execution.StartCommand.CanExecute(null));

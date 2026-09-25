@@ -1070,7 +1070,6 @@ public sealed class SettingsViewModelTests
         harness.RunnerHandler = (_, _, _) => release.Task;
         harness.Execution.Configure(harness.Input.DefinitionDraft, harness.Input.Metadata!, harness.InputPath);
         await harness.Execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
-        Assert.True(harness.Execution.IsAutoModelAvailable);
         Assert.True(harness.Execution.CanStart);
         List<bool> availability = [];
         harness.Settings.ApplySavedDefinitionCommand.CanExecuteChanged += (_, _) =>

@@ -437,9 +437,8 @@ public sealed class DocumentationScreenshotTests
             TextBlock loginStatus = Required<TextBlock>(executionView, "CopilotLoginStatus");
             Assert.Equal(ExecutionAuthenticationState.NotChecked, execution.AuthenticationState);
             Assert.False(execution.IsAuthenticationAvailable);
-            Assert.False(execution.IsAutoModelAvailable);
-            TextBlock autoStatus = ById<TextBlock>(executionView, "ExecutionFixedAutoModel");
-            Assert.Equal("固定 auto\n未確認", autoStatus.Text);
+            TextBlock effortStatus = ById<TextBlock>(executionView, "ExecutionReasoningEffort");
+            Assert.Equal("effort\n未選択", effortStatus.Text);
             Assert.Empty(execution.AvailableModelIds);
             Assert.Null(execution.SelectedModelId);
             Assert.False(execution.IsLoggingIn);
@@ -460,7 +459,7 @@ public sealed class DocumentationScreenshotTests
             Assert.Equal(loginStatus.Text, AutomationProperties.GetName(loginStatus));
             Assert.Empty(Required<StackPanel>(executionView, "CopilotLoginPanel")
                 .GetVisualDescendants().OfType<TextBox>());
-            foreach (Control control in new Control[] { checkAuthentication, login, cancelLogin, loginStatus, autoStatus, effectiveOutput })
+            foreach (Control control in new Control[] { checkAuthentication, login, cancelLogin, loginStatus, effortStatus, effectiveOutput })
             {
                 Assert.True(control.IsEffectivelyVisible);
                 AssertContainedInViewport(control, window);
@@ -507,7 +506,6 @@ public sealed class DocumentationScreenshotTests
             // AI quality, input-file verification, or actual final workbook creation.
             await execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
             Assert.Equal("gpt-5", execution.SelectedModelId);
-            Assert.True(execution.IsAutoModelAvailable);
             Assert.True(execution.CanStart);
             await execution.StartAsync(TestContext.Current.CancellationToken);
             Render();

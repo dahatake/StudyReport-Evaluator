@@ -564,7 +564,6 @@ public sealed class SettingsWorkflowSystemTests
             ModelCatalogPersistenceAssert.OnlyCatalogChanged(settingsBytes,
                 await File.ReadAllBytesAsync(session.Shell.Settings.FilePath, TestToken), ExpectedCatalog);
             Assert.Equal(ExpectedCatalog.Select(model => model.Id), session.Execution.AvailableModelIds);
-            Assert.True(session.Execution.IsAutoModelAvailable);
         }
         else
         {
@@ -658,7 +657,6 @@ public sealed class SettingsWorkflowSystemTests
         AssertPassive(session, authenticationChecks: session.StartupAuthenticationChecks);
         await session.Execution.CheckAuthenticationAsync(TestToken);
         Assert.Equal(session.StartupAuthenticationChecks + 1, session.Authentication.CallCount);
-        Assert.True(session.Execution.IsAutoModelAvailable);
         Assert.Equal(ModelId, session.Execution.SelectedModelId);
         Assert.Empty(session.Execution.TechnicalErrors);
         Assert.True(session.Execution.CanStart, session.Execution.ValidationSummary);
