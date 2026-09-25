@@ -196,14 +196,14 @@ AllocationValidationResult Validate(
 
 | Operation | Model | Input | Result tool |
 |---|---|---|---|
-| Reference | `auto` | question text | `submit_reference_answer` |
-| Normal | user-selected | question、primary、supporting、criteria | `submit_quantification` |
-| Special | user-selected | question、special primary/supporting、Prompt | `submit_special_quantification` |
+| Reference | run開始時のuser-selected model | question text | `submit_reference_answer` |
+| Normal | run開始時のuser-selected model | question、primary、supporting、criteria | `submit_quantification` |
+| Special | run開始時のuser-selected model | question、special primary/supporting、Prompt | `submit_special_quantification` |
 | Similarity | `auto` | question、student answer、reference | `submit_similarity` |
 
 各sessionへ公開するtoolは表の1件だけとする。permission requestは全拒否する。
 
-session作成の直前に、要求modelが`auto`以外なら同じclientの`ListModelsAsync`で要求modelを探す。`Capabilities.Supports.ReasoningEffort`がtrueで、`SupportedReasoningEfforts`が`medium`を含む場合だけ`SessionConfig.ReasoningEffort = "medium"`とする。`auto`（一覧を取得しない）・非対応model・effort未列挙model・一覧にないmodelには指定しない（非対応modelへ指定するとruntimeがsession作成を拒否する）。model一覧の取得失敗は、session作成失敗と同じ分類でattempt失敗とする。指定した値（未指定はnull）は、そのattemptのジョブログ`Attempt.RequestedReasoningEffort`へ記録する。tracker境界では`medium`以外の文字列を保存しない。
+run開始時に、選択modelの`ModelInfo`からrun-level reasoning effortを1つ解決し、Reference／Normal／Specialの全sessionへ同じ`SessionConfig.ReasoningEffort`を指定する。既定の希望値は`low`（最低限reasoningを維持する最小値）で、`none < minimal < low < medium < high < xhigh < max`の順に、非対応時は最も近い対応値へ決定的にfallbackする。同距離では`none`でreasoningを無効化しにくい高い側を優先する。`auto`・reasoning effort非対応model・対応effort未列挙model・一覧にないmodelではnullをrun全体へ適用する。非対応modelや`auto`へeffortを送るとruntimeがsession作成を拒否するため、session作成直前のtransportは`auto`のeffortを必ずnullに戻す。指定した値（未指定はnull）はcheckpoint、Run sheet、Reference sheet、ジョブログ`Context.RequestedReasoningEffort`と各attemptの`Attempt.RequestedReasoningEffort`へ記録する。tracker境界では安全なeffort識別子だけを保存し、任意のfree textは保存しない。
 
 `submit_quantification`のroot `EvaluatorId`はschema上の任意項目とする。claude-sonnet-5が定数のevaluator IDをtool引数から省略し、必須のままではschema不正（`ROOT_MISSING_PROPERTY`）になった（2026-09-25実測）。省略時はpayloadの値を補い、返された場合は従来どおり期待値との一致を検証する。未知項目・重複項目の拒否は変えない。Promptの「expected evaluator IDを返す」指示は変えない（返された場合も受理して検証するため、変更は不要）。固有評価の`SpecialEvaluationId`は同じ条件（claude-sonnet-5・`medium`）で30/30返されたため必須のままとする。
 
@@ -428,7 +428,8 @@ internal sealed record CheckpointEnvelope
     public required string DefinitionCanonicalJson { get; init; }
     public required string DefinitionSha256 { get; init; }
     public required string NormalModelId { get; init; }
-    public string ReferenceModelId { get; init; } = "auto";
+    public required string ReferenceModelId { get; init; }
+    public string? ReasoningEffort { get; init; }
     public required CheckpointRuntimeIdentity Runtime { get; init; }
     public required string FinalPath { get; init; }
     public required string PartialPath { get; init; }
@@ -471,7 +472,7 @@ Checkpoint sheet:
 2. fileをread-onlyで開き、Checkpoint sheetとpayloadをclosed validateする。
 3. input pathをcheckpointから取得し、identityを再計算する。
 4. canonical definitionからsnapshotを復元し、hashを再計算する。
-5. normal model、`auto` availability、runtime identityを検証する。model IDの一致はID文字列の一致であり、`auto`で同一の実routing先を保証しない。
+5. normal model、reference model、run-level reasoning effort、`auto` availability、runtime identityを検証する。model IDの一致はID文字列の一致であり、`auto`で同一の実routing先を保証しない。
 6. completed rowsをsource rangeとexpected IDsへ再validationする。
 7. 保存済みreferenceとcompleted rowsをseedとしてrunを続行する。
 
@@ -496,7 +497,7 @@ sequenceDiagram
     O->>O: definition/input/formula/request preflight
     O->>C: initial checkpoint
     loop enabled questions without saved reference
-        O->>AI: reference(auto)
+        O->>AI: reference(run model + run effort)
         AI-->>O: reference/status
         O->>C: checkpoint reference state
     end
@@ -740,8 +741,9 @@ checkpointとRun sheetへ次を保存する。
 - SDK assembly informational version
 - CLI reported version
 - CLI executable SHA-256
-- normal model ID
-- reference/similarity model ID `auto`
+- normal/reference model ID（同一ID）
+- run-level reasoning effort（未指定はnull）
+- similarity model ID `auto`
 
 ### 12.3 runtime配置cacheとcredential storeの分離
 
@@ -859,7 +861,7 @@ checkpointとRun sheetへ次を保存する。
 
 ### Reference / special / similarity
 
-`REFERENCE_OUTPUT_INVALID`, `REFERENCE_TIMEOUT`, `REFERENCE_NETWORK_FAILED`, `SPECIAL_OUTPUT_INVALID`, `SIMILARITY_OUTPUT_INVALID`, `AUTO_MODEL_REQUIRED`
+`REFERENCE_OUTPUT_INVALID`, `REFERENCE_TIMEOUT`, `REFERENCE_NETWORK_FAILED`, `SPECIAL_OUTPUT_INVALID`, `SIMILARITY_OUTPUT_INVALID`
 
 既存`AUTH_REQUIRED`, `AI_TIMEOUT`, `NETWORK_FAILED`, `CLEANUP_FAILED`, `AI_RUNTIME_FAILED`をoperation contextとともに再利用できる。
 
@@ -870,7 +872,7 @@ checkpointとRun sheetへ次を保存する。
 - 同梱CLI欠落/不一致: `COPILOT_CLI_UNAVAILABLE`
 - runtime確認失敗: `COPILOT_RUNTIME_FAILED`
 - model未選択/未列挙: `MODEL_SELECTION_REQUIRED` / `MODEL_REQUIRED`
-- 固定`auto`未列挙: Execution preflightの`AUTO_MODEL_UNAVAILABLE`。通常modelとは別に開始を拒否する
+- 固定`auto`未列挙: Execution preflightの`AUTO_MODEL_UNAVAILABLE`。Similarity用の固定modelとして通常modelとは別に開始を拒否する
 - login終了未確認やcleanup失敗は、login status文言で再確認要求を出し、自動run開始を抑止する。
 
 ### Settings（run statusとは独立）

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Text.Json.Serialization;
 using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.Core.Domain;
 
@@ -142,6 +143,9 @@ public sealed record CheckpointEnvelope
     public required string NormalModelId { get; init; }
 
     public string ReferenceModelId { get; init; } = "auto";
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReasoningEffort { get; init; }
 
     public required CheckpointRuntimeIdentity Runtime { get; init; }
 

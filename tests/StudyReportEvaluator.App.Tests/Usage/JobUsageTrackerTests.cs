@@ -125,10 +125,12 @@ public sealed class JobUsageTrackerTests
         await using var tracker = new JobUsageTracker(logDirectory: temp.Path);
         Guid medium = tracker.BeginAttempt(UsageOperation.Normal);
         Guid unset = tracker.BeginAttempt(UsageOperation.Reference);
-        Guid canary = tracker.BeginAttempt(UsageOperation.Normal);
+        Guid xhigh = tracker.BeginAttempt(UsageOperation.Normal);
+        Guid invalid = tracker.BeginAttempt(UsageOperation.Normal);
         tracker.ReplaceAttempt(new(medium, UsageOperation.Normal, 1, new(), UsageSource.Events) { RequestedReasoningEffort = "medium" });
         tracker.ReplaceAttempt(new(unset, UsageOperation.Reference, 1, new(), UsageSource.Events));
-        tracker.ReplaceAttempt(new(canary, UsageOperation.Normal, 1, new(), UsageSource.Events) { RequestedReasoningEffort = "PRIVATE_CANARY" });
+        tracker.ReplaceAttempt(new(xhigh, UsageOperation.Normal, 1, new(), UsageSource.Events) { RequestedReasoningEffort = "xhigh" });
+        tracker.ReplaceAttempt(new(invalid, UsageOperation.Normal, 1, new(), UsageSource.Events) { RequestedReasoningEffort = "PRIVATE\nCANARY" });
         await tracker.CompleteAsync("SUCCESS");
 
         string path = Assert.IsType<string>(tracker.Snapshot.LogPath);
@@ -147,8 +149,9 @@ public sealed class JobUsageTrackerTests
 
         Assert.Equal("medium", recorded[medium]);
         Assert.Null(recorded[unset]);
-        Assert.Null(recorded[canary]);
-        Assert.DoesNotContain("PRIVATE_CANARY", await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.Equal("xhigh", recorded[xhigh]);
+        Assert.Null(recorded[invalid]);
+        Assert.DoesNotContain("PRIVATE", await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Reflection;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
+using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Workbooks.Intake;
 
 namespace StudyReportEvaluator.App.Workbooks.Writing;
@@ -19,6 +20,8 @@ public sealed record RunSheetMetadata
     public required string CopilotCliIdentity { get; init; }
 
     public required string ModelIdentity { get; init; }
+
+    public string? ReasoningEffort { get; init; }
 
     public required DateTimeOffset StartedAtUtc { get; init; }
 
@@ -79,6 +82,7 @@ public sealed class RunSheetWriter
         AppendInlineRecord(sheetData, ref rowNumber, "CopilotSdkIdentity", metadata.CopilotSdkIdentity);
         AppendInlineRecord(sheetData, ref rowNumber, "CopilotCliIdentity", metadata.CopilotCliIdentity);
         AppendInlineRecord(sheetData, ref rowNumber, "ModelIdentity", metadata.ModelIdentity);
+        AppendInlineRecord(sheetData, ref rowNumber, "ReasoningEffort", metadata.ReasoningEffort ?? "未指定");
         AppendInlineRecord(sheetData, ref rowNumber, "OpenXmlSdkIdentity", GetOpenXmlSdkIdentity());
         AppendInlineRecord(
             sheetData,
@@ -119,6 +123,12 @@ public sealed class RunSheetWriter
         ValidateIdentity(metadata.CopilotSdkIdentity, nameof(metadata.CopilotSdkIdentity));
         ValidateIdentity(metadata.CopilotCliIdentity, nameof(metadata.CopilotCliIdentity));
         ValidateIdentity(metadata.ModelIdentity, nameof(metadata.ModelIdentity));
+        if (metadata.ReasoningEffort is not null
+            && !ReasoningEffortPolicy.IsSafeReasoningEffort(metadata.ReasoningEffort))
+        {
+            throw new ArgumentException("The reasoning effort is invalid.", nameof(metadata));
+        }
+
         ValidateUtc(metadata.StartedAtUtc, nameof(metadata.StartedAtUtc));
         ValidateUtc(metadata.EndedAtUtc, nameof(metadata.EndedAtUtc));
 

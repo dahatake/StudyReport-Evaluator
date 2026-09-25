@@ -101,7 +101,9 @@ internal static class CheckpointPayloadCodec
         ValidateInput(envelope.Input);
         ValidateDefinition(envelope.DefinitionCanonicalJson, envelope.DefinitionSha256);
         ValidateBoundedText(envelope.NormalModelId, 256);
-        if (!string.Equals(envelope.ReferenceModelId, "auto", StringComparison.Ordinal))
+        ValidateBoundedText(envelope.ReferenceModelId, 256);
+        if (envelope.ReasoningEffort is not null
+            && !ReasoningEffortPolicy.IsSafeReasoningEffort(envelope.ReasoningEffort))
         {
             throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
         }

@@ -33,7 +33,9 @@ public sealed class CopilotModelAvailability
     public CopilotModelAvailability(
         string id,
         int? maximumPromptTokens,
-        int? maximumContextWindowTokens)
+        int? maximumContextWindowTokens,
+        IEnumerable<string>? supportedReasoningEfforts = null,
+        string? defaultReasoningEffort = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         if (id.Length > 256
@@ -46,6 +48,13 @@ public sealed class CopilotModelAvailability
         Id = id;
         MaximumPromptTokens = PositiveOrNull(maximumPromptTokens);
         MaximumContextWindowTokens = PositiveOrNull(maximumContextWindowTokens);
+        SupportedReasoningEfforts = Array.AsReadOnly((supportedReasoningEfforts ?? [])
+            .Where(ReasoningEffortPolicy.IsSafeReasoningEffort)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray());
+        DefaultReasoningEffort = ReasoningEffortPolicy.IsSafeReasoningEffort(defaultReasoningEffort)
+            ? defaultReasoningEffort
+            : null;
     }
 
     public string Id { get; }
@@ -54,11 +63,28 @@ public sealed class CopilotModelAvailability
 
     public int? MaximumContextWindowTokens { get; }
 
+    public IReadOnlyList<string> SupportedReasoningEfforts { get; }
+
+    public string? DefaultReasoningEffort { get; }
+
+    public bool SupportsReasoningEffort => SupportedReasoningEfforts.Count > 0;
+
     public int? EffectivePromptTokenLimit => MaximumPromptTokens is int prompt
         ? MaximumContextWindowTokens is int context
             ? Math.Min(prompt, context)
             : prompt
         : null;
+
+    internal ModelInfo ToModelInfo() => new()
+    {
+        Id = Id,
+        Capabilities = new ModelCapabilities
+        {
+            Supports = new ModelSupports { ReasoningEffort = SupportsReasoningEffort },
+        },
+        SupportedReasoningEfforts = [.. SupportedReasoningEfforts],
+        DefaultReasoningEffort = DefaultReasoningEffort,
+    };
 
     public override string ToString() =>
         $"{nameof(CopilotModelAvailability)} {{ Id = {Id}, PromptLimitKnown = {MaximumPromptTokens is not null}, ContextLimitKnown = {MaximumContextWindowTokens is not null}, Content = <redacted> }}";
@@ -515,7 +541,9 @@ internal sealed class SdkCopilotAuthenticationRuntime : ICopilotAuthenticationRu
                 available.Add(new CopilotModelAvailability(
                     model.Id,
                     limits?.MaxPromptTokens,
-                    limits?.MaxContextWindowTokens));
+                    limits?.MaxContextWindowTokens,
+                    model.SupportedReasoningEfforts,
+                    model.DefaultReasoningEffort));
             }
         }
 

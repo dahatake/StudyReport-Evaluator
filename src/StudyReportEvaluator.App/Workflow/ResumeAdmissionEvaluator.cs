@@ -46,6 +46,27 @@ public static class ResumeAdmissionEvaluator
         InputSnapshot? currentInput,
         string? inputPath,
         string? modelId,
+        CheckpointRuntimeIdentity? runtime) =>
+        Evaluate(
+            checkpoint,
+            requestedPartialPath,
+            snapshot,
+            plan,
+            currentInput,
+            inputPath,
+            modelId,
+            reasoningEffort: null,
+            runtime);
+
+    public static ResumeAdmissionReport Evaluate(
+        CheckpointEnvelope checkpoint,
+        string requestedPartialPath,
+        QuantificationSnapshot? snapshot,
+        EvaluationPlan? plan,
+        InputSnapshot? currentInput,
+        string? inputPath,
+        string? modelId,
+        string? reasoningEffort,
         CheckpointRuntimeIdentity? runtime)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
@@ -57,7 +78,8 @@ public static class ResumeAdmissionEvaluator
             && string.Equals(checkpoint.DefinitionCanonicalJson, snapshot.CanonicalJson, StringComparison.Ordinal);
         bool modelMatches = modelId is not null
             && string.Equals(checkpoint.NormalModelId, modelId, StringComparison.Ordinal)
-            && string.Equals(checkpoint.ReferenceModelId, "auto", StringComparison.Ordinal);
+            && string.Equals(checkpoint.ReferenceModelId, modelId, StringComparison.Ordinal)
+            && string.Equals(checkpoint.ReasoningEffort, reasoningEffort, StringComparison.Ordinal);
         bool runtimeMatches = runtime is not null && RuntimeCompatible(checkpoint.Runtime, runtime);
         // A different definition cannot be used to interpret saved row structure.
         bool shapeMatches = definitionMatches && plan is not null
@@ -71,7 +93,7 @@ public static class ResumeAdmissionEvaluator
             Finding(ResumeAdmissionItem.Definition, definitionMatches, CheckpointAdmissionStatusCodes.DefinitionMismatch,
                 "採点設計が一致しています。", "採点設計が未設定、または checkpoint と異なります。中断時の設計へ戻すか、新規実行を選んでください。"),
             Finding(ResumeAdmissionItem.NormalModel, modelMatches, CheckpointAdmissionStatusCodes.ModelMismatch,
-                "モデルが一致しています。", "モデルが未選択、または checkpoint と異なります。利用可能な同一モデルを明示的に選択してください。"),
+                "モデルとreasoning effortが一致しています。", "モデルまたはreasoning effortが checkpoint と異なります。利用可能な同一モデルを明示的に選択し、reasoning effortを再確認してください。"),
             Finding(ResumeAdmissionItem.Runtime, runtimeMatches, CheckpointAdmissionStatusCodes.RuntimeMismatch,
                 "アプリと CLI / SDK の版が一致しています。", "認証状態が未確認、またはアプリ／CLI／SDK の版が異なります。状態を再確認し、版が異なる場合は中断時の版を使用してください。"),
             Finding(ResumeAdmissionItem.CheckpointShape, shapeMatches, CheckpointStatusCodes.Invalid,

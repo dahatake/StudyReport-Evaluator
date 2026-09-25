@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
+using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.Core.Domain;
 
 namespace StudyReportEvaluator.App.Workbooks.Writing;
@@ -11,6 +12,8 @@ public sealed record ReferenceAnswerSheetRow
     public required string QuestionId { get; init; }
 
     public required string ModelId { get; init; }
+
+    public string? ReasoningEffort { get; init; }
 
     public string? Answer { get; init; }
 
@@ -77,10 +80,11 @@ public sealed class ReferenceAnswersSheetWriter
                 SpreadsheetLiteral.CreateInlineStringCell("B" + rowText, question.DisplayName),
                 SpreadsheetLiteral.CreateInlineStringCell("C" + rowText, question.QuestionText),
                 SpreadsheetLiteral.CreateInlineStringCell("D" + rowText, source.ModelId),
-                SpreadsheetLiteral.CreateInlineStringCell("E" + rowText, source.Answer ?? string.Empty),
-                SpreadsheetLiteral.CreateInlineStringCell("F" + rowText, source.StatusCode),
+                SpreadsheetLiteral.CreateInlineStringCell("E" + rowText, source.ReasoningEffort ?? "未指定"),
+                SpreadsheetLiteral.CreateInlineStringCell("F" + rowText, source.Answer ?? string.Empty),
+                SpreadsheetLiteral.CreateInlineStringCell("G" + rowText, source.StatusCode),
                 SpreadsheetLiteral.CreateInlineStringCell(
-                    "G" + rowText,
+                    "H" + rowText,
                     source.GeneratedAtUtc.ToString("O", CultureInfo.InvariantCulture)));
             data.Append(row);
             rowNumber++;
@@ -104,9 +108,19 @@ public sealed class ReferenceAnswersSheetWriter
                 throw new ArgumentException("Reference rows must have unique question IDs.", nameof(rows));
             }
 
-            if (!string.Equals(row.ModelId, "auto", StringComparison.Ordinal))
+            try
             {
-                throw new ArgumentException("The reference model ID must be auto.", nameof(rows));
+                EphemeralEvaluationRunner.ValidateModelId(row.ModelId);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new ArgumentException("The reference model ID is invalid.", nameof(rows), exception);
+            }
+
+            if (row.ReasoningEffort is not null
+                && !ReasoningEffortPolicy.IsSafeReasoningEffort(row.ReasoningEffort))
+            {
+                throw new ArgumentException("The reference reasoning effort is invalid.", nameof(rows));
             }
 
             if (string.IsNullOrWhiteSpace(row.StatusCode))
@@ -145,9 +159,10 @@ public sealed class ReferenceAnswersSheetWriter
         SpreadsheetLiteral.CreateInlineStringCell("B1", "DisplayName"),
         SpreadsheetLiteral.CreateInlineStringCell("C1", "QuestionText"),
         SpreadsheetLiteral.CreateInlineStringCell("D1", "ModelId"),
-        SpreadsheetLiteral.CreateInlineStringCell("E1", "ReferenceAnswer"),
-        SpreadsheetLiteral.CreateInlineStringCell("F1", "Status"),
-        SpreadsheetLiteral.CreateInlineStringCell("G1", "GeneratedAtUtc"))
+        SpreadsheetLiteral.CreateInlineStringCell("E1", "ReasoningEffort"),
+        SpreadsheetLiteral.CreateInlineStringCell("F1", "ReferenceAnswer"),
+        SpreadsheetLiteral.CreateInlineStringCell("G1", "Status"),
+        SpreadsheetLiteral.CreateInlineStringCell("H1", "GeneratedAtUtc"))
     {
         RowIndex = 1,
     };

@@ -104,6 +104,7 @@ public sealed class WorkbookDurableRunFinalizer : IDurableRunFinalizer
                     {
                         QuestionId = reference.QuestionId,
                         ModelId = checkpoint.ReferenceModelId,
+                        ReasoningEffort = checkpoint.ReasoningEffort,
                         Answer = reference.Answer,
                         StatusCode = reference.StatusCode,
                         GeneratedAtUtc = reference.GeneratedAtUtc,
@@ -163,6 +164,7 @@ public sealed class WorkbookDurableRunFinalizer : IDurableRunFinalizer
             CopilotCliIdentity = "copilot/" + checkpoint.Runtime.CliVersion
                 + ";sha256=" + checkpoint.Runtime.CliSha256,
             ModelIdentity = checkpoint.NormalModelId,
+            ReasoningEffort = checkpoint.ReasoningEffort,
             StartedAtUtc = summary.StartedAtUtc,
             EndedAtUtc = summary.EndedAtUtc,
             PlannedEvaluationCount = summary.PlannedOperationCount,

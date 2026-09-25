@@ -1,8 +1,14 @@
 # Current implementation status
 
+## 2026-09-25 — run-level reasoning effortの統一
+
+- **方針**: run開始時に選択modelの対応effortから1つだけ解決し、Reference／通常評価／固有評価へ同じ値を指定する。既定希望は`low`。`none`はreasoningを無効化するため既定にはせず、非対応・`auto`・一覧にないmodelではrun全体を未指定（`null`）にする。
+- **実装**: effort解決を`ModelInfo`列挙＋希望値のpure functionへ分離した。参照回答は固定`auto`ではなくrunの選択modelを使い、checkpointの`ReferenceModelId`と`ReasoningEffort`、Run sheet、Reference sheet、ジョブログcontext／attemptへ記録する。再開時はmodel、ReferenceModelId、reasoning effortの一致を同じmodel条件として確認する。
+- **SDK確認**: SDK 1.0.11のREADMEは`SessionConfig.ReasoningEffort`を`low`/`medium`/`high`/`xhigh`/`max`等として記載し、`ListModelsAsync()`で対応可否を確認するよう説明している。XML docsはCAPI値がmodel-definedで、`none`はreasoningを無効化し、未指定ならoverrideしないこと、`ModelInfo.SupportedReasoningEfforts`と`DefaultReasoningEffort`を公開することを記載している。ローカルCLI probeは`CopilotClientFactory`が`CliUnavailable`を返したため、この環境では実model一覧の測定はできなかった。
+
 ## 2026-09-25 — 類似度評価のローカル決定化
 
-- **SimilarityのLLM呼び出し廃止**: 参照回答生成は従来どおり`auto`で1問1回実行するが、学生回答とのSimilarityはCoreのローカル計算へ移した。NFKC正規化、invariant小文字化、空白・句読点・記号除去、文字n-gram、Dice/Jaccard、最長共通substring被覆率を使い、4桁丸めの決定的な0〜1値を保存する。
+- **SimilarityのLLM呼び出し廃止**: 参照回答生成は1問1回LLMで実行するが、学生回答とのSimilarityはCoreのローカル計算へ移した。NFKC正規化、invariant小文字化、空白・句読点・記号除去、文字n-gram、Dice/Jaccard、最長共通substring被覆率を使い、4桁丸めの決定的な0〜1値を保存する。
 - **コピー検知寄りの式**: `max(0.70*学生n-gram包含率 + 0.20*Dice + 0.10*Jaccard, 最長一致被覆率)`。学生回答が参照回答の一部を貼り付けた場合を拾うため、包含率は学生→参照の非対称指標にした。reasonは指標値だけで、学生本文は出力しない。
 - **学生間Similarity**: finalization時に全行の主回答を読み直し、同じ設問の他学生回答との最大ローカル類似度と相手source rowを`.Similarity_Peer_Max`、`.Similarity_Peer_Row`へ情報列として出す。採点式と減点には使わない。
 - **checkpoint互換性**: LLM Similarity結果を含む旧schema `1`は再開時に`SCHEMA_UNSUPPORTED`として拒否する。新schema `2`はローカルSimilarity結果を再計算して検証する。列名`.Similarity_AI_Raw`は既存workbook互換のため維持する。
@@ -10,7 +16,7 @@
 
 ## 2026-09-25 — Copilot client共有・行pipeline・rate limit対応
 
-- **共有client**: run内で`SharedCopilotClientPool`を使い、通常／参照／固有operationが1つの検証済みCopilot CLI processを共有するようにした。attemptごとのsession ID、tool制約、session削除、usage記録は維持し、`ListModelsAsync`はrun内cacheから既存`ResolveReasoningEffort`へ渡す。CLI process死亡が疑われるtransport障害ではpoolをinvalidateし、既存retry規則の次attemptで再作成する。
+- **共有client**: run内で`SharedCopilotClientPool`を使い、通常／参照／固有operationが1つの検証済みCopilot CLI processを共有するようにした。attemptごとのsession ID、tool制約、session削除、usage記録は維持し。reasoning effortは認証確認時のmodel一覧からrun開始時に1回だけ解決するため、attemptごとの`ListModelsAsync`は行わない。CLI process死亡が疑われるtransport障害ではpoolをinvalidateし、既存retry規則の次attemptで再作成する。
 - **rate limit / quota**: SDK `SessionErrorEvent`の`errorType=rate_limit`／`quota`と既知codeを分類し、`RATE_LIMITED`／`QUOTA_EXHAUSTED`を追加した。rate limitは最大3attempt内で指数backoff＋jitter（retry-after seamあり）を使い、adaptive limiterがAIMDで有効並列度を下げる。quota exhaustedは再試行せず、partialを残して停止する。
 - **行pipeline**: durable workflowで複数student rowをin-flightにし、全行・全operationがrun共通のglobal limiterを共有する。checkpointはsource row順の連続prefixだけを保存し、後続行が先に完了した場合はmemoryに保持する。crash時の再実行範囲は最大pipeline幅へ広がるが、resume admissionのprefix検証と出力順序は維持する。
 - **並列度**: 既定4、選択上限8へ変更。典型workload（40〜200名×3〜5問）では共有CLIによりattemptごとの10〜25秒程度の準備重複を避け、4並列でrate limitリスクとslot利用率の均衡を取る。8は明示選択時の上限で、rate limit時は4→2→1のように縮退する。実CLIでの合成測定は今回未実施。
