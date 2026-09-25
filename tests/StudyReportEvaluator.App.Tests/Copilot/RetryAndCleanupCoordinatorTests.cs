@@ -19,6 +19,8 @@ public sealed class RetryAndCleanupCoordinatorTests
                 EvaluationAttemptFailureKind.SchemaInvalid,
                 EvaluationAttemptFailureKind.Network,
                 EvaluationAttemptFailureKind.Timeout,
+                EvaluationAttemptFailureKind.RateLimited,
+                EvaluationAttemptFailureKind.QuotaExhausted,
                 EvaluationAttemptFailureKind.Authentication,
                 EvaluationAttemptFailureKind.Cancelled,
                 EvaluationAttemptFailureKind.Fatal,
@@ -31,6 +33,8 @@ public sealed class RetryAndCleanupCoordinatorTests
                 EphemeralEvaluationStatus.AiOutputInvalid,
                 EphemeralEvaluationStatus.AiTimeout,
                 EphemeralEvaluationStatus.NetworkFailed,
+                EphemeralEvaluationStatus.RateLimited,
+                EphemeralEvaluationStatus.QuotaExhausted,
                 EphemeralEvaluationStatus.AuthRequired,
                 EphemeralEvaluationStatus.Cancelled,
                 EphemeralEvaluationStatus.CleanupFailed,
@@ -90,6 +94,56 @@ public sealed class RetryAndCleanupCoordinatorTests
         Assert.Equal(RetryAndCleanupCoordinator.MaximumTransientAttempts, result.AttemptCount);
         Assert.Equal(3, attempts.Count);
         Assert.All(attempts, attempt => Assert.Equal(["execute", "abort", "dispose", "delete"], attempt.Operations));
+    }
+
+    [Fact]
+    public async Task Rate_limit_retries_with_delay_and_observer_then_returns_distinct_status()
+    {
+        List<FakeAttempt> attempts = [];
+        RecordingObserver observer = new();
+        ZeroRetryDelayProvider delays = new();
+        RetryAndCleanupCoordinator coordinator = new();
+
+        EphemeralEvaluationResult result = await coordinator.ExecuteAsync(
+            attemptNumber => AddAttempt(
+                attempts,
+                attemptNumber,
+                _ => Task.FromException<QuantificationResult>(new EvaluationRateLimitException(TimeSpan.FromSeconds(5)))),
+            TestTimeout,
+            TestTimeout,
+            maxConcurrency: 4,
+            TestContext.Current.CancellationToken,
+            observer,
+            delays);
+
+        Assert.Equal(EphemeralEvaluationStatus.RateLimited, result.Status);
+        Assert.Equal("RATE_LIMITED", result.StatusCode);
+        Assert.Equal(3, result.AttemptCount);
+        Assert.Equal([1, 2], delays.RetryNumbers);
+        Assert.Equal(3, observer.RateLimitedCount);
+        Assert.All(attempts, attempt => Assert.Equal(["execute", "abort", "dispose", "delete"], attempt.Operations));
+    }
+
+    [Fact]
+    public async Task Quota_exhausted_is_not_retried_and_returns_distinct_status()
+    {
+        List<FakeAttempt> attempts = [];
+        RetryAndCleanupCoordinator coordinator = new();
+
+        EphemeralEvaluationResult result = await coordinator.ExecuteAsync(
+            attemptNumber => AddAttempt(
+                attempts,
+                attemptNumber,
+                _ => Task.FromException<QuantificationResult>(new EvaluationQuotaExhaustedException())),
+            TestTimeout,
+            TestTimeout,
+            maxConcurrency: 4,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(EphemeralEvaluationStatus.QuotaExhausted, result.Status);
+        Assert.Equal("QUOTA_EXHAUSTED", result.StatusCode);
+        Assert.Equal(1, result.AttemptCount);
+        Assert.Single(attempts);
     }
 
     [Theory]
@@ -367,8 +421,8 @@ public sealed class RetryAndCleanupCoordinatorTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(4)]
-    public async Task Concurrency_outside_one_through_three_is_rejected(int concurrency)
+    [InlineData(9)]
+    public async Task Concurrency_outside_one_through_eight_is_rejected(int concurrency)
     {
         RetryAndCleanupCoordinator coordinator = new();
 
@@ -488,5 +542,23 @@ public sealed class RetryAndCleanupCoordinatorTests
         public List<SafeLogEntry> Entries { get; } = [];
 
         public void Write(SafeLogEntry entry) => Entries.Add(entry);
+    }
+
+    private sealed class RecordingObserver : IEvaluationConcurrencyObserver
+    {
+        public int RateLimitedCount { get; private set; }
+
+        public void RecordRateLimited(TimeSpan? retryAfter) => RateLimitedCount++;
+    }
+
+    private sealed class ZeroRetryDelayProvider : IRetryDelayProvider
+    {
+        public List<int> RetryNumbers { get; } = [];
+
+        public TimeSpan GetRateLimitDelay(int retryNumber, TimeSpan? retryAfter)
+        {
+            RetryNumbers.Add(retryNumber);
+            return TimeSpan.Zero;
+        }
     }
 }

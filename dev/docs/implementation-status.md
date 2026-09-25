@@ -1,5 +1,13 @@
 # Current implementation status
 
+## 2026-09-25 — Copilot client共有・行pipeline・rate limit対応
+
+- **共有client**: run内で`SharedCopilotClientPool`を使い、通常／参照／固有／類似度operationが1つの検証済みCopilot CLI processを共有するようにした。attemptごとのsession ID、tool制約、session削除、usage記録は維持し、`ListModelsAsync`はrun内cacheから既存`ResolveReasoningEffort`へ渡す。CLI process死亡が疑われるtransport障害ではpoolをinvalidateし、既存retry規則の次attemptで再作成する。
+- **rate limit / quota**: SDK `SessionErrorEvent`の`errorType=rate_limit`／`quota`と既知codeを分類し、`RATE_LIMITED`／`QUOTA_EXHAUSTED`を追加した。rate limitは最大3attempt内で指数backoff＋jitter（retry-after seamあり）を使い、adaptive limiterがAIMDで有効並列度を下げる。quota exhaustedは再試行せず、partialを残して停止する。
+- **行pipeline**: durable workflowで複数student rowをin-flightにし、全行・全operationがrun共通のglobal limiterを共有する。checkpointはsource row順の連続prefixだけを保存し、後続行が先に完了した場合はmemoryに保持する。crash時の再実行範囲は最大pipeline幅へ広がるが、resume admissionのprefix検証と出力順序は維持する。
+- **並列度**: 既定4、選択上限8へ変更。典型workload（40〜200名×3〜5問）では共有CLIによりattemptごとの10〜25秒程度の準備重複を避け、4並列でrate limitリスクとslot利用率の均衡を取る。8は明示選択時の上限で、rate limit時は4→2→1のように縮退する。実CLIでの合成測定は今回未実施。
+- **確認**: `dotnet build .\StudyReportEvaluator.slnx -c Release --no-restore`成功。関連単体（Retry/設定/実行設定/ durable orchestrator / documentation contract）288件成功。
+
 ## 2026-09-25 — schema不正の根本原因とreasoning effortの記録
 
 - **schema不正の原因**: 通常評価のtool引数を一時的な診断（commitしない）で記録したところ、schema不正はすべて`ROOT_MISSING_PROPERTY`で、claude-sonnet-5がroot `EvaluatorId`（アプリが知っている定数）を省略していた。同じPromptを直接SDKで送ると、省略は`medium`で10/30、effort未指定で2/30だった（`medium`で増えるが、未指定でも起きる）。proxyは関係なかった（proxyなしのアプリ通し実行でも7 attempt中3件）。

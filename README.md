@@ -21,7 +21,7 @@ AIが作る値は確認対象です。最終的な評点と利用判断は、授
 
 StudyReport EvaluatorはAI modelを内蔵していません。Windowsアプリ内のGitHub Copilot SDKが、配布物に同梱され版とSHA-256を検証したGitHub Copilot CLIを起動し、CLIがGitHub Copilotサービスとの通信を担当します。アプリは入力Excelのread-only読込、採点条件、AIへ渡す範囲、結果検証、checkpoint、別Excelへの出力を管理します。
 
-AI処理ごとに一時sessionを作り、その処理専用の結果提出toolだけを公開します。shell、filesystem、Web、GitHub write、MCP toolは評価sessionへ公開しません。認証・model確認・AI評価にはnetworkが必要ですが、Excel読込と採点設計はAI処理を開始せずローカルで行えます。
+1回のrunでは検証済み同梱CLIを1つの共有Copilot clientとして起動し、AI処理ごとに一時sessionを作ります。各sessionにはその処理専用の結果提出toolだけを公開し、shell、filesystem、Web、GitHub write、MCP toolは評価sessionへ公開しません。認証・model確認・AI評価にはnetworkが必要ですが、Excel読込と採点設計はAI処理を開始せずローカルで行えます。
 
 Component図、認証から出力までのmessage flow、変更時に同期すべき実装とtestは[ソフトウェアエンジニア向け技術ガイド](docs/technical-guid.md)を参照してください。
 
@@ -168,9 +168,11 @@ Knowledgeの固定Promptは読取専用、Custom Promptは編集可能です。�
 実行画面の**モデル・並列度・実効出力先は読取専用**です。編集は**変更 → 設定の共通**で行います。認証確認・login、新規／再開、開始・cancelは実行画面に残っています。
 
 1. **Copilot 状態を確認**を明示的に選びます。未認証なら、候補版の**GitHubにログイン**で同梱native CLIのconsole／ブラウザーを開き、本人が対話loginします。完了・取消・失敗後は同じ状態確認buttonで再確認してください。processの起動・終了だけを認証成功とは扱いません。
-2. **変更 → 共通**で、列挙された通常モデル、並列度（1〜3、既定1）、指定出力先を確認・変更します。保存希望modelが利用不可なら未選択のままで、別modelへfallbackしません。Reference／Similarityの固定`auto`は通常モデルと別に利用可否を確認し、未確認・利用不可のまま開始しません。
+2. **変更 → 共通**で、列挙された通常モデル、並列度（1〜8、既定4）、指定出力先を確認・変更します。保存希望modelが利用不可なら未選択のままで、別modelへfallbackしません。Reference／Similarityの固定`auto`は通常モデルと別に利用可否を確認し、未確認・利用不可のまま開始しません。
 3. **設定から戻る**で実効値と新規／checkpoint再開を確認します。再開する場合は既存の`.partial.xlsx`を指定します。
 4. 技術検証を通過したら**定量化を開始**を選びます。予約された出力pathの表示だけではfile作成・保存成功を意味しません。
+
+run中は1つのCopilot CLI processを共有し、複数の学生行を最大並列度の範囲で先行処理します。checkpointはsource row順の連続した完了prefixだけを保存するため、再開時の出力順序は決定的です。rate limitを検出した場合は一時的に待機し、有効並列度を下げます。quota exhaustedは無限再試行せず、その時点までのpartialを残して停止します。
 
 **公開`v0.8.1`にはlogin buttonがありません。** 同梱CLIで本人loginを行い、アプリの状態確認buttonで確認する手順は[はじめに](docs/getting-started.md)を参照してください。どちらの版でもアプリへpassword、PAT、token、device codeを入力しないでください。
 

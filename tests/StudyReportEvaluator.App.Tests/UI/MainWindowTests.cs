@@ -914,7 +914,7 @@ public sealed class MainWindowTests
             Assert.True(harness.Execution.CanCancel);
             Assert.Same(active, harness.Runner.LastRequest);
             Assert.Equal(activeHash, Canonical.ComputeSha256(active.DraftDefinition));
-            Assert.Equal(1, active.MaxConcurrency);
+            Assert.Equal(4, active.MaxConcurrency);
             Assert.NotEqual(activeHash, nextHash);
             AssertNoAutomaticActivity(harness, authenticationChecks: 1, runs: 1);
             release.TrySetResult(summary);
@@ -1048,7 +1048,7 @@ public sealed class MainWindowTests
             Assert.Equal(outputB, execution.OutputDirectory);
             Assert.Equal(outputB, Required<TextBox>(view, "EffectiveOutputDirectoryTextBox").Text);
             Assert.Equal("今回run 新規出力先: " + outputA, Required<TextBox>(view, "CurrentRunOutputTextBox").Text);
-            Assert.Contains("実行中 model-test 並列1", Required<TextBox>(view, "EffectiveModelTextBox").Text, StringComparison.Ordinal);
+            Assert.Contains("実行中 model-test 並列4", Required<TextBox>(view, "EffectiveModelTextBox").Text, StringComparison.Ordinal);
             Assert.Contains("次回", Required<TextBlock>(view, "PlanSummaryLabel").Text, StringComparison.Ordinal);
             Assert.Equal(execution.PlanSummary, Required<TextBlock>(view, "PlanSummaryText").Text);
             Assert.Contains("7 evaluation units", execution.PlanSummary, StringComparison.Ordinal);

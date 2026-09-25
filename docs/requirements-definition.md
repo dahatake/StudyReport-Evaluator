@@ -625,7 +625,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 ### 11.6 設定fileの読込と明示保存
 
 - 保存先はOSのLocalApplicationData配下`StudyReportEvaluator/setting.txt`とする。Windowsでは通常`%LOCALAPPDATA%`配下であり、EXE、入力、出力、抽出cache、CLI credential storeと分離する。新しい製品CLI引数・必須環境変数を追加しない。
-- UTF-8 JSON、設定schema整数1で、共通設定（通常model希望ID、並列度1〜3・既定1、absoluteな明示出力先または`null`）と任意の採点定義1件だけを保存する。設定schemaはcanonical schema・要求版・製品版とは独立する。
+- UTF-8 JSON、設定schema整数1で、共通設定（通常model希望ID、並列度1〜8・既定4、absoluteな明示出力先または`null`）と任意の採点定義1件だけを保存する。設定schemaはcanonical schema・要求版・製品版とは独立する。
 - 採点定義はID・name・revision、sheet／header／行範囲、base／special／similarity係数、設問text・mapping・Points・enabled、evaluator／criterion／range／weight、固有評価、適用済みPrompt、丸めを含む。ID・順序・decimal・Unicode・改行・Promptとcanonical hashの往復一致を要求する。
 - 保存しないものは入力xlsxのpath・bytes、回答行を自動収集した本文、AI結果・reason・evidence・参照回答、run／checkpoint状態、credential・login状態・CLI hash、warning承認状態、未適用Prompt一覧・本文、Control・Command・選択ID・表示ページ・操作履歴とする。平文に含まれ得る内容は§14に従う。
 - 有効な編集は次回用draftへ反映するが、diskへの書込は利用者の明示保存だけとする。起動・読込・主列変更・画面遷移・終了で自動保存しない。fileなしは既定値で継続し、最初の明示保存までfileを作らない。設定読込完了前に未読の保存定義を空で上書きできないようにする。
@@ -799,7 +799,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 ## 15. performance・capacity
 
 - 回答行上限は20,000とする。
-- concurrencyは既定1、最大3とする。
+- concurrencyは既定4、最大8とする。
 - Excel row、column、cell、formula、function argument上限をwrite前に検査する。
 - Promptとschemaのapp-owned request上限を測定し、AI送信前に検査する。この検査はmodel上限の既知／不明にかかわらず常に適用する。
 - model contextの安全marginは、SDKが当該modelの上限を公開している場合だけAI送信前に検査する。上限不明のmodelでは検査せず、検査していないことを画面に明示する。
@@ -1044,3 +1044,4 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | Auto model selection source | 2026-09-15の要求所有者指示「`auto`を通常評価modelとして選択できるように必要なら要求定義から変更」。同梱CLIを実測し、`auto`はrouterでtoken上限を公開しないことを確認した上で§7.1・§10.3・§10.4・§11・§15・§16を改訂した。上限不明modelを拒否せず、model相対のcontext budget検査だけを適用外とし、既定値の推定と別modelへのfallbackは行わない。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Timeout / reasoning effort source | 2026-09-24の要求所有者指示「7.6節のattempt timeoutはSDKの60秒に従う」「Thinking Effortはmedium。答案の定量化なのでHighは不要」。当初はattempt全体を60秒としたが、実機の通し実行で起動・session作成に約10〜25秒かかり、SDKの60秒の応答待ちより先にattempt側が満了してAI_TIMEOUTとなった（応答完了直前の打切りを含む）ため、§7.6は応答待ちをSDK既定の60秒とし、attempt全体の外側上限120秒は維持した。§7.1へreasoning effort `medium`を追加した。同梱CLIの実測で、`auto`と非対応modelへeffortを指定するとsession作成が失敗することを確認し、対応modelだけに指定する。2026-09-25の要求所有者指示「effortを記録する」により、attemptごとの指定値をジョブログへ記録する（§7.1、§11.9）。同日の指示「schema不正の根本原因を調査・修正する」により、claude-sonnet-5がtool引数から定数のevaluator IDを省略することが原因と確認し（`medium`で10/30、未指定で2/30）、§7.3でアプリが補う。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Meaning | repository要求baselineの承認記録。実装完了・試験成功・release存在・tag／push／draft／公開操作の承認、組織の法務・教育・security承認または電子署名を意味しない |
+

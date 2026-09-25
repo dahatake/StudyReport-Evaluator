@@ -194,6 +194,8 @@ internal static class DurableOperationConversions
             EvaluationAttemptFailureKind.SchemaInvalid => ResultsStatusCodes.AiOutputInvalid,
             EvaluationAttemptFailureKind.Network => ResultsStatusCodes.NetworkFailed,
             EvaluationAttemptFailureKind.Timeout => ResultsStatusCodes.AiTimeout,
+            EvaluationAttemptFailureKind.RateLimited => ResultsStatusCodes.RateLimited,
+            EvaluationAttemptFailureKind.QuotaExhausted => ResultsStatusCodes.QuotaExhausted,
             EvaluationAttemptFailureKind.Authentication => ResultsStatusCodes.AuthRequired,
             EvaluationAttemptFailureKind.Cancelled => ResultsStatusCodes.Cancelled,
             EvaluationAttemptFailureKind.Cleanup => ResultsStatusCodes.CleanupFailed,

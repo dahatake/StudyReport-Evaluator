@@ -33,7 +33,7 @@
 - 1 request: 65,536 Unicode scalars以下、かつ採用model context windowの80%以下。
 - 1 tool arguments: 32,767 Unicode scalars以下。
 - 1 run: 20,000 outbound attempts以下。
-- concurrency: default 1、maximum 3。
+- concurrency: default 4、maximum 8。run内では1つの検証済みCopilot CLI processを共有し、attemptごとのsession分離を維持する。rate limit時はAIMDで有効並列度を下げ、quota exhaustedは自動反復しない。
 - Excel/Open XMLの列、cell、formula、sheet/package物理上限。
 
 利用者はこれを引き上げられない。report設定に対して一律の教育上限を製品が埋め込む理由には使わない。

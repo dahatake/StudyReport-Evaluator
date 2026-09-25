@@ -192,7 +192,7 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
         }, CancellationToken.None);
     }
 
-    private static Task<RunSummary> RunCoreAsync(
+    private static async Task<RunSummary> RunCoreAsync(
         QuantificationRunRequest request,
         Action<EvaluationProgress>? progress,
         JobUsageTracker usage,
@@ -200,16 +200,19 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
     {
         ArgumentNullException.ThrowIfNull(request);
         OpenXmlEvaluationRowSource rowSource = new(request.InputPath);
+        AdaptiveEvaluationConcurrencyLimiter concurrencyLimiter = new(request.MaxConcurrency);
         EphemeralEvaluationRunnerOptions runnerOptions = new(
-            maxConcurrency: request.MaxConcurrency);
+            maxConcurrency: request.MaxConcurrency,
+            concurrencyObserver: concurrencyLimiter);
+        await using SharedCopilotClientPool sharedClient = new(new CopilotClientFactory());
         EphemeralEvaluationRunner runner = new(
-            new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory(), usage, UsageOperation.Normal),
+            new SdkEphemeralCopilotTransportFactory(sharedClient, usage, UsageOperation.Normal),
             runnerOptions);
         EphemeralEvaluationRunnerAdapter normalRunner = new(runner);
         if (!request.UseDurableWorkflow)
         {
             QuantificationOrchestrator orchestrator = new(rowSource, normalRunner);
-            return orchestrator.RunAsync(request, progress, cancellationToken);
+            return await orchestrator.RunAsync(request, progress, cancellationToken).ConfigureAwait(false);
         }
 
         CopilotRuntimeIdentity identity = request.RuntimeIdentity
@@ -218,15 +221,15 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
             rowSource,
             normalRunner,
             new ReferenceAnswerOperationRunnerAdapter(new ReferenceAnswerEvaluationRunner(
-                new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory(), usage, UsageOperation.Reference),
+                new SdkEphemeralCopilotTransportFactory(sharedClient, usage, UsageOperation.Reference),
                 runnerOptions)),
             new SpecialEvaluationOperationRunnerAdapter(new SpecialEvaluationRunner(
-                new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory(), usage, UsageOperation.Special),
+                new SdkEphemeralCopilotTransportFactory(sharedClient, usage, UsageOperation.Special),
                 runnerOptions)),
             new SimilarityEvaluationOperationRunnerAdapter(new SimilarityEvaluationRunner(
-                new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory(), usage, UsageOperation.Similarity),
+                new SdkEphemeralCopilotTransportFactory(sharedClient, usage, UsageOperation.Similarity),
                 runnerOptions)));
-        return durable.RunAsync(
+        return await durable.RunAsync(
             new DurableQuantificationRunRequest
             {
                 Run = request,
@@ -241,7 +244,8 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
                 ResumePartialPath = request.ResumePartialPath,
             },
             value => progress?.Invoke(ToLegacyProgress(value)),
-            cancellationToken);
+            cancellationToken,
+            concurrencyLimiter).ConfigureAwait(false);
     }
 
     public override string ToString() =>
@@ -383,7 +387,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         "ログイン処理の終了を確認できませんでした。終了を待って再試行するか、アプリを終了して開き直してください。";
 
     private static readonly IReadOnlyList<int> ClosedConcurrencyOptions =
-        Array.AsReadOnly([1, 2, 3]);
+        Array.AsReadOnly([1, 2, 3, 4, 5, 6, 7, 8]);
 
     private readonly IExecutionAuthenticationBoundary authenticationBoundary;
     private readonly IQuantificationRunBoundary runBoundary;
@@ -611,7 +615,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
     }
 
     public string ConcurrencyText =>
-        $"最大 {MaxConcurrency.ToString(CultureInfo.InvariantCulture)} 件を並列実行（許可範囲 1～3）";
+        $"最大 {MaxConcurrency.ToString(CultureInfo.InvariantCulture)} 件を並列実行（許可範囲 1～8）";
 
     /// <summary>An explicit next-run directory, or null to derive it from the current input.</summary>
     public string? OutputDirectoryOverride
@@ -998,7 +1002,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         && runtimeIdentity is not null
         && SelectedModelId is not null
         && modelItems.Contains(SelectedModelId)
-        && MaxConcurrency is >= EvaluationSchedulerOptions.DefaultMaxConcurrency
+        && MaxConcurrency is >= EvaluationSchedulerOptions.MinimumMaxConcurrency
             and <= EvaluationSchedulerOptions.MaximumMaxConcurrency
         && !HasTechnicalErrors;
 
@@ -2021,13 +2025,13 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 $"retry込み最大attempt数 {WorstCaseAttemptCount.ToString(CultureInfo.InvariantCulture)} がrun上限 {EvaluationRequestCapacityValidator.MaximumWorstCaseAttemptsPerRun.ToString(CultureInfo.InvariantCulture)} を超えています。"));
             }
 
-        if (MaxConcurrency is < EvaluationSchedulerOptions.DefaultMaxConcurrency
+        if (MaxConcurrency is < EvaluationSchedulerOptions.MinimumMaxConcurrency
             or > EvaluationSchedulerOptions.MaximumMaxConcurrency)
         {
             AddError(errors, new ExecutionTechnicalError(
                 "CONCURRENCY_OUT_OF_RANGE",
                 "Concurrency",
-                "並列度は 1～3 にしてください。"));
+                "並列度は 1～8 にしてください。"));
         }
 
         if (IsResumeMode)

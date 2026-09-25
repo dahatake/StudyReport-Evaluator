@@ -12,6 +12,8 @@ public enum EvaluationAttemptFailureKind
     SchemaInvalid,
     Network,
     Timeout,
+    RateLimited,
+    QuotaExhausted,
     Authentication,
     Cancelled,
     Fatal,
@@ -51,6 +53,25 @@ public sealed class EvaluationAttemptTimeoutException : EvaluationAttemptExcepti
 {
     public EvaluationAttemptTimeoutException()
         : base(EvaluationAttemptFailureKind.Timeout, "The evaluation attempt timed out.")
+    {
+    }
+}
+
+public sealed class EvaluationRateLimitException : EvaluationAttemptException
+{
+    public EvaluationRateLimitException(TimeSpan? retryAfter = null)
+        : base(EvaluationAttemptFailureKind.RateLimited, "The evaluation request was rate limited.")
+    {
+        RetryAfter = retryAfter is { } value && value > TimeSpan.Zero ? value : null;
+    }
+
+    public TimeSpan? RetryAfter { get; }
+}
+
+public sealed class EvaluationQuotaExhaustedException : EvaluationAttemptException
+{
+    public EvaluationQuotaExhaustedException()
+        : base(EvaluationAttemptFailureKind.QuotaExhausted, "The evaluation quota is exhausted.")
     {
     }
 }
@@ -179,6 +200,8 @@ public enum EphemeralEvaluationStatus
     AiOutputInvalid,
     AiTimeout,
     NetworkFailed,
+    RateLimited,
+    QuotaExhausted,
     AuthRequired,
     Cancelled,
     CleanupFailed,
@@ -207,6 +230,8 @@ public sealed class EphemeralEvaluationResult
         EphemeralEvaluationStatus.AiOutputInvalid => "AI_OUTPUT_INVALID",
         EphemeralEvaluationStatus.AiTimeout => "AI_TIMEOUT",
         EphemeralEvaluationStatus.NetworkFailed => "NETWORK_FAILED",
+        EphemeralEvaluationStatus.RateLimited => "RATE_LIMITED",
+        EphemeralEvaluationStatus.QuotaExhausted => "QUOTA_EXHAUSTED",
         EphemeralEvaluationStatus.AuthRequired => "AUTH_REQUIRED",
         EphemeralEvaluationStatus.Cancelled => "CANCELLED",
         EphemeralEvaluationStatus.CleanupFailed => "CLEANUP_FAILED",
@@ -255,6 +280,41 @@ public sealed class EphemeralEvaluationResult
     }
 }
 
+public interface IEvaluationConcurrencyObserver
+{
+    void RecordAttemptSucceeded() { }
+
+    void RecordRateLimited(TimeSpan? retryAfter) { }
+}
+
+public interface IRetryDelayProvider
+{
+    TimeSpan GetRateLimitDelay(int retryNumber, TimeSpan? retryAfter);
+}
+
+internal sealed class ExponentialJitterRetryDelayProvider : IRetryDelayProvider
+{
+    private static readonly TimeSpan MaximumDelay = TimeSpan.FromSeconds(30);
+
+    public TimeSpan GetRateLimitDelay(int retryNumber, TimeSpan? retryAfter)
+    {
+        if (retryNumber < 1)
+        {
+            retryNumber = 1;
+        }
+
+        double exponentialSeconds = Math.Min(8, Math.Pow(2, retryNumber));
+        double jitterSeconds = Random.Shared.NextDouble();
+        TimeSpan computed = TimeSpan.FromSeconds(exponentialSeconds + jitterSeconds);
+        if (retryAfter is { } serverDelay && serverDelay > computed)
+        {
+            computed = serverDelay;
+        }
+
+        return computed > MaximumDelay ? MaximumDelay : computed;
+    }
+}
+
 public sealed class RetryAndCleanupCoordinator
 {
     public const int MaximumSchemaRetries = 1;
@@ -274,7 +334,9 @@ public sealed class RetryAndCleanupCoordinator
         TimeSpan attemptTimeout,
         TimeSpan cleanupTimeout,
         int maxConcurrency,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IEvaluationConcurrencyObserver? concurrencyObserver = null,
+        IRetryDelayProvider? retryDelayProvider = null)
     {
         ArgumentNullException.ThrowIfNull(attemptFactory);
         EphemeralEvaluationResult<QuantificationResult> result = await ExecuteCoreAsync(
@@ -282,7 +344,9 @@ public sealed class RetryAndCleanupCoordinator
             attemptTimeout,
             cleanupTimeout,
             maxConcurrency,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            concurrencyObserver,
+            retryDelayProvider).ConfigureAwait(false);
         return result.IsSuccess
             ? EphemeralEvaluationResult.Succeeded(
                 result.AttemptCount,
@@ -299,39 +363,48 @@ public sealed class RetryAndCleanupCoordinator
         TimeSpan attemptTimeout,
         TimeSpan cleanupTimeout,
         int maxConcurrency,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IEvaluationConcurrencyObserver? concurrencyObserver = null,
+        IRetryDelayProvider? retryDelayProvider = null)
         where TResult : class =>
         ExecuteCoreAsync(
             attemptFactory,
             attemptTimeout,
             cleanupTimeout,
             maxConcurrency,
-            cancellationToken);
+            cancellationToken,
+            concurrencyObserver,
+            retryDelayProvider);
 
     private async Task<EphemeralEvaluationResult<TResult>> ExecuteCoreAsync<TResult>(
         Func<int, IEphemeralEvaluationAttempt<TResult>> attemptFactory,
         TimeSpan attemptTimeout,
         TimeSpan cleanupTimeout,
         int maxConcurrency,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IEvaluationConcurrencyObserver? concurrencyObserver,
+        IRetryDelayProvider? retryDelayProvider)
         where TResult : class
     {
         ArgumentNullException.ThrowIfNull(attemptFactory);
         ValidateFiniteTimeout(attemptTimeout, nameof(attemptTimeout));
         ValidateFiniteTimeout(cleanupTimeout, nameof(cleanupTimeout));
-        if (maxConcurrency is < 1 or > 3)
+        if (maxConcurrency is < EphemeralEvaluationRunnerOptions.MinimumMaxConcurrency
+            or > EphemeralEvaluationRunnerOptions.MaximumMaxConcurrency)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(maxConcurrency),
-                "Evaluation concurrency must be between 1 and 3.");
+                $"Evaluation concurrency must be between {EphemeralEvaluationRunnerOptions.MinimumMaxConcurrency} and {EphemeralEvaluationRunnerOptions.MaximumMaxConcurrency}.");
         }
 
         int attemptCount = 0;
         int schemaRetryCount = 0;
         int transientRetryCount = 0;
+        int rateLimitRetryCount = 0;
         Guid operationId = Guid.NewGuid();
         EvaluationTokenUsage tokenUsage = EvaluationTokenUsage.Unavailable;
         HashSet<string> observedSessionIds = new(StringComparer.Ordinal);
+        retryDelayProvider ??= new ExponentialJitterRetryDelayProvider();
 
         while (true)
         {
@@ -397,6 +470,7 @@ public sealed class RetryAndCleanupCoordinator
             EvaluationAttemptFailureKind? failureKind = validUniqueSessionId
                 ? null
                 : EvaluationAttemptFailureKind.Fatal;
+            TimeSpan? retryAfter = null;
             bool abortRequired = !validUniqueSessionId;
             Task<TResult>? executionTask = null;
 
@@ -436,11 +510,18 @@ public sealed class RetryAndCleanupCoordinator
                     failureKind = EvaluationAttemptFailureKind.Network;
                     abortRequired = true;
                 }
+                catch (EvaluationRateLimitException exception)
+                {
+                    failureKind = EvaluationAttemptFailureKind.RateLimited;
+                    retryAfter = exception.RetryAfter;
+                    abortRequired = true;
+                }
                 catch (EvaluationAttemptException exception)
                 {
                     failureKind = NormalizeFailureKind(exception.FailureKind);
                     abortRequired = failureKind is EvaluationAttemptFailureKind.Network
                         or EvaluationAttemptFailureKind.Timeout
+                        or EvaluationAttemptFailureKind.RateLimited
                         or EvaluationAttemptFailureKind.Fatal;
                 }
                 catch
@@ -483,6 +564,8 @@ public sealed class RetryAndCleanupCoordinator
             if (acceptedResult is not null)
             {
                 CompleteUsageAttempt(attempt, UsageAttemptOutcome.Succeeded);
+                try { concurrencyObserver?.RecordAttemptSucceeded(); }
+                catch { /* Adaptive concurrency is advisory. */ }
                 Log(
                     SafeLogSeverity.Information,
                     SafeLogEventCode.EvaluationAttemptSucceeded,
@@ -521,9 +604,16 @@ public sealed class RetryAndCleanupCoordinator
                 EvaluationAttemptFailureKind.SchemaInvalid => UsageAttemptOutcome.SchemaInvalid,
                 EvaluationAttemptFailureKind.Network => UsageAttemptOutcome.NetworkFailed,
                 EvaluationAttemptFailureKind.Timeout => UsageAttemptOutcome.TimedOut,
+                EvaluationAttemptFailureKind.RateLimited => UsageAttemptOutcome.RateLimited,
+                EvaluationAttemptFailureKind.QuotaExhausted => UsageAttemptOutcome.QuotaExhausted,
                 EvaluationAttemptFailureKind.Authentication => UsageAttemptOutcome.AuthRequired,
                 _ => UsageAttemptOutcome.Fatal,
             });
+            if (terminalFailure == EvaluationAttemptFailureKind.RateLimited)
+            {
+                try { concurrencyObserver?.RecordRateLimited(retryAfter); }
+                catch { /* Adaptive concurrency is advisory. */ }
+            }
 
             Log(
                 SeverityFor(terminalFailure),
@@ -538,8 +628,28 @@ public sealed class RetryAndCleanupCoordinator
                     terminalFailure,
                     attemptCount,
                     ref schemaRetryCount,
-                    ref transientRetryCount))
+                    ref transientRetryCount,
+                    ref rateLimitRetryCount))
             {
+                if (terminalFailure == EvaluationAttemptFailureKind.RateLimited)
+                {
+                    TimeSpan delay = retryDelayProvider.GetRateLimitDelay(rateLimitRetryCount, retryAfter);
+                    if (delay > TimeSpan.Zero)
+                    {
+                        try
+                        {
+                            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            return EphemeralEvaluationResult<TResult>.Failed(
+                                EphemeralEvaluationStatus.Cancelled,
+                                attemptCount,
+                                tokenUsage);
+                        }
+                    }
+                }
+
                 Log(
                     SafeLogSeverity.Information,
                     SafeLogEventCode.EvaluationRetryScheduled,
@@ -614,7 +724,8 @@ public sealed class RetryAndCleanupCoordinator
         EvaluationAttemptFailureKind failureKind,
         int attemptCount,
         ref int schemaRetryCount,
-        ref int transientRetryCount)
+        ref int transientRetryCount,
+        ref int rateLimitRetryCount)
     {
         if (attemptCount >= MaximumTransientAttempts)
         {
@@ -633,6 +744,11 @@ public sealed class RetryAndCleanupCoordinator
                 transientRetryCount++;
                 return true;
 
+            case EvaluationAttemptFailureKind.RateLimited
+                when rateLimitRetryCount < MaximumTransientRetries:
+                rateLimitRetryCount++;
+                return true;
+
             default:
                 return false;
         }
@@ -642,7 +758,8 @@ public sealed class RetryAndCleanupCoordinator
         failureKind switch
         {
             EvaluationAttemptFailureKind.SchemaInvalid => MaximumSchemaAttempts,
-            EvaluationAttemptFailureKind.Network or EvaluationAttemptFailureKind.Timeout =>
+            EvaluationAttemptFailureKind.Network or EvaluationAttemptFailureKind.Timeout
+                or EvaluationAttemptFailureKind.RateLimited =>
                 MaximumTransientAttempts,
             _ => 1,
         };
@@ -654,6 +771,8 @@ public sealed class RetryAndCleanupCoordinator
             EvaluationAttemptFailureKind.SchemaInvalid => EvaluationAttemptFailureKind.SchemaInvalid,
             EvaluationAttemptFailureKind.Network => EvaluationAttemptFailureKind.Network,
             EvaluationAttemptFailureKind.Timeout => EvaluationAttemptFailureKind.Timeout,
+            EvaluationAttemptFailureKind.RateLimited => EvaluationAttemptFailureKind.RateLimited,
+            EvaluationAttemptFailureKind.QuotaExhausted => EvaluationAttemptFailureKind.QuotaExhausted,
             EvaluationAttemptFailureKind.Authentication => EvaluationAttemptFailureKind.Authentication,
             EvaluationAttemptFailureKind.Cancelled => EvaluationAttemptFailureKind.Cancelled,
             EvaluationAttemptFailureKind.Fatal => EvaluationAttemptFailureKind.Fatal,
@@ -668,6 +787,8 @@ public sealed class RetryAndCleanupCoordinator
             EvaluationAttemptFailureKind.SchemaInvalid => EphemeralEvaluationStatus.AiOutputInvalid,
             EvaluationAttemptFailureKind.Network => EphemeralEvaluationStatus.NetworkFailed,
             EvaluationAttemptFailureKind.Timeout => EphemeralEvaluationStatus.AiTimeout,
+            EvaluationAttemptFailureKind.RateLimited => EphemeralEvaluationStatus.RateLimited,
+            EvaluationAttemptFailureKind.QuotaExhausted => EphemeralEvaluationStatus.QuotaExhausted,
             EvaluationAttemptFailureKind.Authentication => EphemeralEvaluationStatus.AuthRequired,
             EvaluationAttemptFailureKind.Cancelled => EphemeralEvaluationStatus.Cancelled,
             _ => EphemeralEvaluationStatus.Fatal,
@@ -685,6 +806,8 @@ public sealed class RetryAndCleanupCoordinator
             EvaluationAttemptFailureKind.SchemaInvalid => SafeLogFailureCategory.SchemaInvalid,
             EvaluationAttemptFailureKind.Network => SafeLogFailureCategory.Network,
             EvaluationAttemptFailureKind.Timeout => SafeLogFailureCategory.Timeout,
+            EvaluationAttemptFailureKind.RateLimited => SafeLogFailureCategory.Network,
+            EvaluationAttemptFailureKind.QuotaExhausted => SafeLogFailureCategory.Fatal,
             EvaluationAttemptFailureKind.Authentication => SafeLogFailureCategory.Authentication,
             EvaluationAttemptFailureKind.Cancelled => SafeLogFailureCategory.Cancelled,
             EvaluationAttemptFailureKind.Cleanup => SafeLogFailureCategory.Cleanup,

@@ -253,7 +253,7 @@ public sealed class SettingsFileStore
     {
         if (settings is null
             || settings.SchemaVersion != ApplicationSettings.CurrentSchemaVersion
-            || settings.MaxConcurrency is < EphemeralEvaluationRunnerOptions.DefaultMaxConcurrency
+            || settings.MaxConcurrency is < EphemeralEvaluationRunnerOptions.MinimumMaxConcurrency
                 or > EphemeralEvaluationRunnerOptions.MaximumMaxConcurrency)
         {
             return false;

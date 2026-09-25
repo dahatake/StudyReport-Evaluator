@@ -85,7 +85,7 @@ public sealed class SafeLogDimensions
             throw new ArgumentOutOfRangeException(nameof(attemptLimit));
         }
 
-        if (maxConcurrency is < 1 or > 3)
+        if (maxConcurrency is < 1 or > 8)
         {
             throw new ArgumentOutOfRangeException(nameof(maxConcurrency));
         }

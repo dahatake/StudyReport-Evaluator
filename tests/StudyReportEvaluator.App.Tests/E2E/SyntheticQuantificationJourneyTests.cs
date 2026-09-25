@@ -290,12 +290,14 @@ public sealed class SyntheticQuantificationJourneyTests
         DurableReferenceRunner interruptedReferences = new();
         DurableSpecialRunner interruptedSpecials = new(workbook);
         DurableSimilarityRunner interruptedSimilarities = new();
+        bool interruptionRequested = false;
         DurableCountingCheckpointStore interruptedStore = new(
             new CheckpointStore(),
             envelope =>
             {
-                if (envelope.CompletedRows.Length == 265)
+                if (!interruptionRequested && envelope.CompletedRows.Length >= 265)
                 {
+                    interruptionRequested = true;
                     interruption.Cancel();
                 }
             });
@@ -313,7 +315,7 @@ public sealed class SyntheticQuantificationJourneyTests
         Assert.True(interrupted.IsPartial);
         Assert.False(interrupted.WasResumed);
         Assert.Equal(2, interrupted.References.Length);
-        Assert.Equal(265, interrupted.CompletedRows.Length);
+        Assert.InRange(interrupted.CompletedRows.Length, 265, SyntheticWorkbookFactory.DataRowCount - 1);
         Assert.Null(interrupted.FinalPath);
         string partialPath = Assert.IsType<string>(interrupted.PartialPath);
         Assert.True(File.Exists(partialPath));
@@ -347,7 +349,7 @@ public sealed class SyntheticQuantificationJourneyTests
         Assert.Equal(expectedSpecialCalls - interruptedSpecials.CallCount, resumedSpecials.CallCount);
         Assert.Equal(expectedNormalCalls - interruptedSimilarities.CallCount, resumedSimilarities.CallCount);
         Assert.Equal(0, resumedStore.CreateCount);
-        Assert.Equal(265, resumedStore.UpdateCount);
+        Assert.Equal(SyntheticWorkbookFactory.DataRowCount - interrupted.CompletedRows.Length, resumedStore.UpdateCount);
         Assert.Equal(1, resumedStore.LoadCount);
         Assert.False(File.Exists(partialPath));
 

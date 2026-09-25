@@ -17,6 +17,8 @@ public static class ResultsStatusCodes
     public const string AiOutputInvalid = "AI_OUTPUT_INVALID";
     public const string AiTimeout = "AI_TIMEOUT";
     public const string NetworkFailed = "NETWORK_FAILED";
+    public const string RateLimited = "RATE_LIMITED";
+    public const string QuotaExhausted = "QUOTA_EXHAUSTED";
     public const string AuthRequired = "AUTH_REQUIRED";
     public const string Cancelled = "CANCELLED";
     public const string CleanupFailed = "CLEANUP_FAILED";
@@ -30,6 +32,8 @@ public static class ResultsStatusCodes
         AiOutputInvalid,
         AiTimeout,
         NetworkFailed,
+        RateLimited,
+        QuotaExhausted,
         AuthRequired,
         Cancelled,
         CleanupFailed,

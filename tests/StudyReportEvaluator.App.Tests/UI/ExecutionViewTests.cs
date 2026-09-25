@@ -241,11 +241,11 @@ public sealed class ExecutionViewTests
             metadata,
             new RecordingRunBoundary((_, _, _) => throw new IOException(exceptionCanary)));
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
-        viewModel.MaxConcurrency = 4;
+        viewModel.MaxConcurrency = 9;
 
         Assert.False(viewModel.CanStart);
         Assert.Contains(viewModel.TechnicalErrors, error => error.Code == "CONCURRENCY_OUT_OF_RANGE");
-        viewModel.MaxConcurrency = 1;
+        viewModel.MaxConcurrency = 4;
         Assert.True(viewModel.CanStart);
 
         await viewModel.StartAsync(TestContext.Current.CancellationToken);
@@ -1241,7 +1241,7 @@ public sealed class ExecutionViewTests
     public async Task Technical_errors_keep_selection_virtualize_long_lists_and_hide_when_resolved()
     {
         using LoginViewHarness harness = new();
-        harness.ViewModel.MaxConcurrency = 4;
+        harness.ViewModel.MaxConcurrency = 9;
         Render();
         ListBox list = Required<ListBox>(harness.View, "TechnicalErrorsList");
         TextBox detail = Required<TextBox>(harness.View, "SelectedTechnicalErrorDetail");
@@ -1285,7 +1285,7 @@ public sealed class ExecutionViewTests
         AssertNoAutomaticActivity(harness);
 
         list.SetCurrentValue(ItemsControl.ItemsSourceProperty, harness.ViewModel.TechnicalErrors);
-        harness.ViewModel.MaxConcurrency = 1;
+        harness.ViewModel.MaxConcurrency = 4;
         await harness.ViewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
         Render();
         Assert.Empty(harness.ViewModel.TechnicalErrors);
@@ -1411,7 +1411,7 @@ public sealed class ExecutionViewTests
         Render();
         Assert.Equal(0, ViewObserverCount(harness.ViewModel, harness.View));
         Assert.Equal(1, ViewObserverCount(next, harness.View));
-        Assert.Equal("次回 未選択 並列1 · 希望: new-owner · 上限: 未選択", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+        Assert.Equal("次回 未選択 並列4 · 希望: new-owner · 上限: 未選択", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
         Assert.Same(next.CheckAuthenticationCommand, Required<Button>(harness.View, "CheckAuthenticationButton").Command);
         Assert.Same(next.StartCommand, Required<Button>(harness.View, "StartRunButton").Command);
         Assert.Same(next.LoginCommand, Required<Button>(harness.View, "StartCopilotLogin").Command);

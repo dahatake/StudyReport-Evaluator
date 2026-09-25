@@ -324,7 +324,7 @@ public sealed class SettingsFileStoreTests
 
     [Theory]
     [InlineData("maxConcurrency", "0")]
-    [InlineData("maxConcurrency", "4")]
+    [InlineData("maxConcurrency", "9")]
     [InlineData("maxConcurrency", "null")]
     [InlineData("maxConcurrency", "\"2\"")]
     [InlineData("maxConcurrency", "1.5")]
@@ -658,7 +658,7 @@ public sealed class SettingsFileStoreTests
         AssertSaved(await secondStore.SaveAsync(draft, TestContext.Current.CancellationToken));
         byte[] lastSuccessfulBytes = File.ReadAllBytes(fixture.FilePath);
         SettingsSaveResult rejected = await firstStore.SaveAsync(
-            savedSnapshot with { MaxConcurrency = 4 },
+            savedSnapshot with { MaxConcurrency = 9 },
             TestContext.Current.CancellationToken);
         Assert.Equal(SettingsSaveStatus.InvalidSettings, rejected.Status);
         fixture.AssertUnchanged(lastSuccessfulBytes);
@@ -776,7 +776,7 @@ public sealed class SettingsFileStoreTests
         "null-settings" => null!,
         "schema" => settings with { SchemaVersion = 2 },
         "concurrency-low" => settings with { MaxConcurrency = 0 },
-        "concurrency-high" => settings with { MaxConcurrency = 4 },
+        "concurrency-high" => settings with { MaxConcurrency = 9 },
         "model-empty" => settings with { PreferredModelId = string.Empty },
         "model-space" => settings with { PreferredModelId = " model " },
         "model-control" => settings with { PreferredModelId = "model\u007F" },

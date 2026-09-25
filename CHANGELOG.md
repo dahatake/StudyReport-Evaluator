@@ -9,6 +9,7 @@ StudyReport Evaluatorの利用者に影響する変更をこのファイルへ�
 
 - 実行中／終了後に、GitHub Copilot SDKから観測できた入力・出力token、推論／cache内訳、`nano-AI units`、premium request消費量を、実行・結果画面とジョブ単位のローカルJSON Linesログで確認できるように追加。未取得値は0とせず、請求確定額・通貨・アカウント全体の利用量として扱わない。再試行ごとの試行番号・相関ID・終端結果（成功・スキーマ不正・通信失敗・timeout・認証要求・取消・後始末失敗）もジョブ単位のログへ記録し、数値観測の状態（部分取得・観測完了）は変更しない。項目ごとの取得元（イベント／最終RPC／最後の呼び出しのみ）と、モデル内訳とセッション総量の不一致も表示し、不一致を配賦・補正で一致させない。
 - ジョブログ（JSON Lines）の各試行に、アプリが指定したreasoning effort（`RequestedReasoningEffort`。`medium`、未指定は`null`）を記録。`auto`や非対応モデルで実際に使われたeffortはSDKから観測できないため記録しません。
+- run内で同梱Copilot CLI processを共有し、attemptごとに一時sessionを分けたまま`ListModels`結果を再利用する性能改善を追加。rate limitは専用statusとしてbackoff付きで再試行し、有効並列度を下げます。quota exhaustedは無限再試行せずpartialを残して停止します。
 - 実行を中断した後、保存済みpartial checkpointから再開準備を行う導線を追加。再開元の選択、開始前の入力／採点設計／モデル／runtime／checkpoint構造の項目別確認、入力・モデルだけの明示的な条件合わせ込み、window close時の有限な中断待機を提供。再開は引き続き利用者が「定量化を開始」を選ぶまで開始しません。
 - 同じウィンドウ内に、共通／入力詳細／通常評価／固有評価／読込Promptの5カテゴリの[設定画面](docs/settings.md)を追加。
 - 共通設定と任意の採点定義1件の手動保存・読込を追加。保存先はOSのLocalApplicationData配下`StudyReportEvaluator\setting.txt`（Windowsでは通常`%LOCALAPPDATA%\StudyReportEvaluator\setting.txt`）、UTF-8の平文JSON（設定用schema `1`、暗号化なし）。保存定義はExcel読込後に明示適用し、ID・順序・設問文・Prompt・配点を保持。入力との整合を検証し、適用失敗・取消では現在の編集と設定ファイルを保持。
@@ -19,6 +20,7 @@ StudyReport Evaluatorの利用者に影響する変更をこのファイルへ�
 ### Changed
 
 - 入力・採点設計・実行・結果の4ステップを保ち、主画面の要点と設定での詳細編集を分離。「基礎配点」「評価方法」「評価項目」などの日本語ラベルへ整理。設問は全カードの同時表示から、残領域に応じたコンパクト一覧とページ切替へ変更し、全件への到達と固定式ガイドが編集領域を圧迫しない配置を両立。
+- 並列度の既定値を1から4、選択上限を3から8へ変更。学生行はsource row順の連続prefixだけをcheckpointへ保存しながら複数行を先行処理し、出力順序とresume correctnessを維持します。
 - 警告・ナビゲーション・前後操作を固定し、本文14 DIP・主要操作の最小44 DIPを維持。通常サイズは外側スクロール不要で横に見切れない配置とし、長文・全文path・候補一覧は局所スクロール、狭小・拡大時は再配置と必要な本文縦スクロールで対応。
 - 結果をページ一覧と選択行の詳細・override編集に分離し、元の行番号でも移動可能に。修正版は「検証して出力」で別名workbookへ保存し、入力・既存final／partialを上書きしない。
 - 利用者ガイドと[8枚の説明画像](images/README.md)を更新し、[Fluent System Iconsの出典・固定revision・LICENSE／NOTICE](docs/third-party-notices.md)を明記。画像は合成／fake状態で、実認証・実保存・実機検証の証拠ではない。

@@ -41,7 +41,9 @@ public sealed class ReferenceAnswerEvaluationRunner
             options.AttemptTimeout,
             options.CleanupTimeout,
             options.MaxConcurrency,
-            cancellationToken);
+            cancellationToken,
+            options.ConcurrencyObserver,
+            options.RetryDelayProvider);
     }
 
     private IEphemeralEvaluationAttempt<ReferenceAnswerResult> CreateAttempt(
@@ -94,7 +96,9 @@ public sealed class SpecialEvaluationRunner
             options.AttemptTimeout,
             options.CleanupTimeout,
             options.MaxConcurrency,
-            cancellationToken);
+            cancellationToken,
+            options.ConcurrencyObserver,
+            options.RetryDelayProvider);
     }
 
     private IEphemeralEvaluationAttempt<SpecialQuantificationResult> CreateAttempt(
@@ -148,7 +152,9 @@ public sealed class SimilarityEvaluationRunner
             options.AttemptTimeout,
             options.CleanupTimeout,
             options.MaxConcurrency,
-            cancellationToken);
+            cancellationToken,
+            options.ConcurrencyObserver,
+            options.RetryDelayProvider);
     }
 
     private IEphemeralEvaluationAttempt<SimilarityQuantificationResult> CreateAttempt(

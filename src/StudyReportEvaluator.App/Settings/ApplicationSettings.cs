@@ -21,9 +21,9 @@ public sealed record ApplicationSettings
     [JsonPropertyName("preferredModelId")]
     public string? PreferredModelId { get; init; }
 
-    /// <summary>The requested concurrency, validated as 1 through 3 by the settings store.</summary>
+    /// <summary>The requested concurrency, validated as 1 through 8 by the settings store.</summary>
     [JsonPropertyName("maxConcurrency")]
-    public int MaxConcurrency { get; init; } = 1;
+    public int MaxConcurrency { get; init; } = 4;
 
     /// <summary>An explicitly selected absolute directory, or null for the input-adjacent default.</summary>
     [JsonPropertyName("outputDirectoryOverride")]

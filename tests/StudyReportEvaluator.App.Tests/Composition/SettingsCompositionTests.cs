@@ -288,7 +288,7 @@ public sealed class SettingsCompositionTests
     [Theory]
     [InlineData("{PRIVATE-T23-SETTINGS", SettingsLoadStatus.JsonInvalid)]
     [InlineData("{\"schemaVersion\":99}", SettingsLoadStatus.UnsupportedVersion)]
-    [InlineData("{\"schemaVersion\":1,\"maxConcurrency\":4}", SettingsLoadStatus.JsonInvalid)]
+    [InlineData("{\"schemaVersion\":1,\"maxConcurrency\":9}", SettingsLoadStatus.JsonInvalid)]
     public async Task Invalid_settings_keep_the_original_file_and_offline_editors_with_safe_status(string json, SettingsLoadStatus expected)
     {
         using SettingsDirectory directory = new();
@@ -313,7 +313,7 @@ public sealed class SettingsCompositionTests
         Assert.Null(harness.Shell.Settings.StoredDefinition);
         Assert.Null(harness.Shell.Settings.LastSaveTask);
         Assert.Null(harness.Execution.PreferredModelId);
-        Assert.Equal(1, harness.Execution.MaxConcurrency);
+        Assert.Equal(4, harness.Execution.MaxConcurrency);
         Assert.Equal(original, File.ReadAllBytes(directory.SettingsPath));
         Assert.Equal(0, harness.Loader.CallCount);
         AssertNoRuntimeActivity(harness);

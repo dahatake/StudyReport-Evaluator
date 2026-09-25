@@ -256,7 +256,7 @@ resultは`question_id`、`similarity`、`reason`だけとし、similarityを0〜
 
 ### 5.5 retry
 
-既存`RetryAndCleanupCoordinator`の有限attempt、timeout、cleanup順序を再利用する。operationごとにadapterを作るがretry engineを複製しない。AIの応答待ちは、送信をSDKへ`timeout: null`で渡してSDK `SendAndWaitAsync`の既定60秒に従う（SDKは`TimeoutException`を送出し、`TimedOut`として扱う）。`AttemptTimeout`の既定120秒は起動・認証確認・session作成を含むattempt全体の外側上限で、準備が異常に長い場合だけ先に満了する。送信中にCLIがAI呼び出しの通信失敗をsession errorとして返した場合（SDKは`InvalidOperationException`、messageに`error sending request for url`を含む）は`NetworkFailed`として再試行する。
+既存`RetryAndCleanupCoordinator`の有限attempt、timeout、cleanup順序を再利用する。operationごとにadapterを作るがretry engineを複製しない。run内では1つの`CopilotClient`／同梱CLI processを共有し、attemptごとに新しい一時sessionを作る。認証確認と`ListModelsAsync`はrun内でcacheし、既存の`ResolveReasoningEffort`へcached model listを渡すだけにしてeffort選択規則を変えない。AIの応答待ちは、送信をSDKへ`timeout: null`で渡してSDK `SendAndWaitAsync`の既定60秒に従う（SDKは`TimeoutException`を送出し、`TimedOut`として扱う）。`AttemptTimeout`の既定120秒は起動・認証確認・session作成を含むattempt全体の外側上限で、準備が異常に長い場合だけ先に満了する。送信中にCLIがAI呼び出しの通信失敗をsession errorとして返した場合（SDKは`InvalidOperationException`、messageに`error sending request for url`を含む）は`NetworkFailed`として再試行する。`SessionErrorEvent`の`rate_limit`は`RATE_LIMITED`としてbackoff付きretry、`quota`は`QUOTA_EXHAUSTED`として非retry停止に分類する。
 
 ## 6. Excel workbook設計
 
@@ -526,13 +526,14 @@ sequenceDiagram
 
 ### 8.2 Row scheduling
 
-学生行はsource row昇順に処理する。row間は並列化しない。1行内のnormal evaluator、special item、similarityを既定1／最大3で並列化する。
+学生行はsource row昇順の決定的な出力順を維持しながら、複数行をin-flightにできる。run開始時の最大並列度は既定4／最大8で、normal evaluator、special item、similarityの全operationがrun共通のadaptive limiterを共有する。少問・多行のworkloadで1行内のoperation数が少なくても、後続行を先行して読み出し、空いたslotへ投入する。
 
 理由:
 
-- student row単位checkpointを自然に保証する。
-- process終了時の再実行範囲を最大1行に限定する。
-- current global concurrency上限を維持する。
+- 共有Copilot CLI processの起動・認証・model列挙をrun内1回に抑え、operationごとの一時sessionだけを分離する。
+- 少問・多行workloadで、遅いoperationが1行全体を塞いでも他行のoperationでslotを埋める。
+- rate limitを検出した場合は指数backoff付きでretryし、AIMDで有効並列度を下げる。quota exhaustedは再試行せず、保存済みpartialを残して停止する。
+- checkpointは`CompletedRows`の穴を永続化しない。後続行が先に完了してもmemoryに保持し、source row順の連続prefixだけを保存する。process終了時の再実行範囲は最大pipeline幅（通常は最大並列度）まで広がるが、resume admissionは従来どおりprefixを検証できる。
 
 専用operationを汎用queue hierarchyへ抽象化しない。orchestratorはnormal／special／similarityの3配列を明示的に扱う。
 
@@ -678,7 +679,7 @@ lock fileやglobal reservation serviceは追加しない。
 |---|---|
 | `schemaVersion` | 必須の整数`1` |
 | `preferredModelId` | 通常model希望IDまたは`null`。利用可能性の確認状態ではない |
-| `maxConcurrency` | 1〜3、既定1 |
+| `maxConcurrency` | 1〜8、既定4 |
 | `outputDirectoryOverride` | fully qualifiedな明示出力先または`null`。自動算出resultは含めない |
 | `definition` | 任意の`QuantificationDefinition`1件。ID・順序・decimal・設問文・mapping・配点・evaluator／criterion／special・適用済みPrompt・丸めを保持 |
 

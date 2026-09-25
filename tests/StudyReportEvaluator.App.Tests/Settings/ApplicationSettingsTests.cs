@@ -35,7 +35,7 @@ public sealed class ApplicationSettingsTests
 
         Assert.Equal(1, ApplicationSettings.CurrentSchemaVersion);
         Assert.Equal(1, original.SchemaVersion);
-        Assert.Equal(1, original.MaxConcurrency);
+        Assert.Equal(4, original.MaxConcurrency);
         Assert.Null(original.PreferredModelId);
         Assert.Null(original.OutputDirectoryOverride);
         Assert.Null(original.Definition);
@@ -44,7 +44,7 @@ public sealed class ApplicationSettingsTests
             ["definition", "maxConcurrency", "outputDirectoryOverride", "preferredModelId", "schemaVersion"],
             root.EnumerateObject().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal));
         Assert.Equal(1, root.GetProperty("schemaVersion").GetInt32());
-        Assert.Equal(1, root.GetProperty("maxConcurrency").GetInt32());
+        Assert.Equal(4, root.GetProperty("maxConcurrency").GetInt32());
         Assert.Equal(JsonValueKind.Null, root.GetProperty("preferredModelId").ValueKind);
         Assert.Equal(JsonValueKind.Null, root.GetProperty("outputDirectoryOverride").ValueKind);
         Assert.Equal(JsonValueKind.Null, root.GetProperty("definition").ValueKind);

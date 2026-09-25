@@ -187,7 +187,8 @@ public sealed class DurableQuantificationOrchestrator
     public async Task<RunSummary> RunAsync(
         DurableQuantificationRunRequest request,
         Action<DurableEvaluationProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        AdaptiveEvaluationConcurrencyLimiter? concurrencyLimiter = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Run);
@@ -356,6 +357,11 @@ public sealed class DurableQuantificationOrchestrator
                 terminalCode = saved.Code;
                 break;
             }
+
+            if (string.Equals(reference.StatusCode, ResultsStatusCodes.QuotaExhausted, StringComparison.Ordinal))
+            {
+                break;
+            }
         }
 
         if (terminalCode is null && references.Count == referenceTotal)
@@ -363,57 +369,127 @@ public sealed class DurableQuantificationOrchestrator
             Dictionary<string, CheckpointReference> referencesByQuestion = references.ToDictionary(
                 reference => reference.QuestionId,
                 StringComparer.Ordinal);
-            for (int rowIndex = completedRows.Count; rowIndex < rowTotal; rowIndex++)
+            concurrencyLimiter ??= new AdaptiveEvaluationConcurrencyLimiter(run.MaxConcurrency);
+            using CancellationTokenSource rowCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            Dictionary<int, Task<DurableRowEvaluationResult>> inFlightRows = [];
+            Dictionary<int, CheckpointCompletedRow> readyRows = [];
+            Dictionary<int, int> rowInFlight = [];
+            object rowInFlightGate = new();
+            int nextLaunchRowIndex = completedRows.Count;
+            int nextCheckpointRowIndex = completedRows.Count;
+            int pipelineLimit = Math.Max(1, run.MaxConcurrency);
+
+            while ((nextLaunchRowIndex < rowTotal || inFlightRows.Count > 0)
+                && terminalCode is null)
             {
-                if (cancellationToken.IsCancellationRequested)
+                while (nextLaunchRowIndex < rowTotal
+                    && inFlightRows.Count < pipelineLimit
+                    && !rowCancellation.IsCancellationRequested)
+                {
+                    int rowIndex = nextLaunchRowIndex++;
+                    int sourceRow = checked(plan.Mapping.FirstDataRow + rowIndex);
+                    ReportCurrent(boundProgress, DurableEvaluationStage.EvaluatingRows, references.Count, referenceTotal, completedRows.Count, rowTotal, completedRows.Count * perRowOperations + references.Count, operationTotal, SumInFlight(rowInFlight, rowInFlightGate), "EVALUATING_ROW");
+                    Task<DurableRowEvaluationResult> task = rowScheduler.EvaluateRowAsync(
+                        plan,
+                        sourceRow,
+                        referencesByQuestion,
+                        run.ModelId,
+                        run.MaxConcurrency,
+                        run.MaximumPromptTokens,
+                        run.MaximumContextWindowTokens,
+                        inFlight =>
+                        {
+                            lock (rowInFlightGate)
+                            {
+                                rowInFlight[rowIndex] = inFlight;
+                            }
+
+                            ReportCurrent(
+                                boundProgress,
+                                rowCancellation.IsCancellationRequested
+                                    ? DurableEvaluationStage.Cancelling
+                                    : DurableEvaluationStage.EvaluatingRows,
+                                references.Count,
+                                referenceTotal,
+                                completedRows.Count,
+                                rowTotal,
+                                completedRows.Count * perRowOperations + references.Count,
+                                operationTotal,
+                                SumInFlight(rowInFlight, rowInFlightGate),
+                                rowCancellation.IsCancellationRequested ? "CANCELLING" : "EVALUATING_ROW");
+                        },
+                        rowCancellation.Token,
+                        concurrencyLimiter);
+                    inFlightRows.Add(rowIndex, task);
+                }
+
+                if (inFlightRows.Count == 0)
                 {
                     break;
                 }
 
-                int sourceRow = checked(plan.Mapping.FirstDataRow + rowIndex);
-                ReportCurrent(boundProgress, DurableEvaluationStage.EvaluatingRows, references.Count, referenceTotal, completedRows.Count, rowTotal, completedRows.Count * perRowOperations + references.Count, operationTotal, 0, "EVALUATING_ROW");
-                DurableRowEvaluationResult row = await rowScheduler.EvaluateRowAsync(
-                    plan,
-                    sourceRow,
-                    referencesByQuestion,
-                    run.ModelId,
-                    run.MaxConcurrency,
-                    run.MaximumPromptTokens,
-                    run.MaximumContextWindowTokens,
-                    inFlight => ReportCurrent(
-                        boundProgress,
-                        cancellationToken.IsCancellationRequested
-                            ? DurableEvaluationStage.Cancelling
-                            : DurableEvaluationStage.EvaluatingRows,
-                        references.Count,
-                        referenceTotal,
-                        completedRows.Count,
-                        rowTotal,
-                        completedRows.Count * perRowOperations + references.Count,
-                        operationTotal,
-                        inFlight,
-                        cancellationToken.IsCancellationRequested ? "CANCELLING" : "EVALUATING_ROW"),
-                    cancellationToken).ConfigureAwait(false);
+                Task<DurableRowEvaluationResult> completedTask = await Task
+                    .WhenAny(inFlightRows.Values)
+                    .ConfigureAwait(false);
+                int completedRowIndex = inFlightRows.Single(pair => ReferenceEquals(pair.Value, completedTask)).Key;
+                inFlightRows.Remove(completedRowIndex);
+                lock (rowInFlightGate)
+                {
+                    rowInFlight.Remove(completedRowIndex);
+                }
+
+                DurableRowEvaluationResult row;
+                try
+                {
+                    row = await completedTask.ConfigureAwait(false);
+                }
+                catch
+                {
+                    row = new DurableRowEvaluationResult(
+                        checked(plan.Mapping.FirstDataRow + completedRowIndex),
+                        null);
+                }
+
                 if (!row.IsComplete || row.CompletedRow is null)
                 {
+                    rowCancellation.Cancel();
                     break;
                 }
 
-                completedRows.Add(row.CompletedRow);
-                checkpoint = checkpoint with
+                readyRows[completedRowIndex] = row.CompletedRow;
+                while (readyRows.Remove(nextCheckpointRowIndex, out CheckpointCompletedRow? ready))
                 {
-                    CompletedRows = completedRows.ToImmutable(),
-                    SavedAtUtc = UtcNow(checkpoint.SavedAtUtc),
-                };
-                ReportCurrent(boundProgress, DurableEvaluationStage.SavingCheckpoint, references.Count, referenceTotal, completedRows.Count, rowTotal, completedRows.Count * perRowOperations + references.Count, operationTotal, 0, "SAVING_CHECKPOINT");
-                CheckpointSaveResult saved = checkpointStore.Update(checkpoint, CancellationToken.None);
-                if (!saved.IsSuccess)
-                {
-                    completedRows.RemoveAt(completedRows.Count - 1);
-                    checkpoint = checkpoint with { CompletedRows = completedRows.ToImmutable() };
-                    terminalCode = saved.Code;
-                    break;
+                    completedRows.Add(ready);
+                    checkpoint = checkpoint with
+                    {
+                        CompletedRows = completedRows.ToImmutable(),
+                        SavedAtUtc = UtcNow(checkpoint.SavedAtUtc),
+                    };
+                    ReportCurrent(boundProgress, DurableEvaluationStage.SavingCheckpoint, references.Count, referenceTotal, completedRows.Count, rowTotal, completedRows.Count * perRowOperations + references.Count, operationTotal, SumInFlight(rowInFlight, rowInFlightGate), "SAVING_CHECKPOINT");
+                    CheckpointSaveResult saved = checkpointStore.Update(checkpoint, CancellationToken.None);
+                    if (!saved.IsSuccess)
+                    {
+                        completedRows.RemoveAt(completedRows.Count - 1);
+                        checkpoint = checkpoint with { CompletedRows = completedRows.ToImmutable() };
+                        terminalCode = saved.Code;
+                        rowCancellation.Cancel();
+                        break;
+                    }
+
+                    if (HasQuotaExhausted(ready))
+                    {
+                        rowCancellation.Cancel();
+                        break;
+                    }
+
+                    nextCheckpointRowIndex++;
                 }
+            }
+
+            if (rowCancellation.IsCancellationRequested && inFlightRows.Count > 0)
+            {
+                try { await Task.WhenAll(inFlightRows.Values).ConfigureAwait(false); }
+                catch { /* In-flight rows are discarded unless checkpointed as a contiguous prefix. */ }
             }
         }
 
@@ -940,6 +1016,19 @@ public sealed class DurableQuantificationOrchestrator
         + plan.Snapshot.Definition.Questions.Where(question => question.Enabled)
             .Sum(question => question.SpecialEvaluations.Count(special => special.Enabled))
         + plan.Snapshot.Definition.Questions.Count(question => question.Enabled));
+
+    private static int SumInFlight(Dictionary<int, int> rowInFlight, object gate)
+    {
+        lock (gate)
+        {
+            return rowInFlight.Values.Sum();
+        }
+    }
+
+    private static bool HasQuotaExhausted(CheckpointCompletedRow row) =>
+        row.NormalResults.Any(result => string.Equals(result.StatusCode, ResultsStatusCodes.QuotaExhausted, StringComparison.Ordinal))
+        || row.SpecialResults.Any(result => string.Equals(result.StatusCode, ResultsStatusCodes.QuotaExhausted, StringComparison.Ordinal))
+        || row.SimilarityResults.Any(result => string.Equals(result.StatusCode, ResultsStatusCodes.QuotaExhausted, StringComparison.Ordinal));
 
     private static Dictionary<string, string?> SelectCells(
         EvaluationRowData row,
