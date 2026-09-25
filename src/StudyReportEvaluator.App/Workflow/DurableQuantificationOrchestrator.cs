@@ -197,6 +197,7 @@ public sealed class DurableQuantificationOrchestrator
         ArgumentNullException.ThrowIfNull(run.WorkbookMetadata);
         ArgumentException.ThrowIfNullOrWhiteSpace(run.InputPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(run.ModelId);
+        EphemeralEvaluationRunner.ValidateReasoningEffort(run.ReasoningEffort);
         _ = new EvaluationSchedulerOptions(run.MaxConcurrency);
 
         Report(progress, DurableEvaluationStage.Preparing, 0, 0, 0, 0, 0, 0, 0, "PREPARING");
@@ -251,6 +252,8 @@ public sealed class DurableQuantificationOrchestrator
                 DefinitionCanonicalJson = snapshot.CanonicalJson,
                 DefinitionSha256 = snapshot.Sha256,
                 NormalModelId = run.ModelId,
+                ReferenceModelId = run.ModelId,
+                ReasoningEffort = run.ReasoningEffort,
                 Runtime = request.Runtime,
                 FinalPath = reservation.FinalPath,
                 PartialPath = reservation.PartialPath,
@@ -285,6 +288,7 @@ public sealed class DurableQuantificationOrchestrator
                 currentInput,
                 run.InputPath,
                 run.ModelId,
+                run.ReasoningEffort,
                 request.Runtime).BlockingStatusCode;
             if (admissionError is not null)
             {
@@ -333,6 +337,8 @@ public sealed class DurableQuantificationOrchestrator
                 snapshot,
                 question,
                 checkpoint.StartedAtUtc,
+                run.ModelId,
+                run.ReasoningEffort,
                 run.MaximumPromptTokens,
                 run.MaximumContextWindowTokens,
                 cancellationToken).ConfigureAwait(false);
@@ -377,6 +383,7 @@ public sealed class DurableQuantificationOrchestrator
                     sourceRow,
                     referencesByQuestion,
                     run.ModelId,
+                    run.ReasoningEffort,
                     run.MaxConcurrency,
                     run.MaximumPromptTokens,
                     run.MaximumContextWindowTokens,
@@ -501,6 +508,8 @@ public sealed class DurableQuantificationOrchestrator
         QuantificationSnapshot snapshot,
         QuestionDefinition question,
         DateTimeOffset startedAtUtc,
+        string modelId,
+        string? reasoningEffort,
         int? maximumPromptTokens,
         int? maximumContextWindowTokens,
         CancellationToken cancellationToken)
@@ -534,7 +543,7 @@ public sealed class DurableQuantificationOrchestrator
             }
 
             AuxiliaryOperationResult<ReferenceAnswerResult> result = await referenceRunner
-                .EvaluateAsync(payload, cancellationToken)
+                .EvaluateAsync(payload, modelId, reasoningEffort, cancellationToken)
                 .ConfigureAwait(false);
             DateTimeOffset generatedAtUtc = UtcNow(startedAtUtc);
             if (!result.IsSuccess)

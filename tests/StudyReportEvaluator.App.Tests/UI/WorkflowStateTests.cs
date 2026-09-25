@@ -963,6 +963,7 @@ public sealed class WorkflowStateTests
                 DefinitionCanonicalJson = snapshot.CanonicalJson,
                 DefinitionSha256 = snapshot.Sha256,
                 NormalModelId = Execution.SelectedModelId ?? "model-test",
+                ReferenceModelId = Execution.SelectedModelId ?? "model-test",
                 Runtime = new CheckpointRuntimeIdentity
                 {
                     ApplicationIdentity = QuantificationRunBoundary.ApplicationIdentity(),

@@ -103,6 +103,8 @@ public sealed record QuantificationRunRequest
 
     public required string ModelId { get; init; }
 
+    public string? ReasoningEffort { get; init; }
+
     /// null は SDK が当該 model の上限を公開していないことを表す。
     public int? MaximumPromptTokens { get; init; }
 

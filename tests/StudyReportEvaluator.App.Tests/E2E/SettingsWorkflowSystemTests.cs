@@ -310,7 +310,7 @@ public sealed class SettingsWorkflowSystemTests
 
             Assert.Equal(RuntimeFor(U04TestSupport.RuntimeIdentity()), saved.Runtime);
             Assert.Equal(ModelId, saved.NormalModelId);
-            Assert.Equal("auto", saved.ReferenceModelId);
+            Assert.Equal(ModelId, saved.ReferenceModelId);
             Assert.Equal(FixedUtc, saved.StartedAtUtc);
             Assert.Equal(JsonSerializer.Serialize(partial.References), JsonSerializer.Serialize(saved.References));
             Assert.Equal(JsonSerializer.Serialize(partial.CompletedRows), JsonSerializer.Serialize(saved.CompletedRows));

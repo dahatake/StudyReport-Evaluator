@@ -85,15 +85,18 @@ public interface IEvaluationRunner
 public sealed class EphemeralEvaluationRunnerAdapter : IEvaluationRunner
 {
     private readonly EphemeralEvaluationRunner runner;
+    private readonly string? reasoningEffort;
 
     public EphemeralEvaluationRunnerAdapter()
         : this(new EphemeralEvaluationRunner())
     {
     }
 
-    public EphemeralEvaluationRunnerAdapter(EphemeralEvaluationRunner runner)
+    public EphemeralEvaluationRunnerAdapter(EphemeralEvaluationRunner runner, string? reasoningEffort = null)
     {
         this.runner = runner ?? throw new ArgumentNullException(nameof(runner));
+        EphemeralEvaluationRunner.ValidateReasoningEffort(reasoningEffort);
+        this.reasoningEffort = reasoningEffort;
     }
 
     public async Task<EvaluationRunnerResult> EvaluateAsync(
@@ -102,7 +105,7 @@ public sealed class EphemeralEvaluationRunnerAdapter : IEvaluationRunner
         CancellationToken cancellationToken)
     {
         EphemeralEvaluationResult result = await runner
-            .EvaluateAsync(payload, modelId, cancellationToken)
+            .EvaluateAsync(payload, modelId, reasoningEffort, cancellationToken)
             .ConfigureAwait(false);
         return new EvaluationRunnerResult(
             result.StatusCode,

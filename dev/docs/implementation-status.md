@@ -1,5 +1,11 @@
 # Current implementation status
 
+## 2026-09-25 — run-level reasoning effortの統一
+
+- **方針**: run開始時に選択modelの対応effortから1つだけ解決し、Reference／通常評価／固有評価へ同じ値を指定する。既定希望は`low`。`none`はreasoningを無効化するため既定にはせず、非対応・`auto`・一覧にないmodelではrun全体を未指定（`null`）にする。
+- **実装**: effort解決を`ModelInfo`列挙＋希望値のpure functionへ分離した。参照回答は固定`auto`ではなくrunの選択modelを使い、checkpointの`ReferenceModelId`と`ReasoningEffort`、Run sheet、Reference sheet、ジョブログcontext／attemptへ記録する。再開時はmodel、ReferenceModelId、reasoning effortの一致を同じmodel条件として確認する。
+- **SDK確認**: SDK 1.0.11のREADMEは`SessionConfig.ReasoningEffort`を`low`/`medium`/`high`/`xhigh`/`max`等として記載し、`ListModelsAsync()`で対応可否を確認するよう説明している。XML docsはCAPI値がmodel-definedで、`none`はreasoningを無効化し、未指定ならoverrideしないこと、`ModelInfo.SupportedReasoningEfforts`と`DefaultReasoningEffort`を公開することを記載している。ローカルCLI probeは`CopilotClientFactory`が`CliUnavailable`を返したため、この環境では実model一覧の測定はできなかった。
+
 ## 2026-09-25 — schema不正の根本原因とreasoning effortの記録
 
 - **schema不正の原因**: 通常評価のtool引数を一時的な診断（commitしない）で記録したところ、schema不正はすべて`ROOT_MISSING_PROPERTY`で、claude-sonnet-5がroot `EvaluatorId`（アプリが知っている定数）を省略していた。同じPromptを直接SDKで送ると、省略は`medium`で10/30、effort未指定で2/30だった（`medium`で増えるが、未指定でも起きる）。proxyは関係なかった（proxyなしのアプリ通し実行でも7 attempt中3件）。

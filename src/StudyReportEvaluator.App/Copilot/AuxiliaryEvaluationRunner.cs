@@ -8,8 +8,6 @@ namespace StudyReportEvaluator.App.Copilot;
 
 public sealed class ReferenceAnswerEvaluationRunner
 {
-    public const string ModelId = "auto";
-
     private readonly IEphemeralCopilotTransportFactory transportFactory;
     private readonly AuxiliaryEvaluationSchemaFactory schemaFactory = new();
     private readonly RetryAndCleanupCoordinator coordinator;
@@ -33,11 +31,20 @@ public sealed class ReferenceAnswerEvaluationRunner
 
     public Task<EphemeralEvaluationResult<ReferenceAnswerResult>> EvaluateAsync(
         SafeReferenceAnswerPayload payload,
+        CancellationToken cancellationToken = default) =>
+        EvaluateAsync(payload, "auto", null, cancellationToken);
+
+    public Task<EphemeralEvaluationResult<ReferenceAnswerResult>> EvaluateAsync(
+        SafeReferenceAnswerPayload payload,
+        string modelId,
+        string? reasoningEffort = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(payload);
+        EphemeralEvaluationRunner.ValidateModelId(modelId);
+        EphemeralEvaluationRunner.ValidateReasoningEffort(reasoningEffort);
         return coordinator.ExecuteAuxiliaryAsync(
-            _ => CreateAttempt(payload),
+            _ => CreateAttempt(payload, modelId, reasoningEffort),
             options.AttemptTimeout,
             options.CleanupTimeout,
             options.MaxConcurrency,
@@ -45,15 +52,18 @@ public sealed class ReferenceAnswerEvaluationRunner
     }
 
     private IEphemeralEvaluationAttempt<ReferenceAnswerResult> CreateAttempt(
-        SafeReferenceAnswerPayload payload)
+        SafeReferenceAnswerPayload payload,
+        string modelId,
+        string? reasoningEffort)
     {
         SessionConfig config = schemaFactory.CreateReferenceSessionConfig(payload, out SubmitReferenceAnswerTool collector);
+        config.ReasoningEffort = reasoningEffort;
         return new CopilotAuxiliaryAttempt<ReferenceAnswerResult>(
             transportFactory.Create()
                 ?? throw new InvalidOperationException("The transport factory returned no transport."),
             config,
             payload.RenderedPrompt,
-            ModelId,
+            modelId,
             $"ref-{Guid.NewGuid():N}",
             () => collector.TryGetAcceptedResult(out ReferenceAnswerResult? result) ? result : null);
     }
@@ -85,12 +95,20 @@ public sealed class SpecialEvaluationRunner
     public Task<EphemeralEvaluationResult<SpecialQuantificationResult>> EvaluateAsync(
         SafeSpecialEvaluationPayload payload,
         string modelId,
+        CancellationToken cancellationToken = default) =>
+        EvaluateAsync(payload, modelId, null, cancellationToken);
+
+    public Task<EphemeralEvaluationResult<SpecialQuantificationResult>> EvaluateAsync(
+        SafeSpecialEvaluationPayload payload,
+        string modelId,
+        string? reasoningEffort = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(payload);
         EphemeralEvaluationRunner.ValidateModelId(modelId);
+        EphemeralEvaluationRunner.ValidateReasoningEffort(reasoningEffort);
         return coordinator.ExecuteAuxiliaryAsync(
-            _ => CreateAttempt(payload, modelId),
+            _ => CreateAttempt(payload, modelId, reasoningEffort),
             options.AttemptTimeout,
             options.CleanupTimeout,
             options.MaxConcurrency,
@@ -99,9 +117,11 @@ public sealed class SpecialEvaluationRunner
 
     private IEphemeralEvaluationAttempt<SpecialQuantificationResult> CreateAttempt(
         SafeSpecialEvaluationPayload payload,
-        string modelId)
+        string modelId,
+        string? reasoningEffort)
     {
         SessionConfig config = schemaFactory.CreateSpecialSessionConfig(payload, out SubmitSpecialQuantificationTool collector);
+        config.ReasoningEffort = reasoningEffort;
         return new CopilotAuxiliaryAttempt<SpecialQuantificationResult>(
             transportFactory.Create()
                 ?? throw new InvalidOperationException("The transport factory returned no transport."),

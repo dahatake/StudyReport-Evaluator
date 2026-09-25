@@ -168,7 +168,7 @@ Knowledgeの固定Promptは読取専用、Custom Promptは編集可能です。�
 実行画面の**モデル・並列度・実効出力先は読取専用**です。編集は**変更 → 設定の共通**で行います。認証確認・login、新規／再開、開始・cancelは実行画面に残っています。
 
 1. **Copilot 状態を確認**を明示的に選びます。未認証なら、候補版の**GitHubにログイン**で同梱native CLIのconsole／ブラウザーを開き、本人が対話loginします。完了・取消・失敗後は同じ状態確認buttonで再確認してください。processの起動・終了だけを認証成功とは扱いません。
-2. **変更 → 共通**で、列挙された通常モデル、並列度（1〜3、既定1）、指定出力先を確認・変更します。保存希望modelが利用不可なら未選択のままで、別modelへfallbackしません。Reference／Similarityの固定`auto`は通常モデルと別に利用可否を確認し、未確認・利用不可のまま開始しません。
+2. **変更 → 共通**で、列挙された通常モデル、並列度（1〜3、既定1）、指定出力先を確認・変更します。保存希望modelが利用不可なら未選択のままで、別modelへfallbackしません。Reference／通常評価／固有評価は同じ通常モデルとrun-level reasoning effort（既定希望`low`、非対応時は未指定）を使います。Similarityは固定`auto`です。
 3. **設定から戻る**で実効値と新規／checkpoint再開を確認します。再開する場合は既存の`.partial.xlsx`を指定します。
 4. 技術検証を通過したら**定量化を開始**を選びます。予約された出力pathの表示だけではfile作成・保存成功を意味しません。
 
@@ -238,7 +238,7 @@ Final scoreはFinal rawを0〜100へ収めた表示用の値です。
 - final: `eval-yyyyMMdd-HHmm[-NN].xlsx`
 - partial: `eval-yyyyMMdd-HHmm[-NN].partial.xlsx`
 
-既存final/partialがある場合は、共通の次suffixを使って上書きを避けます。参照回答の完了ごと・回答行の完了ごとにcheckpointを保存します。cancelまたはprocess終了後は、実行画面で**checkpoint から再開**を選び、入力・定義・model・runtimeの照合後に保存済み参照回答と完了行を再利用します。処理途中の行は完了扱いにせず、最初の未完了行から続けます。再開時はcheckpoint内の予約pathを使い、新規run用の出力先で置き換えません。
+既存final/partialがある場合は、共通の次suffixを使って上書きを避けます。参照回答の完了ごと・回答行の完了ごとにcheckpointを保存します。cancelまたはprocess終了後は、実行画面で**checkpoint から再開**を選び、入力・定義・model・reasoning effort・runtimeの照合後に保存済み参照回答と完了行を再利用します。処理途中の行は完了扱いにせず、最初の未完了行から続けます。再開時はcheckpoint内の予約pathを使い、新規run用の出力先で置き換えません。
 
 finalの保存成功後はpartialを削除します。partialの削除だけが失敗した場合は完成版を無効にせず、cleanup警告と残存pathを表示します。
 

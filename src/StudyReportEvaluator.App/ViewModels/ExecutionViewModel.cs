@@ -167,7 +167,8 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
             var usageContext = new JobUsageContext(
                 assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
                 request.RuntimeIdentity?.SdkInformationalVersion, request.RuntimeIdentity?.CliVersion,
-                request.ModelId, request.MaxConcurrency, request.ResumePartialPath is not null);
+                request.ModelId, request.MaxConcurrency, request.ResumePartialPath is not null,
+                requestedReasoningEffort: request.ReasoningEffort);
             await using JobUsageTracker usage = new(costChanged, context: usageContext);
             string status = "RUN_FAILED";
             try
@@ -205,7 +206,7 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
         EphemeralEvaluationRunner runner = new(
             new SdkEphemeralCopilotTransportFactory(new CopilotClientFactory(), usage, UsageOperation.Normal),
             runnerOptions);
-        EphemeralEvaluationRunnerAdapter normalRunner = new(runner);
+        EphemeralEvaluationRunnerAdapter normalRunner = new(runner, request.ReasoningEffort);
         if (!request.UseDurableWorkflow)
         {
             QuantificationOrchestrator orchestrator = new(rowSource, normalRunner);
@@ -558,6 +559,18 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
             ? $"{limit.ToString("N0", CultureInfo.InvariantCulture)} tokens"
             : "SDK未公開・事前検証なし";
 
+    public string? SelectedModelReasoningEffort =>
+        SelectedModelId is string id && modelsById.TryGetValue(id, out CopilotModelAvailability? model)
+            ? ReasoningEffortPolicy.ResolveReasoningEffort(
+                [model.ToModelInfo()],
+                id,
+                ReasoningEffortPolicy.DefaultPreferredReasoningEffort)
+            : null;
+
+    public string SelectedModelReasoningEffortText => SelectedModelId is null
+        ? "未選択"
+        : SelectedModelReasoningEffort ?? "未指定（model非対応またはauto）";
+
     public string AuthenticationStatusText => AuthenticationState switch
     {
         ExecutionAuthenticationState.NotChecked => "Copilot CLI の login 状態は未確認です。",
@@ -873,6 +886,10 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
     public string? CurrentRunModelId => currentRunRequest?.ModelId;
 
     public int? CurrentRunMaxConcurrency => currentRunRequest?.MaxConcurrency;
+
+    public string? CurrentRunReasoningEffortText => currentRunRequest is null
+        ? null
+        : currentRunRequest.ReasoningEffort ?? "未指定（model非対応またはauto）";
 
     public string? CurrentRunLimitText => currentRunRequest is null
         ? null
@@ -1399,6 +1416,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
             WorkbookMetadata = workbookMetadata,
             InputPath = runInputPath,
             ModelId = runModelId,
+            ReasoningEffort = SelectedModelReasoningEffort,
             MaximumPromptTokens = runModel.EffectivePromptTokenLimit,
             MaximumContextWindowTokens = runModel.EffectivePromptTokenLimit is null
                 ? null
@@ -1460,6 +1478,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 nameof(HasCurrentRun),
                 nameof(CurrentRunModelId),
                 nameof(CurrentRunMaxConcurrency),
+                nameof(CurrentRunReasoningEffortText),
                 nameof(CurrentRunLimitText),
                 nameof(CurrentRunOutputSummary));
             Revalidate();
@@ -1703,7 +1722,9 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 OnPropertyChanged(nameof(SelectedModelId));
                 OnPropertiesChanged(
                     nameof(SelectedModelPromptTokenLimit),
-                    nameof(SelectedModelLimitText));
+                    nameof(SelectedModelLimitText),
+                    nameof(SelectedModelReasoningEffort),
+                    nameof(SelectedModelReasoningEffortText));
             }
         }
         finally
@@ -1730,6 +1751,8 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 nameof(SelectedModelId),
                 nameof(SelectedModelPromptTokenLimit),
                 nameof(SelectedModelLimitText),
+                nameof(SelectedModelReasoningEffort),
+                nameof(SelectedModelReasoningEffortText),
                 nameof(RuntimeIdentityText));
         }
         finally
@@ -1780,6 +1803,8 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 nameof(SelectedModelId),
                 nameof(SelectedModelPromptTokenLimit),
                 nameof(SelectedModelLimitText),
+                nameof(SelectedModelReasoningEffort),
+                nameof(SelectedModelReasoningEffortText),
                 nameof(RuntimeIdentityText));
         }
         finally
@@ -2139,7 +2164,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
             AddError(errors, new ExecutionTechnicalError(
                 "AUTO_MODEL_UNAVAILABLE",
                 "Model",
-                "参照回答生成と類似度評価に必要な model ID auto を利用できないため、run を開始できません。Copilot 状態を再確認してください。"));
+                "類似度評価に必要な model ID auto を利用できないため、run を開始できません。Copilot 状態を再確認してください。"));
         }
 
         if (runtimeErrorCode is not null)

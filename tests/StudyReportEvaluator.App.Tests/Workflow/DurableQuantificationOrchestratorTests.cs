@@ -702,6 +702,7 @@ public sealed class DurableQuantificationOrchestratorTests
             DefinitionCanonicalJson = snapshot.CanonicalJson,
             DefinitionSha256 = snapshot.Sha256,
             NormalModelId = "model-test",
+            ReferenceModelId = "model-test",
             Runtime = runtime,
             FinalPath = "C:\\PRIVATE\\result\\eval-20260902-1435.xlsx",
             PartialPath = "C:\\PRIVATE\\result\\eval-20260902-1435.partial.xlsx",

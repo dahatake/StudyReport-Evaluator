@@ -120,13 +120,21 @@ public sealed class EphemeralEvaluationRunner
     public Task<EphemeralEvaluationResult> EvaluateAsync(
         SafeEvaluationPayload payload,
         string modelId,
+        CancellationToken cancellationToken = default) =>
+        EvaluateAsync(payload, modelId, reasoningEffort: null, cancellationToken);
+
+    public Task<EphemeralEvaluationResult> EvaluateAsync(
+        SafeEvaluationPayload payload,
+        string modelId,
+        string? reasoningEffort,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(payload);
         ValidateModelId(modelId);
+        ValidateReasoningEffort(reasoningEffort);
 
         return _coordinator.ExecuteAsync(
-            _ => CreateAttempt(payload, modelId),
+            _ => CreateAttempt(payload, modelId, reasoningEffort),
             _options.AttemptTimeout,
             _options.CleanupTimeout,
             _options.MaxConcurrency,
@@ -135,7 +143,8 @@ public sealed class EphemeralEvaluationRunner
 
     private IEphemeralEvaluationAttempt CreateAttempt(
         SafeEvaluationPayload payload,
-        string modelId)
+        string modelId,
+        string? reasoningEffort)
     {
         IEphemeralCopilotTransport transport = _transportFactory.Create()
             ?? throw new InvalidOperationException("The transport factory returned no transport.");
@@ -144,6 +153,7 @@ public sealed class EphemeralEvaluationRunner
             _schemaFactory,
             payload,
             modelId,
+            reasoningEffort,
             CreateSessionId());
     }
 
@@ -158,6 +168,15 @@ public sealed class EphemeralEvaluationRunner
             || modelId.Any(char.IsControl))
         {
             throw new ArgumentException("The model ID is invalid.", nameof(modelId));
+        }
+    }
+
+    internal static void ValidateReasoningEffort(string? reasoningEffort)
+    {
+        if (reasoningEffort is not null
+            && !ReasoningEffortPolicy.IsSafeReasoningEffort(reasoningEffort))
+        {
+            throw new ArgumentException("The reasoning effort value is invalid.", nameof(reasoningEffort));
         }
     }
 }
@@ -177,6 +196,7 @@ internal sealed class CopilotEvaluationAttempt : IEphemeralEvaluationAttempt
         EvaluationSchemaFactory schemaFactory,
         SafeEvaluationPayload payload,
         string modelId,
+        string? reasoningEffort,
         string sessionId)
     {
         ArgumentNullException.ThrowIfNull(transport);
@@ -189,6 +209,7 @@ internal sealed class CopilotEvaluationAttempt : IEphemeralEvaluationAttempt
         _sessionConfig = schemaFactory.CreateSessionConfig(payload, out _collector);
         _sessionConfig.SessionId = sessionId;
         _sessionConfig.Model = modelId;
+        _sessionConfig.ReasoningEffort = reasoningEffort;
         _messageOptions = new MessageOptions
         {
             Prompt = payload.RenderedPrompt,
@@ -347,8 +368,6 @@ internal sealed class SdkEphemeralCopilotTransportFactory : IEphemeralCopilotTra
 
 internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
 {
-    internal const string MediumReasoningEffort = "medium";
-
     private readonly ICopilotClientFactory _clientFactory;
     private readonly JobUsageTracker? _usageTracker;
     private readonly UsageOperation _operation;
@@ -419,11 +438,11 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
         return TranslateAsync<IEphemeralCopilotSession>(async () =>
         {
             CopilotClient client = GetClient();
-            config.ReasoningEffort = string.Equals(config.Model, "auto", StringComparison.Ordinal)
-                ? null
-                : ResolveReasoningEffort(
-                    await client.ListModelsAsync(cancellationToken).ConfigureAwait(false),
-                    config.Model);
+            if (string.Equals(config.Model, "auto", StringComparison.Ordinal))
+            {
+                config.ReasoningEffort = null;
+            }
+
             CopilotSession session = await client
                 .CreateSessionAsync(config, cancellationToken)
                 .ConfigureAwait(false);
@@ -461,16 +480,11 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
         Volatile.Read(ref _client)
         ?? throw new EvaluationFatalException();
 
-    // The runtime rejects session creation when a reasoning effort is sent to `auto` or to a model without support.
-    internal static string? ResolveReasoningEffort(IEnumerable<ModelInfo>? models, string? modelId)
-    {
-        ModelInfo? model = models?.FirstOrDefault(
-            candidate => candidate is not null && string.Equals(candidate.Id, modelId, StringComparison.Ordinal));
-        return model?.Capabilities?.Supports?.ReasoningEffort == true
-            && model.SupportedReasoningEfforts?.Contains(MediumReasoningEffort, StringComparer.Ordinal) == true
-            ? MediumReasoningEffort
-            : null;
-    }
+    internal static string? ResolveReasoningEffort(
+        IEnumerable<ModelInfo>? models,
+        string? modelId,
+        string? preferredEffort = null) =>
+        ReasoningEffortPolicy.ResolveReasoningEffort(models, modelId, preferredEffort);
 
     private static async Task TranslateAsync(Func<Task> operation)
     {

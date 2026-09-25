@@ -456,6 +456,7 @@ public sealed class CheckpointStore : ICheckpointStore
             || !string.Equals(previous.DefinitionSha256, next.DefinitionSha256, StringComparison.Ordinal)
             || !string.Equals(previous.NormalModelId, next.NormalModelId, StringComparison.Ordinal)
             || !string.Equals(previous.ReferenceModelId, next.ReferenceModelId, StringComparison.Ordinal)
+            || !string.Equals(previous.ReasoningEffort, next.ReasoningEffort, StringComparison.Ordinal)
             || !string.Equals(
                 CheckpointPayloadCodec.SerializeValue(previous.Runtime),
                 CheckpointPayloadCodec.SerializeValue(next.Runtime),

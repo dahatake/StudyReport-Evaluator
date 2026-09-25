@@ -51,11 +51,34 @@ public sealed class DurableEvaluationScheduler
         normalScheduler = new EvaluationScheduler(rowSource, normalRunner);
     }
 
+    public Task<DurableRowEvaluationResult> EvaluateRowAsync(
+        EvaluationPlan plan,
+        int sourceRowNumber,
+        IReadOnlyDictionary<string, CheckpointReference> references,
+        string modelId,
+        int maxConcurrency,
+        int? maximumPromptTokens = null,
+        int? maximumContextWindowTokens = null,
+        Action<int>? inFlightChanged = null,
+        CancellationToken cancellationToken = default) =>
+        EvaluateRowAsync(
+            plan,
+            sourceRowNumber,
+            references,
+            modelId,
+            reasoningEffort: null,
+            maxConcurrency,
+            maximumPromptTokens,
+            maximumContextWindowTokens,
+            inFlightChanged,
+            cancellationToken);
+
     public async Task<DurableRowEvaluationResult> EvaluateRowAsync(
         EvaluationPlan plan,
         int sourceRowNumber,
         IReadOnlyDictionary<string, CheckpointReference> references,
         string modelId,
+        string? reasoningEffort,
         int maxConcurrency,
         int? maximumPromptTokens = null,
         int? maximumContextWindowTokens = null,
@@ -65,6 +88,7 @@ public sealed class DurableEvaluationScheduler
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(references);
         ArgumentException.ThrowIfNullOrWhiteSpace(modelId);
+        EphemeralEvaluationRunner.ValidateReasoningEffort(reasoningEffort);
         _ = new EvaluationSchedulerOptions(maxConcurrency);
         if (sourceRowNumber < plan.Mapping.FirstDataRow
             || sourceRowNumber > plan.Mapping.LastDataRow)
@@ -154,6 +178,7 @@ public sealed class DurableEvaluationScheduler
                     special,
                     row,
                     modelId,
+                    reasoningEffort,
                     maximumPromptTokens,
                     maximumContextWindowTokens,
                     cancellationToken).ConfigureAwait(false);
@@ -239,6 +264,7 @@ public sealed class DurableEvaluationScheduler
         SpecialEvaluationDefinition special,
         EvaluationRowData row,
         string modelId,
+        string? reasoningEffort,
         int? maximumPromptTokens,
         int? maximumContextWindowTokens,
         CancellationToken cancellationToken)
@@ -286,7 +312,7 @@ public sealed class DurableEvaluationScheduler
             }
 
             AuxiliaryOperationResult<SpecialQuantificationResult> result = await specialRunner
-                .EvaluateAsync(payload, modelId, cancellationToken)
+                .EvaluateAsync(payload, modelId, reasoningEffort, cancellationToken)
                 .ConfigureAwait(false);
             if (!result.IsSuccess)
             {

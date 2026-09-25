@@ -1450,6 +1450,7 @@ public sealed class ExecutionSettingsTests
                 DefinitionCanonicalJson = snapshot.CanonicalJson,
                 DefinitionSha256 = snapshot.Sha256,
                 NormalModelId = harness.ViewModel.SelectedModelId ?? "model-a",
+                ReferenceModelId = harness.ViewModel.SelectedModelId ?? "model-a",
                 Runtime = new CheckpointRuntimeIdentity
                 {
                     ApplicationIdentity = QuantificationRunBoundary.ApplicationIdentity(),

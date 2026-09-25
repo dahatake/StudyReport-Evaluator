@@ -246,14 +246,14 @@ public sealed class EphemeralEvaluationRunnerTests
     }
 
     [Theory]
-    [InlineData("claude-sonnet-5", "medium")]
-    [InlineData("gpt-5.5", "medium")]
+    [InlineData("claude-sonnet-5", "low")]
+    [InlineData("gpt-5.5", "low")]
     [InlineData("auto", null)]
     [InlineData("claude-haiku-4.5", null)]
     [InlineData("listless", null)]
-    [InlineData("high-only", null)]
+    [InlineData("high-only", "high")]
     [InlineData("not-listed", null)]
-    public void Reasoning_effort_is_medium_only_for_models_that_support_it(string modelId, string? expected)
+    public void Reasoning_effort_prefers_low_and_falls_back_to_nearest_supported_value(string modelId, string? expected)
     {
         static ModelInfo Model(string id, bool supports, params string[]? efforts) => new()
         {
@@ -272,6 +272,7 @@ public sealed class EphemeralEvaluationRunnerTests
         ];
 
         Assert.Equal(expected, SdkEphemeralCopilotTransport.ResolveReasoningEffort(models, modelId));
+        Assert.Equal("medium", SdkEphemeralCopilotTransport.ResolveReasoningEffort(models, "claude-sonnet-5", "medium"));
     }
 
     [Theory]

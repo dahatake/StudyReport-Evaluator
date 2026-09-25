@@ -44,7 +44,7 @@ public sealed class CheckpointStoreTests
         Assert.Equal(envelope.DefinitionCanonicalJson, actual.DefinitionCanonicalJson);
         Assert.Equal(envelope.DefinitionSha256, actual.DefinitionSha256);
         Assert.Equal(envelope.NormalModelId, actual.NormalModelId);
-        Assert.Equal("auto", actual.ReferenceModelId);
+        Assert.Equal(envelope.ReferenceModelId, actual.ReferenceModelId);
         Assert.Equal(envelope.FinalPath, actual.FinalPath);
         Assert.Equal(envelope.PartialPath, actual.PartialPath);
         Assert.Empty(actual.References);
@@ -619,6 +619,7 @@ public sealed class CheckpointStoreTests
             DefinitionCanonicalJson = snapshot.CanonicalJson,
             DefinitionSha256 = snapshot.Sha256,
             NormalModelId = "model-test",
+            ReferenceModelId = "model-test",
             Runtime = new CheckpointRuntimeIdentity
             {
                 ApplicationIdentity = "StudyReportEvaluator.App/4.0.0",

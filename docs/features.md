@@ -55,14 +55,14 @@
 
 | 処理 | 入力 | Model | 出力 |
 |---|---|---|---|
-| Reference | 設問text | `auto` | 設問ごとの参照回答 |
+| Reference | 設問text | 利用者選択 | 設問ごとの参照回答 |
 | Normal | 同じrowの主回答・選択済み補助列 | 利用者選択 | criterion別raw、reason、evidence、source |
 | Special | 同じrowの固有評価主値・選択済み補助列 | 利用者選択 | 0〜1、reason、evidence、source |
 | Similarity | 同じrowの主回答と同じ設問の参照回答 | `auto` | 0〜1の類似度とreason |
 
 Referenceは1Questionにつき1runで1回生成し、同じrunの全rowで共有します。checkpointから再開すると保存済みReferenceを再利用します。
 
-NormalとSpecialの「利用者選択」には`auto`も選べます。`auto`はrouterのためSDKがtoken上限を公開せず、その場合はmodel相対の容量検査を行いません。実際にroutingされたmodelは通常の実行記録には保存されません。コスト内訳でSDKが報告したモデルは匿名化した識別子だけを表示・記録します。
+Reference、Normal、Specialの「利用者選択」には`auto`も選べます。`auto`はrouterのためSDKがtoken上限を公開せず、その場合はmodel相対の容量検査を行いません。実際にroutingされたmodelは通常の実行記録には保存されません。コスト内訳でSDKが報告したモデルは匿名化した識別子だけを表示・記録します。
 
 ## ジョブごとのコスト観測
 
@@ -74,7 +74,7 @@ AIへBase points、Question earned、Special earned、Similarity penalty、Final
 
 ## 実行設定と出力先
 
-通常モデル、並列度（1〜3）、指定出力先の利用者編集は**設定 → 共通**で行います。実行画面には次回の実効値と、今回／前回runの開始時に固定した値を分けて表示します。Reference／Similarityのmodelは固定の`auto`です。
+通常モデル、並列度（1〜3）、指定出力先の利用者編集は**設定 → 共通**で行います。実行画面には次回の実効値と、今回／前回runの開始時に固定した値を分けて表示します。Reference／Normal／Specialはrun開始時の通常モデルと同じreasoning effort（既定希望`low`、非対応時は未指定）を使います。Similarityは固定の`auto`です。
 
 - 共通設定は、今回の明示編集、保存済み設定、既定値の順で使います。**Copilot 状態を確認**で利用可能modelを確認し、保存希望IDが使えない場合は別modelへ自動変更せず、共通設定で選び直します。
 - 明示した出力先は別の入力Excelへ変更しても保持します。保存済みなら再起動後も復元します。入力が未選択になっても明示指定は失われません。
@@ -210,9 +210,9 @@ partial削除だけが失敗した場合、validなfinalは無効になりませ
 | Sheet | 内容 |
 |---|---|
 | `Quantification_Config` | definition snapshot、配点、Prompt、mapping、range |
-| `Quantification_References` | 設問、参照回答、model、status、時刻 |
+| `Quantification_References` | 設問、参照回答、model、reasoning effort、status、時刻 |
 | `Quantification_Results` | row別raw、reason、evidence、status、formula、Final score |
-| `Quantification_Run` | input/definition/runtime identity、時刻、件数、観測usage |
+| `Quantification_Run` | input/definition/runtime identity、model、reasoning effort、時刻、件数、観測usage |
 
 入力に同名sheetがある場合、既存sheetを保持して新しいsheetに` (2)`等を付けます。formula cellにはapp previewのcached valueを保存し、formula対応spreadsheetで開いた際にfull calculationを要求する設定を入れます。
 

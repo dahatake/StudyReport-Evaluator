@@ -69,6 +69,13 @@ public interface IReferenceAnswerOperationRunner
     Task<AuxiliaryOperationResult<ReferenceAnswerResult>> EvaluateAsync(
         SafeReferenceAnswerPayload payload,
         CancellationToken cancellationToken);
+
+    Task<AuxiliaryOperationResult<ReferenceAnswerResult>> EvaluateAsync(
+        SafeReferenceAnswerPayload payload,
+        string modelId,
+        string? reasoningEffort,
+        CancellationToken cancellationToken) =>
+        EvaluateAsync(payload, cancellationToken);
 }
 
 public interface ISpecialEvaluationOperationRunner
@@ -77,6 +84,13 @@ public interface ISpecialEvaluationOperationRunner
         SafeSpecialEvaluationPayload payload,
         string modelId,
         CancellationToken cancellationToken);
+
+    Task<AuxiliaryOperationResult<SpecialQuantificationResult>> EvaluateAsync(
+        SafeSpecialEvaluationPayload payload,
+        string modelId,
+        string? reasoningEffort,
+        CancellationToken cancellationToken) =>
+        EvaluateAsync(payload, modelId, cancellationToken);
 }
 
 public interface ISimilarityEvaluationOperationRunner
@@ -97,10 +111,17 @@ public sealed class ReferenceAnswerOperationRunnerAdapter : IReferenceAnswerOper
 
     public async Task<AuxiliaryOperationResult<ReferenceAnswerResult>> EvaluateAsync(
         SafeReferenceAnswerPayload payload,
+        CancellationToken cancellationToken) =>
+        await EvaluateAsync(payload, "auto", null, cancellationToken).ConfigureAwait(false);
+
+    public async Task<AuxiliaryOperationResult<ReferenceAnswerResult>> EvaluateAsync(
+        SafeReferenceAnswerPayload payload,
+        string modelId,
+        string? reasoningEffort,
         CancellationToken cancellationToken)
     {
         EphemeralEvaluationResult<ReferenceAnswerResult> result = await runner
-            .EvaluateAsync(payload, cancellationToken)
+            .EvaluateAsync(payload, modelId, reasoningEffort, cancellationToken)
             .ConfigureAwait(false);
         return new AuxiliaryOperationResult<ReferenceAnswerResult>(
             result.StatusCode,
@@ -122,10 +143,17 @@ public sealed class SpecialEvaluationOperationRunnerAdapter : ISpecialEvaluation
     public async Task<AuxiliaryOperationResult<SpecialQuantificationResult>> EvaluateAsync(
         SafeSpecialEvaluationPayload payload,
         string modelId,
+        CancellationToken cancellationToken) =>
+        await EvaluateAsync(payload, modelId, null, cancellationToken).ConfigureAwait(false);
+
+    public async Task<AuxiliaryOperationResult<SpecialQuantificationResult>> EvaluateAsync(
+        SafeSpecialEvaluationPayload payload,
+        string modelId,
+        string? reasoningEffort,
         CancellationToken cancellationToken)
     {
         EphemeralEvaluationResult<SpecialQuantificationResult> result = await runner
-            .EvaluateAsync(payload, modelId, cancellationToken)
+            .EvaluateAsync(payload, modelId, reasoningEffort, cancellationToken)
             .ConfigureAwait(false);
         return new AuxiliaryOperationResult<SpecialQuantificationResult>(
             result.StatusCode,

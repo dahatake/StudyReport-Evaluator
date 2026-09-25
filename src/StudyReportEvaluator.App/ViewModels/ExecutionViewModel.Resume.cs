@@ -56,11 +56,12 @@ public sealed partial class ExecutionViewModel
     private sealed record ResumeValidationIdentity(
         QuantificationDefinition? Definition, WorkbookMetadata? Metadata, string InputPath,
         string? ModelId, CopilotRuntimeIdentity? Runtime, ExecutionAuthenticationState Authentication,
-        string PartialPath, bool ResumeMode, int Concurrency, string? OutputDirectory);
+        string PartialPath, bool ResumeMode, int Concurrency, string? OutputDirectory,
+        string? ReasoningEffort);
 
     private ResumeValidationIdentity CaptureResumeIdentity() => new(
         definition, workbookMetadata, inputPath, selectedModelId, runtimeIdentity, AuthenticationState,
-        resumePartialPath, isResumeMode, maxConcurrency, outputDirectoryOverride);
+        resumePartialPath, isResumeMode, maxConcurrency, outputDirectoryOverride, SelectedModelReasoningEffort);
 
     public async Task PrepareResumeAsync(CancellationToken cancellationToken = default)
     {
@@ -126,7 +127,8 @@ public sealed partial class ExecutionViewModel
                 }
                 : null;
             ResumeAdmissionReport report = ResumeAdmissionEvaluator.Evaluate(loaded.Envelope,
-                identity.PartialPath, snapshot, plan, input, identity.InputPath, identity.ModelId, runtime);
+                identity.PartialPath, snapshot, plan, input, identity.InputPath, identity.ModelId,
+                identity.ReasoningEffort, runtime);
             if (!IsCurrentResumeInspection(sequence, identity)) return;
             resumeReport = report;
             validatedResumeIdentity = identity;

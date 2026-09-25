@@ -59,6 +59,43 @@ public sealed class ResumeAdmissionEvaluatorTests
     }
 
     [Theory]
+    [InlineData("low", "low", "model-test", true)]
+    [InlineData("low", "medium", "model-test", false)]
+    [InlineData("low", "low", "auto", false)]
+    public void Reasoning_effort_and_reference_model_are_part_of_resume_model_identity(
+        string? savedEffort,
+        string? requestedEffort,
+        string referenceModelId,
+        bool expectedCanResume)
+    {
+        QuantificationDefinition definition = Definition();
+        QuantificationSnapshot snapshot = QuantificationSnapshot.Create(definition);
+        EvaluationPlan plan = new EvaluationPlanBuilder().Build(
+            snapshot,
+            U01TestSupport.ValidateMapping(definition).Mapping!);
+        InputSnapshot input = new(new string('A', 64), 123, DateTimeOffset.UnixEpoch);
+        CheckpointRuntimeIdentity runtime = Runtime();
+        CheckpointEnvelope checkpoint = Envelope(snapshot, input, runtime) with
+        {
+            ReferenceModelId = referenceModelId,
+            ReasoningEffort = savedEffort,
+        };
+
+        ResumeAdmissionReport report = ResumeAdmissionEvaluator.Evaluate(
+            checkpoint, checkpoint.PartialPath, snapshot, plan, input,
+            checkpoint.InputPath, checkpoint.NormalModelId, requestedEffort, runtime);
+
+        Assert.Equal(expectedCanResume, report.CanResume);
+        ResumeAdmissionFinding model = Assert.Single(report.Findings,
+            finding => finding.Item == ResumeAdmissionItem.NormalModel);
+        Assert.Equal(expectedCanResume, model.IsSatisfied);
+        if (!expectedCanResume)
+        {
+            Assert.Equal(CheckpointAdmissionStatusCodes.ModelMismatch, report.BlockingStatusCode);
+        }
+    }
+
+    [Theory]
     [InlineData(nameof(ResumeAdmissionItem.PartialPath), CheckpointAdmissionStatusCodes.InputMismatch)]
     [InlineData(nameof(ResumeAdmissionItem.InputIdentity), CheckpointAdmissionStatusCodes.InputMismatch)]
     [InlineData(nameof(ResumeAdmissionItem.NormalModel), CheckpointAdmissionStatusCodes.ModelMismatch)]
@@ -241,6 +278,7 @@ public sealed class ResumeAdmissionEvaluatorTests
         DefinitionCanonicalJson = snapshot.CanonicalJson,
         DefinitionSha256 = snapshot.Sha256,
         NormalModelId = "model-test",
+        ReferenceModelId = "model-test",
         Runtime = runtime,
         FinalPath = "C:\\result\\eval.xlsx",
         PartialPath = "C:\\result\\eval.partial.xlsx",

@@ -415,6 +415,7 @@ public sealed class ResumeWorkflowTests
                 InputPath = Workbook.Path, Input = input,
                 DefinitionCanonicalJson = snapshot.CanonicalJson, DefinitionSha256 = snapshot.Sha256,
                 NormalModelId = "model-test",
+                ReferenceModelId = "model-test",
                 Runtime = new CheckpointRuntimeIdentity
                 {
                     ApplicationIdentity = QuantificationRunBoundary.ApplicationIdentity(),

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 using System.Threading.Channels;
+using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Logging;
 
 namespace StudyReportEvaluator.App.Usage;
@@ -109,8 +110,10 @@ public sealed class JobUsageTracker : IAsyncDisposable
                 ModelsTruncated = modelsTruncated,
                 RequestedModelKey = observation.RequestedModelKey is null ? null
                     : ModelUsageSnapshot.SafeKey(observation.RequestedModelKey),
-                // Persist only the effort value the app sends, never arbitrary caller text.
-                RequestedReasoningEffort = observation.RequestedReasoningEffort is "medium" ? "medium" : null,
+                // Persist only safe effort identifiers the app sends, never arbitrary caller text.
+                RequestedReasoningEffort = ReasoningEffortPolicy.IsSafeReasoningEffort(observation.RequestedReasoningEffort)
+                    ? observation.RequestedReasoningEffort
+                    : null,
                 // Null stays null: an absent map identifies a legacy caller, not a complete one.
                 MetricProvenance = observation.MetricProvenance is null ? null
                     : UsageProvenance.Sanitize(metrics, observation.MetricProvenance),
