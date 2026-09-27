@@ -263,7 +263,12 @@ public sealed class ResultsOutputViewTests
                 cancellationToken: TestContext.Current.CancellationToken);
         string finalPath = Path.Combine(workbook.Directory, "quantified.xlsx");
         ResultsOutputBoundary output = new();
-        ExecutionRunContext context = U04TestSupport.Context(summary, workbook.Path);
+        ExecutionRunContext context = new(
+            summary,
+            workbook.Path,
+            "model-test",
+            U04TestSupport.RuntimeIdentity(),
+            reasoningEffort: "low");
 
         Assert.True(output.AssessPath(workbook.Path, finalPath).IsValid);
         ResultsOutputResult result = await output.ExportAsync(
@@ -297,7 +302,27 @@ public sealed class ResultsOutputViewTests
         Assert.NotEmpty(outputPart.WorksheetParts.SelectMany(part =>
             (part.Worksheet ?? throw new InvalidDataException("An output worksheet is missing."))
                 .Descendants<CellFormula>()));
+        // References and Run sheets record the run model and run-level effort, not a fixed auto.
+        Assert.Equal("ModelId", InlineText(outputPart, sheets, AppOwnedSheetNameResolver.ReferencesBaseName, "D1"));
+        Assert.Equal("model-test", InlineText(outputPart, sheets, AppOwnedSheetNameResolver.ReferencesBaseName, "D2"));
+        Assert.Equal("ReasoningEffort", InlineText(outputPart, sheets, AppOwnedSheetNameResolver.ReferencesBaseName, "H1"));
+        Assert.Equal("low", InlineText(outputPart, sheets, AppOwnedSheetNameResolver.ReferencesBaseName, "H2"));
+        Worksheet runSheet = ((WorksheetPart)outputPart.GetPartById(sheets
+                .Single(sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.RunBaseName).Id!.Value!))
+            .Worksheet!;
+        Row effortRow = runSheet.Descendants<Row>().Single(row => row.Elements<Cell>()
+            .Any(cell => cell.InlineString?.InnerText == "ReasoningEffort"));
+        Assert.Contains(effortRow.Elements<Cell>(), cell => cell.InlineString?.InnerText == "low");
         Assert.DoesNotContain(workbook.Path, result.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? InlineText(WorkbookPart part, Sheet[] sheets, string sheetName, string reference)
+    {
+        Sheet sheet = sheets.Single(item => item.Name?.Value == sheetName);
+        Worksheet worksheet = ((WorksheetPart)part.GetPartById(sheet.Id!.Value!)).Worksheet!;
+        return worksheet.Descendants<Cell>()
+            .SingleOrDefault(cell => cell.CellReference?.Value == reference)?
+            .InlineString?.InnerText;
     }
 
     [Fact]

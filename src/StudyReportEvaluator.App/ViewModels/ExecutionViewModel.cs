@@ -334,7 +334,8 @@ public sealed class ExecutionRunContext
         string inputPath,
         string modelId,
         CopilotRuntimeIdentity runtimeIdentity,
-        JobCostSnapshot? cost = null)
+        JobCostSnapshot? cost = null,
+        string? reasoningEffort = null)
     {
         Summary = summary ?? throw new ArgumentNullException(nameof(summary));
         ArgumentException.ThrowIfNullOrWhiteSpace(inputPath);
@@ -348,8 +349,14 @@ public sealed class ExecutionRunContext
             throw new ArgumentException("The model identity is invalid.", nameof(modelId));
         }
 
+        if (reasoningEffort is not null && !ReasoningEffortPolicy.IsSafeReasoningEffort(reasoningEffort))
+        {
+            throw new ArgumentException("The reasoning effort is invalid.", nameof(reasoningEffort));
+        }
+
         InputPath = Path.GetFullPath(inputPath);
         ModelId = modelId;
+        ReasoningEffort = reasoningEffort;
         Cost = cost;
     }
 
@@ -358,6 +365,8 @@ public sealed class ExecutionRunContext
     public string InputPath { get; }
 
     public string ModelId { get; }
+
+    public string? ReasoningEffort { get; }
 
     public CopilotRuntimeIdentity RuntimeIdentity { get; }
 
@@ -1493,7 +1502,8 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 runInputPath,
                 runModelId,
                 runRuntimeIdentity,
-                latestCost);
+                latestCost,
+                request.ReasoningEffort);
             LastRunContext = context;
             RaiseRunCompleted(context);
         }

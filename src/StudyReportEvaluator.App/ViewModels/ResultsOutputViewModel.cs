@@ -315,7 +315,7 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
                     document,
                     preparation.Snapshot,
                     sheetNames,
-                    CreateReferenceRows(summary));
+                    CreateReferenceRows(request.Context));
                 results = new ResultsSheetWriter().Write(
                     document,
                     preparation.Snapshot,
@@ -374,6 +374,7 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
             CopilotCliIdentity = "copilot/" + context.RuntimeIdentity.CliVersion
                 + ";sha256=" + context.RuntimeIdentity.CliSha256,
             ModelIdentity = context.ModelId,
+            ReasoningEffort = context.ReasoningEffort,
             StartedAtUtc = summary.StartedAtUtc,
             EndedAtUtc = summary.EndedAtUtc,
             PlannedEvaluationCount = summary.PlannedOperationCount,
@@ -389,8 +390,9 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
         };
     }
 
-    private static IEnumerable<ReferenceAnswerSheetRow> CreateReferenceRows(RunSummary summary)
+    private static IEnumerable<ReferenceAnswerSheetRow> CreateReferenceRows(ExecutionRunContext context)
     {
+        RunSummary summary = context.Summary;
         Dictionary<string, CheckpointReference> references = summary.References
             .ToDictionary(reference => reference.QuestionId, StringComparer.Ordinal);
         foreach (QuestionDefinition question in summary.Snapshot.Definition.Questions.Where(question => question.Enabled))
@@ -399,7 +401,9 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
             yield return new ReferenceAnswerSheetRow
             {
                 QuestionId = question.Id,
-                ModelId = "auto",
+                // Reference answers use the run model and run-level effort (requirements §7.1).
+                ModelId = context.ModelId,
+                ReasoningEffort = context.ReasoningEffort,
                 Answer = reference?.Answer,
                 StatusCode = reference?.StatusCode ?? ResultsStatusCodes.AiRuntimeFailed,
                 GeneratedAtUtc = reference?.GeneratedAtUtc ?? summary.EndedAtUtc,

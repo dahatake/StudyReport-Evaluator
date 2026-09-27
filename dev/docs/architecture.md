@@ -78,11 +78,11 @@ run開始後のdraft変更は次runだけへ反映する。current run、checkpo
 
 各attemptはrestricted sessionを新規作成する。公開toolは該当operationの1件だけで、shell、filesystem、Web、GitHub write、MCP、ambient memoryを公開しない。normal assistant bodyはresultとして採用しない。tool call exactly once、closed property set、expected ID、finite range、same-row evidenceをvalidationする。
 
-`auto`がavailable modelにない場合はrunを開始せず、別modelへfallbackしない。SDK session persistenceをjob resumeに使用せず、partial workbookだけをresume正本とする。
+選択modelが実行時のmodel一覧にない場合はrunを開始せず、別modelへfallbackしない。固定`auto`の別availability検証は行わない。SDK session persistenceをjob resumeに使用せず、partial workbookだけをresume正本とする。
 
 ## 4. Score境界
 
-AIはnormal raw、special 0〜1、similarity 0〜1だけを返す。Excelが次を計算する。
+AIはnormal raw、special 0〜1だけを返す。similarity 0〜1はアプリ内のローカル計算で求める。Excelが次を計算する。
 
 $$
 QuestionEarned_q=QuestionPoints_q\times QuestionRate_q

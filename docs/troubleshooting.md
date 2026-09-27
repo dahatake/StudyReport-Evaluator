@@ -247,7 +247,7 @@ GUI起動・起動引数・Prompt適用・状態確認からloginを暗黙に開
 - checkpoint schema
 - input path、SHA-256、size、last-write time
 - definition SHA-256
-- normal modelと`auto`
+- normal model、reference model（normalと同じ）、run-level reasoning effort
 - アプリidentity: `アプリ名/バージョン`として解釈できる場合はアプリ名とmajor版が一致。minor／patch差だけでは拒否しない。解釈できないidentityは文字列の完全一致
 - CLI version、CLI SHA-256、SDK informational version: 完全一致
 

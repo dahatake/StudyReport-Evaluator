@@ -47,8 +47,9 @@ flowchart LR
 | `Core/Validation` | definition、result、checkpoint payloadの純粋validation |
 | `Core/Scoring` | allocationとcached preview計算 |
 | `Core/Formulas` | closed Excel formula AST |
-| `Core/Prompting` | normal/special/similarity Prompt rendering |
-| `App/Copilot` | 4種類のclosed Copilot operation |
+| `Core/Prompting` | normal/special/reference Prompt rendering |
+| `Core/Similarity` | 学生回答と参照回答のローカル表層類似度（LLMを使わない決定的計算） |
+| `App/Copilot` | 3種類のclosed Copilot operation（reference/normal/special） |
 | `App/Workbooks` | read-only input、Config/References/Results/Run/Checkpoint sheet |
 | `App/Workflow` | reference先行、student row単位処理、checkpoint、resume |
 | `App/Settings` | `ApplicationSettings`、strictな`SettingsFileStore`。Core型を保存するがCoreへI/Oを持ち込まない |
@@ -473,7 +474,7 @@ Checkpoint sheet:
 2. fileをread-onlyで開き、Checkpoint sheetとpayloadをclosed validateする。
 3. input pathをcheckpointから取得し、identityを再計算する。
 4. canonical definitionからsnapshotを復元し、hashを再計算する。
-5. normal model、reference model、run-level reasoning effort、`auto` availability、runtime identityを検証する。model IDの一致はID文字列の一致であり、`auto`で同一の実routing先を保証しない。
+5. normal model、reference model、run-level reasoning effort、runtime identityを検証する。model IDの一致はID文字列の一致であり、`auto`で同一の実routing先を保証しない。
 6. completed rowsをsource rangeとexpected IDsへ再validationする。
 7. 保存済みreferenceとcompleted rowsをseedとしてrunを続行する。
 
@@ -607,7 +608,7 @@ lock fileやglobal reservation serviceは追加しない。
 
 ### 10.3 Execution
 
-- normal model／並列度／実効出力先は主画面では読取専用。「変更」でSettings.Commonを開き、model選択・並列度・明示出力先を編集する。`auto` availabilityは通常modelと別表示する。
+- normal model／並列度／実効出力先は主画面では読取専用。「変更」でSettings.Commonを開き、model選択・並列度・明示出力先を編集する。`auto` availabilityの別表示はなく、同じ位置に次回runのreasoning effortを表示する。
 - `PreferredModelId`は保存希望、`SelectedModelId`は確認結果に存在する実効選択。不在なら未選択のまま明示変更を要求し、確認失敗だけで希望IDを消さない。希望未指定の初回は既存の明示確認後の初期選択を維持する。
 - `CurrentRunModelId`／`CurrentRunMaxConcurrency`／`CurrentRunOutputSummary`は実際にdispatchしたrequestに由来し、次回の共通設定と区別する。予約final／partial pathも読取専用だが、予約名はfile作成済みの証明ではない。
 - 明示login／取消／状態確認、新規／再開、partial path、開始／停止は主画面に残す。状態確認・loginは画面の表示だけでは開始しない。

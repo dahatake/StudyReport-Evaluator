@@ -1,5 +1,12 @@
 # Current implementation status
 
+## 2026-09-27 — 要求定義との突合で見つかった残差の解消
+
+- **結果画面からの別名出力**: `ResultsOutputBoundary`が`Quantification_References`のmodelを固定`auto`と書き、References／Run sheetのreasoning effortを未記録（「未指定」）にしていた。§7.1／§7.2／§9.2どおり、`ExecutionRunContext`へrunのreasoning effortを持たせ、runのmodelとeffortを記録するよう修正した（自動finalizationの`DurableRunFinalizer`はcheckpoint値を使っており正しかった）。`Production_output_boundary_writes_valid_separate_workbook_and_preserves_exact_input_identity`でD2／H2とRun sheetの`ReasoningEffort`を検証する。
+- **要求定義の残存記述**: 2026-09-25の所有者指示で廃止した固定`auto`参照回答・LLM類似度・4 operationの記述が§7.2・§9.2・§11・§11.9・§14・§16・AC-009・AC-039・§19に残っていたため整合し、実装済みのrate limit／quota枯渇の挙動を§7.6・§16・TR-15へ明記した。`architecture.md`・`detailed-design.md`・`troubleshooting.md`・`getting-started.md`の同種の記述も更新した。
+- **説明画像**: 05が削除済みの「固定 auto」表示、06／07が旧類似度（fake 0.2）の点数を示していたため、opt-inの8枚生成testで再生成し（01・03はbytes不変）、`images/README.md`と文書contractを更新した。
+- **確認**: `dotnet build .\StudyReportEvaluator.slnx -c Release`成功（警告0）。`dotnet test .\StudyReportEvaluator.slnx -c Release`でCore 199/199、App 1873成功・9 skip（opt-in）・1失敗。失敗は既知の`SampleWorkbookStructuralTests.Repository_sample_is_opened_read_only_and_only_structural_metadata_drives_mapping`（git管理外のローカル`sample/SampleReport.xlsx`が`A1:L531`、期待`A1:J531`）で、今回の変更と無関係。
+
 ## 2026-09-26 — 類似度・並列化・reasoning effortの統合
 
 以下3件（2026-09-25）を1つのbranchへ統合し、統合時の不整合を修正した。

@@ -2,9 +2,9 @@
 
 このフォルダーは、StudyReport Evaluatorの操作説明に使う実際のAvalonia viewのPNGを保存します。
 
-> **対象版:** この画像一覧は**UNRELEASED（未リリース）の`0.8.6`候補**のUI説明用です。**8枚のPNGの生成時の製品版は`0.8.4`**で、公開`0.8.1`の画面を示すものではありません。公開版`0.8.1`は変更していません。設問text同期・固定表示の採点計算式・幅に応じたカード配置を`0.8.1`の機能として扱わないでください。既存PNGは生成後のcode/UI変更の検証証跡ではありません。
+> **対象版:** この画像一覧は**UNRELEASED（未リリース）の`0.8.6`候補**のUI説明用です。**8枚のPNGは`0.8.6`候補のsourceから2026-09-27に再生成**したもので、公開`0.8.1`の画面を示すものではありません。公開版`0.8.1`は変更していません。設問text同期・固定表示の採点計算式・幅に応じたカード配置を`0.8.1`の機能として扱わないでください。既存PNGは生成後のcode/UI変更の検証証跡ではありません。
 
-F02は版metadataと文書表記の更新です。UI実装と既存８枚のPNG bytesは変更せず、PNGを再生成していません。`0.8.6`への表記更新だけを新たなUI検証と扱いません。
+F02は版metadataと文書表記の更新で、その時点ではPNGを再生成していません。その後、固定`auto`表示の削除（reasoning effort表示へ置換）、並列度既定8、類似度のローカル計算化に合わせ、2026-09-27に下記の8枚生成手順で8枚を再生成しました。再生成は文書画像の同期であり、native表示・本人確認等の新たなUI検証とは扱いません。
 
 ## Architecture diagrams
 
@@ -20,8 +20,8 @@ F02は版metadataと文書表記の更新です。UI実装と既存８枚のPNG 
 
 ## Provenance
 
-- 生成日: 2026-09-07（親T28での実際のPNG生成日。fixture内の固定日時や出力名の日付とは別）
-- 生成時の製品版: `0.8.4`（現在の`0.8.6`候補への版metadata更新前）
+- 生成日: 2026-09-27（再生成日。初回生成は2026-09-07の親T28。いずれもfixture内の固定日時や出力名の日付とは別）
+- 生成時の製品版: `0.8.6`候補（UNRELEASED）。初回生成時は`0.8.4`
 - renderer: Avalonia 12.1.1 Headless + Skia
 - size: 1440 × 1050 pixels、8枚
 - generator source: `tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs`（repositoryでのみ利用。配布ZIPにはsourceを含めない）
@@ -30,9 +30,9 @@ F02は版metadataと文書表記の更新です。UI実装と既存８枚のPNG 
 - displayed path: `C:\Synthetic\StudyReport-100x2.xlsx`
 - design state: Base 60、Special 0、Question points 20/20、Similarity penalty weight 0.1
 - Copilot state: bundled CLI 1.0.79を模した合成runtime identityとfake authentication boundary。実CLIプロセス・live login・network requestは実行していない
-- login UI state（05）: 状態確認前の`NotChecked`（認証未確認）・ログイン未開始。表示は「effort／未選択」で、model未選択、認証確認・ログイン・runはいずれも未実施。ログインボタンとstatusは認証済み／live loginの証跡ではない
-- run state（06/07のみ）: production durable orchestratorをfake row/AI/input-snapshot/checkpoint/path-planner/finalizer/output boundariesで実行。Reference 2 + 100行 ×（Normal 2 + Similarity 2）= 402 operations。認証と完了・final出力成功もfake応答であり、実入力fileの検証や実結果workbook作成の証跡ではない
-- result state: fake runnerのraw 8・similarity 0.2を実際の計算処理へ渡す。06はoverrideなしでFinal score 91.2。07は選択行の設問1のraw 8を保持したままoverride 9とし、Final score 93.2。AI品質や実データ結果を表さない
+- login UI state（05）: 状態確認前の`NotChecked`（認証未確認）・ログイン未開始。表示は「effort／未選択」（固定`auto`表示は削除済み）で、model未選択、認証確認・ログイン・runはいずれも未実施。ログインボタンとstatusは認証済み／live loginの証跡ではない
+- run state（06/07のみ）: production durable orchestratorをfake row/AI/input-snapshot/checkpoint/path-planner/finalizer/output boundariesで実行。Reference 2 + 100行 ×（Normal 2 + Similarity 2）= 402 operations。SimilarityはAIを呼ばないローカル計算で、fake参照回答と合成回答の表層類似度は0。認証と完了・final出力成功もfake応答であり、実入力fileの検証や実結果workbook作成の証跡ではない
+- result state: fake runnerのraw 8とローカル計算のsimilarity 0を実際の計算処理へ渡す。06はoverrideなしでFinal score 92.0。07は選択行の設問1のraw 8を保持したままoverride 9とし、Final score 94.0。AI品質や実データ結果を表さない
 - output state: final/partialは合成path。07の`C:\Synthetic\result\eval-20260902-1200-reviewed.xlsx`は元のfinalとは別名の**未保存候補**で、exportは未実行。出力可能表示はfake path判定であり、実file作成の証跡ではない
 - settings state（08）: fake認証確認・runより前のSettings / Common。合成デモでは`settingsStore: null`を明示し、保存・読込再試行は無効。「保存先が構成されていません。ファイルへの読込・保存は行いません。」と表示し、`setting.txt`の読込・保存は行わない。本番アプリはユーザー用の保存先を解決するため、利用者に環境変数の設定を求める状態ではない
 - personal/student data・secret: なし。password・token・device codeなどの資格情報や実ユーザーの保存先を含めず、画面上のpathは合成値のみ
@@ -48,6 +48,11 @@ F02は版metadataと文書表記の更新です。UI実装と既存８枚のPNG 
 
 上記は製品`0.8.4`時点の親T28の実績で、T29では生成・テストを再実行していません。T01〜T38は対象範囲でREVIEWEDとなり、T36の文書・画像contractは21/21成功です。この文書contractの成功を、native表示確認や版更新後のUI検証へ読み替えません。非opt-inの自動テストによるrepository画像との一致保証や、native DPIでの動作保証を意味しません。
 
+### 2026-09-27の再生成
+
+- `STUDY_REPORT_EVALUATOR_GENERATE_DOC_IMAGES=1`で`FullyQualifiedName~DocumentationScreenshotTests`の4テストを実行し4/4成功。通常サイズ8枚を`images/`へ保存した（01・03はbytes不変）。
+- 同じ実行で2回生成の一致と1024 × 720の8フレーム検証も成功。headless Skiaの描画であり、native表示・本人確認の証跡ではない。
+
 ## Image index
 
 | File | 表示内容 | 主な確認項目 |
@@ -56,9 +61,9 @@ F02は版metadataと文書表記の更新です。UI実装と既存８枚のPNG 
 | [`02-input-mapping.png`](02-input-mapping.png) | Settings / Mapping | 設問2を選択、primary C・supporting D、設問表示名、read-onlyの設問text、候補概要 |
 | [`03-design-knowledge.png`](03-design-knowledge.png) | DesignのKnowledge概要 | 設問1のKnowledge summary、2設問の配点20/20、Base 60、採点計算式（Prompt editorではない） |
 | [`04-design-custom-prompt.png`](04-design-custom-prompt.png) | Settings / Evaluation / Prompt | 設問2の実際のCustom Prompt editor（編集可）とread-only preview |
-| [`05-execution-auto.png`](05-execution-auto.png) | Executionの状態確認前 | `NotChecked`・ログイン未開始・固定auto未確認、状態確認／ログインボタン、concurrency 2、実行無効、read-onlyの実効output directory |
-| [`06-results-review.png`](06-results-review.png) | Results一覧（fake run完了） | 402 operations、100行の結果、raw 8・similarity 0.2によるFinal score 91.2、overrideなし。final pathはfake完了応答で、実workbook出力ではない |
-| [`07-output-export.png`](07-output-export.png) | Results詳細（override編集中） | 選択行の設問1はraw 8 → override 9、Final score 93.2。別名reviewed pathは未保存候補、export未実行 |
+| [`05-execution-auto.png`](05-execution-auto.png) | Executionの状態確認前 | `NotChecked`・ログイン未開始・reasoning effort未選択、状態確認／ログインボタン、concurrency 2、実行無効、read-onlyの実効output directory |
+| [`06-results-review.png`](06-results-review.png) | Results一覧（fake run完了） | 402 operations、100行の結果、raw 8・similarity 0によるFinal score 92.0、overrideなし。final pathはfake完了応答で、実workbook出力ではない |
+| [`07-output-export.png`](07-output-export.png) | Results詳細（override編集中） | 選択行の設問1はraw 8 → override 9、Final score 94.0。別名reviewed pathは未保存候補、export未実行 |
 | [`08-settings.png`](08-settings.png) | Settings / Common（合成デモのstore未構成） | 定義名・revision・丸め桁数・実効output directory、未保存変更、保存無効、ファイル読込・保存なし。本番の保存先設定手順ではない |
 
 ## Regeneration

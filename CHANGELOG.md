@@ -46,6 +46,7 @@ StudyReport Evaluatorの利用者に影響する変更をこのファイルへ�
 - AIへの送信中に通信が途切れ、Copilot CLIが接続の時間切れなどをsession errorとして返した場合に、再試行せず`AI_RUNTIME_FAILED`としていた問題を修正。通信失敗として新しいsessionで最大2回再試行し、再試行後も失敗した場合は`NETWORK_FAILED`とします。
 - Copilot CLIの起動前確認（同梱CLIのSHA-256照合）に1回あたり約12秒かかっていた問題を修正（約0.4秒に短縮）。「Copilot 状態を確認」が15秒の確認時間内に終わらず失敗することがある主な原因とみられます。
 - 通常評価で、モデル（実測ではclaude-sonnet-5）が結果toolの引数からアプリが指定したevaluator IDを省略すると、schema不正として再試行し、再試行でも省略されると`AI_OUTPUT_INVALID`になっていた問題を修正。evaluator IDはアプリが保持している値なので、省略された場合はアプリが補います。返された値が異なる場合は従来どおりschema不正です。reasoning effort `medium`では省略が増えることを実測しています（同じPromptで`medium` 10/30、未指定 2/30）。
+- 結果画面から「検証して出力」で別名workbookを出力すると、`Quantification_References`のmodelが実際のrunのmodelではなく`auto`と記録され、References／Run sheetのreasoning effortが「未指定」になっていた問題を修正。runで選択したmodelとrun開始時に解決したreasoning effortを記録します。
 
 ## [0.8.1] - 2026-09-04
 

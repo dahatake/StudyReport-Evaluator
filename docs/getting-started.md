@@ -122,7 +122,7 @@ $$
 
 ## 3. 実行
 
-![05 ExecutionのNotChecked・ログイン未開始の合成画面。モデル未選択、固定auto未確認、並列度2、実効出力先は読取専用。認証成功の証跡ではない](../images/05-execution-auto.png)
+![05 ExecutionのNotChecked・ログイン未開始の合成画面。モデル未選択、reasoning effort未選択、並列度2、実効出力先は読取専用。認証成功の証跡ではない](../images/05-execution-auto.png)
 
 実行画面の**モデル・並列度・実効出力先は確認用**です。編集は**変更 → 設定の共通**で行います。新規／再開、認証確認・login開始／取消、**定量化を開始／cancel**は実行画面に残っています。
 

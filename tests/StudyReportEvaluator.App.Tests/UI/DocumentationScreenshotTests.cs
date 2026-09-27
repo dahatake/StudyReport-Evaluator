@@ -51,7 +51,7 @@ public sealed class DocumentationScreenshotTests
         "02-input-mapping.png",        // Settings / Mapping: question 2, primary C, supporting D.
         "03-design-knowledge.png",     // Design: question 1, Knowledge summary (not its Prompt editor).
         "04-design-custom-prompt.png", // Settings / Evaluation / Prompt: actual Custom editor + preview.
-        "05-execution-auto.png",       // Execution: NotChecked, login not started, auto unconfirmed.
+        "05-execution-auto.png",       // Execution: NotChecked, login not started, effort unselected.
         "06-results-review.png",       // Results list: completed FAKE run/finalization, no overrides.
         "07-output-export.png",        // Results detail: raw 8 -> override 9, separate UNSAVED candidate.
         "08-settings.png",             // Settings / Common: no store; no file load/save or success claim.

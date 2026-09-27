@@ -290,13 +290,13 @@ $$
 
 ### 7.2 参照回答生成
 
-各有効設問について、質問文をそのまま`auto`へ入力し、LLM生成回答を1件作る。
+各有効設問について、質問文をそのままrunで選択したmodel（§7.1、通常評価と同じmodelとreasoning effort）へ入力し、LLM生成回答を1件作る。
 
 - 生成回数は1設問につき1runで1回だけとする。
 - 同じrunの全学生は同一の参照回答を使用する。
 - 再開時はcheckpointに保存済みの参照回答を再利用し、再生成しない。
 - 参照回答はfinal outputの`Quantification_References` sheetへ保存する。
-- question ID、質問文、model ID、生成status、生成時刻を併記する。
+- question ID、質問文、model ID、生成status、生成時刻、reasoning effortを併記する。
 - 生成失敗はblankと技術statusを保持し、その設問の類似度とFinalScoreをblankにする。
 
 参照回答と類似度はAI生成品質に依存する。高い類似度は不正行為を証明せず、低い類似度は回答品質を保証しない。既定係数0.1は初期値であり、利用者は授業目的に応じて0を含む範囲で変更し、結果を自ら確認する。
@@ -352,6 +352,8 @@ AIは次だけを返す。
 - transient network errorとtimeoutは新sessionで最大2回再試行する。Copilot CLIがAI呼び出しの通信失敗（接続・時間切れ）をsession errorとして返した場合もnetwork errorとして扱う。
 - AIの応答待ちtimeoutは、Copilot SDKの`SendAndWaitAsync`既定の60秒に従う（アプリは値を指定しない。SDK版を更新する場合はSDK既定を再確認する）。起動・認証確認・session作成を含むattempt全体には、この60秒の応答待ちを先取りしない外側の上限として120秒を掛ける。どちらが満了してもtimeoutとして扱う。
 - cleanup失敗後は追加retryを行わない。
+- rate limit（SDK session errorの`rate_limit`または既知のrate limit code）は`RATE_LIMITED`とし、上記のattempt上限内で指数backoff＋jitterを入れて新sessionで再試行する。観測時はrun全体の有効並列度を半減（下限1）し、成功が続けば設定値まで1ずつ戻す。
+- quota枯渇（SDK session errorの`quota`または既知のquota code）は`QUOTA_EXHAUSTED`とし、再試行せず新規送信を止めてpartialを保持する。該当の参照回答・学生行はcheckpointへ保存せず、再開時に再実行する。
 - cancel後に新規sessionを開始しない。
 - 技術的失敗を0へ変換しない。
 
@@ -464,7 +466,7 @@ $$
 | Sheet | 内容 |
 |---|---|
 | `Quantification_Config` | immutable definition snapshot、base、special、question points、similarity weight、Prompt、mapping、range、rounding |
-| `Quantification_References` | 設問ごとの質問文、`auto`生成回答、model、status、生成時刻 |
+| `Quantification_References` | 設問ごとの質問文、runで選択したmodelによる生成回答、model、status、生成時刻、reasoning effort |
 | `Quantification_Results` | 行ごとの通常評価、固有評価、類似度、減点、FinalRaw、FinalScore、理由、根拠、status、Excel formula |
 | `Quantification_Run` | input/definition/checkpoint identity、app/SDK/CLI/model、開始/終了、件数、error、token usage、実sheet名 |
 
@@ -559,7 +561,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
    - 読込Promptの件数と設定への入口
    - formula／capacity preflight
 3. **実行**
-   - Copilot loginの明示開始・取消・既存buttonでの状態再確認、通常modelの実効選択とその上限の既知／不明、`auto` availability
+   - Copilot loginの明示開始・取消・既存buttonでの状態再確認、通常modelの実効選択とその上限の既知／不明、次回runのreasoning effort
    - 実効output／partial pathと設定変更への入口
    - 参照生成、通常評価、固有評価、類似度、finalizationの段階表示
    - completed rows / total rows、in-flight、error、cancel
@@ -657,7 +659,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 ### 11.9 実行コストの表示とジョブログ
 
 - 「3 実行」「4 結果」でExcelを開かずに、今回のAI処理で観測できた使用量を確認できる。対象は開始操作ごとのジョブ1件で、入力・出力・推論・キャッシュのtoken数、SDKが報告した`nano-AI units`、premium request消費量、観測状態を示す。
-- 通常評価・参照回答生成・固有評価・類似度評価と、それぞれの再試行を対象とする。成功・技術失敗・取消・timeout・出力失敗、checkpointへ保存されなかった行で観測できた値も今回ジョブに残す。
+- 通常評価・参照回答生成・固有評価と、それぞれの再試行を対象とする。類似度評価はローカル計算（§7.5）でAIを呼ばないため、使用量は発生しない。成功・技術失敗・取消・timeout・出力失敗、checkpointへ保存されなかった行で観測できた値も今回ジョブに残す。
 - 取得できない値は理由とともに未取得として示し、0や推定値へ置き換えない。明示的な0、未送信、送信状況不明、最後の呼び出しのみの部分取得を区別する。
 - 単位はSDK報告の原単位を保持し、AIクレジット・通貨へ換算しない。換算根拠を確認できるまでAIクレジットの数値を表示しない。
 - 同一attemptの累計は置換で更新し、イベント合計とセッション累計、モデル別内訳とセッション総量を加算しない。内訳と総量が一致しない場合は不一致として示し、配賦・補正で一致させない。
@@ -786,7 +788,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 - AIへ送るworkbook由来の値は、現在行の選択済みprimary/supporting/special sourceだけとする。
 - question text、Prompt、criterion metadata、参照回答、closed schema metadataは必要範囲で送る。
 - 他行、非選択列、workbook pathを送らない。
-- reference answerはその質問の全学生比較へ使用するため、類似度Promptに含める。
+- reference answerはその質問の全学生比較へ使用する。類似度はローカル計算のため、学生回答と参照回答を類似度のためにAIへ送らない。
 - untrusted textはExcel string cellとして保存し、formulaとして実行しない。
 - outputとpartial workbookは元本全体、Prompt、AI結果を保持するため、元本と同等以上に機密として扱う。
 - app-owned cloud backend、database、telemetry本文送信を追加しない。
@@ -817,13 +819,15 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | 空の固有項目 | AI callなし、当該special score 0 |
 | 質問文行とmetadataの不一致 | 現在のQuestionTextを保持し、以前の質問文行の値を反映せず、`HEADER_METADATA_MISMATCH`で再読込を要求 |
 | invalid definition / 配点不一致 | AI call前に具体的field error |
-| `auto` unavailable | AI call前に停止。別modelへfallbackしない |
+| 選択modelが未選択・一覧に不在 | AI call前に停止（`MODEL_SELECTION_REQUIRED`）。別modelへfallbackしない |
 | 選択modelの上限がSDK未公開 | run前のmodel相対検査を行わず実行する。app-owned絶対上限とattempt上限は適用する。送信後のmodel上限超過は対象値blank、行ごとの技術status |
 | reference generation failure | reference / similarity / FinalRaw / FinalScore blank、技術status |
 | invalid AI response after retry | 対象値blank、FinalRaw / FinalScore blank、`AI_OUTPUT_INVALID` |
 | authentication unavailable | 新規AI callなし、`AUTH_REQUIRED` |
 | timeout after retry | 対象値blank、`AI_TIMEOUT` |
 | network failure after retry | 対象値blank、`NETWORK_FAILED` |
+| rate limit after retry | 対象値blank、`RATE_LIMITED`。有効並列度を縮退 |
+| quota exhausted | 再試行せず新規送信停止、`QUOTA_EXHAUSTED`。該当の参照回答・行はcheckpointへ保存せず再開時に再実行 |
 | cancel | 新規送信停止。最後の完了行checkpointを保持 |
 | process終了 | 最後にatomic保存したcheckpointから再開可能 |
 | input changed | checkpoint更新とfinal renameを停止、`INPUT_CHANGED` |
@@ -892,7 +896,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | AC-006 | `base + special + Σ question points = 100`をrun前とformulaで検証する。 |
 | AC-007 | 通常Knowledge/Custom評価を動的に構成し、AIはcriterion rawだけを返す。 |
 | AC-008 | 各設問へ0件以上の固有評価項目を設定し、同一設問内と対象設問間を等分平均してSpecialEarnedを計算する。 |
-| AC-009 | `auto`で各設問1件の参照回答を生成し、同一runの全学生で共有してReferences sheetへ保存する。 |
+| AC-009 | runで選択したmodelと同じrun-level reasoning effortで各設問1件の参照回答を生成し、同一runの全学生で共有してReferences sheetへ保存する。 |
 | AC-010 | 各学生回答と参照回答の類似度を0〜1で定量化し、`Points × Similarity × Weight`を設問別に出力する。 |
 | AC-011 | QuestionEarned、SpecialEarned、SimilarityPenalty、FinalRaw、0〜100 clamp済みFinalScoreをConfig参照Excel数式で計算する。 |
 | AC-012 | 空入力はAIを呼ばず0、技術的AI失敗はblankとし、FinalScoreへblankを伝播する。 |
@@ -922,7 +926,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | AC-036 | 保存定義はExcel読込後の明示操作で、保存headerのmetadata・sheet・行・列・定義全体を検証してからInput／Designへ一括適用する。失敗・取消時は現在状態とfileを変更せず、成功時はID・順序・設問text・Prompt・配点を保持する。Imported Prompt一覧は不変、run中の一括適用は禁止し、既存checkpoint admissionを緩めない。 |
 | AC-037 | 設定を第5ステップにせず、同じ対象へ1操作で移動し、値・対象ID・ページ・カテゴリ・入力途中の編集を保持して戻れる。希望modelは明示確認後だけ実効選択にし、不在なら未選択・no fallback、確認失敗だけで保存希望を消さない。遷移・設定読込／保存／適用・login完了で認証確認／login／runを自動開始せず、実行中の次回draft編集は現在snapshotへ混入しない。全画面で進捗・停止を保持し、設定中完了は結果通知だけとする。前回結果・override・未保存修正版を次回設定から分離する。 |
 | AC-038 | 中断後は部分結果のpartial pathと再開準備を表示し、同一セッションでは明示操作で、再起動後はpartial選択またはpath指定で再開条件を開始前に項目別検証する。不一致時はcheckpointを変更せず開始しない。入力・modelだけは明示操作で合わせられ、採点設計・runtimeは自動変更しない。window close時は有限時間の中断待機後に閉じる。 |
-| AC-039 | 実行・結果画面とジョブ単位のローカルJSON Linesログで、今回の開始操作に対応するAI使用量（入力・出力・推論・キャッシュtoken、`nano-AI units`、premium request消費量）を、全4 operationと再試行・失敗・取消・未保存行を含めて確認できる。未取得は0や推定値にせず理由とともに示し、明示0・未送信・送信状況不明・部分取得を区別する。項目別の取得元、試行番号・相関ID・終端結果、モデル内訳と総量の不一致を保持し、内訳を総量へ加算・配賦しない。SDK報告の原単位を保ち、換算根拠のないAIクレジット・通貨表示をしない。ログは数値・生成ID・閉じたコードだけを記録し、保存失敗でも観測済み表示と採点を壊さない。 |
+| AC-039 | 実行・結果画面とジョブ単位のローカルJSON Linesログで、今回の開始操作に対応するAI使用量（入力・出力・推論・キャッシュtoken、`nano-AI units`、premium request消費量）を、AIを呼ぶ3 operation（参照回答・通常評価・固有評価）と再試行・失敗・取消・未保存行を含めて確認できる。未取得は0や推定値にせず理由とともに示し、明示0・未送信・送信状況不明・部分取得を区別する。項目別の取得元、試行番号・相関ID・終端結果、モデル内訳と総量の不一致を保持し、内訳を総量へ加算・配賦しない。SDK報告の原単位を保ち、換算根拠のないAIクレジット・通貨表示をしない。ログは数値・生成ID・閉じたコードだけを記録し、保存失敗でも観測済み表示と採点を壊さない。 |
 
 ## 19. Test requirements
 
@@ -938,7 +942,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 4. base/special/question pointsの初期配分、最後の設問への端数、手動値保持、均等配分test。
 5. 配点合計、range、similarity weight、enabled special minimumのvalidation test。
 6. Knowledge/Custom evaluatorとspecial Prompt placeholder／closed schema test。
-7. reference answer exactly once/question/run、`auto`必須、failure、resume reuse test。
+7. reference answer exactly once/question/run、run modelとrun-level reasoning effortの共用、failure、resume reuse test。
 8. normal/special/similarityの0/1境界、range外、empty-zero、failure-blank test。
 9. QuestionEarned、SpecialEarned、SimilarityPenalty、FinalRaw、clampの独立手計算oracle。
 10. Config参照formula、blank伝播、cached preview、formula allowlist/ref/DAG/length test。
@@ -946,7 +950,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 12. result path分単位命名、`-02` suffix、directory作成、no-overwrite、atomic fault test。
 13. partial作成、reference checkpoint、学生行checkpoint、atomic replace、強制終了相当fault test。
 14. checkpoint schema/input/definition/model/runtime mismatchと完了行skip test。
-15. auth、timeout、network（CLIが返す通信失敗のsession errorを含む）、schema（evaluator ID省略の受理と不一致の拒否を含む）、cleanup、cancel、no-send-after-cancel、reasoning effort指定条件とジョブログへの記録test。
+15. auth、timeout、network（CLIが返す通信失敗のsession errorを含む）、rate limit（backoff・並列度縮退）、quota枯渇（非再試行・非保存）、schema（evaluator ID省略の受理と不一致の拒否を含む）、cleanup、cancel、no-send-after-cancel、reasoning effort指定条件とジョブログへの記録test。
 16. selected-column／same-row isolation、literal string、no-content log test。
 17. 4-step＋設定、warning exact text/nonblock、progress、resume、completion、keyboard、200% scale test。1024×720／1180×800の通常shellは実ClientSize、Extent／Viewport、主要Control完全包含を実測して外側scroll不要とhorizontal overflowなしを確認する。多数項目のページ切替・元行移動・空一覧・最終ページ・選択保持・リサイズとvirtualization、長文／path／dropdownの局所scroll、760×600 standalone／200%表示のreflow後の本文縦scroll例外を分離し、全操作への到達を検証する。44 DIP、focus復帰、一意Automation ID、native DPI／Narratorをheadlessと分けて記録する。主回答列ComboBox操作後の可視設問text同期も維持する。
 18. CLI option parser、UTF-8 Prompt file、複数Prompt、明示適用、no-auto-run test。
@@ -967,11 +971,11 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 33. exact candidate EXEのfresh OS試験CH-01〜06と公開境界test。matrix v2のclosed 3行／public 4 assets、candidate workflow／run／source／version／hash／sidecar拘束、metadata限定JSONの型・長さ・許可field、MSIXのcandidate検証記録のみ受渡し・本体非upload、再download照合後の最終matrix確定を検証する。unknown／duplicate／missing row、必須試験欠落・FAIL・NOT_RUN、CH-06の任意化、別EXE証跡、機微field、MSIX公開を拒否し、ADV-01／02のNOT_RUNは許容する。開発host／fake成功をclean-host／本人認証の代用にしない（AC-028／029／034）。
 34. 一時absolute pathに限定した設定storeの明示保存・再読込test。fileなし、BOM、型／enum／範囲、schema欠損／不正型／未知版／未知項目、定義なし／不正draft、入力未読込時の保存定義保持、ID／decimal／Unicode／Prompt／canonical hash往復、保存中再編集、atomic置換と旧bytes保持・temp後始末を確認する。Windowsの排他file・file-valued親path等で実際のIO拒否を確認し、ReadOnlyディレクトリだけを拒否根拠にしない。合成header／貼付内容の平文保存、回答自動収集・credential／AI結果非保存・no-content logを検証する。未指定で入力A→Bのresult、明示先の再起動→入力Bでの復元、空欄→null、利用不可no fallback、復元時directory非作成を確認し、実利用者設定を使わない（AC-035）。
 35. 保存定義の明示適用test。Excel未読込／run中の禁止、同入力／別header／sheet・列・行不一致、取消・失敗時のInput metadata／draft／Design／保存file無変更、成功時のID・順序・設問text・Prompt・配点・canonical hash保持を確認する。後続主列変更の既存同期、Imported Prompt一覧・本文・順序不変、AI送信0、既存checkpoint admission維持を検証する（AC-036）。
-36. Input→Design→Settings→Input→Executionの往復と交互編集→保存、入力途中、選択ID／ページ／カテゴリ保持、同じ入力・定義での再開指定非初期化と変更時の再確認、保存希望modelの有／無／欠落・確認失敗・auto欠落、no fallback／no-auto-login/runをfake境界で検証する。実行中の次回編集で現在request／snapshot不変、全画面の進捗・停止、設定中完了の非強制遷移、前回結果とoverrideの保持を確認する。save→新VM／store→read-only Excel明示適用→fake run→別名出力・resumeのdeterministic E2Eで元本、exact100、zero／blank、formula、checkpoint契約を維持する。本人walkthroughは別途実施し未確認を合格にしない（AC-035〜037、AC-016〜019）。
+36. Input→Design→Settings→Input→Executionの往復と交互編集→保存、入力途中、選択ID／ページ／カテゴリ保持、同じ入力・定義での再開指定非初期化と変更時の再確認、保存希望modelの有／無／欠落・確認失敗、no fallback／no-auto-login/runをfake境界で検証する。実行中の次回編集で現在request／snapshot不変、全画面の進捗・停止、設定中完了の非強制遷移、前回結果とoverrideの保持を確認する。save→新VM／store→read-only Excel明示適用→fake run→別名出力・resumeのdeterministic E2Eで元本、exact100、zero／blank、formula、checkpoint契約を維持する。本人walkthroughは別途実施し未確認を合格にしない（AC-035〜037、AC-016〜019）。
 
 37. 中断後の再開準備、partial picker取消時の状態不変、開始前の項目別再開検証、入力・modelの明示適用、window close時の有限中断待機をdeterministicに確認する。
 
-38. ジョブ使用量の集計・表示・JSONLログのdeterministic test。取得成功／一部欠落／全欠落、明示0と未取得、最後の呼び出しのみ、イベント重複・順序逆転・final複数通知、再試行と4 operation、取消・cleanup失敗、項目別の取得元、モデル内訳と総量の不一致、下方訂正、overflow／負数を確認する。JSONLは一時directoryだけを使い、回答・Prompt・path・credentialのcanary非記録、容量上限・保存失敗時の観測値保持、終端記録の整合を検証する。実AI・実課金照合・AIクレジット換算は含めない（AC-039）。
+38. ジョブ使用量の集計・表示・JSONLログのdeterministic test。取得成功／一部欠落／全欠落、明示0と未取得、最後の呼び出しのみ、イベント重複・順序逆転・final複数通知、再試行と3 operation（類似度はAIを呼ばない）、取消・cleanup失敗、項目別の取得元、モデル内訳と総量の不一致、下方訂正、overflow／負数を確認する。JSONLは一時directoryだけを使い、回答・Prompt・path・credentialのcanary非記録、容量上限・保存失敗時の観測値保持、終端記録の整合を検証する。実AI・実課金照合・AIクレジット換算は含めない（AC-039）。
 
 ## 20. 外部仕様出典
 
@@ -1044,6 +1048,6 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | Implementation / validation status | 要求承認済み。T01は要求・契約・追跡・要求版metadataの同期で、当時のUI／設定は未実装・試験NOT_RUNだった。T01〜T35はREVIEWEDだった履歴を維持し、現在は2026-09-07の[実行記録](../dev/docs/archive/work/20260907-ui-settings-execution-record.md)と後続引継ぎでT01〜T38がREVIEWED、T39はBLOCKED。実装と局所試験の対応はVERIFIED_SCOPED。T35の対象文書試験は4/4成功・敵対的レビュー済みで、別scopeのT36は自身のt36-current.trxで21/21成功。製品`0.8.6`は未公開候補、公開済みは`v0.8.1` ZIPのまま。0.8.4のT37実ZIP・T38実EXE・T39自動回帰／MSIX成功と追加native FAILを分離する。F02最終再検証は本同期時点では親担当で未完了、以後は実行記録の最新F02欄へ接続する。本人確認／隔離利用者保存／CH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITEで、G4・全タスク完了・新EXE公開は未達 |
 | Auto model selection source | 2026-09-15の要求所有者指示「`auto`を通常評価modelとして選択できるように必要なら要求定義から変更」。同梱CLIを実測し、`auto`はrouterでtoken上限を公開しないことを確認した上で§7.1・§10.3・§10.4・§11・§15・§16を改訂した。上限不明modelを拒否せず、model相対のcontext budget検査だけを適用外とし、既定値の推定と別modelへのfallbackは行わない。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Timeout / reasoning effort source | 2026-09-24の要求所有者指示「7.6節のattempt timeoutはSDKの60秒に従う」「Thinking Effortはmedium。答案の定量化なのでHighは不要」。当初はattempt全体を60秒としたが、実機の通し実行で起動・session作成に約10〜25秒かかり、SDKの60秒の応答待ちより先にattempt側が満了してAI_TIMEOUTとなった（応答完了直前の打切りを含む）ため、§7.6は応答待ちをSDK既定の60秒とし、attempt全体の外側上限120秒は維持した。§7.1へreasoning effort `medium`を追加した。同梱CLIの実測で、`auto`と非対応modelへeffortを指定するとsession作成が失敗することを確認し、対応modelだけに指定する。2026-09-25の要求所有者指示「effortを記録する」により、attemptごとの指定値をジョブログへ記録する（§7.1、§11.9）。同日の指示「schema不正の根本原因を調査・修正する」により、claude-sonnet-5がtool引数から定数のevaluator IDを省略することが原因と確認し（`medium`で10/30、未指定で2/30）、§7.3でアプリが補う。要求版はv4.6のままで、製品版・公開版とは独立 |
-| Similarity / effort / concurrency source | 2026-09-25の要求所有者指示「類似度判定を最適化する」「並列度をSDKが許容する最大値まで設定できるようにする（最速実行時間・LLM回答の高い一貫性・Tokenコスト最小化）」「全ての評価・回答で同じreasoning effortにする（採点の一貫性のため、最低でよい）」。§7.5を生成AI出力の貼り付け検出向けのローカル表層類似度へ改訂し、§7.1のreasoning effortを`medium`からrun-level統一（希望`low`）へ改訂、参照回答を固定`auto`から通常評価と同じmodelへ変更した。SDKには並列session数の上限がないため、並列度はapp判断として合成Promptの実測で頭打ちとなった8を既定、16を最大とし、rate limitは専用statusでbackoff付き再試行と有効並列度の縮退を行う。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Similarity / effort / concurrency source | 2026-09-25の要求所有者指示「類似度判定を最適化する」「並列度をSDKが許容する最大値まで設定できるようにする（最速実行時間・LLM回答の高い一貫性・Tokenコスト最小化）」「全ての評価・回答で同じreasoning effortにする（採点の一貫性のため、最低でよい）」。§7.5を生成AI出力の貼り付け検出向けのローカル表層類似度へ改訂し、§7.1のreasoning effortを`medium`からrun-level統一（希望`low`）へ改訂、参照回答を固定`auto`から通常評価と同じmodelへ変更した。SDKには並列session数の上限がないため、並列度はapp判断として合成Promptの実測で頭打ちとなった8を既定、16を最大とし、rate limitは専用statusでbackoff付き再試行と有効並列度の縮退を行う。2026-09-27に、同指示と実装に合わせて§7.2・§7.6・§9.2・§11・§11.9・§14・§16・AC-009・AC-039・§19（7、15、36、38）に残っていた固定`auto`・LLM類似度・4 operationの記述を整合し、rate limit／quota枯渇の挙動を明記した。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Meaning | repository要求baselineの承認記録。実装完了・試験成功・release存在・tag／push／draft／公開操作の承認、組織の法務・教育・security承認または電子署名を意味しない |
 

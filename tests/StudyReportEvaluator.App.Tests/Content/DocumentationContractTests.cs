@@ -696,13 +696,13 @@ public sealed class DocumentationContractTests
             "fake row/AI/input-snapshot/checkpoint/path-planner/finalizer/output boundaries",
             "実file作成の証跡ではない",
             "personal/student data・secret: なし",
-            "生成日: 2026-09-07（親T28での実際のPNG生成日",
+            "生成日: 2026-09-27（再生成日。初回生成は2026-09-07の親T28",
             "renderer: Avalonia 12.1.1 Headless + Skia",
             "generator source: `tests/StudyReportEvaluator.App.Tests/UI/DocumentationScreenshotTests.cs`",
             "1440 × 1050 pixels、8枚",
             "`NotChecked`（認証未確認）・ログイン未開始",
-            "Final score 91.2",
-            "Final score 93.2",
+            "Final score 92.0",
+            "Final score 94.0",
             "**未保存候補**で、exportは未実行",
             "`settingsStore: null`を明示し、保存・読込再試行は無効",
             "`setting.txt`の読込・保存は行わない",
@@ -834,7 +834,7 @@ public sealed class DocumentationContractTests
         }
 
         AssertContainsAll(Read("images/README.md"), "一時directoryへ描画", "2回生成の一致", "finally",
-            "生成時の製品版: `0.8.4`", "PNGを再生成していません");
+            "生成時の製品版: `0.8.6`候補（UNRELEASED）", "その時点ではPNGを再生成していません");
         AssertContainsAll(Read("CHANGELOG.md"), "## [Unreleased]", "ソース候補`0.8.6`", "**未公開**");
         Assert.DoesNotContain("## [0.8.6]", Read("CHANGELOG.md"), StringComparison.Ordinal);
         AssertContainsAll(
