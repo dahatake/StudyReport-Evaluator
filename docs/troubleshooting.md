@@ -188,12 +188,12 @@ PATH上の別CLIのinstall／追加、他版CLIのcopy、manifest変更やhash�
 
 **「GitHubにログイン」「ログインを取り消す」は未公開`0.8.6`候補のみ**です。公開`v0.8.1`にはこのbuttonがなく、従来どおり同梱CLIで本人loginを行い、既存の状態確認buttonを使います。buttonがないことだけを不具合と判断しないでください。
 
-1. Execution画面で**Copilot 状態を確認**を選びます。この操作はlogin開始ではありません。
-2. 未認証の場合、候補版では利用者自身が**GitHubにログイン**を選びます。検証済みの同梱native CLIだけを直接起動し、CLIのconsole／ブラウザーの案内に従って本人のGitHub accountで対話認証を完了します。
+1. 候補版は起動直後にこのPCで利用中のGitHubアカウントのログイン（環境変数`COPILOT_GITHUB_TOKEN`／`GH_TOKEN`／`GITHUB_TOKEN`、OSの資格情報ストア、GitHub CLI `gh`の順に同梱CLIが解決）を自動確認します。手動で再確認するにはExecution画面で**Copilot 状態を確認**を選びます。
+2. 利用できるログインがない場合、候補版は検証済みの同梱native CLIだけを直接起動し、ブラウザー認証を1回だけ自動で開始します。CLIのconsole／ブラウザーの案内に従って本人のGitHub accountで対話認証を完了します。取消・失敗後は自動では再試行しないので、必要なら**GitHubにログイン**を選びます。ブラウザーを開きたくない環境では環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`を`0`または`false`にします。
 3. login processが正常終了すると、認証状態とmodel一覧を自動再確認します。取消・失敗後や自動再確認に失敗した場合は、**Copilot 状態を確認**で再試行します。CLI processの起動・終了やexit codeだけを認証成功とは扱いません。
 4. 状態と列挙されたmodelを確認し、候補版では必要な変更を**設定 → 共通**で行います。AI評価は**定量化を開始**の明示操作まで始まりません。
 
-GUI起動・起動引数・Prompt適用・状態確認からloginを暗黙に開始せず、login後もAI評価を自動開始しません。実効modelは自動再確認の結果に従って反映し、希望modelが不在でも別modelへfallbackしません。アプリへPAT、token、password、client secret、device codeを入力しないでください。認証とcredential保管はCLI／ブラウザーに委譲し、アプリの認証処理はこれらを収集・解析・保存・log出力しません。設問textやPrompt等へ貼り付けると、明示保存した定義に平文で残り得ます。認証console／ブラウザーの秘密情報をerror reportへ貼らないでください。
+起動時の自動確認・自動login以外では、起動引数・Prompt適用・画面遷移・状態確認からloginを暗黙に開始せず、いずれの場合もAI評価を自動開始しません。環境変数`GH_TOKEN`等に無効なtoken（例: 非対応のclassic PAT `ghp_`）が設定されていると、保存済みログインより優先されるため、自動loginを完了しても認証確認が失敗し得ます。その場合は該当の環境変数を解除して再起動してください。実効modelは自動再確認の結果に従って反映し、希望modelが不在でも別modelへfallbackしません。アプリへPAT、token、password、client secret、device codeを入力しないでください。認証とcredential保管はCLI／ブラウザーに委譲し、アプリの認証処理はこれらを収集・解析・保存・log出力しません。設問textやPrompt等へ貼り付けると、明示保存した定義に平文で残り得ます。認証console／ブラウザーの秘密情報をerror reportへ貼らないでください。
 
 ### loginの失敗・取消・終了処理
 

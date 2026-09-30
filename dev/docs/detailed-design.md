@@ -761,7 +761,7 @@ checkpointとRun sheetへ次を保存する。
 - shell/PowerShell/`cmd /c`/任意command文字列経由でloginを起動しない。標準入出力のcredential処理を行わない。
 - login取消またはアプリ終了時のみ、serviceが所有する当該login processだけを停止対象にする。process tree全体や名前一致killを行わない。
 - login完了は認証成功の証明ではない。完了/取消/失敗後、利用者が`Copilot 状態を確認`を押して認証状態とモデルを明示再確認する。
-- login完了による自動model選択変更・自動評価開始を行わない。
+- login完了による自動model選択変更・自動評価開始を行わない。起動時の自動認証確認・自動login（`ExecutionViewModel.RunStartupAuthenticationAsync`、要求§11.10）はAI評価を開始しない。
 
 ## 13. Packaging
 

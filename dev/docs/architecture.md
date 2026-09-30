@@ -130,15 +130,17 @@ finalは新tempへ4 sheetとformulaを書き、close、read-only reopen、packag
 | Execution | 明示login／取消／状態確認、新規／再開・partial指定、開始／停止 | 実効model・並列度・出力先、現在／前回runの固定条件、予約pathと実progressを分離。「変更」で共通設定へ |
 | Results | 学生行ページ・元行移動、一覧／詳細、通常criterion override、別名出力 | 前回runのfinal／partial、件数・行状態・計算preview・入力確認段階・cleanup warning。結果は設定へ移さない |
 
-runはExecutionの明示buttonからだけ開始する。command-line引数、画面遷移、設定の読込／保存／適用、Prompt適用から認証確認・login・AIを自動開始しない。Prompt previewは固定／合成値のローカル展開であり実AI previewではない。
+runはExecutionの明示buttonからだけ開始する。command-line引数、画面遷移、設定の読込／保存／適用、Prompt適用から認証確認・login・AIを自動開始しない。例外として、メインwindowのOpened後に1回だけ起動時の自動認証確認と、`AuthRequired`時の自動loginを行う（§6.1、要求§11.10）。AIは自動開始しない。Prompt previewは固定／合成値のローカル展開であり実AI previewではない。
 
 指定warningはshell rootへ常時表示し、focus、checkbox、dismiss、snapshot field、processing dependencyを持たない。
 
 ### 6.1 明示loginと状態再確認
 
+- 起動時: `App.OnFrameworkInitializationCompleted`が`AttachStartupAuthentication`でMainWindowの`Opened`を1回購読し、`ExecutionViewModel.RunStartupAuthenticationAsync`を呼ぶ。進行中の確認（設定復元による確認）に合流し、状態が`NotChecked`のときだけ確認する。`AuthRequired`かつ環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`が`0`／`false`でない場合だけ既存の`LoginAsync`を1回呼ぶ。資格情報の解決（環境変数→OS資格情報ストア→`gh`）は同梱CLIに委譲し、Appはtokenに触れない。1 VMにつき1回だけで、取消・失敗後の再試行はしない。
+
 - `ExecutionView.axaml`の「GitHubにログイン」→ `ExecutionViewModel.LoginCommand` → App所有の`BundledCopilotLoginService`がlogin経路となる。既存の`CopilotAuthenticationService`による状態確認とは分離する。
 - bundled resolverが検証した絶対CLI pathだけを直接子processとして起動する。固定CLIで確認した引数は`--no-auto-update --log-level none login --web-flow`。shell、PowerShell、`cmd /c`、任意command文字列を介さず、標準入力／出力／errorをredirect・収集しない。認証console／ブラウザーとcredential保管はCLIに委譲し、Appはtoken／device codeを入力・収集・解析・保存・log出力しない。
-- 二重開始、評価実行中・認証確認中のlogin開始を防ぐ。login開始時に古い認証状態とmodel選択を無効化し、終了codeだけで認証成功としない。完了・取消・失敗後は利用者が「Copilot 状態を確認」を押してruntime identity、認証、利用可能modelを再確認する。login完了による自動再確認・model選択・AI開始を追加しない。
+- 二重開始、評価実行中・認証確認中のlogin開始を防ぐ。login開始時に古い認証状態とmodel選択を無効化し、終了codeだけで認証成功としない。完了・取消・失敗後は利用者が「Copilot 状態を確認」を押してruntime identity、認証、利用可能modelを再確認する。login完了時の自動再確認は行うが、自動のmodel fallback・AI開始は追加しない。
 - login processの強制終了はlogin取消またはアプリ終了時だけとし、serviceが開始・所有した当該processに限定する。正常完了を含め、終了確認後に所有processを解放する。process tree全体や名前一致でkillせず、ブラウザー、他CLI、workbook、credential storeに触れない。logout・credential削除・失効を行わない。終了未確認のprocessは所有を保持して二重起動を防ぎ、認証確認・評価を止めるが、GUI／Excel読込／mapping／設計は継続可能にし、safeな状態と再試行案内を表示する。
 - CLI欠落・不一致は配布物の再取得／ZIP再展開を案内する。PATH上の別CLIやintegrity検証緩和で回避しない。自己更新抑止とlogin後の明示再確認で固定CLI identityを維持する。
 
@@ -232,7 +234,7 @@ flowchart LR
     ZIP[ZIP / 代替] --> Folder[手動展開 / apphost / folderのApp base]
     Cache --> Main[既存Program.Main / LaunchOptions / 起動時cwd]
     Folder --> Main
-    Main --> GUI[4-step GUI / loginとAIの自動開始なし]
+    Main --> GUI[4-step GUI / 起動時の自動認証確認とlogin・AIの自動開始なし]
     Cache -. manifestとCLI .-> Resolver[bundled resolver / RID・版・hash検証]
     Folder -. manifestとCLI .-> Resolver
     GUI -->|明示login・状態確認・run| Resolver

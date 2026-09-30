@@ -22,9 +22,9 @@ flowchart LR
 
 ## offline GUIと外部通信
 
-GUI起動、Excel読込、mapping、採点設計は、本人loginやAI利用とは分離したoffline機能として設計しています。clean-hostでの実証は上記のとおり未完了です。GUI起動、Prompt適用、状態確認からloginやAI評価を暗黙に開始しません。
+GUI起動、Excel読込、mapping、採点設計は、本人loginやAI利用とは分離したoffline機能として設計しています。clean-hostでの実証は上記のとおり未完了です。候補版は、GUI表示後に既存のGitHubログインを自動確認し、利用できるログインがなければloginを1回だけ自動開始します。それ以外の起動引数・Prompt適用・画面遷移・状態確認からloginを暗黙に開始せず、AI評価は一切自動開始しません。
 
-上図の評価データ送信とは別に、CLI／ブラウザーによるGitHubとのOAuth認証にはnetwork接続が必要です。**Copilot 状態を確認**も認証状態と利用可能modelを要求するため、AI評価を開始しなくてもCLI／SDKがnetwork通信を行うことがあります。候補版ではlogin processの正常終了後と、model一覧キャッシュがある場合の起動時にも、この再確認を自動で行います。キャッシュなしの旧設定・初回起動は自動確認しません。**「AI評価なし」は「network通信なし」ではありません。** AI利用には本人認証に加え、利用可能account・model、network接続、組織policy上の許可が必要です。
+上図の評価データ送信とは別に、CLI／ブラウザーによるGitHubとのOAuth認証にはnetwork接続が必要です。**Copilot 状態を確認**も認証状態と利用可能modelを要求するため、AI評価を開始しなくてもCLI／SDKがnetwork通信を行うことがあります。候補版ではlogin processの正常終了後と、起動時にも、この再確認を自動で行います。起動時の確認では、同梱CLIがこのPCの環境変数（`COPILOT_GITHUB_TOKEN`／`GH_TOKEN`／`GITHUB_TOKEN`）、OSの資格情報ストア、GitHub CLI（`gh`）のログインを自力で解決します。アプリはこれらのtokenを読取・保存しません。**「AI評価なし」は「network通信なし」ではありません。** AI利用には本人認証に加え、利用可能account・model、network接続、組織policy上の許可が必要です。
 
 ## AIへ送る情報
 
@@ -135,7 +135,7 @@ EXE配置先や抽出cacheを既定の出力先にせず、配布・展開・起
 
 失敗・取消では現在のmetadata・draft・Designと保存fileを変更しません。成功時は保存したID・順序・質問文・Prompt・配点を保持し、候補の作り直しや新しいheader値への暗黙置換をしません。その後に利用者が主回答列を変更すると、既存どおり交差セルの値へ質問文を更新します。Imported Prompt一覧・本文・順序は適用で変更・消去しません。
 
-run中の一括適用はできません。別Excelのsheet・列が存在しても授業内容の一致やcheckpoint再開可能性は保証せず、利用者の確認と既存の再開検証が必要です。認証・一覧の自動再確認は前述のキャッシュありの起動時とlogin正常終了後に限り、設定の明示再読込・保存・適用からは開始しません。login・AI評価も自動開始しません。
+run中の一括適用はできません。別Excelのsheet・列が存在しても授業内容の一致やcheckpoint再開可能性は保証せず、利用者の確認と既存の再開検証が必要です。認証・一覧の自動再確認は起動時とlogin正常終了後に限り、設定の明示再読込・保存・適用からは開始しません。login・AI評価も自動開始しません。
 
 障害時は[設定のトラブルシューティング](troubleshooting.md#設定を保存読み込めない未公開候補)を確認してください。詳細な操作は[設定ガイド](settings.md)を参照してください。
 
@@ -187,7 +187,7 @@ finalも入力を匿名化・縮小したfileではありません。入力の�
 
 ### loginの開始と再確認
 
-1. **未公開`0.8.6`候補のみ**、利用者が**GitHubにログイン**を選んだ場合に開始します。manifest、RID、SDK／CLI版、SHA-256を検証した同梱native CLIの絶対pathだけを使い、PATH上の別CLIへfallbackしません。
+1. **未公開`0.8.6`候補のみ**、利用者が**GitHubにログイン**を選んだ場合、または起動時の自動確認で利用できるログインが見つからなかった場合に1回だけ自動で開始します（環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`が`0`／`false`なら自動開始しません。取消・失敗後は自動で再試行しません）。manifest、RID、SDK／CLI版、SHA-256を検証した同梱native CLIの絶対pathだけを使い、PATH上の別CLIへfallbackしません。
 2. shell、PowerShell、`cmd /c`を介さず、固定引数`--no-auto-update`、`--log-level none`、`login --web-flow`で直接子processを起動します。token等を引数・標準入力へ渡さず、標準入力／標準出力／標準errorをredirectせず、CLIの出力もcapture・解析しません。本人の対話はCLI／ブラウザー上で完了します。
 3. login processの正常終了後は認証状態とmodel一覧を自動再確認します。取消・失敗後や再確認失敗時は、利用者が**Copilot 状態を確認**で再試行します。processの開始・終了codeだけを認証成功とせず、実効modelは再確認結果に従って反映します。AI評価は自動開始しません。
 

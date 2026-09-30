@@ -595,7 +595,7 @@ public sealed class ExecutionViewTests
         Assert.Same(check, harness.Window.FocusManager?.GetFocusedElement());
         Assert.Contains("別のブラウザー", instructions.Text, StringComparison.Ordinal);
         Assert.Contains("パスワードやトークンを取得・保存しません", ToolTip.GetTip(login)?.ToString(), StringComparison.Ordinal);
-        Assert.Equal("別のブラウザーで認証後、モデル一覧を自動更新・保存します。ログイン・定量化は自動で開始しません。", instructions.Text);
+        Assert.Equal("起動時にこのPCの既存ログインを自動確認し、なければ自動ログインを試みます。別のブラウザーで認証後、モデル一覧を自動更新・保存します。定量化は自動で開始しません。", instructions.Text);
         Assert.Contains("自動で開始しません", instructions.Text, StringComparison.Ordinal);
         Assert.All(new[] { check, login, cancelLogin, start, cancelRun }, button =>
             Assert.False(string.IsNullOrWhiteSpace(ToolTip.GetTip(button)?.ToString())));

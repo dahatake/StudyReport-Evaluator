@@ -9,6 +9,8 @@ namespace StudyReportEvaluator.App;
 
 public sealed partial class App : Application
 {
+    public const string AutomaticLoginEnvironmentVariable = "STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN";
+
     public App()
         : this(new ServiceRegistration(), null)
     {
@@ -39,11 +41,39 @@ public sealed partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = StartupError is null
-                ? CreateMainWindow()
-                : new StartupErrorWindow(StartupError);
+            if (StartupError is null)
+            {
+                MainWindow window = CreateMainWindow();
+                AttachStartupAuthentication(
+                    window,
+                    IsAutomaticLoginEnabled(Environment.GetEnvironmentVariable(AutomaticLoginEnvironmentVariable)));
+                desktop.MainWindow = window;
+            }
+            else
+            {
+                desktop.MainWindow = new StartupErrorWindow(StartupError);
+            }
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>Only "0" or "false" (case-insensitive) opts out of the automatic login start.</summary>
+    public static bool IsAutomaticLoginEnabled(string? environmentValue) =>
+        !("0".Equals(environmentValue?.Trim(), StringComparison.Ordinal)
+            || "false".Equals(environmentValue?.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Runs the one-time startup authentication after the window is shown.</summary>
+    public static void AttachStartupAuthentication(MainWindow window, bool allowAutomaticLogin)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+
+        void HandleOpened(object? sender, EventArgs e)
+        {
+            window.Opened -= HandleOpened;
+            _ = window.ViewModel.ExecutionViewModel.RunStartupAuthenticationAsync(allowAutomaticLogin);
+        }
+
+        window.Opened += HandleOpened;
     }
 }

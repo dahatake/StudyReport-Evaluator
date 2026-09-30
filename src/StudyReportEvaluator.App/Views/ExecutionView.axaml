@@ -210,7 +210,7 @@
               </Border>
             </StackPanel>
             <TextBlock x:Name="CopilotLoginInstructions" Classes="muted" TextWrapping="Wrap"
-                       Text="別のブラウザーで認証後、モデル一覧を自動更新・保存します。ログイン・定量化は自動で開始しません。" />
+                       Text="起動時にこのPCの既存ログインを自動確認し、なければ自動ログインを試みます。別のブラウザーで認証後、モデル一覧を自動更新・保存します。定量化は自動で開始しません。" />
           </StackPanel>
         </ScrollViewer>
         <ScrollViewer Grid.Row="1" MaxHeight="44"

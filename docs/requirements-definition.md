@@ -67,11 +67,11 @@
 
 ### 3.2 GitHub Copilot
 
-AI処理にはGitHub Copilotを利用できるaccount、本人の対話login、必要なnetwork接続と組織policy上の利用許可が必要である。これらはGUI起動の前提とは分離する。
+AI処理にはGitHub Copilotを利用できるaccount、login、必要なnetwork接続と組織policy上の利用許可が必要である。これらはGUI起動の前提とは分離する。
 
 - 配布物は、固定したGitHub Copilot SDKと互換なCopilot CLI runtimeを同梱する。
 - PATH上の任意CLIへ黙ってfallbackしない。
-- loginは利用者本人がCLI／ブラウザーを通じてGitHubとの対話で行う。アプリはPAT、password、client secret、token、device codeを入力・収集・解析・保存しない。
+- loginは、起動時にOS利用者の既存GitHub資格情報を同梱CLIが自力で解決する自動確認（§11.10）を先に行い、利用できる資格情報がない場合だけ、CLI／ブラウザーを通じたGitHubとの対話認証を自動で開始する。手動の「GitHubにログイン」も維持する。アプリはPAT、password、client secret、token、device codeを入力・収集・解析・保存しない。
 - CLIまたはloginが利用できない場合、アプリ起動、Excel読込、mapping、設計編集、checkpoint確認は利用できるが、新しいAI処理は開始できない。
 - 利用できない理由、明示的な「GitHubにログイン」開始・取消、既存の「Copilot 状態を確認」による再確認をExecution画面へ表示する。D-06は採用済みとし、動作とprocess所有範囲は§11.3に従う。
 
@@ -83,7 +83,7 @@ Microsoft Excel、Office、LibreOffice、COM automationはrequired runtimeでは
 
 - 取得済みの単一EXEだけで、Windows 11 x64の標準userがofflineでGUI、Excel読込、mapping、採点設計を利用できることを要求する。管理者昇格、setup script、terminalへのcommand入力、手動展開を要求しない。
 - GUI起動に.NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI（`gh`）、別Copilot CLI、Office、IDEの導入を要求しない。sidecar、repository、隣接DLL／manifest、既存のCLI cacheや認証情報も起動の前提にしない。
-- 起動時にloginやAI評価を自動開始しない。CLIのStart/Ping、認証状態確認、本人login、実AI評価は別々に検証し、GUI表示やCLI helpの成功をAI-readyへ読み替えない。
+- GUIは、認証確認やloginの完了を待たずに表示・操作可能とする。起動時の自動認証確認・自動login（§11.10）はGUI表示後に非同期で行い、AI評価は自動開始しない。CLIのStart/Ping、認証状態確認、login、実AI評価は別々に検証し、GUI表示やCLI helpの成功をAI-readyへ読み替えない。
 - OS保護による警告・拒否と、network／account／認証の必要性は追加runtime不要の契約とは別であり、すべての端末での無警告・無条件起動を保証しない。
 
 ## 4. 入力workbook契約
@@ -597,13 +597,39 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 ### 11.3 同梱CLIによるlogin開始（D-06採用済み）
 
-1. 利用者が「GitHubにログイン」を押した場合だけloginを開始する。GUI起動、Prompt適用、認証状態確認から暗黙に開始しない。
+1. loginは、利用者が「GitHubにログイン」を押した場合、または§11.10（FR-AL-03）の起動時自動loginの場合だけ開始する。画面遷移、Prompt適用、設定の読込／保存／適用、手動の認証状態確認から暗黙に開始しない。
 2. 既存のbundled resolverでmanifest、RID、SDK／CLI版、SHA-256を検証した絶対CLI pathだけを使い、固定CLI `1.0.79`の`login` subcommandを直接子processとして起動する。shell command文字列、PowerShell、`cmd /c`、任意command実行を介さない。optionは固定版で実在と動作を確認したものだけに限定する。
 3. 認証用console／ブラウザーとcredential保管はCLIに委譲する。アプリはtokenやdevice code等を解析・収集・保存せず、引数・標準入力・application logへ渡さない。独自OAuth、token入力UI、WebView、callback serverを追加しない。
 4. loginの二重開始と評価実行中のlogin開始を防ぐ。取消・失敗時もGUI、Excel読込、mapping、設計編集を利用可能に保ち、safeな理由と再試行操作を表示する。
-5. login子processを取消・強制終了するのは利用者のlogin取消またはアプリ終了時だけとし、アプリが開始・所有した当該login processだけを終了・解放する。process tree全体や名前一致で一括killせず、ブラウザー、他のCLI、credential storeに触れない。credentialの削除、logout、失効を行わない。
-6. 完了・取消・失敗後は利用者が既存の「Copilot 状態を確認」で認証を再確認する。process起動・終了codeだけを認証成功とせず、自動model選択変更やAI評価開始を追加しない。
+5. login子processを取消・強制終了するのは利用者のlogin取消またはアプリ終了時だけ（起動時自動loginも同じ）とし、アプリが開始・所有した当該login processだけを終了・解放する。process tree全体や名前一致で一括killせず、ブラウザー、他のCLI、credential storeに触れない。credentialの削除、logout、失効を行わない。
+6. login完了後は認証状態とmodel一覧を再確認する（完了時の自動再確認、および取消・失敗後の既存「Copilot 状態を確認」）。process起動・終了codeだけを認証成功とせず、自動model選択変更やAI評価開始を追加しない。
 7. login前後で固定CLIのversion／hashを維持し、自己更新によるmanifest不一致を許容しない。必要な更新抑止optionも固定版の確認に基づく。CLI欠落・不一致時は配布物の再取得／展開状態の確認を案内し、PATH上の別CLI導入やhash検証緩和で回避しない。
+
+### 11.10 起動時の自動Copilotログイン（2026-09-30追加）
+
+出典: 依頼原文（2026-09-30「アプリケーションの起動時に、ユーザーがPCやMacなどにログインしているアカウントで、GitHub Copilot CLIに自動的（可能な限りユーザーが何もしなくてもいいように）にログインしてください」）、[Authenticating GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli)（確認日2026-09-30）。§3.4・§11.3の「起動時に自動開始しない」を本節が置き換える。
+
+**既存ログイン**とは、同梱CLIが当該OS利用者の環境から自力で解決する資格情報を指す。CLIの解決順は、`COPILOT_GITHUB_TOKEN`、`GH_TOKEN`、`GITHUB_TOKEN`の各環境変数、OS資格情報ストア（Windows Credential Manager／macOS Keychain）のOAuth token、GitHub CLI（`gh auth token`）の順である。アプリはこの解決に関与せず、既存の認証確認（`UseLoggedInUser = true`、`GitHubToken = null`）でCLIへ委ねる。
+
+| ID | 優先度 | 要求 |
+|---|---|---|
+| FR-AL-01 | MUST | メインwindowが最初に表示された直後（Openedイベント）に、1アプリ起動につき1回だけ、既存の「Copilot 状態を確認」と同じ認証確認を自動で開始する。利用者操作を要さず、GUI表示・入力操作を待たせない（非同期）。起動引数の有無、Prompt適用の有無によらず同じである。起動引数の検証エラーwindowでは開始しない。 |
+| FR-AL-02 | MUST | 認証確認が`Available`の場合、login子process・ブラウザー・入力欄を出さない。認証状態とmodel一覧を反映し、login状態文へ「この PC で利用中の GitHub アカウントで自動的にログインしました。」を表示する。 |
+| FR-AL-03 | MUST | 認証確認が`AuthRequired`（同梱CLIは正常に動作したが利用できる資格情報がない）の場合だけ、§11.3と同じ経路（検証済み絶対CLI path・固定`login` subcommandの直接起動）でloginを1回自動開始する。開始時は「利用できる GitHub ログインが見つからないため、自動ログインを開始します…」を表示し、完了後は§11.3 6の自動再確認でmodel一覧を更新する。`CliUnavailable`・`RuntimeFailed`・`Cancelled`ではloginを開始せず、「起動時の自動ログイン確認を完了できませんでした。「Copilot 状態を確認」で再試行してください。」を表示する。 |
+| FR-AL-04 | MUST | 自動loginが取消・失敗・終了しても、同じアプリ起動中に自動再確認・自動再loginをしない。以後は利用者の「Copilot 状態を確認」「GitHubにログイン」操作だけとする。利用者が起動直後に手動で認証確認・login・runを行い自動確認を開始できない状態のときは、自動確認を行わず、後から再開もしない。 |
+| FR-AL-05 | MUST | 自動loginは、§11.3の2〜7（shell非使用、二重開始・評価中開始の防止、「ログインを取り消す」での取消、取消／アプリ終了時の所有process限定終了、CLI version／hash維持）をすべて満たす。 |
+| FR-AL-06 | MUST | 自動処理は認証確認とlogin開始だけを行う。AI評価・run開始、Prompt適用、自動model選択変更（既存の認証確認後のmodel選択規則を超える変更）、別modelへのfallbackをしない。 |
+| FR-AL-07 | MUST | 自動確認・自動loginの成否によらず、GUI、Excel読込、mapping、設計編集を利用可能に保つ。失敗はsafeな理由と再試行操作（「Copilot 状態を確認」「GitHubにログイン」）で表示し、例外内容・path・token・device codeを表示しない。 |
+| FR-AL-08 | MUST | 環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`が前後の空白を除いて`0`、または大文字小文字を区別せず`false`のとき、FR-AL-03の自動login開始をしない（FR-AL-01の認証確認は行い、`AuthRequired`時は「利用できる GitHub ログインが見つかりませんでした。「GitHubにログイン」を押してください。」を表示する）。未設定・空・その他の値は自動login有効とする。この環境変数は任意の抑止手段であり、必須ではない。 |
+| SEC-AL-01 | MUST | アプリはtoken、password、device code、`COPILOT_GITHUB_TOKEN`／`GH_TOKEN`／`GITHUB_TOKEN`の値、`gh`のtoken出力を読取・解析・保存・log出力・引数／標準入力への受渡しをしない。アプリは`gh`を起動せず、独自OAuth・token入力UI・WebView・callback serverを追加しない。 |
+| SEC-AL-02 | MUST | credentialの削除・logout・失効、ブラウザー・他CLIの終了、PATH上の別CLIへのfallback、hash検証の緩和をしない。 |
+| SEC-AL-03 | MUST | 自動確認・自動loginで送信し得るのはCLIによるGitHub認証通信だけとする。学生回答・Prompt・workbook pathを送らず、AI送信は0件である。 |
+| NFR-AL-01 | SHOULD | 認証確認が失敗・timeoutしても（既定15秒）UI操作を妨げない。offline時はGUI・Excel読込・mapping・設計を従来どおり利用できる。 |
+
+境界・例外:
+
+- 環境変数のtokenは、CLI仕様上、保存済みOAuth tokenより優先される。無効なtoken（例: 非対応の`ghp_`classic PAT）が設定されている場合は、自動loginで別のログインをしても認証確認が`AuthRequired`のままとなり得る。この場合は環境変数の解除をtroubleshootingへ案内する。
+- 期待動作の例: ①既存ログインあり → 起動後数秒でExecution画面の状態が「既存の Copilot CLI login を利用できます。」、login process起動0回。②資格情報なし → 起動後にブラウザー認証が1回始まり、承認後にmodel一覧が更新される。取消後は再自動起動しない。③`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN=0`で資格情報なし → ブラウザーは開かず、手動ボタン待ち。
 
 ### 11.4 主画面と設定の分担
 
@@ -794,7 +820,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 - app-owned cloud backend、database、telemetry本文送信を追加しない。
 - checkpointは暗号化containerではない。保存先のaccess controlは利用者のOS権限に従う。
 - runtime抽出cacheと利用者workbook／CLI credential storeを分離する。配布・展開・起動のために利用者workbookを移動・削除しない。アプリはcacheの再帰削除、旧版の自動掃除、credential削除を行わない。
-- loginでは検証済みCLIとブラウザーに本人認証を委譲し、アプリはtoken／device code等を収集・解析・保存・log出力しない。取消／アプリ終了による終了対象は§11.3の所有login processだけとする。
+- loginでは検証済みCLIとブラウザーに本人認証を委譲し、アプリはtoken／device code等を収集・解析・保存・log出力しない（起動時の自動loginも同じ、§11.10 SEC-AL-01〜03）。取消／アプリ終了による終了対象は§11.3の所有login processだけとする。
 - Windowsの保護設定を変更せず、実行拒否を回避しない。公開用evidenceも§13.6のmetadataに限定し、利用者本文やcredentialをcontrol artifact／公開物へ混入させない。
 - 定義を明示保存すると、主回答列選択によって見出しセルから取り込まれた設問textもsetting.txtに平文で含まれる。Prompt・評価基準等へ利用者が貼り付けた内容、sheet名、明示出力pathも含まれ得る。読込・主列変更だけで自動保存する意味ではない。
 - 回答行本文の自動収集は追加しないが、機密な本文が設定へ絶対に含まれないとは保証しない。setting.txtは暗号化containerではなく、OSの利用者別保存先のaccess controlに従う。§11.6の非保存対象を守り、設定の実内容を公開物・画像・log・共有証跡へ混入させず、自動削除機能を追加しない。
@@ -853,6 +879,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 - App限定の.NET標準single-file全内容展開によるWindows self-contained unsigned EXEとSHA-256 sidecarを主配布へ追加
 - Windows self-contained unsigned ZIPとSHA-256 sidecarを代替として維持
 - D-06採用による同梱CLIの明示login開始・取消・既存buttonでの認証再確認
+- 起動時の既存GitHubログイン自動確認と、資格情報がない場合の自動login開始（§11.10）
 - non-public development MSIXのpackage/unpack/integrity `PASS_MECHANISM` evidence
 - clean extract、apphost起動、bundled CLI identityのWindows evidence
 - exact EXEのclean-host CH-01〜06と、EXE／ZIP／development MSIXのclosed 3-row matrix v2による公開判定
@@ -920,17 +947,18 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | AC-030 | 単一EXEに.NET/native依存・固定CLI・manifest・既存公開docs／画像／LICENSEを含め、外部PATH／SDKやsidecarに依存せず既存CLI integrity検証を維持する。App限定profileとCore／Appの2 production projectを維持する。 |
 | AC-031 | EXE／ZIPで任意cwd、日本語・空白path、相対`--input`、複数`--prompt`、既存invalid入力・明示適用の契約を維持する。起動によるAI送信は0件で、EXE配置先や抽出先へcwd基準を変えない。 |
 | AC-032 | 初回・再起動・同時起動・cache欠落・抽出中断・容量／権限不足でも利用者input／final／partialを変更・削除しない。cacheとdata／setting.txtを分離し、明示出力先の復元と未指定時だけの入力隣接result、同版EXE／ZIP間の既存checkpoint再開条件を維持する。 |
-| AC-033 | 本人のbutton操作だけで検証済み同梱CLIのloginを直接開始し、shellを介さずcredential／device codeを収集しない。二重開始・評価中開始を防ぎ、取消・失敗後もGUIを継続する。取消／アプリ終了時だけ所有login processを終了し、ブラウザー・他CLI・credentialに触れず、既存buttonで再確認する。自動AI実行しない。 |
+| AC-033 | 利用者のbutton操作または§11.10の起動時自動loginだけで検証済み同梱CLIのloginを直接開始し、shellを介さずcredential／device codeを収集しない。二重開始・評価中開始を防ぎ、取消・失敗後もGUIを継続する。取消／アプリ終了時だけ所有login processを終了し、ブラウザー・他CLI・credentialに触れず、既存buttonで再確認する。自動AI実行しない。 |
 | AC-034 | candidate run／source／version／bytes／hashに拘束されたexact EXEとCH-01〜06のPASSが一致した場合だけ新経路をprotected publishする。metadata限定JSON、candidate-bound MSIX検証記録、4 public assetsの再download照合を要求し、必須試験の欠落・FAIL・NOT_RUN・差替えを拒否する。未実測のOS-only／署名／installer claimを出さない。 |
 | AC-035 | 利用者別setting.txt（UTF-8 JSON、schema整数1）へ共通設定＋任意の採点定義1件を明示保存し、ID／decimal／Prompt／canonical hashを復元する。header由来の設問text・貼付内容は明示保存時に平文で含まれ、§11.6の非保存対象は保存しない。破損・未知schema・IO失敗は元fileとdraftを保持しoffline継続する。保存中再編集は未保存のまま、同時保存は最後の成功が優先する。明示出力先は再起動・入力変更後も復元し、初回の未指定または空欄への明示編集によるnullの場合だけ入力隣接resultを算出し、fallback・復元時directory作成をしない。 |
 | AC-036 | 保存定義はExcel読込後の明示操作で、保存headerのmetadata・sheet・行・列・定義全体を検証してからInput／Designへ一括適用する。失敗・取消時は現在状態とfileを変更せず、成功時はID・順序・設問text・Prompt・配点を保持する。Imported Prompt一覧は不変、run中の一括適用は禁止し、既存checkpoint admissionを緩めない。 |
-| AC-037 | 設定を第5ステップにせず、同じ対象へ1操作で移動し、値・対象ID・ページ・カテゴリ・入力途中の編集を保持して戻れる。希望modelは明示確認後だけ実効選択にし、不在なら未選択・no fallback、確認失敗だけで保存希望を消さない。遷移・設定読込／保存／適用・login完了で認証確認／login／runを自動開始せず、実行中の次回draft編集は現在snapshotへ混入しない。全画面で進捗・停止を保持し、設定中完了は結果通知だけとする。前回結果・override・未保存修正版を次回設定から分離する。 |
+| AC-037 | 設定を第5ステップにせず、同じ対象へ1操作で移動し、値・対象ID・ページ・カテゴリ・入力途中の編集を保持して戻れる。希望modelは明示確認後だけ実効選択にし、不在なら未選択・no fallback、確認失敗だけで保存希望を消さない。遷移・設定読込／保存／適用・login完了で認証確認／login／runを自動開始せず（起動時の自動確認・自動loginだけは§11.10・AC-040に従う）、実行中の次回draft編集は現在snapshotへ混入しない。全画面で進捗・停止を保持し、設定中完了は結果通知だけとする。前回結果・override・未保存修正版を次回設定から分離する。 |
 | AC-038 | 中断後は部分結果のpartial pathと再開準備を表示し、同一セッションでは明示操作で、再起動後はpartial選択またはpath指定で再開条件を開始前に項目別検証する。不一致時はcheckpointを変更せず開始しない。入力・modelだけは明示操作で合わせられ、採点設計・runtimeは自動変更しない。window close時は有限時間の中断待機後に閉じる。 |
 | AC-039 | 実行・結果画面とジョブ単位のローカルJSON Linesログで、今回の開始操作に対応するAI使用量（入力・出力・推論・キャッシュtoken、`nano-AI units`、premium request消費量）を、AIを呼ぶ3 operation（参照回答・通常評価・固有評価）と再試行・失敗・取消・未保存行を含めて確認できる。未取得は0や推定値にせず理由とともに示し、明示0・未送信・送信状況不明・部分取得を区別する。項目別の取得元、試行番号・相関ID・終端結果、モデル内訳と総量の不一致を保持し、内訳を総量へ加算・配賦しない。SDK報告の原単位を保ち、換算根拠のないAIクレジット・通貨表示をしない。ログは数値・生成ID・閉じたコードだけを記録し、保存失敗でも観測済み表示と採点を壊さない。 |
+| AC-040 | 事前条件: fake認証境界とfake login processを注入した`ExecutionViewModel`（実CLI・実ブラウザー・実資格情報は使わない）。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~CopilotLoginCommandTests"`。期待結果（exit code 0）: ①window表示（Opened）で認証確認が1回だけ実行される（FR-AL-01）。②`Available`ならlogin processの起動0回・resolver呼出0回・状態文に「自動的にログインしました」（FR-AL-02）。③`AuthRequired`ならlogin processがちょうど1回起動し、完了後に認証を再確認し、2回目の起動時処理は何もしない（FR-AL-03、FR-AL-04）。④`CliUnavailable`／`RuntimeFailed`／`Cancelled`ではlogin起動0回で再試行案内を表示する（FR-AL-03、FR-AL-07）。⑤自動login中の「ログインを取り消す」で所有processだけを`Kill(false)`で1回終了し、再自動起動しない（FR-AL-04、FR-AL-05）。⑥run呼出0回・model fallbackなし（FR-AL-06）。⑦環境変数値`0`／`false`（大文字小文字・前後空白を無視）でlogin起動0回、未設定・空・その他値は有効（FR-AL-08）。⑧状態文・`ToString()`にcanary（token、device code、path、例外名）を含まない（SEC-AL-01〜02）。⑨dispose後・手動確認中・確認失敗時に例外を漏らさずloginを開始しない（FR-AL-07、NFR-AL-01）。証跡: テスト結果（.trx）。実資格情報での確認はAC-040に含めず、§18外の本人確認とする。 |
 
 ## 19. Test requirements
 
-以下の番号は追跡ID `TR-01`〜`TR-38`に対応する。既存番号を維持し、中断・再開導線の37とジョブコスト表示の38を末尾へ追加する。T01時点の未実装・試験NOT_RUNは履歴であり、現在の実装・局所検証は[traceability](../dev/docs/traceability.md)のVERIFIED_SCOPEDに限定する。過去の試験結果と現在の局所検証は同追跡表で区別し、異なる対象集合を合算して全体合格にしない。
+以下の番号は追跡ID `TR-01`〜`TR-39`に対応する。既存番号を維持し、中断・再開導線の37、ジョブコスト表示の38、起動時の自動Copilotログインの39を末尾へ追加する。T01時点の未実装・試験NOT_RUNは履歴であり、現在の実装・局所検証は[traceability](../dev/docs/traceability.md)のVERIFIED_SCOPEDに限定する。過去の試験結果と現在の局所検証は同追跡表で区別し、異なる対象集合を合算して全体合格にしない。
 
 **0.8.4での記録済み結果:** T35の対象文書試験は4/4成功・敵対的レビュー済み（`artifacts/test/ui-settings/t35/t35-reviewed.trx`、指摘0）。T36の文書・画像contract全体は別scopeで、独自の`artifacts/test/ui-settings/t36/t36-current.trx`が21/21成功・REVIEWED。T37は`artifacts/test/ui-settings/t37/t37.trx`の9/9（実ZIP＋MSIX静的契約）、T38は`artifacts/test/ui-settings/t38/t38.trx`の114/114とP06実EXE 7/7・P07 `PASS_DEVELOPMENT`。T39の自動回帰は`artifacts/test/ui-settings/t39/reviewed/`の2026-09-07の2 TRXでCore 190＋App 1702＝1892/1892、skip 0。初回1失敗→fixture修正→126/126・レビュー指摘0→全体再実行成功の履歴を保持する。MSIX実物は`artifacts/package/mechanism/StudyReportEvaluator-win-x64.unsigned.test.evidence.json`の`PASS_MECHANISM`（256 entries、0.8.4.0）で、install／公開の成功ではない。
 
@@ -976,6 +1004,8 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 37. 中断後の再開準備、partial picker取消時の状態不変、開始前の項目別再開検証、入力・modelの明示適用、window close時の有限中断待機をdeterministicに確認する。
 
 38. ジョブ使用量の集計・表示・JSONLログのdeterministic test。取得成功／一部欠落／全欠落、明示0と未取得、最後の呼び出しのみ、イベント重複・順序逆転・final複数通知、再試行と3 operation（類似度はAIを呼ばない）、取消・cleanup失敗、項目別の取得元、モデル内訳と総量の不一致、下方訂正、overflow／負数を確認する。JSONLは一時directoryだけを使い、回答・Prompt・path・credentialのcanary非記録、容量上限・保存失敗時の観測値保持、終端記録の整合を検証する。実AI・実課金照合・AIクレジット換算は含めない（AC-039）。
+
+39. 起動時の自動Copilotログインのdeterministic test。既存資格情報あり（login process起動0）、資格情報なし（自動login1回・完了後の再確認・以後の再実行なし）、`CliUnavailable`／`RuntimeFailed`／`Cancelled`でのlogin非開始、利用者取消後の非再試行、dispose後・手動確認中の非実行、確認失敗の封じ込め、環境変数の解釈（未設定・空・`0`・`false`・大文字小文字・空白）、window表示（Opened）で1回だけ開始されること、AI送信0件、状態文・ToStringへのcanary非混入をfake境界で検証する。実CLI・実ブラウザー・実資格情報は使わない（AC-040）。
 
 ## 20. 外部仕様出典
 
@@ -1026,6 +1056,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | Platform release matrix | 既存protected CI/release workflow + candidate-bound v2 matrix／metadata evidence（AC-028／034、TR-29／33） |
 | User/developer documentation | docs + dev/docs + screenshot tests |
 | 実行コスト表示・ジョブログ | App `Usage`の集計と`Logging`のJSONL writer、Execution／Resultsが共有するコストView（AC-039、TR-38）。JobUsageTracker／SdkUsageAdapter／UsageProvenance／JobCostBackend／JobCostView testsで局所検証済み（VERIFIED_SCOPED）。実AI・実課金照合・AIクレジット換算・native確認は未実施 |
+| 起動時の自動Copilotログイン | `ExecutionViewModel.RunStartupAuthenticationAsync`と`App.AttachStartupAuthentication`（AC-040、TR-39、FR-AL-01〜08／SEC-AL-01〜03）。CopilotLoginCommandTestsの起動時自動ログイン試験で局所検証。実CLI・実ブラウザー・実資格情報での確認は未実施（本人操作が必要） |
 
 ## 22. Approval record
 
@@ -1049,5 +1080,17 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | Auto model selection source | 2026-09-15の要求所有者指示「`auto`を通常評価modelとして選択できるように必要なら要求定義から変更」。同梱CLIを実測し、`auto`はrouterでtoken上限を公開しないことを確認した上で§7.1・§10.3・§10.4・§11・§15・§16を改訂した。上限不明modelを拒否せず、model相対のcontext budget検査だけを適用外とし、既定値の推定と別modelへのfallbackは行わない。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Timeout / reasoning effort source | 2026-09-24の要求所有者指示「7.6節のattempt timeoutはSDKの60秒に従う」「Thinking Effortはmedium。答案の定量化なのでHighは不要」。当初はattempt全体を60秒としたが、実機の通し実行で起動・session作成に約10〜25秒かかり、SDKの60秒の応答待ちより先にattempt側が満了してAI_TIMEOUTとなった（応答完了直前の打切りを含む）ため、§7.6は応答待ちをSDK既定の60秒とし、attempt全体の外側上限120秒は維持した。§7.1へreasoning effort `medium`を追加した。同梱CLIの実測で、`auto`と非対応modelへeffortを指定するとsession作成が失敗することを確認し、対応modelだけに指定する。2026-09-25の要求所有者指示「effortを記録する」により、attemptごとの指定値をジョブログへ記録する（§7.1、§11.9）。同日の指示「schema不正の根本原因を調査・修正する」により、claude-sonnet-5がtool引数から定数のevaluator IDを省略することが原因と確認し（`medium`で10/30、未指定で2/30）、§7.3でアプリが補う。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Similarity / effort / concurrency source | 2026-09-25の要求所有者指示「類似度判定を最適化する」「並列度をSDKが許容する最大値まで設定できるようにする（最速実行時間・LLM回答の高い一貫性・Tokenコスト最小化）」「全ての評価・回答で同じreasoning effortにする（採点の一貫性のため、最低でよい）」。§7.5を生成AI出力の貼り付け検出向けのローカル表層類似度へ改訂し、§7.1のreasoning effortを`medium`からrun-level統一（希望`low`）へ改訂、参照回答を固定`auto`から通常評価と同じmodelへ変更した。SDKには並列session数の上限がないため、並列度はapp判断として合成Promptの実測で頭打ちとなった8を既定、16を最大とし、rate limitは専用statusでbackoff付き再試行と有効並列度の縮退を行う。2026-09-27に、同指示と実装に合わせて§7.2・§7.6・§9.2・§11・§11.9・§14・§16・AC-009・AC-039・§19（7、15、36、38）に残っていた固定`auto`・LLM類似度・4 operationの記述を整合し、rate limit／quota枯渇の挙動を明記した。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Startup automatic login source | 2026-09-30の要求所有者依頼「アプリケーションの起動時に、ユーザーがPCやMacなどにログインしているアカウントで、GitHub Copilot CLIに自動的（可能な限りユーザーが何もしなくてもいいように）にログインしてください」。§3.2・§3.4・§11.3・§14・§17.1・AC-033・AC-037を改訂し、§11.10（FR-AL-01〜08、SEC-AL-01〜03、NFR-AL-01）、AC-040、TR-39を追加した。削除した要求IDはない。「起動時にloginやAI評価を自動開始しない」という旧規定のうちlogin部分だけを置き換え、AI評価の自動開始禁止は維持する。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Meaning | repository要求baselineの承認記録。実装完了・試験成功・release存在・tag／push／draft／公開操作の承認、組織の法務・教育・security承認または電子署名を意味しない |
 
+## 23. 仮定・未解決事項
+
+本節は2026-09-30の起動時自動login依頼で選んだ仮定を記録する。TBD、BLOCKED、競合はない。
+
+| ID | 種別 | 内容 |
+|---|---|---|
+| A-AL-01 | [ASSUMPTION] | 「PCやMacにログインしているアカウント」は、OS利用者ごとに同梱CLIが解決する既存GitHub資格情報（§11.10の解決順）と解釈する。根拠: GitHub Copilot CLIの公式資料（確認日2026-09-30）に、Windows／macOSのサインインアカウントをCopilotへ直接連携する手段は記載されておらず、アプリがOSアカウントからGitHubの資格情報を作る実装は独自認証providerとなり§17.2・SEC-AL-01に反する。影響: OSサインインだけではGitHubへログインしない。覆す条件: GitHubがOSサインイン連携を提供した場合。 |
+| A-AL-02 | [ASSUMPTION] | 既存資格情報がない場合の「可能な限り利用者が何もしない」は、起動時にCLIのブラウザー認証を1回自動で開始し、利用者がブラウザーで承認するだけの状態にすることとする。根拠: 資格情報がない状態でCLIがlogin対話なしに認証することはできない。影響: 起動時にブラウザーが開く。覆す条件: 起動時のブラウザー自動起動が不適切と判断された場合、環境変数の既定値を無効へ変更する。 |
+| A-AL-03 | [ASSUMPTION] | 自動loginは1アプリ起動につき1回とし、取消・失敗後は自動再試行しない。根拠: 取消した利用者へ認証画面を繰り返し提示しない安全側の動作。覆す条件: 再試行間隔・回数を利用者が指定した場合。 |
+| A-AL-04 | [ASSUMPTION] | 任意の抑止手段として環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`を採用し、設定画面・setting.txtの項目は追加しない。根拠: 既存のsetting.txt schema・§17.2「必須環境変数」を増やさず、後から低コストで変更できる。覆す条件: 利用者向けの設定UIが必要になった場合。 |
+| A-AL-05 | [ASSUMPTION] | macOSでも同じ実装経路（Avalonia／同梱CLI）が動く想定だが、macOSは現版の正式公開対象外（§17.2）であり、実測していない。影響: macOSでの動作は保証しない。 |

@@ -172,6 +172,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | AC-037 | 4step外の設定、選択・ページ・編集保持、model希望ID／実効選択、no fallback／no-auto-login/run、現在snapshot／前回結果不変 | T05〜10/T13〜27、最新修正T28 | TR-36／ST-UC-29。MainWindowSettingsTests／WorkflowStateTests／ExecutionSettingsTests／ResultsPresentationTests／SettingsWorkflowSystemTests。headlessと実file E2Eを分離。T39追加native FAILと本人確認NOT_RUN_EXTERNAL_PREREQUISITEは未解消 | VERIFIED_SCOPED |
 | AC-038 | 中断後の再開準備、開始前検証、明示条件適用、有限close drain | W-01/W-02/U-03 | ResumeWorkflowTests 14件、ResumeAdmissionEvaluatorTests 8件（2026-09-24時点の件数。2026-09-17の局所記録は8件・2件） | VERIFIED_SCOPED |
 | AC-039 | 今回ジョブのAI使用量を画面とJSONLで確認、未取得をゼロ化しない、項目別取得元・試行番号・終端結果・内訳不一致の保持、原単位維持 | J-01 + U-03 | JobUsageTrackerTests／SdkUsageAdapterTests／UsageProvenanceTests／AttemptOutcomeLoggingTests／JobCostBackendTests／JobCostViewTests／CostAttemptLifecycleTests。2026-09-18の局所記録を参照。実AI・課金照合・AIクレジット換算・nativeは未実施 | VERIFIED_SCOPED |
+| AC-040 | 起動時の既存GitHubログイン自動確認、資格情報がない場合だけ1回の自動login、取消・失敗後の非再試行、環境変数での自動login抑止、AI・model fallbackの非自動化、token非収集 | U-03 + App composition | CopilotLoginCommandTestsの起動時自動ログイン試験（`Startup_*`、`Automatic_login_is_enabled_unless_the_environment_value_opts_out`、`Opening_the_window_runs_startup_authentication_exactly_once`）。実CLI・実ブラウザー・実資格情報は未実施 | VERIFIED_SCOPED |
 
 ## Test requirement mapping
 
@@ -215,6 +216,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | TR-36 | 往復・交互編集・model希望、no-auto、現在run固定・停止・設定中完了、前回結果／override、保存→再読込→明示適用→fake run／resume E2E（AC-035〜037） | MainWindowSettingsTests／WorkflowStateTests／ExecutionSettingsTests／ResultsPresentationTests／SettingsWorkflowSystemTests、ST-UC-29。T24の12ケースとT27の7ケースは各集合の内数。T39追加native FAIL、本人walkthroughはNOT_RUN_EXTERNAL_PREREQUISITE | VERIFIED_SCOPED |
 | TR-37 | 中断後の再開準備、partial picker取消、開始前の項目別検証、明示入力／model反映、有限close drain（AC-038） | ResumeWorkflowTests／ResumeAdmissionEvaluatorTests。実AI・別process・OS shutdownは別境界 | VERIFIED_SCOPED |
 | TR-38 | 使用量の取得成功／一部欠落／全欠落、明示0と未取得、イベント重複・順序逆転・final複数通知、再試行と4 operation、項目別取得元、内訳不一致、下方訂正、overflow／負数、JSONLのcanary非記録・容量上限・保存失敗時の観測値保持（AC-039） | JobUsageTrackerTests／SdkUsageAdapterTests／UsageProvenanceTests／AttemptOutcomeLoggingTests／JobCostBackendTests／JobCostViewTests／CostAttemptLifecycleTests。symlink保護は通常のhostでは権限不足でSKIP、Windows Sandboxの管理者userではPASS（2026-09-24）、実AI・課金照合は別境界 | VERIFIED_SCOPED |
+| TR-39 | 既存資格情報あり／なし、`CliUnavailable`等での非login、取消後の非再試行、進行中確認への合流、dispose後、確認失敗の封じ込め、環境変数解釈、Opened時の1回実行（AC-040） | CopilotLoginCommandTests。fake認証境界・fake login processのみで実CLI・実ブラウザーは別境界 | VERIFIED_SCOPED |
 
 ## Mandatory safety surfaces
 

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Reflection;
 using System.Windows.Input;
@@ -429,6 +430,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
     private bool isLoggingIn;
     private bool loginExitUnconfirmed;
     private bool loginServiceDisposed;
+    private bool startupAuthenticationStarted;
     private string loginStatusText = "GitHub へのログインは開始していません。";
     private bool isRunning;
     private bool isCancelling;
@@ -764,6 +766,8 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
     }
 
     public Task? LastLoginTask { get; private set; }
+
+    public Task? LastStartupAuthenticationTask { get; private set; }
 
     public bool IsRunning
     {
@@ -1395,6 +1399,111 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 IsCheckingAuthentication = false;
                 Revalidate();
             }
+        }
+    }
+
+    /// <summary>
+    /// Runs the application-start sequence once: check the credentials the bundled CLI
+    /// already resolves for this OS user and, only when none are usable, start the
+    /// bundled login once. Never throws; never selects a model or starts evaluation.
+    /// </summary>
+    public Task RunStartupAuthenticationAsync(
+        bool allowAutomaticLogin,
+        CancellationToken cancellationToken = default)
+    {
+        if (startupAuthenticationStarted || disposed || closing)
+        {
+            return Task.CompletedTask;
+        }
+
+        startupAuthenticationStarted = true;
+        LastStartupAuthenticationTask = StartupAuthenticationCoreAsync(allowAutomaticLogin, cancellationToken);
+        OnPropertyChanged(nameof(LastStartupAuthenticationTask));
+        return LastStartupAuthenticationTask;
+    }
+
+    private async Task StartupAuthenticationCoreAsync(
+        bool allowAutomaticLogin,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            // The settings restore may already have started a check; join it instead of racing it.
+            await WaitForAuthenticationCheckAsync(cancellationToken);
+            if (disposed || cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (AuthenticationState == ExecutionAuthenticationState.NotChecked)
+            {
+                if (!CanCheckAuthentication)
+                {
+                    return;
+                }
+
+                LoginStatusText = "起動時に、この PC で利用中の GitHub アカウントのログイン状態を自動確認しています…";
+                await CheckAuthenticationAsync(cancellationToken);
+                if (disposed || cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+            }
+
+            switch (AuthenticationState)
+            {
+                case ExecutionAuthenticationState.Available:
+                    LoginStatusText = "この PC で利用中の GitHub アカウントで自動的にログインしました。";
+                    break;
+                case ExecutionAuthenticationState.AuthRequired when allowAutomaticLogin && CanLogin:
+                    LoginStatusText = "利用できる GitHub ログインが見つからないため、自動ログインを開始します…";
+                    await LoginAsync(cancellationToken);
+                    break;
+                case ExecutionAuthenticationState.AuthRequired:
+                    LoginStatusText = "利用できる GitHub ログインが見つかりませんでした。「GitHubにログイン」を押してください。";
+                    break;
+                default:
+                    LoginStatusText = "起動時の自動ログイン確認を完了できませんでした。「Copilot 状態を確認」で再試行してください。";
+                    break;
+            }
+        }
+        catch
+        {
+            // Startup convenience must not fault the app or expose exception content.
+            if (!disposed)
+            {
+                LoginStatusText = "起動時の自動ログイン確認を完了できませんでした。「Copilot 状態を確認」で再試行してください。";
+            }
+        }
+    }
+
+    private async Task WaitForAuthenticationCheckAsync(CancellationToken cancellationToken)
+    {
+        if (!IsCheckingAuthentication)
+        {
+            return;
+        }
+
+        TaskCompletionSource finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        void HandleChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(IsCheckingAuthentication) && !IsCheckingAuthentication)
+            {
+                finished.TrySetResult();
+            }
+        }
+
+        PropertyChanged += HandleChanged;
+        try
+        {
+            if (IsCheckingAuthentication)
+            {
+                await finished.Task.WaitAsync(cancellationToken);
+            }
+        }
+        finally
+        {
+            PropertyChanged -= HandleChanged;
         }
     }
 

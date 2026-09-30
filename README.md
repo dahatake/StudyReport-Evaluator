@@ -33,7 +33,7 @@ Component図、認証から出力までのmessage flow、変更時に同期す�
 | 配布 | .NET 10 self-contained。公開`v0.8.1`はunsigned ZIP、未公開`0.8.6`候補ではunsigned単一EXEを追加。各形式にSHA-256 sidecar |
 | 入力 | 標準Office Open XML `.xlsx` 1file |
 | AI runtime | 配布物へ同梱したGitHub Copilot CLI。PATH上の別CLIへfallbackしません |
-| AI login | 利用者本人のGitHub Copilot対話login。GUI起動とは別条件です |
+| AI login | GitHub Copilotのlogin。候補版は起動時にこのPCの既存GitHubログインを自動確認し、なければブラウザー認証を自動で開始します。GUI起動とは別条件です |
 | Spreadsheet runtime | Microsoft Excel、Office、LibreOfficeはアプリ実行に不要 |
 
 `.xls`、`.xlsb`、CSV、PDF、`.xlsm`等のmacro-enabled file、password／rights-protected／暗号化workbook、安全境界に違反するpackageは対象外です。
@@ -54,7 +54,7 @@ Component図、認証から出力までのmessage flow、変更時に同期す�
 - 標準userがofflineでGUI、Excel読込、mapping、採点設計を利用する設計です。ただし、**clean-hostでの実証は未完了**です。
 - GUI起動に.NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI（`gh`）、別Copilot CLI、Microsoft Excel／Office／LibreOffice、IDEの導入を要求しないself-contained設計です。
 - 手動展開、setup script、terminalへのcommand入力、管理者昇格、repository、隣接DLL／manifest、既存CLI cache・認証情報、sidecarをGUI起動の前提にしません。
-- GUI起動時にloginやAI評価は自動開始しません。AIのnetwork・account・model・組織policy上の許可は別条件です。
+- GUI表示後、候補版は既存のGitHubログインを自動確認し、利用できるログインがなければloginを1回だけ自動開始します（AI評価は自動開始しません）。AIのnetwork・account・model・組織policy上の許可は別条件です。
 
 ### 現在の公開版を起動する（v0.8.1 ZIP・今後も代替として維持）
 
@@ -167,7 +167,7 @@ Knowledgeの固定Promptは読取専用、Custom Promptは編集可能です。�
 
 実行画面の**モデル・並列度・実効出力先は読取専用**です。編集は**変更 → 設定の共通**で行います。認証確認・login、新規／再開、開始・cancelは実行画面に残っています。
 
-1. **Copilot 状態を確認**を明示的に選びます。未認証なら、候補版の**GitHubにログイン**で同梱native CLIのconsole／ブラウザーを開き、本人が対話loginします。完了・取消・失敗後は同じ状態確認buttonで再確認してください。processの起動・終了だけを認証成功とは扱いません。
+1. 候補版は起動直後に、このPCで利用中のGitHubアカウント（同梱CLIが解決する環境変数`COPILOT_GITHUB_TOKEN`／`GH_TOKEN`／`GITHUB_TOKEN`、OSの資格情報ストア、GitHub CLI `gh`のログインの順）で自動的にログインを確認します。利用できるログインがなければ、同梱native CLIのブラウザー認証を1回だけ自動で開始するので、ブラウザーで承認してください。自動処理は**Copilot 状態を確認**・**GitHubにログイン**と同じ処理で、取消・失敗後は自動では再試行しません。手動の**Copilot 状態を確認**・**GitHubにログイン**も使えます。環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`を`0`または`false`にすると自動のブラウザー認証だけを止められます（既存ログインの確認は行います）。processの起動・終了だけを認証成功とは扱いません。
 2. **変更 → 共通**で、列挙された通常モデル、並列度（1〜16、既定8）、指定出力先を確認・変更します。保存希望modelが利用不可なら未選択のままで、別modelへfallbackしません。Reference／通常評価／固有評価は同じ通常モデルとrun-level reasoning effort（既定希望`low`、非対応時は未指定）を使います。Similarityはローカル計算でLLMを呼びません。
 3. **設定から戻る**で実効値と新規／checkpoint再開を確認します。再開する場合は既存の`.partial.xlsx`を指定します。
 4. 技術検証を通過したら**定量化を開始**を選びます。予約された出力pathの表示だけではfile作成・保存成功を意味しません。
@@ -176,7 +176,7 @@ run中は1つのCopilot CLI processを共有し、複数の学生行を最大並
 
 **公開`v0.8.1`にはlogin buttonがありません。** 同梱CLIで本人loginを行い、アプリの状態確認buttonで確認する手順は[はじめに](docs/getting-started.md)を参照してください。どちらの版でもアプリへpassword、PAT、token、device codeを入力しないでください。
 
-AI処理には、利用可能なGitHub Copilot account、本人認証、network接続、利用可能model、組織policy上の許可が別途必要です。GUI表示やlogin完了だけでAI利用可能とは判断しません。起動引数・Prompt適用・状態確認でloginやAI評価を暗黙に開始せず、login後もmodelを自動変更したりAI評価を自動開始したりしません。
+AI処理には、利用可能なGitHub Copilot account、本人認証、network接続、利用可能model、組織policy上の許可が別途必要です。GUI表示やlogin完了だけでAI利用可能とは判断しません。起動時の自動確認・自動login以外では、起動引数・Prompt適用・状態確認・画面遷移でloginを暗黙に開始せず、AI評価は一切自動開始しません。login後もmodelを自動変更しません。自動処理でもアプリはpassword、PAT、token、device codeを読取・保存せず、学生回答も送信しません。
 
 SimilarityはLLMへ送らず、NFKC正規化・空白／句読点／記号除去・文字n-gram・最長共通substringに基づくローカル決定的計算で求めます。Excel列名は互換性のため`.Similarity_AI_Raw`を維持します。結果には、参照回答との表層コピー傾向に加えて、同じ設問の他学生回答との最大類似度（`.Similarity_Peer_Max`、`.Similarity_Peer_Row`）も情報として出力します。Similarityは不正行為の証明ではなく、低いSimilarityも回答品質を保証しません。
 
@@ -276,7 +276,7 @@ final/partialには入力全体、Prompt、Reference、AI結果が含まれ得�
 - 相対pathは起動時のcwdが基準。EXE配置先や抽出cacheを基準に変更しません。日本語・空白を含むpathも扱います
 - Prompt fileはstrict UTF-8の`.txt`、1〜32,767文字
 - 候補版では**設定 → 読込Prompt**で原文と適用先を選び、**Promptを適用**した時だけCustom／固有評価のtemplateへcopy
-- 起動引数やPrompt適用ではloginもAI処理も自動開始しません。AI処理はExecution画面の明示操作まで開始しません。候補版のlogin buttonも別の明示操作が必要です
+- 起動引数やPrompt適用ではloginもAI処理も自動開始しません。AI処理はExecution画面の明示操作まで開始しません。候補版の起動時の自動login確認は起動引数とは無関係に行われ、AI評価は開始しません（[実行](#3-実行)を参照）
 
 詳しい例は[Promptファイルから起動](docs/prompt-launch.md)を参照してください。
 

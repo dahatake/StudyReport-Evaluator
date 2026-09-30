@@ -1097,6 +1097,249 @@ public sealed class CopilotLoginCommandTests
     private static IEnumerable<Control> AllControls(Control root) => root.GetVisualDescendants().OfType<Control>()
         .Concat(root.GetLogicalDescendants().OfType<Control>()).Prepend(root).Distinct();
 
+    [Fact]
+    public async Task Startup_uses_existing_credentials_without_starting_login_or_evaluation()
+    {
+        using LoginHarness harness = new();
+        ExecutionViewModel viewModel = harness.ViewModel;
+        harness.Authentication.Snapshot = AvailableSnapshot("model-a");
+
+        await viewModel.RunStartupAuthenticationAsync(true, TestContext.Current.CancellationToken).WaitAsync(TestWait, TestContext.Current.CancellationToken);
+
+        Assert.True(viewModel.IsAuthenticationAvailable);
+        Assert.Equal(["model-a", "auto"], viewModel.AvailableModelIds);
+        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Equal(0, harness.Resolver.CallCount);
+        Assert.Equal(0, harness.Process.StartCount);
+        Assert.Equal(0, harness.Runner.CallCount);
+        Assert.Null(viewModel.LastLoginTask);
+        Assert.Contains("自動的にログインしました", viewModel.LoginStatusText, StringComparison.Ordinal);
+        AssertSafe(viewModel);
+    }
+
+    [Fact]
+    public async Task Startup_without_credentials_starts_bundled_login_once_and_rechecks_without_running_AI()
+    {
+        using LoginHarness harness = new();
+        ExecutionViewModel viewModel = harness.ViewModel;
+        harness.Authentication.Snapshot = new(ExecutionAuthenticationState.AuthRequired);
+
+        Task startup = viewModel.RunStartupAuthenticationAsync(true, TestContext.Current.CancellationToken);
+        await harness.Process.Waiting.Task.WaitAsync(TestWait, TestContext.Current.CancellationToken);
+
+        Assert.True(viewModel.IsLoggingIn);
+        Assert.Equal(1, harness.Process.StartCount);
+        Assert.Equal(1, harness.Authentication.CallCount);
+        harness.Authentication.Snapshot = AvailableSnapshot("model-b");
+        harness.Process.Complete(0);
+        await startup.WaitAsync(TestWait, TestContext.Current.CancellationToken);
+
+        Assert.False(viewModel.IsLoggingIn);
+        Assert.True(viewModel.IsAuthenticationAvailable);
+        Assert.Equal(2, harness.Authentication.CallCount);
+        Assert.Equal(1, harness.FactoryCallCount);
+        Assert.Equal(0, harness.Runner.CallCount);
+
+        await viewModel.RunStartupAuthenticationAsync(true, TestContext.Current.CancellationToken).WaitAsync(TestWait, TestContext.Current.CancellationToken);
+        Assert.Equal(2, harness.Authentication.CallCount);
+        Assert.Equal(1, harness.FactoryCallCount);
+        AssertSafe(viewModel);
+    }
+
+    [Fact]
+    public async Task Startup_opt_out_checks_credentials_but_leaves_login_to_the_button()
+    {
+        using LoginHarness harness = new();
+        ExecutionViewModel viewModel = harness.ViewModel;
+        harness.Authentication.Snapshot = new(ExecutionAuthenticationState.AuthRequired);
+
+        await viewModel.RunStartupAuthenticationAsync(false, TestContext.Current.CancellationToken).WaitAsync(TestWait, TestContext.Current.CancellationToken);
+
+        Assert.Equal(ExecutionAuthenticationState.AuthRequired, viewModel.AuthenticationState);
+        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Equal(0, harness.Resolver.CallCount);
+        Assert.Equal(0, harness.Process.StartCount);
+        Assert.True(viewModel.CanLogin);
+        Assert.Contains("「GitHubにログイン」", viewModel.LoginStatusText, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(ExecutionAuthenticationState.CliUnavailable)]
+    [InlineData(ExecutionAuthenticationState.RuntimeFailed)]
+    [InlineData(ExecutionAuthenticationState.Cancelled)]
+    public async Task Startup_starts_login_only_when_credentials_are_missing(ExecutionAuthenticationState state)
+    {
+        using LoginHarness harness = new();
+        ExecutionViewModel viewModel = harness.ViewModel;
+        harness.Authentication.Snapshot = new(state);
+
+        await viewModel.RunStartupAuthenticationAsync(true, TestContext.Current.CancellationToken).WaitAsync(TestWait, TestContext.Current.CancellationToken);
+
+        Assert.Equal(state, viewModel.AuthenticationState);
+        Assert.Equal(0, harness.Resolver.CallCount);
+        Assert.Equal(0, harness.Process.StartCount);
+        Assert.Null(viewModel.LastLoginTask);
+        Assert.True(viewModel.CanLogin);
+        Assert.Contains("「Copilot 状態を確認」", viewModel.LoginStatusText, StringComparison.Ordinal);
+        AssertSafe(viewModel);
+    }
+
+    [Fact]
+    public async Task Startup_login_cancelled_by_the_user_is_not_retried_automatically()
+    {
+        using LoginHarness harness = new();
+        ExecutionViewModel viewModel = harness.ViewModel;
+        harness.Authentication.Snapshot = new(ExecutionAuthenticationState.AuthRequired);
+
+        Task startup = viewModel.RunStartupAuthenticationAsync(true, TestContext.Current.CancellationToken);
+        await harness.Process.Waiting.Task.WaitAsync(TestWait, TestContext.Current.CancellationToken);
+        viewModel.CancelLoginCommand.Execute(null);
+        await startup.WaitAsync(TestWait, TestContext.Current.CancellationToken);
+
+        Assert.False(viewModel.IsLoggingIn);
+        Assert.Equal([false], harness.Process.KillTreeArguments);
+        Assert.Contains("取り消しました", viewModel.LoginStatusText, StringComparison.Ordinal);
+
+        await viewModel.RunStartupAuthenticationAsync(true, TestContext.Current.CancellationToken).WaitAsync(TestWait, TestContext.Current.CancellationToken);
+        Assert.Equal(1, harness.Process.StartCount);
+        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Equal(0, harness.Runner.CallCount);
+    }
+
+    [Fact]
+    public async Task Startup_after_dispose_does_nothing()
+    {
+        using LoginHarness harness = new();
+        harness.ViewModel.Dispose();
+
+        await harness.ViewModel.RunStartupAuthenticationAsync(true, TestContext.Current.CancellationToken)
+            .WaitAsync(TestWait, TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, harness.Authentication.CallCount);
+        Assert.Equal(0, harness.Process.StartCount);
+        Assert.Null(harness.ViewModel.LastStartupAuthenticationTask);
+    }
+
+    [Fact]
+    public async Task Startup_joins_an_in_flight_check_instead_of_racing_it()
+    {
+        using LoginHarness harness = new();
+        ExecutionViewModel viewModel = harness.ViewModel;
+        TaskCompletionSource<ExecutionAuthenticationSnapshot> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Authentication.CheckOverride = token => completion.Task.WaitAsync(token);
+        Task earlier = viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+
+        Task startup = viewModel.RunStartupAuthenticationAsync(true, TestContext.Current.CancellationToken);
+        Assert.False(startup.IsCompleted);
+        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Equal(0, harness.Process.StartCount);
+
+        completion.SetResult(new ExecutionAuthenticationSnapshot(ExecutionAuthenticationState.AuthRequired));
+        await earlier.WaitAsync(TestWait, TestContext.Current.CancellationToken);
+        await harness.Process.Waiting.Task.WaitAsync(TestWait, TestContext.Current.CancellationToken);
+        Assert.Equal(1, harness.Process.StartCount);
+        Assert.Equal(1, harness.Authentication.CallCount);
+
+        harness.Authentication.CheckOverride = null;
+        harness.Authentication.Snapshot = AvailableSnapshot("model-b");
+        harness.Process.Complete(0);
+        await startup.WaitAsync(TestWait, TestContext.Current.CancellationToken);
+        Assert.True(viewModel.IsAuthenticationAvailable);
+        Assert.Equal(2, harness.Authentication.CallCount);
+        Assert.Equal(0, harness.Runner.CallCount);
+    }
+
+    [Fact]
+    public async Task Startup_does_not_recheck_when_the_state_is_already_known()
+    {
+        using LoginHarness harness = new();
+        ExecutionViewModel viewModel = harness.ViewModel;
+        await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, harness.Authentication.CallCount);
+
+        await viewModel.RunStartupAuthenticationAsync(true, TestContext.Current.CancellationToken)
+            .WaitAsync(TestWait, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, harness.Authentication.CallCount);
+        Assert.Equal(0, harness.Process.StartCount);
+        Assert.Contains("自動的にログインしました", viewModel.LoginStatusText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Startup_during_a_manual_login_does_not_start_another_login()
+    {
+        using LoginHarness harness = new();
+        ExecutionViewModel viewModel = harness.ViewModel;
+        viewModel.LoginCommand.Execute(null);
+        await harness.Process.Waiting.Task.WaitAsync(TestWait, TestContext.Current.CancellationToken);
+
+        await viewModel.RunStartupAuthenticationAsync(true, TestContext.Current.CancellationToken)
+            .WaitAsync(TestWait, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, harness.Process.StartCount);
+        Assert.Equal(0, harness.Authentication.CallCount);
+        harness.Process.Complete(0);
+        await LoginTask(viewModel).WaitAsync(TestWait, TestContext.Current.CancellationToken);
+    }
+    [Fact]
+    public async Task Startup_check_failure_is_contained_and_does_not_start_login()
+    {
+        using LoginHarness harness = new();
+        harness.Authentication.CheckOverride = _ => throw new InvalidOperationException(SensitiveFailure);
+
+        await harness.ViewModel.RunStartupAuthenticationAsync(true, TestContext.Current.CancellationToken).WaitAsync(TestWait, TestContext.Current.CancellationToken);
+
+        Assert.Equal(ExecutionAuthenticationState.RuntimeFailed, harness.ViewModel.AuthenticationState);
+        Assert.Equal(0, harness.Process.StartCount);
+        AssertSafe(harness.ViewModel);
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("", true)]
+    [InlineData("1", true)]
+    [InlineData("true", true)]
+    [InlineData("0", false)]
+    [InlineData(" 0 ", false)]
+    [InlineData("false", false)]
+    [InlineData("FALSE", false)]
+    public void Automatic_login_is_enabled_unless_the_environment_value_opts_out(string? value, bool expected) =>
+        Assert.Equal(expected, App.IsAutomaticLoginEnabled(value));
+
+    [AvaloniaFact]
+    public async Task Opening_the_window_runs_startup_authentication_exactly_once()
+    {
+        using LoginHarness harness = new();
+        harness.Authentication.Snapshot = AvailableSnapshot("model-a");
+        using MainWindowViewModel shell = new(
+            new WorkflowNavigator(),
+            new InputViewModel(),
+            new QuantificationDesignViewModel(),
+            harness.ViewModel,
+            new ResultsOutputViewModel());
+        MainWindow window = new(shell);
+        App.AttachStartupAuthentication(window, true);
+        try
+        {
+            RenderUi();
+            Assert.Equal(0, harness.Authentication.CallCount);
+
+            window.Show();
+            RenderUi();
+            await Assert.IsAssignableFrom<Task>(harness.ViewModel.LastStartupAuthenticationTask)
+                .WaitAsync(TestWait, TestContext.Current.CancellationToken);
+
+            Assert.Equal(1, harness.Authentication.CallCount);
+            Assert.True(harness.ViewModel.IsAuthenticationAvailable);
+            Assert.Equal(0, harness.Process.StartCount);
+            Assert.Equal(0, harness.Runner.CallCount);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     private static void Activate(Window window, Button button)
     {
         Assert.True(button.IsEffectivelyVisible);
