@@ -233,7 +233,7 @@ public sealed class ResumeWorkflowTests
         using ExecutionViewModel vm = fixture.CreateExecution();
         vm.IsResumeMode = true;
         vm.ResumePartialPath = fixture.Checkpoint.PartialPath;
-        ExecutionView view = new(vm, new CancelPicker());
+        ExecutionPreparationPanel view = new(new CancelPicker()) { DataContext = vm };
         Window window = new() { Content = view, Width = 1024, Height = 720 };
         window.Show();
         try

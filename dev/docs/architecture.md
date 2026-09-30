@@ -121,7 +121,7 @@ finalは新tempへ4 sheetとformulaを書き、close、read-only reopen、packag
 
 ## 6. UI境界
 
-4 stepを維持し、設定は同じwindow内の独立した内容画面とする。`WorkflowStep`へ第5工程を追加しない。`WorkflowNavigator`の`Visited`は訪問済みを表し、準備完了やrun成功ではない。
+4 stepを維持し、設定は同じwindow内の独立した内容画面とする。`WorkflowStep`へ第5工程を追加しない。`WorkflowNavigator`の`Visited`は画面上「設定済み」と表示し（過去に表示したstep）、準備完了やrun成功ではない。
 
 | 主画面 | 編集・操作 | 読取専用の概要／詳細への入口 |
 |---|---|---|

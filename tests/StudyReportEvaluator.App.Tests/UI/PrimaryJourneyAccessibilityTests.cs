@@ -35,37 +35,47 @@ public sealed class PrimaryJourneyAccessibilityTests
         viewModel.Configure(definition, metadata, Path.Combine(Path.GetTempPath(), "synthetic-T25-input.xlsx"));
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
         ExecutionView view = new(viewModel);
+        ExecutionPreparationPanel prep = new() { DataContext = viewModel };
         Window window = new()
         {
             Width = 1080,
             Height = 760,
             Content = view,
         };
+        Window prepWindow = new()
+        {
+            Width = 540,
+            Height = 760,
+            Content = prep,
+        };
 
         try
         {
             window.Show();
+            prepWindow.Show();
             window.SetRenderScaling(2d);
+            prepWindow.SetRenderScaling(2d);
             Render();
 
-            Button auth = Required<Button>(view, "CheckAuthenticationButton");
-            Button login = Required<Button>(view, "StartCopilotLogin");
+            Button auth = Required<Button>(prep, "CheckAuthenticationButton");
+            Button login = Required<Button>(prep, "StartCopilotLogin");
             Button changeSettings = Required<Button>(view, "ChangeExecutionSettingsButton");
             TextBox model = Required<TextBox>(view, "EffectiveModelTextBox");
             TextBlock concurrency = Required<TextBlock>(view, "ConcurrencySummary");
-            CheckBox resumeMode = Required<CheckBox>(view, "ResumeModeCheckBox");
-            TextBox resumePath = Required<TextBox>(view, "ResumePartialPathTextBox");
+            CheckBox resumeMode = Required<CheckBox>(prep, "ResumeModeCheckBox");
+            TextBox resumePath = Required<TextBox>(prep, "ResumePartialPathTextBox");
             TextBox outputDirectory = Required<TextBox>(view, "EffectiveOutputDirectoryTextBox");
             Button start = Required<Button>(view, "StartRunButton");
             Button cancel = Required<Button>(view, "CancelRunButton");
             ProgressBar progress = Required<ProgressBar>(view, "RunProgressBar");
-            Border validation = Required<Border>(view, "ExecutionValidationSummary");
+            Border validation = Required<Border>(prep, "ExecutionValidationSummary");
+            Assert.Null(view.FindControl<Border>("ExecutionValidationSummary"));
 
             Assert.Same(viewModel, view.DataContext);
             Assert.Equal(2d, window.RenderScaling);
-            foreach (string name in new[] { "ExecutionAuthenticationScroll", "ExecutionProgressScroll" })
+            foreach ((Control owner, string name) in new (Control, string)[] { (prep, "ExecutionAuthenticationScroll"), (view, "ExecutionProgressScroll") })
             {
-                ScrollViewer scroll = Required<ScrollViewer>(view, name);
+                ScrollViewer scroll = Required<ScrollViewer>(owner, name);
                 Assert.Equal(ScrollBarVisibility.Disabled, scroll.HorizontalScrollBarVisibility);
                 Assert.Equal(ScrollBarVisibility.Auto, scroll.VerticalScrollBarVisibility);
                 Assert.True(double.IsFinite(scroll.Viewport.Height));
@@ -101,41 +111,37 @@ public sealed class PrimaryJourneyAccessibilityTests
             // These editable IDs now belong to Settings/Common, not read-only substitutes here.
             Assert.DoesNotContain(AllControls(view), control => AutomationProperties.GetAutomationId(control)
                 is "ExecutionModel" or "ExecutionConcurrency" or "ExecutionOutputDirectory");
-            Assert.Same(auth, window.FocusManager?.GetFocusedElement());
             Assert.True(start.IsEffectivelyEnabled);
             Assert.False(cancel.IsEffectivelyEnabled);
             Assert.False(resumePath.IsEffectivelyVisible);
             Assert.Null(view.FindControl<Border>("EthicsWarningBanner"));
             AssertUniqueAutomationIds(view);
+            AssertUniqueAutomationIds(prep);
 
-            Press(window, Key.Tab);
-            Assert.Same(login, window.FocusManager?.GetFocusedElement());
-            Press(window, Key.Tab, RawInputModifiers.Shift);
-            Assert.Same(auth, window.FocusManager?.GetFocusedElement());
-            Press(window, Key.Tab);
-            Press(window, Key.Tab); // Disabled login cancellation is not a Tab stop.
-            Assert.Same(changeSettings, window.FocusManager?.GetFocusedElement());
-            Press(window, Key.Tab);
-            Assert.Same(resumeMode, window.FocusManager?.GetFocusedElement());
-            Press(window, Key.Tab);
-            Assert.Same(start, window.FocusManager?.GetFocusedElement());
+            Assert.True(start.Focus(NavigationMethod.Tab));
             Assert.Equal(new Thickness(3d), start.BorderThickness);
-            Press(window, Key.Tab, RawInputModifiers.Shift);
-            Assert.Same(resumeMode, window.FocusManager?.GetFocusedElement());
-            Press(window, Key.Space);
+            Assert.True(auth.Focus(NavigationMethod.Tab));
+            Press(prepWindow, Key.Tab);
+            Assert.Same(login, prepWindow.FocusManager?.GetFocusedElement());
+            Press(prepWindow, Key.Tab, RawInputModifiers.Shift);
+            Assert.Same(auth, prepWindow.FocusManager?.GetFocusedElement());
+            Press(prepWindow, Key.Tab);
+            Press(prepWindow, Key.Tab); // Disabled login cancellation is not a Tab stop.
+            Assert.Same(resumeMode, prepWindow.FocusManager?.GetFocusedElement());
+            Press(prepWindow, Key.Space);
             Assert.True(viewModel.IsResumeMode);
             Assert.True(resumePath.IsEffectivelyVisible);
             AssertKeyboardTarget(resumePath);
-            Press(window, Key.Tab);
-            Assert.Same(resumePath, window.FocusManager?.GetFocusedElement());
+            Press(prepWindow, Key.Tab);
+            Assert.Same(resumePath, prepWindow.FocusManager?.GetFocusedElement());
             // Same path-then-picker order as the input step (InputView FilePath 0 → PickFile 1).
-            Press(window, Key.Tab);
-            Assert.Same(Required<Button>(view, "PickResumeCheckpointButton"), window.FocusManager?.GetFocusedElement());
-            Press(window, Key.Tab, RawInputModifiers.Shift);
-            Assert.Same(resumePath, window.FocusManager?.GetFocusedElement());
-            Press(window, Key.Tab, RawInputModifiers.Shift);
-            Assert.Same(resumeMode, window.FocusManager?.GetFocusedElement());
-            Press(window, Key.Space);
+            Press(prepWindow, Key.Tab);
+            Assert.Same(Required<Button>(prep, "PickResumeCheckpointButton"), prepWindow.FocusManager?.GetFocusedElement());
+            Press(prepWindow, Key.Tab, RawInputModifiers.Shift);
+            Assert.Same(resumePath, prepWindow.FocusManager?.GetFocusedElement());
+            Press(prepWindow, Key.Tab, RawInputModifiers.Shift);
+            Assert.Same(resumeMode, prepWindow.FocusManager?.GetFocusedElement());
+            Press(prepWindow, Key.Space);
             Assert.False(viewModel.IsResumeMode);
             Assert.True(start.IsEffectivelyEnabled);
 
@@ -157,6 +163,7 @@ public sealed class PrimaryJourneyAccessibilityTests
         finally
         {
             window.Close();
+            prepWindow.Close();
         }
     }
 

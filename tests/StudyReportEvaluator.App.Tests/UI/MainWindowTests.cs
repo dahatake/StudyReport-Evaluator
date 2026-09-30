@@ -1841,7 +1841,7 @@ public sealed class MainWindowTests
             Assert.True(design.IsFocused);
             Press(window, Key.Enter);
             Assert.Equal(WorkflowStep.Design, window.ViewModel.CurrentStep);
-            Assert.Equal("訪問済み", window.ViewModel.InputStep.StatusText);
+            Assert.Equal("設定済み", window.ViewModel.InputStep.StatusText);
             Assert.Equal("◉", window.ViewModel.InputStep.StatusIcon);
             Assert.Contains("現在", window.ViewModel.DesignStep.StatusText, StringComparison.Ordinal);
             Assert.Contains("visited", input.Classes);
@@ -1859,7 +1859,7 @@ public sealed class MainWindowTests
             ExecutionView executionView = Assert.Single(
                 window.GetVisualDescendants().OfType<ExecutionView>());
             Assert.Same(window.ViewModel.ExecutionViewModel, executionView.DataContext);
-            Assert.Same(Required<Button>(executionView, "CheckAuthenticationButton"), window.FocusManager?.GetFocusedElement());
+            Assert.Same(Required<Button>(executionView, "ChangeExecutionSettingsButton"), window.FocusManager?.GetFocusedElement());
             AssertNoDevelopmentTaskText(window);
             Assert.True(next.Focus(NavigationMethod.Tab, KeyModifiers.None));
             Press(window, Key.Enter);
@@ -1867,7 +1867,7 @@ public sealed class MainWindowTests
             ResultsOutputView resultsView = Assert.Single(
                 window.GetVisualDescendants().OfType<ResultsOutputView>());
             Assert.Same(window.ViewModel.ResultsOutputViewModel, resultsView.DataContext);
-            Assert.Equal("訪問済み", window.ViewModel.ExecutionStep.StatusText);
+            Assert.Equal("設定済み", window.ViewModel.ExecutionStep.StatusText);
             Assert.Contains("現在", window.ViewModel.ResultsStep.StatusText, StringComparison.Ordinal);
             Assert.False(next.IsEffectivelyEnabled);
             Assert.False(next.IsEffectivelyVisible); // No disabled "最終ステップ" primary action.

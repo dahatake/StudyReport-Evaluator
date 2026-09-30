@@ -73,7 +73,7 @@ AI処理にはGitHub Copilotを利用できるaccount、login、必要なnetwork
 - PATH上の任意CLIへ黙ってfallbackしない。
 - loginは、起動時にOS利用者の既存GitHub資格情報を同梱CLIが自力で解決する自動確認（§11.10）を先に行い、利用できる資格情報がない場合だけ、CLI／ブラウザーを通じたGitHubとの対話認証を自動で開始する。手動の「GitHubにログイン」も維持する。アプリはPAT、password、client secret、token、device codeを入力・収集・解析・保存しない。
 - CLIまたはloginが利用できない場合、アプリ起動、Excel読込、mapping、設計編集、checkpoint確認は利用できるが、新しいAI処理は開始できない。
-- 利用できない理由、明示的な「GitHubにログイン」開始・取消、既存の「Copilot 状態を確認」による再確認をExecution画面へ表示する。D-06は採用済みとし、動作とprocess所有範囲は§11.3に従う。
+- 利用できない理由、明示的な「GitHubにログイン」開始・取消、既存の「Copilot 状態を確認」による再確認を入力画面（§11.15）へ表示する。D-06は採用済みとし、動作とprocess所有範囲は§11.3に従う。
 
 ### 3.3 Spreadsheet runtime
 
@@ -571,6 +571,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
    - native pickerまたはpath入力
    - sheet、質問文行1/2、回答行
    - 対象設問、有効化、主回答列、設問text、必須エラー。補助列・候補詳細等は同じ対象の設定へ移動
+   - 実行の準備（§11.15）: Copilot loginの明示開始・取消・状態再確認、checkpoint再開の準備と再開条件の検証、技術検証エラー
 2. **採点設計**
    - base、special、question points、similarity weight
    - 均等配分
@@ -578,12 +579,12 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
    - 読込Promptの件数と設定への入口
    - formula／capacity preflight
 3. **実行**
-   - Copilot loginの明示開始・取消・既存buttonでの状態再確認、通常modelの実効選択とその上限の既知／不明、次回runのreasoning effort
+   - 通常modelの実効選択とその上限の既知／不明、次回runのreasoning effort（Copilot loginとcheckpoint再開の準備は入力画面、§11.15）
    - 実効output／partial pathと設定変更への入口
    - 参照生成、通常評価、固有評価、類似度、finalizationの段階表示
    - completed rows / total rows、in-flight、error、cancel
    - 「実測」の直下に、Excelの学生行と1:1の速報値一覧（対象の文字列・Prompt・定量値、§11.12）
-   - 利用可能checkpointの再開、中断からの再開準備、再開条件の項目別read-only検証
+   - 実行開始の判断結果と、「定量化を開始」「中断」
 4. **結果**
    - 完了／一部失敗／取消を明示
    - finalまたはpartial path
@@ -682,7 +683,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 - 主画面は対象、配点、実行の開始判断、結果を扱い、有効値と変更入口を残す。「変更」から同じ対象IDの設定カテゴリへ1操作で移動し、「設定から戻る」で元ステップへ復帰する。同じ入力欄を二重配置しない。
 - 設定は「共通」「入力詳細」「通常評価」「固有評価」「読込Prompt」の5カテゴリとする。共通内の定義名・revision・丸めはDesignの採点定義に属し、独立した6番目のカテゴリや実行設定へ移さない。
 - 入力詳細は候補再適用・補助列・設問名・複製・並替え等、通常評価は既存evaluator／criterionのCRUD・range・weight・Knowledge読取・Custom編集、固有評価はsource／補助列／Prompt／enabledを扱う。結果とoverrideは設定へ移さない。
-- 対象がないカテゴリも位置を保ち、利用できない理由を表示する。カテゴリ変更でworkflowを進めず、前後操作は行先を明示する。訪問済みと準備完了・処理成功を区別し、結果画面に無効な最終ステップ主ボタンを残さない。
+- 対象がないカテゴリも位置を保ち、利用できない理由を表示する。カテゴリ変更でworkflowを進めず、前後操作は行先を明示する。各stepの「設定済み」表示（§11.16）と準備完了・処理成功を区別し、結果画面に無効な最終ステップ主ボタンを残さない。
 - 既存FluentThemeと必要な静的Fluent System Iconsだけを使い、常時見える日本語ラベルを併記する。素材・revision・LICENSE／NOTICEは採用時に記録し、新UI framework、renderer、NuGet依存、テーマ切替を追加しない。
 
 ### 11.5 通常表示・ページ切替・例外到達
@@ -784,6 +785,43 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 境界・例外: 別設問が同じ設問文を持つ場合も設問順で並べ、統合しない。設問文に` · `や`:`を含む場合も加工しない。学生の回答本文は入力workbookをこの画面で再読込する必要があり、privacy境界（§14）と実行後の元本非接触を保つため、本版では表示しない（§23 A-RS-01）。
 
+### 11.15 実行準備部品の入力画面への集約（2026-10-01追加）
+
+出典: 依頼原文（2026-10-01「[3.実行]画面の中の、左型の[GitHub Copilot CLIへのログイン]などの全ての画面コンポーネントを、「1.入力」の画面の中に移動させてください。」）、`src/StudyReportEvaluator.App/Views/ExecutionView.axaml`の従来配置（左列）。
+
+従来の「3 実行」画面の左列にあった部品（以下「実行準備部品」）を、「1 入力」画面へ移す。移動は配置だけの変更であり、各部品の動作・有効条件・状態文・Automation ID・ToolTip・§11.3／§11.10／§10.5の契約は変えない。
+
+実行準備部品（すべて移動対象。追加・省略しない）:
+
+| 区分 | 部品（表示文言／Automation ID） |
+|---|---|
+| Copilot認証 | 認証状態文（`CopilotAuthenticationStatus`）、「Copilot 状態を確認」（`CheckCopilotAuthentication`）、「GitHubにログイン」（`StartCopilotLogin`）、「ログインを取り消す」（`CancelCopilotLogin`）、確認中の進行表示、ログイン状態文（`CopilotLoginStatus`）、ログイン説明文（`CopilotLoginInstructions`） |
+| checkpoint再開 | 「checkpoint から再開」（`ExecutionResumeMode`）、再開元path入力（`ExecutionResumePartialPath`）と「参照…」（`ExecutionPickResumeCheckpoint`）、選択状態文（`ExecutionResumePickerStatus`）、中断した処理の概要（`ExecutionInterruptedRunSummary`）と「中断した処理を再開準備」（`ExecutionResumeInterruptedRun`）、「再開元を確認」（`ExecutionValidateResumeCheckpoint`）、「中断時の入力を読み込む」（`ExecutionApplyCheckpointInput`）、「中断時のモデルを選ぶ」（`ExecutionApplyCheckpointModel`）、再開検証の状態文（`ExecutionResumeValidationStatus`）、再開条件の一覧（`ExecutionResumeFindings`）と詳細（`ExecutionResumeFindingDetail`） |
+| 実行前の判断 | 新規run／再開の出力方針文（`OutputModeSummary`）、技術的な問題の一覧（`ExecutionTechnicalErrors`）と詳細（`ExecutionTechnicalErrorDetail`）を含む`ExecutionValidationSummary` |
+
+| ID | 優先度 | 要求 |
+|---|---|---|
+| FR-PREP-01 | MUST | アプリのメインwindowの「1 入力」画面に、「実行の準備を開く」button（`InputTogglePreparation`、ファイルpath行の右端）を表示する。押すと、同じ画面内で範囲・設問・検証の区画を上表のすべての部品の区画へ置き換え（button文言は「入力に戻る」）、もう一度押すと元に戻る。部品の表示名・Automation IDは従来と同一で、開閉で入力値・選択・ページを失わない。初期状態は閉じている。部品が対象外の状態（再開モードでない、中断runがない、技術的な問題がない）で従来から非表示のものは、同じ条件で非表示とする。 |
+| FR-PREP-02 | MUST | 「3 実行」画面には上表の部品を1つも表示しない（Automation ID・名前付きcontrolとも0件）。「3 実行」は、実行条件の要約と「変更」、次回の出力先と実行予定・進捗・実測・速報値・予約名・コスト、「定量化を開始」「中断」、前後移動を従来どおり表示する。 |
+| FR-PREP-03 | MUST | 入力画面の実行準備部品は、メインwindowが保持する単一の`ExecutionViewModel`へ結び付く。入力画面で行った認証確認・login・再開元指定・再開検証は「3 実行」の判断（「定量化を開始」の可否、実行条件）へ反映され、画面を往復しても状態（checkbox、path、選択した再開条件）を失わない。 |
+| FR-PREP-04 | MUST | 入力workbookの読込・範囲・設問編集の既存操作、最小window（1024×720 DIP）での表示と到達性を損なわない。実行準備部品は「1 入力」の本文内に置き、本文の高さ（450 DIP）を増やさず、§11.5の「通常画面は外側スクロール不要」を維持する。そのため既存の入力部品（範囲・設問・検証）と同時には表示せず、FR-PREP-01の切替で同じ本文領域を共有する。ファイルpath・読込・切替buttonは常に表示する。 |
+| FR-PREP-05 | MUST | 画面表示だけでは認証確認・login・AI評価・設定fileの保存を開始しない。自動確認・自動login（§11.10）は、どの画面が表示中でも従来どおり1アプリ起動につき1回である。入力画面が表示されていない間もloginの取消・再確認の状態は保持される。 |
+| FR-PREP-06 | MUST | 「1 入力」を開いたときの初期focusは従来どおりファイルpath入力とし、「3 実行」の初期focusは実行画面内の操作可能な最初の部品とする（移動した部品へは移さない）。Tab順は、既存の入力部品の後に実行準備部品が続く。 |
+| FR-PREP-07 | MUST | 入力画面を単体で（メインwindowの`ExecutionViewModel`なしに）表示した場合は、実行準備部品を表示せず、従来の入力部品の配置・寸法を変えない。 |
+
+境界: 実行中（`IsRunning`）の有効・無効条件、run中にloginを開始できない条件、再開モードの編集可否は従来の`ExecutionViewModel`の判定をそのまま使う。移動で新しい入力検証・永続化・外部通信を追加しない。
+
+### 11.16 step状態の表示名「設定済み」（2026-10-01追加）
+
+出典: 依頼原文（2026-10-01「画面上部の[訪問済み]の表現を[設定済み]に変更してください。」）。
+
+| ID | 優先度 | 要求 |
+|---|---|---|
+| FR-STEP-01 | MUST | 画面上部の4つのstep button（「1 入力」「2 採点設計」「3 実行」「4 結果」）で、現在表示していないが過去に表示した（従来「訪問済み」）stepの状態文を「設定済み」と表示する。「現在・選択中」「未着手」の表示は変えない。 |
+| FR-STEP-02 | MUST | 状態文は、stepのbuttonのAccessible Name（`InputStep.AccessibleName`等）にも含まれ、画面上の表示と同じ「設定済み」とする。画面内・利用者向け文書に、同じ状態を指す「訪問済み」を残さない。 |
+| FR-STEP-03 | MUST | 「設定済み」は従来の「訪問済み」と同じ判定（過去に表示した）であり、値の保存・検証成功・準備完了・処理成功を意味しない。判定・アイコン（◉）・色・遷移規則は変えない。 |
+
+例: 「1 入力」を開いた後に「2 採点設計」へ進むと、「1 入力」のbuttonの2行目は「設定済み」、「2 採点設計」は「現在・選択中」、「3 実行」「4 結果」は「未着手」。
 ## 12. Promptファイルからの起動
 
 ### 12.1 command line
@@ -1052,9 +1090,10 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | AC-043 | 事前条件: 実CLI・実資格情報を使わない。SDKの`ModelInfo`をfakeとして与える。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~CopilotModelEnumerationTests|FullyQualifiedName~ModelCatalogTests"`。期待結果（exit code 0）: ①`auto`、policy未設定、`unconfigured`、大文字の`ENABLED`を含む全modelがSDK順に選択肢となり、上限・reasoning effortが保持される（FR-MS-01、FR-MS-04）。②1000件でも切り捨てない（FR-MS-01）。③`disabled`（大文字小文字不問）は除外され他modelは残る（FR-MS-02、FR-MS-03）。④null・空・空白のみ・前後空白・制御文字・257文字のIDは除外され、例外なく他modelが残る。256文字は残る（FR-MS-02、FR-MS-03）。⑤null・空の列挙は空一覧になる（FR-MS-03）。⑥cache 4096件は保存・復元でき、4097件の保存は`InvalidSettings`で既存fileを変更しない（FR-MS-05）。⑦4097件の一覧は全件を選択でき、最後のmodelを選択でき、cacheと設定fileは作られない（FR-MS-01、FR-MS-05）。証跡: テスト結果（.trx）。実accountでの列挙件数の確認は§18外の本人確認とする。 |
 | AC-044 | 事前条件: リポジトリルート。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~DocumentationContractTests"`。期待結果（exit code 0）: ①`docs/getting-started.md`で、`## 2. 採点設計`と`## 3. 実行`の間に、FR-DOC-01の見出しの小節が1つある（FR-DOC-01）。②その小節が`../images/02-input-mapping.png`を1回だけ参照し、参照先が存在する。`images/`のPNGは8枚のまま（FR-DOC-02）。③小節にFR-DOC-03の14個のラベルがすべて含まれる（FR-DOC-03）。④小節に`基本の使い方`と`注意してください`の見出し文言、FR-DOC-04の4つの注意点がある（FR-DOC-04）。証跡: テスト結果（.trx）。実画面との一致はAC-022の画像生成手順に従い、本ACは文書の構造だけを判定する。 |
 | AC-045 | 対応要求: FR-XD-01〜06。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultExcelDescriptionTests"`、`--filter "FullyQualifiedName~DocumentationContractTests"`、`--filter "FullyQualifiedName~Packaging"`の3回（いずれも同じprojectで、`--filter`の値だけを替える）。期待結果（exit code 0）: ①`docs/result-excel-description.md`が存在し、`README.md`（本文と「ガイド」）と`docs/README.md`からリンクされ、全local linkと見出しanchorが解決する（FR-XD-04）。②文書に警告文の固定文言、`UNRELEASED`、`0.8.6`、公開版`0.8.1`、4つのsheet名が含まれ、`dev/docs`と実装の型名を含まない（FR-XD-03、FR-XD-05）。③`ResultsSheetWriter`のsuffix定数・列見出し定数の全値と、`ResultsStatusCodes`の12個の全値、`PRIMARY_ANSWER`／`SUPPORTING_COLUMN`／`NONE`が文書にある（FR-XD-01、FR-XD-02）。④実際に書いたConfig sheet（見出し33列の列記号と名前、全`RecordType`）、References sheet（8列）、Run sheet（`Field`25項目）の値がすべて文書の表にある（FR-XD-01）。⑤文書が単一EXE・ZIP・MSIXの公開文書allowlist（scripts・pubxml・試験の期待一覧）に含まれ、抽出後の全local linkが解決する（FR-XD-05）。証跡: テスト結果（.trx）。文章の平易さ（FR-XD-02）は自動判定できないため、レビュー者が教員の視点で通読し、専門用語が初出で説明されていることを確認する（許容差なし）。 |
+| AC-046 | 対応要求: FR-PREP-01〜07、FR-STEP-01〜03。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）、Avalonia headless。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~PreparationOnInputTests|FullyQualifiedName~MainWindowTests|FullyQualifiedName~ExecutionViewTests"`。期待結果（exit code 0）: ①メインwindowの「1 入力」に§11.15の表の全Automation IDの部品が存在し、「3 実行」には0件である（FR-PREP-01、FR-PREP-02）。②入力画面の切替button（初期は閉）で実行準備の区画が開閉し、開閉で入力値が保持される（FR-PREP-01）。入力画面の「Copilot 状態を確認」「GitHubにログイン」「ログインを取り消す」「checkpoint から再開」がメインwindowの`ExecutionViewModel`のcommand・状態へ結び付き、操作結果が「3 実行」の判断に反映され、画面往復後も保持される（FR-PREP-03、FR-PREP-05）。③入力画面を単体表示すると実行準備部品は表示されず、既存の入力部品の配置・寸法試験が変わらず成功する（FR-PREP-07、FR-PREP-04）。④「1 入力」の初期focusがファイルpath入力、実行画面が実行画面内の部品である（FR-PREP-06）。⑤step状態文が、現在以外の過去表示済みstepで「設定済み」、現在は「現在・選択中」、未表示は「未着手」で、Accessible Nameにも同じ文言が入り、「訪問済み」がどのstepにも出ない（FR-STEP-01〜03）。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
 ## 19. Test requirements
 
-以下の番号は追跡ID `TR-01`〜`TR-43`に対応する。既存番号を維持し、中断・再開導線の37、ジョブコスト表示の38、起動時の自動Copilotログインの39、結果画面の設問文表示の40、実行中の速報値表示の41、利用できる全modelの選択の42、結果Excelの解説文書の43を末尾へ追加する。T01時点の未実装・試験NOT_RUNは履歴であり、現在の実装・局所検証は[traceability](../dev/docs/traceability.md)のVERIFIED_SCOPEDに限定する。過去の試験結果と現在の局所検証は同追跡表で区別し、異なる対象集合を合算して全体合格にしない。
+以下の番号は追跡ID `TR-01`〜`TR-44`に対応する。既存番号を維持し、中断・再開導線の37、ジョブコスト表示の38、起動時の自動Copilotログインの39、結果画面の設問文表示の40、実行中の速報値表示の41、利用できる全modelの選択の42、結果Excelの解説文書の43を末尾へ追加する。T01時点の未実装・試験NOT_RUNは履歴であり、現在の実装・局所検証は[traceability](../dev/docs/traceability.md)のVERIFIED_SCOPEDに限定する。過去の試験結果と現在の局所検証は同追跡表で区別し、異なる対象集合を合算して全体合格にしない。
 
 **0.8.4での記録済み結果:** T35の対象文書試験は4/4成功・敵対的レビュー済み（`artifacts/test/ui-settings/t35/t35-reviewed.trx`、指摘0）。T36の文書・画像contract全体は別scopeで、独自の`artifacts/test/ui-settings/t36/t36-current.trx`が21/21成功・REVIEWED。T37は`artifacts/test/ui-settings/t37/t37.trx`の9/9（実ZIP＋MSIX静的契約）、T38は`artifacts/test/ui-settings/t38/t38.trx`の114/114とP06実EXE 7/7・P07 `PASS_DEVELOPMENT`。T39の自動回帰は`artifacts/test/ui-settings/t39/reviewed/`の2026-09-07の2 TRXでCore 190＋App 1702＝1892/1892、skip 0。初回1失敗→fixture修正→126/126・レビュー指摘0→全体再実行成功の履歴を保持する。MSIX実物は`artifacts/package/mechanism/StudyReportEvaluator-win-x64.unsigned.test.evidence.json`の`PASS_MECHANISM`（256 entries、0.8.4.0）で、install／公開の成功ではない。
 
@@ -1110,6 +1149,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 42. 利用できる全modelの選択のdeterministic test。SDK `ModelInfo`のfakeから、全model（`auto`・policy未設定・`unconfigured`）のSDK順での列挙、1000件の非切捨て、`disabled`除外、不正ID（null・空・空白・前後空白・制御文字・257文字）の除外と他modelの継続、256文字ID保持、null／空列挙、cache件数境界（4096可・4097不可）、4097件一覧の全件選択とcache非保存を検証する。実CLI・実資格情報は使わない（AC-043）。
 
 43. 結果Excelの解説文書のdeterministic test。文書の存在、README・利用者index・各ガイドからのリンク、警告文・版注記・sheet名、`ResultsSheetWriter`の列定数と`ResultsStatusCodes`の全値、実際に書いたConfig・References・Run sheetの見出し・列記号・`Field`名・`RecordType`の全値が文書にあること、公開文書allowlist（scripts・pubxml・package試験）への収録を検証する。実CLI・実AI・実資格情報は使わない（AC-045、FR-XD-01〜06）。
+44. 実行準備部品の入力画面集約とstep状態文「設定済み」のheadless UI試験。メインwindowで入力・実行画面のAutomation ID所在、`ExecutionViewModel`への結び付き、単体表示時の非表示、focus、状態文とAccessible Nameを検証する。実CLI・実AI・実資格情報は使わない（AC-046、FR-PREP-01〜07、FR-STEP-01〜03）。
 
 ## 20. 外部仕様出典
 
@@ -1165,6 +1205,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | 結果画面の設問文表示 | `ResultsOutputViewModel`（設問別得点・基準の設問文）と`ResultsOutputView`（AC-041、TR-40、FR-RS-01〜05）。ResultsQuestionTextTestsと既存Results系UI試験で局所検証 |
 | 利用できる全modelの選択 | `SdkCopilotAuthenticationRuntime.MapAvailableModels`、`ExecutionViewModel`のcache反映、`SettingsFileStore`のcache上限（AC-043、TR-42、FR-MS-01〜05）。CopilotModelEnumerationTests・ModelCatalogTestsで局所検証。実accountでの列挙確認は未実施（本人操作が必要） |
 | 結果Excelの解説文書 | `docs/result-excel-description.md`、README・利用者indexからのリンク、公開文書allowlist（`WindowsSingleFile.pubxml`と各package／publish script）、`ResultExcelDescriptionTests`（AC-045、TR-43、FR-XD-01〜06）。実装の列定数・実際に書いたsheetとの一致とpackage収録を局所検証。文章の平易さはレビュー者の通読 |
+| 実行準備部品の集約・step状態文 | `InputView`＋`ExecutionPreparationPanel`（左列の移設先）、`MainWindow`のExecutionViewModel結線、`MainWindowViewModel`のstep状態文（AC-046、TR-44、FR-PREP-01〜07／FR-STEP-01〜03）。PreparationOnInputTests・MainWindowTests・ExecutionViewTestsで局所検証 |
 ## 22. Approval record
 
 | 項目 | 内容 |
@@ -1193,6 +1234,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | All-models selection source | 2026-09-30の要求所有者依頼「私がGitHub Copilotで利用できる全てのモデルを選択できるようにしてください。」。§7.1を改訂し、§11.13（FR-MS-01〜05）、AC-043、TR-42を追加した。変更した要求: cache件数上限512→4096（FR-MS-05、旧上限を規定するIDはなく本文の記載だけ）。削除した要求IDはない。不明点は利用者不在のため§23のA-MSを採用した。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Question details guide source | 2026-09-30の要求所有者依頼「`## 2. 採点設計`に、{設問の詳細}を押した後の詳細設定の画面の使い方の説明についてもスクリーンショットもつけて記載をしてください。文章は大学や高校の教員が理解できるようにしてください。」。§11.14（FR-DOC-01〜04）、AC-044を追加した。削除した要求IDはない。アプリの挙動は変更しない。不明点は§23のA-DOCを採用した |
 | Result Excel guide source | 2026-09-30の要求所有者依頼「実行結果のExcelシートの詳細な解説を、ITに詳しくない大学・高校の教授や先生が理解できるような説明用のドキュメントを作成して`/docs/result-excel-description.md`に保存をして、`/README.md`から適切な文章とリンクもつけてください。」。§9.4（FR-XD-01〜06）、AC-045、TR-43を追加した。削除した要求IDはない。アプリの挙動・出力Excelの形式は変更しない。不明点は利用者不在のため§23のA-XDを採用した。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Preparation relocation source | 2026-10-01の要求所有者依頼「[3.実行]画面の中の、左型の[GitHub Copilot CLIへのログイン]などの全ての画面コンポーネントを、「1.入力」の画面の中に移動させてください。」「画面上部の[訪問済み]の表現を[設定済み]に変更してください。」。§11.15（FR-PREP-01〜07）、§11.16（FR-STEP-01〜03）、AC-046、TR-44を追加し、§3.2・§11・§11.4の該当記述を更新した。削除した要求IDはない（「訪問済み」の表示文言をFR-STEP-01へ置換）。ViewModelの振る舞い、認証・再開の契約、永続化は変更しない。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Meaning | repository要求baselineの承認記録。実装完了・試験成功・release存在・tag／push／draft／公開操作の承認、組織の法務・教育・security承認または電子署名を意味しない |
 
 ## 23. 仮定・未解決事項
@@ -1222,3 +1264,6 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | A-XD-03 | [ASSUMPTION] | スクリーンショットは追加せず、表と計算例だけで説明する。根拠: 依頼に画像の指定がなく、画像は8枚固定でpackaging・文書のcontract testが列挙している（A-DOC-01）。覆す条件: Excelの実画面の画像が求められた場合は別依頼とし、生成手順と全contractの更新を伴う。 |
 | A-XD-04 | [ASSUMPTION] | 新しい文書を公開文書allowlist（`WindowsSingleFile.pubxml`と各package／publish script、対応する試験）へ加える。根拠: 配布物内のREADMEが新文書へリンクするため、収録しないと抽出後のリンクが切れる（AC-027／030、`WindowsPublishPackageTests`の抽出後リンク検査）。影響: 配布物の文書が1件増える。文書だけの変更でも、公開する場合は最終EXE／ZIPとsidecarを再生成・再検証する（既存の運用）。覆す条件: 配布物へ文書を含めない方針にする場合は、READMEの当該リンクを配布物外の扱いにする別要求が必要。 |
 | A-XD-05 | [ASSUMPTION] | 解説は現在のソース候補（`0.8.6`）の出力に基づく。公開`0.8.1`が同じ列を出力するかは確認していない。根拠: 本リポジトリのwriter実装だけを確認した。影響: 版注記で利用者へ明示する（FR-XD-03）。覆す条件: `0.8.1`の出力を実測した場合。 |
+| A-PREP-01 | [ASSUMPTION] | 「左型」は「左側（左列）」と解釈し、対象を従来の「3 実行」画面の左列（Copilot認証、checkpoint再開、出力方針文、技術的な問題）の全部品とする。右列・上部の実行条件要約・下部の開始／中断・前後移動は移さない。根拠: 依頼文の「全ての画面コンポーネント」と提示画像の左列。影響: 技術的な問題の一覧も入力画面に移る。覆す条件: 技術的な問題を実行画面に残す指示があった場合は§11.15の表の「実行前の判断」行を分ける。
+| A-PREP-02 | [ASSUMPTION] | 配置は「1 入力」の本文内に、ファイルpath行の切替buttonで開閉する区画として置く。根拠: 通常画面は外側スクロール不要（§11.5）で、最小window（1024×720 DIP）の本文に入力部品と実行準備部品を同時に置く余地がないため。影響: 実行準備部品は常時は見えない。覆す条件: 利用者が別の配置（常時表示の右列等）を指定した場合。 |
+| A-STEP-01 | [ASSUMPTION] | 「訪問済み」を指す「設定済み」は表示文言だけの変更とし、内部の状態名（`WorkflowStepState.Visited`）・CSS class・判定は変えない。根拠: 依頼は「表現」の変更であり、意味の変更（設定の保存・検証成功）を求めていない。影響: 「設定済み」は設定値が有効であることを保証しない（FR-STEP-03）。覆す条件: 実際の設定完了を表す判定が必要な場合は別要求で判定を定義する。 |

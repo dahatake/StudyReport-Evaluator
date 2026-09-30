@@ -420,21 +420,25 @@ public sealed class DocumentationScreenshotTests
             execution.MaxConcurrency = 2;
             Assert.Equal(402, execution.PlannedEvaluationCount);
             ExecutionView executionView = CurrentView<ExecutionView>(window);
-            Assert.True(Required<CheckBox>(executionView, "ResumeModeCheckBox").IsVisible);
+            Assert.Null(executionView.FindControl<CheckBox>("ResumeModeCheckBox"));
             TextBox effectiveOutput = ById<TextBox>(executionView, "ExecutionEffectiveOutputDirectory");
             Assert.Same(Required<TextBox>(executionView, "EffectiveOutputDirectoryTextBox"), effectiveOutput);
             Assert.True(effectiveOutput.IsReadOnly);
             Assert.Equal(SafeOutputDirectory, effectiveOutput.Text);
             ResetScroll(Required<ScrollViewer>(window, "ShellScrollViewer"));
-            ResetScroll(Required<ScrollViewer>(executionView, "ExecutionAuthenticationScroll"));
             ResetScroll(Required<ScrollViewer>(executionView, "ExecutionProgressScroll"));
             Render();
 
             // This is the synthetic, not-yet-checked state, not evidence of live login.
-            Button checkAuthentication = Required<Button>(executionView, "CheckAuthenticationButton");
-            Button login = Required<Button>(executionView, "StartCopilotLogin");
-            Button cancelLogin = Required<Button>(executionView, "CancelCopilotLogin");
-            TextBlock loginStatus = Required<TextBlock>(executionView, "CopilotLoginStatus");
+            // The login parts now live in the Input step; inspect them on a detached panel.
+            ExecutionPreparationPanel preparation = new() { DataContext = execution };
+            Window preparationWindow = new() { Width = 540, Height = 400, Content = preparation };
+            preparationWindow.Show();
+            Render();
+            Button checkAuthentication = Required<Button>(preparation, "CheckAuthenticationButton");
+            Button login = Required<Button>(preparation, "StartCopilotLogin");
+            Button cancelLogin = Required<Button>(preparation, "CancelCopilotLogin");
+            TextBlock loginStatus = Required<TextBlock>(preparation, "CopilotLoginStatus");
             Assert.Equal(ExecutionAuthenticationState.NotChecked, execution.AuthenticationState);
             Assert.False(execution.IsAuthenticationAvailable);
             TextBlock effortStatus = ById<TextBlock>(executionView, "ExecutionReasoningEffort");
@@ -457,15 +461,21 @@ public sealed class DocumentationScreenshotTests
             Assert.Equal("GitHub へのログインは開始していません。", execution.LoginStatusText);
             Assert.Equal(execution.LoginStatusText, loginStatus.Text);
             Assert.Equal(loginStatus.Text, AutomationProperties.GetName(loginStatus));
-            Assert.Empty(Required<StackPanel>(executionView, "CopilotLoginPanel")
+            Assert.Empty(Required<StackPanel>(preparation, "CopilotLoginPanel")
                 .GetVisualDescendants().OfType<TextBox>());
-            foreach (Control control in new Control[] { checkAuthentication, login, cancelLogin, loginStatus, effortStatus, effectiveOutput })
+            foreach (Control control in new Control[] { checkAuthentication, login, cancelLogin, loginStatus })
+            {
+                Assert.True(control.IsEffectivelyVisible);
+            }
+
+            preparationWindow.Close();
+            foreach (Control control in new Control[] { effortStatus, effectiveOutput })
             {
                 Assert.True(control.IsEffectivelyVisible);
                 AssertContainedInViewport(control, window);
             }
 
-            Capture(window, imageDirectory, ScreenshotFileNames[4], checkAuthentication);
+            Capture(window, imageDirectory, ScreenshotFileNames[4], Required<Button>(executionView, "ChangeExecutionSettingsButton"));
             if (executionOnly)
             {
                 return;

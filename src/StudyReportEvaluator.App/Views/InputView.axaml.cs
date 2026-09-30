@@ -106,6 +106,35 @@ public sealed partial class InputView : UserControl
     public InputViewModel ViewModel => DataContext as InputViewModel
         ?? throw new InvalidOperationException("InputView requires an InputViewModel data context.");
 
+    /// <summary>
+    /// Offers the run-preparation parts (Copilot login, resume, technical errors) bound to the shell's
+    /// execution view model; passing null removes them and restores the standalone layout.
+    /// </summary>
+    public void AttachExecutionPreparation(ExecutionViewModel? execution)
+    {
+        PreparationPanel.DataContext = execution;
+        this.FindControl<Button>("PreparationToggleButton")!.IsVisible = execution is not null;
+        SetPreparationOpen(false);
+    }
+
+    public ExecutionPreparationPanel PreparationPanel =>
+        this.FindControl<ExecutionPreparationPanel>("ExecutionPreparation")!;
+
+    public bool IsPreparationOpen => this.FindControl<Control>("ExecutionPreparationHost")!.IsVisible;
+
+    public void SetPreparationOpen(bool open)
+    {
+        this.FindControl<Control>("ExecutionPreparationHost")!.IsVisible = open;
+        foreach (string name in new[] { "InputRangeCard", "InputMappingHost", "InputValidationSummary" })
+        {
+            this.FindControl<Control>(name)!.IsVisible = !open;
+        }
+
+        this.FindControl<Button>("PreparationToggleButton")!.Content = open ? "入力に戻る" : "実行の準備を開く";
+    }
+
+    private void HandlePreparationToggleClick(object? sender, RoutedEventArgs e) =>
+        SetPreparationOpen(!IsPreparationOpen);
     /// <summary>Standalone hosts can open Mapping settings using this view's current selection.</summary>
     public event EventHandler? SettingsRequested;
 

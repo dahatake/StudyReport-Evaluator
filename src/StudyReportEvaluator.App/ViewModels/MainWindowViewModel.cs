@@ -609,7 +609,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
                     },
                     state switch
                     {
-                        WorkflowStepState.Visited => "訪問済み",
+                        WorkflowStepState.Visited => "設定済み",
                         WorkflowStepState.Current => "現在・選択中",
                         WorkflowStepState.Upcoming => "未着手",
                         _ => throw new InvalidOperationException("Unknown workflow step state."),

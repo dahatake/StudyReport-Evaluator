@@ -560,13 +560,13 @@ public sealed class ExecutionViewTests
     {
         using LoginViewHarness harness = new();
         ExecutionViewModel viewModel = harness.ViewModel;
-        Button check = Required<Button>(harness.View, "CheckAuthenticationButton");
-        Button login = Required<Button>(harness.View, "StartCopilotLogin");
-        Button cancelLogin = Required<Button>(harness.View, "CancelCopilotLogin");
+        Button check = Required<Button>(harness.Panel, "CheckAuthenticationButton");
+        Button login = Required<Button>(harness.Panel, "StartCopilotLogin");
+        Button cancelLogin = Required<Button>(harness.Panel, "CancelCopilotLogin");
         Button start = Required<Button>(harness.View, "StartRunButton");
         Button cancelRun = Required<Button>(harness.View, "CancelRunButton");
-        StackPanel panel = Required<StackPanel>(harness.View, "CopilotLoginPanel");
-        TextBlock instructions = Required<TextBlock>(harness.View, "CopilotLoginInstructions");
+        StackPanel panel = Required<StackPanel>(harness.Panel, "CopilotLoginPanel");
+        TextBlock instructions = Required<TextBlock>(harness.Panel, "CopilotLoginInstructions");
 
         Assert.Same(viewModel.LoginCommand, login.Command);
         Assert.Same(viewModel.CancelLoginCommand, cancelLogin.Command);
@@ -592,7 +592,7 @@ public sealed class ExecutionViewTests
         Assert.Equal("Copilot 状態を確認", check.Content);
         Assert.Equal("定量化を開始", start.Content);
         Assert.Equal("中断", cancelRun.Content);
-        Assert.Same(check, harness.Window.FocusManager?.GetFocusedElement());
+        Assert.NotSame(check, harness.PanelWindow.FocusManager?.GetFocusedElement());
         Assert.Contains("別のブラウザー", instructions.Text, StringComparison.Ordinal);
         Assert.Contains("パスワードやトークンを取得・保存しません", ToolTip.GetTip(login)?.ToString(), StringComparison.Ordinal);
         Assert.Equal("起動時にこのPCの既存ログインを自動確認し、なければ自動ログインを試みます。別のブラウザーで認証後、モデル一覧を自動更新・保存します。定量化は自動で開始しません。", instructions.Text);
@@ -632,18 +632,18 @@ public sealed class ExecutionViewTests
     {
         using LoginViewHarness harness = new();
         ExecutionViewModel viewModel = harness.ViewModel;
-        Button check = Required<Button>(harness.View, "CheckAuthenticationButton");
-        Button login = Required<Button>(harness.View, "StartCopilotLogin");
-        Button cancel = Required<Button>(harness.View, "CancelCopilotLogin");
+        Button check = Required<Button>(harness.Panel, "CheckAuthenticationButton");
+        Button login = Required<Button>(harness.Panel, "StartCopilotLogin");
+        Button cancel = Required<Button>(harness.Panel, "CancelCopilotLogin");
         Button start = Required<Button>(harness.View, "StartRunButton");
-        Activate(harness.Window, check, useKeyboard);
+        Activate(harness.PanelWindow, check, useKeyboard);
         Assert.Equal(1, harness.Authentication.CallCount);
         Assert.True(start.IsEffectivelyEnabled);
         AssertValidationStatus(harness.View, viewModel, "run を開始できます");
 
         int clicks = 0;
         login.Click += (_, _) => clicks++;
-        Activate(harness.Window, login, useKeyboard);
+        Activate(harness.PanelWindow, login, useKeyboard);
         Task task = Assert.IsAssignableFrom<Task>(viewModel.LastLoginTask);
 
         Assert.Equal(1, clicks);
@@ -684,7 +684,7 @@ public sealed class ExecutionViewTests
         AssertLoginStatus(harness);
         AssertValidationStatus(harness.View, viewModel, "run を開始できます");
 
-        Activate(harness.Window, check, useKeyboard);
+        Activate(harness.PanelWindow, check, useKeyboard);
 
         Assert.Equal(3, harness.Authentication.CallCount);
         Assert.Equal(ExecutionAuthenticationState.Available, viewModel.AuthenticationState);
@@ -703,16 +703,16 @@ public sealed class ExecutionViewTests
     public async Task Cancel_login_button_click_or_keyboard_stops_once_and_retry_is_explicit(bool useKeyboard)
     {
         using LoginViewHarness harness = new();
-        Button login = Required<Button>(harness.View, "StartCopilotLogin");
-        Button cancel = Required<Button>(harness.View, "CancelCopilotLogin");
-        Button check = Required<Button>(harness.View, "CheckAuthenticationButton");
+        Button login = Required<Button>(harness.Panel, "StartCopilotLogin");
+        Button cancel = Required<Button>(harness.Panel, "CancelCopilotLogin");
+        Button check = Required<Button>(harness.Panel, "CheckAuthenticationButton");
         Button start = Required<Button>(harness.View, "StartRunButton");
-        Activate(harness.Window, login, useKeyboard);
+        Activate(harness.PanelWindow, login, useKeyboard);
         Task first = Assert.IsAssignableFrom<Task>(harness.ViewModel.LastLoginTask);
         LoginViewProcess cancelled = harness.Process;
         Assert.True(cancel.IsEffectivelyEnabled);
 
-        Activate(harness.Window, cancel, useKeyboard, Key.Space);
+        Activate(harness.PanelWindow, cancel, useKeyboard, Key.Space);
         await first.WaitAsync(LoginTestWait, TestContext.Current.CancellationToken);
         Render();
 
@@ -735,7 +735,7 @@ public sealed class ExecutionViewTests
         Render();
         Assert.Equal(0, harness.Process.StartCount);
         Assert.Equal(1, harness.FactoryCallCount);
-        Activate(harness.Window, login, useKeyboard);
+        Activate(harness.PanelWindow, login, useKeyboard);
         Task retry = Assert.IsAssignableFrom<Task>(harness.ViewModel.LastLoginTask);
         Assert.NotSame(first, retry);
         Assert.Equal(2, harness.FactoryCallCount);
@@ -758,9 +758,9 @@ public sealed class ExecutionViewTests
         using LoginViewHarness harness = new();
         harness.Process.StartFailureMessage =
             $"{LoginTokenCanary} device-code-CANARY {harness.Resolver.CliPath} {harness.ViewModel.OutputDirectory}";
-        Button login = Required<Button>(harness.View, "StartCopilotLogin");
+        Button login = Required<Button>(harness.Panel, "StartCopilotLogin");
 
-        Activate(harness.Window, login, useKeyboard: false);
+        Activate(harness.PanelWindow, login, useKeyboard: false);
         Task task = Assert.IsAssignableFrom<Task>(harness.ViewModel.LastLoginTask);
         await task.WaitAsync(LoginTestWait, TestContext.Current.CancellationToken);
         Render();
@@ -769,7 +769,7 @@ public sealed class ExecutionViewTests
         Assert.Contains("失敗", harness.ViewModel.LoginStatusText, StringComparison.Ordinal);
         Assert.Contains("再試行", harness.ViewModel.LoginStatusText, StringComparison.Ordinal);
         Assert.True(login.IsEffectivelyEnabled);
-        Assert.False(Required<Button>(harness.View, "CancelCopilotLogin").IsEffectivelyEnabled);
+        Assert.False(Required<Button>(harness.Panel, "CancelCopilotLogin").IsEffectivelyEnabled);
         Assert.False(Required<Button>(harness.View, "StartRunButton").IsEffectivelyEnabled);
         Assert.True(harness.ViewModel.IsConfigured);
         Assert.Equal(ExecutionAuthenticationState.NotChecked, harness.ViewModel.AuthenticationState);
@@ -783,27 +783,26 @@ public sealed class ExecutionViewTests
     public async Task Login_controls_reflow_and_follow_tab_order_at_two_hundred_percent()
     {
         using LoginViewHarness harness = new();
-        harness.Window.Width = 760;
-        harness.Window.Height = 450;
-        harness.Window.SetRenderScaling(2d);
+        harness.PanelWindow.Width = 300;
+        harness.PanelWindow.Height = 200;
+        harness.PanelWindow.SetRenderScaling(2d);
         Render();
-        StackPanel panel = Required<StackPanel>(harness.View, "CopilotLoginPanel");
-        WrapPanel actions = Required<WrapPanel>(harness.View, "CopilotLoginActions");
-        ScrollViewer scroll = Required<ScrollViewer>(harness.View, "ExecutionAuthenticationScroll");
-        Button check = Required<Button>(harness.View, "CheckAuthenticationButton");
-        Button login = Required<Button>(harness.View, "StartCopilotLogin");
-        Button cancel = Required<Button>(harness.View, "CancelCopilotLogin");
-        Button settings = Required<Button>(harness.View, "ChangeExecutionSettingsButton");
-        TextBlock instructions = Required<TextBlock>(harness.View, "CopilotLoginInstructions");
-        TextBlock status = Required<TextBlock>(harness.View, "CopilotLoginStatus");
+        StackPanel panel = Required<StackPanel>(harness.Panel, "CopilotLoginPanel");
+        WrapPanel actions = Required<WrapPanel>(harness.Panel, "CopilotLoginActions");
+        ScrollViewer scroll = Required<ScrollViewer>(harness.Panel, "ExecutionAuthenticationScroll");
+        Button check = Required<Button>(harness.Panel, "CheckAuthenticationButton");
+        Button login = Required<Button>(harness.Panel, "StartCopilotLogin");
+        Button cancel = Required<Button>(harness.Panel, "CancelCopilotLogin");
+        TextBlock instructions = Required<TextBlock>(harness.Panel, "CopilotLoginInstructions");
+        TextBlock status = Required<TextBlock>(harness.Panel, "CopilotLoginStatus");
 
-        Assert.Equal(2d, harness.Window.RenderScaling);
+        Assert.Equal(2d, harness.PanelWindow.RenderScaling);
         Assert.Equal(ScrollBarVisibility.Disabled, scroll.HorizontalScrollBarVisibility);
         Assert.Equal(ScrollBarVisibility.Auto, scroll.VerticalScrollBarVisibility);
         Assert.True(scroll.Extent.Width <= scroll.Viewport.Width + 1d);
         Assert.True(scroll.Extent.Height > scroll.Viewport.Height);
         Assert.Equal(new Control[] { check, login, cancel }, actions.Children);
-        Assert.Equal([0, 1, 2, 3], new[] { check.TabIndex, login.TabIndex, cancel.TabIndex, settings.TabIndex });
+        Assert.Equal([100, 101, 102], new[] { check.TabIndex, login.TabIndex, cancel.TabIndex });
         Assert.True(cancel.Bounds.Y > check.Bounds.Y, "The narrow viewport must wrap the login actions.");
         Assert.Equal(TextWrapping.Wrap, instructions.TextWrapping);
         foreach (Control control in new Control[] { actions, check, login, cancel, instructions, status })
@@ -812,20 +811,19 @@ public sealed class ExecutionViewTests
         }
 
         Assert.True(check.Focus(NavigationMethod.Tab, KeyModifiers.None));
-        Press(harness.Window, Key.Tab);
-        Assert.Same(login, harness.Window.FocusManager?.GetFocusedElement());
-        Press(harness.Window, Key.Tab);
-        Assert.Same(settings, harness.Window.FocusManager?.GetFocusedElement());
-        Press(harness.Window, Key.Tab, RawInputModifiers.Shift);
-        Assert.Same(login, harness.Window.FocusManager?.GetFocusedElement());
+        Press(harness.PanelWindow, Key.Tab);
+        Assert.Same(login, harness.PanelWindow.FocusManager?.GetFocusedElement());
+        Press(harness.PanelWindow, Key.Tab, RawInputModifiers.Shift);
+        Assert.Same(check, harness.PanelWindow.FocusManager?.GetFocusedElement());
         Assert.Equal(0, harness.FactoryCallCount);
 
-        Activate(harness.Window, login, useKeyboard: true);
+        Activate(harness.PanelWindow, login, useKeyboard: true);
         Task task = Assert.IsAssignableFrom<Task>(harness.ViewModel.LastLoginTask);
-        Assert.True(settings.Focus(NavigationMethod.Tab, KeyModifiers.None));
-        Press(harness.Window, Key.Tab, RawInputModifiers.Shift);
-        Assert.Same(cancel, harness.Window.FocusManager?.GetFocusedElement());
-        Press(harness.Window, Key.Space);
+        Render();
+        Assert.True(cancel.IsEffectivelyEnabled);
+        Assert.True(cancel.Focus(NavigationMethod.Tab, KeyModifiers.None));
+        Assert.Same(cancel, harness.PanelWindow.FocusManager?.GetFocusedElement());
+        Press(harness.PanelWindow, Key.Space);
         await task.WaitAsync(LoginTestWait, TestContext.Current.CancellationToken);
         Render();
 
@@ -879,7 +877,12 @@ public sealed class ExecutionViewTests
             AssertFullyInside(control, harness.View);
         }
 
-        foreach (string name in new[] { "ExecutionAuthenticationScroll", "ExecutionProgressScroll" })
+        Assert.Null(harness.View.FindControl<ScrollViewer>("ExecutionAuthenticationScroll"));
+        Assert.Null(harness.View.FindControl<Border>("ExecutionValidationSummary"));
+        Assert.Null(harness.View.FindControl<Button>("CheckAuthenticationButton"));
+        Assert.True(Required<ScrollViewer>(harness.Panel, "ExecutionAuthenticationScroll").Extent.Height
+            <= Required<ScrollViewer>(harness.Panel, "ExecutionAuthenticationScroll").Viewport.Height + 1d);
+        foreach (string name in new[] { "ExecutionProgressScroll" })
         {
             ScrollViewer scroll = Required<ScrollViewer>(harness.View, name);
             Assert.True(double.IsFinite(scroll.Bounds.Height));
@@ -920,7 +923,7 @@ public sealed class ExecutionViewTests
         Assert.Equal("次回並列\n3 件", Required<TextBlock>(harness.View, "ConcurrencySummary").Text);
         AssertNoAutomaticActivity(harness);
 
-        Activate(harness.Window, Required<Button>(harness.View, "CheckAuthenticationButton"), useKeyboard: true);
+        Activate(harness.PanelWindow, Required<Button>(harness.Panel, "CheckAuthenticationButton"), useKeyboard: true);
         Render();
         Assert.Null(harness.ViewModel.SelectedModelId);
         Assert.Equal("not-listed", harness.ViewModel.PreferredModelId);
@@ -1052,8 +1055,8 @@ public sealed class ExecutionViewTests
         Assert.Equal(directory, harness.ViewModel.OutputDirectoryOverride);
         AssertFullyInside(output, harness.View);
 
-        CheckBox resume = Required<CheckBox>(harness.View, "ResumeModeCheckBox");
-        TextBox partial = Required<TextBox>(harness.View, "ResumePartialPathTextBox");
+        CheckBox resume = Required<CheckBox>(harness.Panel, "ResumeModeCheckBox");
+        TextBox partial = Required<TextBox>(harness.Panel, "ResumePartialPathTextBox");
         Assert.False(partial.IsEffectivelyVisible);
         resume.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
         Render();
@@ -1067,8 +1070,8 @@ public sealed class ExecutionViewTests
         Assert.Equal(resumePath, harness.ViewModel.ResumePartialPath);
         Assert.Equal(directory, output.Text);
         Assert.Equal(directory, harness.ViewModel.OutputDirectoryOverride);
-        Assert.Equal(harness.ViewModel.OutputModeText, Required<TextBlock>(harness.View, "OutputModeSummary").Text);
-        AssertFullyInside(partial, harness.View);
+        Assert.Equal(harness.ViewModel.OutputModeText, Required<TextBlock>(harness.Panel, "OutputModeSummary").Text);
+        AssertFullyInside(partial, harness.Panel);
 
         resume.SetCurrentValue(ToggleButton.IsCheckedProperty, false);
         Render();
@@ -1248,9 +1251,9 @@ public sealed class ExecutionViewTests
         using LoginViewHarness harness = new();
         harness.ViewModel.MaxConcurrency = 17;
         Render();
-        ListBox list = Required<ListBox>(harness.View, "TechnicalErrorsList");
-        TextBox detail = Required<TextBox>(harness.View, "SelectedTechnicalErrorDetail");
-        Border pane = Required<Border>(harness.View, "ExecutionValidationSummary");
+        ListBox list = Required<ListBox>(harness.Panel, "TechnicalErrorsList");
+        TextBox detail = Required<TextBox>(harness.Panel, "SelectedTechnicalErrorDetail");
+        Border pane = Required<Border>(harness.Panel, "ExecutionValidationSummary");
         ExecutionTechnicalError selected = Assert.Single(harness.ViewModel.TechnicalErrors, error => error.Code == "CONCURRENCY_OUT_OF_RANGE");
         list.SelectedItem = selected;
         Render();
@@ -1315,8 +1318,8 @@ public sealed class ExecutionViewTests
         harness.ViewModel.Configure(definition, metadata, inputPath);
         await harness.ViewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
         Render();
-        ListBox list = Required<ListBox>(harness.View, "TechnicalErrorsList");
-        TextBox detail = Required<TextBox>(harness.View, "SelectedTechnicalErrorDetail");
+        ListBox list = Required<ListBox>(harness.Panel, "TechnicalErrorsList");
+        TextBox detail = Required<TextBox>(harness.Panel, "SelectedTechnicalErrorDetail");
         ExecutionTechnicalError[] weightErrors = harness.ViewModel.TechnicalErrors
             .Where(error => error.Code == "WEIGHT_MUST_BE_POSITIVE").ToArray();
         Assert.Equal(2, weightErrors.Length);
@@ -1362,7 +1365,7 @@ public sealed class ExecutionViewTests
         Assert.Empty(harness.ViewModel.TechnicalErrors);
         Assert.Null(list.SelectedItem);
         Assert.Equal(string.Empty, detail.Text);
-        Assert.False(Required<Border>(harness.View, "ExecutionValidationSummary").IsEffectivelyVisible);
+        Assert.False(Required<Border>(harness.Panel, "ExecutionValidationSummary").IsEffectivelyVisible);
         Assert.True(Required<Button>(harness.View, "StartRunButton").IsEffectivelyEnabled);
         AssertNoAutomaticActivity(harness, authenticationChecks: 1);
     }
@@ -1387,7 +1390,7 @@ public sealed class ExecutionViewTests
         Activate(harness.Window, Required<Button>(harness.View, "ChangeExecutionSettingsButton"), useKeyboard: true);
         Assert.Equal(1, settingsRequests);
         AssertNoAutomaticActivity(harness);
-        Activate(harness.Window, Required<Button>(harness.View, "StartCopilotLogin"), useKeyboard: true);
+        Activate(harness.PanelWindow, Required<Button>(harness.Panel, "StartCopilotLogin"), useKeyboard: true);
         Task login = Assert.IsAssignableFrom<Task>(harness.ViewModel.LastLoginTask);
         harness.Window.Content = null;
         Render();
@@ -1411,15 +1414,16 @@ public sealed class ExecutionViewTests
         RecordingRunBoundary runner = new((_, _, _) => throw new InvalidOperationException("must not run"));
         using ExecutionViewModel next = new(authentication, runner);
         harness.View.DataContext = next;
+        harness.Panel.DataContext = next;
         next.ApplySettings(new ApplicationSettings { PreferredModelId = "new-owner" });
         harness.ViewModel.SelectedModelId = "old-owner";
         Render();
         Assert.Equal(0, ViewObserverCount(harness.ViewModel, harness.View));
         Assert.Equal(1, ViewObserverCount(next, harness.View));
         Assert.Equal("次回 未選択 並列8 · effort: 未選択 · 希望: new-owner · 上限: 未選択", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
-        Assert.Same(next.CheckAuthenticationCommand, Required<Button>(harness.View, "CheckAuthenticationButton").Command);
+        Assert.Same(next.CheckAuthenticationCommand, Required<Button>(harness.Panel, "CheckAuthenticationButton").Command);
         Assert.Same(next.StartCommand, Required<Button>(harness.View, "StartRunButton").Command);
-        Assert.Same(next.LoginCommand, Required<Button>(harness.View, "StartCopilotLogin").Command);
+        Assert.Same(next.LoginCommand, Required<Button>(harness.Panel, "StartCopilotLogin").Command);
         Activate(harness.Window, Required<Button>(harness.View, "ChangeExecutionSettingsButton"), useKeyboard: false);
         Assert.Equal(2, settingsRequests);
         Assert.Equal(0, authentication.CallCount);
@@ -1443,10 +1447,10 @@ public sealed class ExecutionViewTests
         using LoginViewHarness harness = new(new ExecutionAuthenticationSnapshot(state));
         await harness.ViewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
         Render();
-        TextBlock authentication = Required<TextBlock>(harness.View, "CopilotAuthenticationStatus");
+        TextBlock authentication = Required<TextBlock>(harness.Panel, "CopilotAuthenticationStatus");
         Assert.Equal(harness.ViewModel.AuthenticationStatusText, authentication.Text);
         AssertFullyWrapped(authentication);
-        AssertFitsLoginPanel(authentication, Required<StackPanel>(harness.View, "CopilotLoginPanel"));
+        AssertFitsLoginPanel(authentication, Required<StackPanel>(harness.Panel, "CopilotLoginPanel"));
         AssertLoginStatus(harness);
         Assert.False(Required<Button>(harness.View, "StartRunButton").IsEffectivelyEnabled);
         Assert.DoesNotContain(harness.View.GetVisualDescendants().OfType<TextBlock>(), text =>
@@ -1593,7 +1597,7 @@ public sealed class ExecutionViewTests
 
     private static void AssertLoginStatus(LoginViewHarness harness)
     {
-        TextBlock status = Required<TextBlock>(harness.View, "CopilotLoginStatus");
+        TextBlock status = Required<TextBlock>(harness.Panel, "CopilotLoginStatus");
         Assert.Equal("CopilotLoginStatus", AutomationProperties.GetAutomationId(status));
         Assert.Equal(harness.ViewModel.LoginStatusText, status.Text);
         Assert.Equal(status.Text, AutomationProperties.GetName(status));
@@ -1685,8 +1689,11 @@ public sealed class ExecutionViewTests
             ViewModel.Configure(definition, U01TestSupport.ValidateMapping(definition).Metadata,
                 Path.Combine(Path.GetTempPath(), "PRIVATE-A03-INPUT-CANARY.xlsx"));
             View = new ExecutionView(ViewModel);
+            Panel = new ExecutionPreparationPanel { DataContext = ViewModel };
             Window = new Window { Width = 950, Height = 450, Content = View };
+            PanelWindow = new Window { Width = 950, Height = 450, Content = Panel };
             Window.Show();
+            PanelWindow.Show();
             Render();
         }
 
@@ -1697,12 +1704,15 @@ public sealed class ExecutionViewTests
         public int FactoryCallCount { get; private set; }
         public ExecutionViewModel ViewModel { get; }
         public ExecutionView View { get; }
+        public ExecutionPreparationPanel Panel { get; }
         public Window Window { get; }
+        public Window PanelWindow { get; }
 
         public void Dispose()
         {
             ViewModel.Dispose();
             Window.Close();
+            PanelWindow.Close();
         }
     }
 

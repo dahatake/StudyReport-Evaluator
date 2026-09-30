@@ -99,6 +99,10 @@ public sealed partial class MainWindow : Window
             // the host's inherited shell context when it is applied. Set this local
             // owner once; cache hits must not rebind or reset unfinished editors.
             view.DataContext = editor;
+            if (view is InputView inputView)
+            {
+                inputView.AttachExecutionPreparation(ViewModel.ExecutionViewModel);
+            }
             editorViews.Add(editor, view);
         }
 
@@ -156,7 +160,7 @@ public sealed partial class MainWindow : Window
             {
                 InputView input => input.FindControl<TextBox>("FilePathTextBox"),
                 QuantificationDesignView design => design.FindControl<TextBox>("BasePointsTextBox"),
-                ExecutionView execution => execution.FindControl<Button>("CheckAuthenticationButton"),
+                ExecutionView execution => execution.FindControl<Button>("ChangeExecutionSettingsButton"),
                 ResultsOutputView results => ResultsFocusTarget(results),
                 _ => null,
             };

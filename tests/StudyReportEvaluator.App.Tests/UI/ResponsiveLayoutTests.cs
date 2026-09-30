@@ -150,24 +150,28 @@ public sealed class ResponsiveLayoutTests(ITestOutputHelper output)
         execution.IsResumeMode = true;
         execution.ResumePartialPath = LongPath;
         ExecutionView view = new(execution);
+        ExecutionPreparationPanel prep = new() { DataContext = execution };
         Window window = Host(view, scale: scale);
+        Window prepWindow = Host(prep, scale: scale);
 
         try
         {
             AssertFitsHorizontally(view, "execution view");
-            AssertScrollEndReachable(Required<ScrollViewer>(view, "ExecutionAuthenticationScroll"),
-                Required<TextBlock>(view, "CopilotLoginInstructions"));
+            AssertFitsHorizontally(prep, "preparation panel");
+            AssertScrollEndReachable(Required<ScrollViewer>(prep, "ExecutionAuthenticationScroll"),
+                Required<TextBlock>(prep, "CopilotLoginInstructions"));
             AssertScrollEndReachable(Required<ScrollViewer>(view, "ExecutionProgressScroll"),
                 Required<TextBlock>(view, "DurableProgressSummary"));
             AssertFullyInside(Required<Grid>(view, "ExecutionActions"), view);
             AssertTextEndReachable(window, Required<TextBox>(view, "EffectiveOutputDirectoryTextBox"));
-            AssertTextEndReachable(window, Required<TextBox>(view, "ResumePartialPathTextBox"));
+            AssertTextEndReachable(prepWindow, Required<TextBox>(prep, "ResumePartialPathTextBox"));
             Assert.Null(execution.LastLoginTask);
             Assert.Null(execution.LastRunContext);
             RecordLayout(output, "standalone-execution", window);
         }
         finally
         {
+            prepWindow.Close();
             window.Close();
         }
     }

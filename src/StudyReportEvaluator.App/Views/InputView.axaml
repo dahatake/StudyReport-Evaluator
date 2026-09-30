@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:converters="using:Avalonia.Data.Converters"
     xmlns:viewModels="using:StudyReportEvaluator.App.ViewModels"
+    xmlns:views="using:StudyReportEvaluator.App.Views"
     Background="{DynamicResource AppCanvasBrush}"
     Foreground="{DynamicResource AppTextBrush}"
     Margin="0"
@@ -61,8 +62,8 @@
   <Grid x:Name="InputContentRoot" Margin="8" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="6"
         SizeChanged="HandleInputContentSizeChanged" KeyboardNavigation.TabNavigation="Continue">
     <StackPanel Spacing="2">
-      <Grid RowDefinitions="Auto,44" RowSpacing="4" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-        <Grid Grid.ColumnSpan="3" ColumnDefinitions="Auto,*" ColumnSpacing="12">
+      <Grid RowDefinitions="Auto,44" RowSpacing="4" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+        <Grid Grid.ColumnSpan="4" ColumnDefinitions="Auto,*" ColumnSpacing="12">
           <TextBlock Text="ファイル path（標準 .xlsx）" Classes="label" VerticalAlignment="Center" />
           <TextBlock x:Name="InputLoadStatus" Grid.Column="1" Text="{Binding StatusText}"
                      Classes="muted" TextWrapping="Wrap" ToolTip.Tip="{Binding WorkbookSummary}"
@@ -79,6 +80,11 @@
                 Classes="primary" Command="{Binding LoadFileCommand}" TabIndex="2"
                 AutomationProperties.AutomationId="LoadInputWorkbook"
                 AutomationProperties.Name="入力 Excel を read-only で読み込む" />
+        <Button x:Name="PreparationToggleButton" Grid.Row="1" Grid.Column="3" Content="実行の準備を開く"
+                IsVisible="False" Click="HandlePreparationToggleClick" TabIndex="19"
+                AutomationProperties.AutomationId="InputTogglePreparation"
+                AutomationProperties.Name="Copilot ログインと再開の準備を開く／入力へ戻る"
+                ToolTip.Tip="Copilot ログイン、checkpoint からの再開、実行前の技術的な問題を、この入力画面の中で開閉します。入力値は保持されます。" />
       </Grid>
       <TextBlock x:Name="PickerStatusMessage" Text="" IsVisible="False" TextWrapping="Wrap"
                  Foreground="{DynamicResource TechnicalTextBrush}"
@@ -247,5 +253,12 @@
                 ToolTip.Tip="この画面で修正できるエラーの入力欄へ移動します。未反映の数値は自動修正しません。" />
       </Grid>
     </Border>
-  </Grid>
+
+    <!-- Copilot login, checkpoint resume and technical-error parts of run preparation. They replace the
+         range/mapping/validation area while open, so the Input step never grows beyond its body.
+         Available only when a host attaches the shell's ExecutionViewModel. -->
+    <Grid x:Name="ExecutionPreparationHost" Grid.Row="1" Grid.RowSpan="3" IsVisible="False"
+          Background="{DynamicResource AppCanvasBrush}" KeyboardNavigation.TabNavigation="Local">
+      <views:ExecutionPreparationPanel x:Name="ExecutionPreparation" DataContext="{x:Null}" />
+    </Grid>  </Grid>
 </UserControl>

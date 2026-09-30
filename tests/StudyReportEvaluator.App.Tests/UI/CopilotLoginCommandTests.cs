@@ -130,15 +130,15 @@ public sealed class CopilotLoginCommandTests
         {
             window.Show();
             RenderUi();
-            Activate(window, Required<Button>(window, "NextStepButton"));
-            Activate(window, Required<Button>(window, "NextStepButton"));
-            ExecutionView execution = Assert.IsType<ExecutionView>(CurrentView(window));
-            Assert.Equal(WorkflowStep.Execution, shell.CurrentStep);
+            InputView inputView = Assert.IsType<InputView>(CurrentView(window));
+            inputView.SetPreparationOpen(true);
+            RenderUi();
+            ExecutionPreparationPanel execution = inputView.PreparationPanel;
+            Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
             Assert.Same(harness.ViewModel, execution.ViewModel);
             Button loginButton = Required<Button>(execution, "StartCopilotLogin");
             Button cancelLogin = Required<Button>(execution, "CancelCopilotLogin");
             Button check = Required<Button>(execution, "CheckAuthenticationButton");
-            Button change = Required<Button>(execution, "ChangeExecutionSettingsButton");
             Assert.Equal("StartCopilotLogin", AutomationProperties.GetAutomationId(loginButton));
             Assert.Equal("CancelCopilotLogin", AutomationProperties.GetAutomationId(cancelLogin));
             Assert.Equal("CheckCopilotAuthentication", AutomationProperties.GetAutomationId(check));
@@ -156,17 +156,18 @@ public sealed class CopilotLoginCommandTests
             Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetHelpText(loginButton)));
             Assert.Null(harness.ViewModel.LastLoginTask);
 
-            Activate(window, change);
+            shell.OpenSettings(SettingsCategory.Common);
+            RenderUi();
             SettingsView settings = Assert.IsType<SettingsView>(CurrentView(window));
             foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
             {
                 Activate(window, ById<Button>(settings, "SettingsCategory" + category));
                 Assert.Equal(category, shell.Settings.SelectedCategory);
-                Assert.Equal(WorkflowStep.Execution, shell.CurrentStep);
+                Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
                 Assert.Same(settings, CurrentView(window));
                 Assert.DoesNotContain(AllControls(settings), control => AutomationProperties.GetAutomationId(control)
                     is "StartCopilotLogin" or "CancelCopilotLogin" or "CheckCopilotAuthentication");
-                Assert.DoesNotContain(AllControls(window), control => control is ExecutionView);
+                Assert.DoesNotContain(AllControls(window), control => control is ExecutionView or ExecutionPreparationPanel);
                 Assert.Equal(0, harness.Resolver.CallCount);
                 Assert.Equal(0, harness.FactoryCallCount);
                 Assert.Equal(0, harness.Process.StartCount);
@@ -176,12 +177,8 @@ public sealed class CopilotLoginCommandTests
             }
 
             Activate(window, Required<Button>(settings, "SettingsRequestClose"));
-            Assert.Same(execution, CurrentView(window));
-            Assert.Same(change, window.FocusManager?.GetFocusedElement());
-            Press(window, Key.Tab);
-            Assert.Same(Required<CheckBox>(execution, "ResumeModeCheckBox"), window.FocusManager?.GetFocusedElement());
-            Press(window, Key.Tab, RawInputModifiers.Shift);
-            Assert.Same(change, window.FocusManager?.GetFocusedElement());
+            Assert.Same(inputView, CurrentView(window));
+            Assert.True(inputView.IsPreparationOpen);
 
             Assert.True(check.Focus(NavigationMethod.Tab));
             Press(window, Key.Tab);
@@ -195,14 +192,15 @@ public sealed class CopilotLoginCommandTests
             Assert.True(cancelLogin.IsEffectivelyEnabled);
             Assert.False(check.IsEffectivelyEnabled);
 
-            Activate(window, change);
+            shell.OpenSettings(SettingsCategory.Common);
+            RenderUi();
             Assert.Same(settings, CurrentView(window));
             Assert.Equal(SettingsCategory.Common, shell.Settings.SelectedCategory);
             harness.Process.Complete(0);
             await login.WaitAsync(TestWait, TestContext.Current.CancellationToken);
             RenderUi();
             Assert.True(shell.IsSettingsOpen);
-            Assert.Equal(WorkflowStep.Execution, shell.CurrentStep);
+            Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
             Assert.Same(settings, CurrentView(window));
             Assert.False(harness.ViewModel.IsLoggingIn);
             Assert.Equal(ExecutionAuthenticationState.Available, harness.ViewModel.AuthenticationState);
@@ -215,8 +213,7 @@ public sealed class CopilotLoginCommandTests
             Assert.Equal(0, harness.Runner.CallCount);
 
             Activate(window, Required<Button>(settings, "SettingsRequestClose"));
-            Assert.Same(execution, CurrentView(window));
-            Assert.Same(change, window.FocusManager?.GetFocusedElement());
+            Assert.Same(inputView, CurrentView(window));
             Assert.Same(loginButton, Required<Button>(execution, "StartCopilotLogin"));
             Assert.True(check.IsEffectivelyEnabled);
             Assert.Contains("モデル一覧の更新が完了", Required<TextBlock>(execution, "CopilotLoginStatus").Text, StringComparison.Ordinal);
@@ -224,11 +221,10 @@ public sealed class CopilotLoginCommandTests
             Assert.Equal(2, harness.Authentication.CallCount);
             Assert.True(harness.ViewModel.IsAuthenticationAvailable);
             Assert.True(harness.ViewModel.CanStart);
-            Assert.True(Required<Button>(execution, "StartRunButton").IsEffectivelyEnabled);
             Assert.Equal(0, harness.Runner.CallCount);
             Assert.False(harness.ViewModel.IsRunning);
             Assert.Null(harness.ViewModel.LastRunContext);
-            Assert.Equal(WorkflowStep.Execution, shell.CurrentStep);
+            Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
             Assert.False(shell.IsSettingsOpen);
             Assert.Same(login, harness.ViewModel.LastLoginTask);
             Assert.Null(shell.Settings.LastLoadTask);

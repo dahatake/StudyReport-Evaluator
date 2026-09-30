@@ -179,6 +179,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | AC-044 | 利用者向けガイドの「設問の詳細」画面説明の構造（見出し、画像参照1回、ラベル、注意点） | DOC | DocumentationContractTests（Getting_started_explains_the_question_details_screen_for_teachers） | VERIFIED_SCOPED |
 | AC-045 | 結果Excel説明文書の存在・リンク・固定文言と公開文書一覧の整合 | DOC | ResultExcelDescriptionTests／DocumentationContractTests／Packaging系試験 | VERIFIED_SCOPED |
 
+| AC-046 | 実行準備部品（Copilot認証・再開・技術エラー）の入力画面への集約と、step状態文「設定済み」 | UI | PreparationOnInputTests／ExecutionViewTests／MainWindowTests／CopilotLoginCommandTests | VERIFIED_SCOPED |
 ## Test requirement mapping
 
 | TR | Requirement | Required evidence owner | Status |

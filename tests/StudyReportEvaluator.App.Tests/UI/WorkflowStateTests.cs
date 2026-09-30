@@ -283,9 +283,12 @@ public sealed class WorkflowStateTests
         Assert.Same(snapshot, fixture.Input.Snapshot);
         Assert.Equal(progress, (fixture.Execution.ProgressTotal, fixture.Execution.ProgressCompleted, fixture.Execution.ProgressStage));
         Assert.Equal(resume, fixture.Execution.IsResumeMode);
-        Assert.Equal(resume, Required<CheckBox>(executionView, "ResumeModeCheckBox").IsChecked);
+        WithPreparationPanel(fixture, panel =>
+        {
+            Assert.Equal(resume, Required<CheckBox>(panel, "ResumeModeCheckBox").IsChecked);
+            Assert.Equal(partial, Required<TextBox>(panel, "ResumePartialPathTextBox").Text);
+        });
         Assert.Equal(partial, fixture.Execution.ResumePartialPath);
-        Assert.Equal(partial, Required<TextBox>(executionView, "ResumePartialPathTextBox").Text);
         Assert.Equal(string.Empty, fixture.Execution.ResumeResetReason);
         Assert.Equal(outputDirectory, Required<TextBox>(executionView, "EffectiveOutputDirectoryTextBox").Text);
         Assert.Equal("auto", fixture.Execution.SelectedModelId);
@@ -749,8 +752,8 @@ public sealed class WorkflowStateTests
         if (savedBytes is not null) Assert.Equal(savedBytes, before);
         int authenticationChecks = fixture.Authentication.CallCount;
         int runs = fixture.Runner.CallCount;
-        Assert.Same(fixture.Execution.CheckAuthenticationCommand,
-            Required<Button>(Current<ExecutionView>(fixture), "CheckAuthenticationButton").Command);
+        WithPreparationPanel(fixture, panel => Assert.Same(fixture.Execution.CheckAuthenticationCommand,
+            Required<Button>(panel, "CheckAuthenticationButton").Command));
         await fixture.Execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken)
             .WaitAsync(BoundaryWait, TestContext.Current.CancellationToken);
         Render();
@@ -798,13 +801,32 @@ public sealed class WorkflowStateTests
 
     private static void SetResume(WorkflowFixture fixture, string path, bool resume)
     {
-        ExecutionView view = Current<ExecutionView>(fixture);
-        CheckBox mode = Required<CheckBox>(view, "ResumeModeCheckBox");
-        mode.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
+        WithPreparationPanel(fixture, view =>
+        {
+            CheckBox mode = Required<CheckBox>(view, "ResumeModeCheckBox");
+            mode.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
+            Render();
+            Edit(Required<TextBox>(view, "ResumePartialPathTextBox"), path);
+            mode.SetCurrentValue(ToggleButton.IsCheckedProperty, resume);
+            Render();
+        });
+    }
+
+    // The preparation parts live in the Input step; visit it, act, then return to the original step.
+    private static void WithPreparationPanel(WorkflowFixture fixture, Action<ExecutionPreparationPanel> action)
+    {
+        WorkflowStep step = fixture.Shell.CurrentStep;
+        if (step != WorkflowStep.Input) Go(fixture, WorkflowStep.Input);
+        InputView input = Current<InputView>(fixture);
+        input.SetPreparationOpen(true);
         Render();
-        Edit(Required<TextBox>(view, "ResumePartialPathTextBox"), path);
-        mode.SetCurrentValue(ToggleButton.IsCheckedProperty, resume);
-        Render();
+        try { action(input.PreparationPanel); }
+        finally
+        {
+            input.SetPreparationOpen(false);
+            Render();
+            if (step != WorkflowStep.Input) Go(fixture, step);
+        }
     }
 
     private static T Current<T>(WorkflowFixture fixture) where T : Control

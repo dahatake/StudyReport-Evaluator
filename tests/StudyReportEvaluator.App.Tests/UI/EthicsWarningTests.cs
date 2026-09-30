@@ -142,7 +142,7 @@ public sealed class EthicsWarningTests
                 {
                     WorkflowStep.Input => Required<Button>(window, "DesignStepButton"),
                     WorkflowStep.Design => Required<Button>(originalView, "OpenSpecialSettingsButton"),
-                    WorkflowStep.Execution => Required<CheckBox>(originalView, "ResumeModeCheckBox"),
+                    WorkflowStep.Execution => Required<CheckBox>(originalView, "ExecutionCostToggle"),
                     _ => Required<Button>(window, "ResultsStepButton"),
                 };
                 Press(window, Key.Tab, previousFirst ? RawInputModifiers.Shift : RawInputModifiers.None);
@@ -277,14 +277,15 @@ public sealed class EthicsWarningTests
         try
         {
             window.Show();
-            window.ViewModel.NextCommand.Execute(null);
-            window.ViewModel.NextCommand.Execute(null);
             Render();
 
             Border warning = Required<Border>(window, "EthicsWarningBanner");
-            ExecutionView execution = Assert.IsType<ExecutionView>(CurrentView(window));
+            InputView input = Assert.IsType<InputView>(CurrentView(window));
+            input.SetPreparationOpen(true);
+            Render();
+            ExecutionPreparationPanel execution = input.PreparationPanel;
             Border technical = Required<Border>(execution, "ExecutionValidationSummary");
-            ExecutionTechnicalError error = Assert.Single(execution.ViewModel.TechnicalErrors, item => item.Code == "AUTH_CHECK_REQUIRED");
+            ExecutionTechnicalError error = Assert.Single(execution.ViewModel!.TechnicalErrors, item => item.Code == "AUTH_CHECK_REQUIRED");
             Required<ListBox>(execution, "TechnicalErrorsList").SelectedItem = error;
             Render();
             TextBox detail = Required<TextBox>(execution, "SelectedTechnicalErrorDetail");
