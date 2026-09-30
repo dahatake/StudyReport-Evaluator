@@ -83,7 +83,8 @@ public sealed class DurableEvaluationScheduler
         int? maximumContextWindowTokens = null,
         Action<int>? inFlightChanged = null,
         CancellationToken cancellationToken = default,
-        AdaptiveEvaluationConcurrencyLimiter? concurrencyLimiter = null)
+        AdaptiveEvaluationConcurrencyLimiter? concurrencyLimiter = null,
+        Action<LivePreviewRow>? livePreview = null)
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(references);
@@ -122,6 +123,29 @@ public sealed class DurableEvaluationScheduler
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
+        LivePreviewRowTracker? tracker = livePreview is null
+            ? null
+            : new LivePreviewRowTracker(
+                sourceRowNumber,
+                normalItems
+                    .Select(item => LivePreviewItems.Waiting(
+                        LivePreviewItemKind.Normal,
+                        NormalTitle(plan, item)))
+                    .Concat(specials.Select(item => LivePreviewItems.Waiting(
+                        LivePreviewItemKind.Special,
+                        LivePreviewItems.SpecialTitle(item.Question, item.Special))))
+                    .Concat(similarityQuestions.Select(question => LivePreviewItems.Waiting(
+                        LivePreviewItemKind.Similarity,
+                        LivePreviewItems.SimilarityTitle(question)))),
+                livePreview);
+
+        DurableRowEvaluationResult FailedRowResult()
+        {
+            tracker?.UpdateAll((_, item) => LivePreviewItems.Settled(item, ResultsStatusCodes.AiRuntimeFailed));
+            tracker?.Complete();
+            return FailedRow(plan, sourceRowNumber, normalItems, specials, similarityQuestions);
+        }
+
         EvaluationRowData row;
         try
         {
@@ -133,7 +157,7 @@ public sealed class DurableEvaluationScheduler
                 cancellationToken).ConfigureAwait(false);
             if (row.SourceRowNumber != sourceRowNumber)
             {
-                return FailedRow(plan, sourceRowNumber, normalItems, specials, similarityQuestions);
+                return FailedRowResult();
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -142,8 +166,49 @@ public sealed class DurableEvaluationScheduler
         }
         catch
         {
-            return FailedRow(plan, sourceRowNumber, normalItems, specials, similarityQuestions);
+            return FailedRowResult();
         }
+
+        tracker?.UpdateAll((slot, item) =>
+        {
+            if (slot < normalItems.Length)
+            {
+                EvaluationPlanItem planItem = normalItems[slot];
+                return item with
+                {
+                    Cells = LivePreviewItems.Cells(
+                        planItem.PrimarySourceColumn,
+                        planItem.SelectedSourceColumns,
+                        column => ReadCell(row, column)),
+                };
+            }
+
+            slot -= normalItems.Length;
+            if (slot < specials.Length)
+            {
+                SpecialEvaluationDefinition special = specials[slot].Special;
+                return item with
+                {
+                    Cells = LivePreviewItems.Cells(
+                        special.PrimarySourceColumn,
+                        special.SupportingSourceColumns.Prepend(special.PrimarySourceColumn),
+                        column => ReadCell(row, column)),
+                };
+            }
+
+            QuestionDefinition question = similarityQuestions[slot - specials.Length];
+            return item with
+            {
+                Cells = LivePreviewItems.Cells(
+                    question.PrimarySourceColumn,
+                    [question.PrimarySourceColumn],
+                    column => ReadCell(row, column)),
+                ComparisonText = references.TryGetValue(question.Id, out CheckpointReference? reference)
+                    && string.Equals(reference.StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal)
+                    ? reference.Answer
+                    : null,
+            };
+        });
 
         CheckpointNormalResult?[] normalResults = new CheckpointNormalResult?[normalItems.Length];
         CheckpointSpecialResult?[] specialResults = new CheckpointSpecialResult?[specials.Length];
@@ -161,14 +226,26 @@ public sealed class DurableEvaluationScheduler
                     modelId,
                     cancellationToken,
                     maximumPromptTokens,
-                    maximumContextWindowTokens).ConfigureAwait(false);
+                    maximumContextWindowTokens,
+                    payload => tracker?.Update(slot, item => item with
+                    {
+                        PromptText = payload.RenderedPrompt,
+                        Phase = LivePreviewItemPhase.Running,
+                    })).ConfigureAwait(false);
                 normalResults[slot] = ToCheckpoint(result);
+                tracker?.Update(slot, item => LivePreviewItems.Settled(
+                    item,
+                    result.StatusCode,
+                    LivePreviewItems.NormalMeasures(
+                        QuestionOf(plan, result.Item.QuestionId),
+                        result.AcceptedResult)));
             });
         }
 
         for (int index = 0; index < specials.Length; index++)
         {
             int slot = index;
+            int previewSlot = normalItems.Length + index;
             operations.Add(async () =>
             {
                 (QuestionDefinition question, SpecialEvaluationDefinition special) = specials[slot];
@@ -181,13 +258,24 @@ public sealed class DurableEvaluationScheduler
                     reasoningEffort,
                     maximumPromptTokens,
                     maximumContextWindowTokens,
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    payload => tracker?.Update(previewSlot, item => item with
+                    {
+                        PromptText = payload.RenderedPrompt,
+                        Phase = LivePreviewItemPhase.Running,
+                    })).ConfigureAwait(false);
+                CheckpointSpecialResult settled = specialResults[slot]!;
+                tracker?.Update(previewSlot, item => LivePreviewItems.Settled(
+                    item,
+                    settled.StatusCode,
+                    LivePreviewItems.SpecialMeasures(settled.AcceptedResult)));
             });
         }
 
         for (int index = 0; index < similarityQuestions.Length; index++)
         {
             int slot = index;
+            int previewSlot = normalItems.Length + specials.Length + index;
             operations.Add(async () =>
             {
                 QuestionDefinition question = similarityQuestions[slot];
@@ -197,6 +285,11 @@ public sealed class DurableEvaluationScheduler
                     row,
                     references,
                     cancellationToken).ConfigureAwait(false);
+                CheckpointSimilarityResult settled = similarityResults[slot]!;
+                tracker?.Update(previewSlot, item => LivePreviewItems.Settled(
+                    item,
+                    settled.StatusCode,
+                    LivePreviewItems.SimilarityMeasures(settled.AcceptedResult)));
             });
         }
 
@@ -214,6 +307,7 @@ public sealed class DurableEvaluationScheduler
             return new DurableRowEvaluationResult(sourceRowNumber, null);
         }
 
+        tracker?.Complete();
         return new DurableRowEvaluationResult(
             sourceRowNumber,
             new CheckpointCompletedRow
@@ -282,7 +376,8 @@ public sealed class DurableEvaluationScheduler
         string? reasoningEffort,
         int? maximumPromptTokens,
         int? maximumContextWindowTokens,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<SafeSpecialEvaluationPayload>? payloadBuilt = null)
     {
         if (cancellationToken.IsCancellationRequested)
         {
@@ -318,6 +413,7 @@ public sealed class DurableEvaluationScheduler
 
         try
         {
+            payloadBuilt?.Invoke(payload);
             if (!requestCapacityValidator.Validate(
                     payload,
                     maximumPromptTokens,
@@ -511,6 +607,20 @@ public sealed class DurableEvaluationScheduler
 
     private static string ReadCell(EvaluationRowData row, string column) =>
         row.Cells.TryGetValue(column, out string? value) ? value ?? string.Empty : string.Empty;
+
+    private static QuestionDefinition? QuestionOf(EvaluationPlan plan, string questionId) =>
+        plan.Snapshot.Definition.Questions.FirstOrDefault(
+            question => string.Equals(question.Id, questionId, StringComparison.Ordinal));
+
+    private static string NormalTitle(EvaluationPlan plan, EvaluationPlanItem item)
+    {
+        QuestionDefinition? question = QuestionOf(plan, item.QuestionId);
+        EvaluatorDefinition? evaluator = question?.Evaluators.FirstOrDefault(
+            candidate => string.Equals(candidate.Id, item.EvaluatorId, StringComparison.Ordinal));
+        return question is not null && evaluator is not null
+            ? LivePreviewItems.NormalTitle(question, evaluator)
+            : $"通常評価 · {item.QuestionId} / {item.EvaluatorId}";
+    }
 
     private static bool IsCancelled(string statusCode) =>
         string.Equals(statusCode, ResultsStatusCodes.Cancelled, StringComparison.Ordinal);

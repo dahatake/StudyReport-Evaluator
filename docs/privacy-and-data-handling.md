@@ -59,6 +59,10 @@ application loggerはclosedな項目だけを扱います。
 
 回答、Prompt、Reference、reason、evidence、file path、credentialを受け取るfree-text parameterはありません。SDKが返したtoken usage数値はapplication logへ出さず、観測できたunitだけをRun sheetへ集計します。これは次節の専用ジョブコストログとは別です。
 
+## 実行画面の速報値
+
+実行画面の**速報値**は、今回のrunで各Excel学生行に使った対象の文字列（主回答・補助列のセル値）、AIへ送ったPrompt全文、返ってきた生の定量値と理由・根拠を、画面上に表示します。これらは**画面のメモリだけ**に置き、application log、ジョブログ、checkpoint、`setting.txt`へは新たに保存しません（出力workbookとcheckpointが従来保持する内容は変わりません）。次のrunの開始、入力・採点定義の変更、アプリ終了で消えます。表示のための追加のAI送信・通信はなく、各文字列は先頭2,000文字までです。画面は画面共有・録画・スクリーンショットに写るため、公開する前に確認してください。選択して手動でコピーした内容は利用者の管理下に移ります。
+
 ## ジョブコストログ
 
 AI処理を開始すると、アプリは今回のジョブだけの観測値を画面の**コスト詳細／ジョブログ**と、利用者別の`%LOCALAPPDATA%\StudyReportEvaluator\jobs\<job-id>.jsonl`へ記録します。JSON LinesはUTF-8の平文で、同じ入力・checkpointを再開した場合も開始操作ごとに別のjob ID・別ファイルです。既存Excelの`Quantification_Run`シートは残りますが、画面・ジョブログの表示はExcelを読む必要がありません。

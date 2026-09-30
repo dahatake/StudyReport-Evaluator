@@ -60,6 +60,7 @@ public sealed class WindowsPublishPackageTests
         "docs/troubleshooting.md",
         "docs/settings.md",
         "docs/third-party-notices.md",
+        "docs/result-excel-description.md",
         "images/README.md",
         "images/architecture-overview.svg",
         "images/technical-architecture.svg",
@@ -610,8 +611,8 @@ public sealed class WindowsPublishPackageTests
                 path.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
-        Assert.Equal(24, RequiredDocumentationFiles.Length);
-        Assert.Equal(24, documentationEntries.Length);
+        Assert.Equal(25, RequiredDocumentationFiles.Length);
+        Assert.Equal(25, documentationEntries.Length);
         Assert.Equal(
             RequiredDocumentationFiles.OrderBy(path => path, StringComparer.Ordinal).ToArray(),
             documentationEntries,

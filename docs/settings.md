@@ -28,7 +28,7 @@
 
 | 画面の項目 | 扱い |
 |---|---|
-| **通常モデル** | 保存済み一覧を表示用に復元。明示または自動の認証・一覧再確認に成功した後、利用可能なmodelを実効選択へ反映 |
+| **通常モデル** | 保存済み一覧を表示用に復元。明示または自動の認証・一覧再確認に成功した後、SDKが返した利用可能なmodel（`auto`を含む全件）を実効選択へ反映。ポリシーで無効（`disabled`）のmodelと不正なIDだけを選択肢から除きます |
 | **並列度** | 1〜16、既定8。変更は次回run用。run中にrate limitを検出した場合は、この値を上限に有効並列度を一時的に下げます |
 | **指定出力先** | ドライブ等を含む完全修飾の絶対path、または空欄。例: `C:\Reports\Results` |
 | **実効出力先** | 現在の明示指定と次回の入力から決まる読取専用表示。ここを保存用の指定値にはしない |
@@ -122,7 +122,7 @@
 | `definition` | 任意の採点定義**1件**、または`null` |
 | `cachedModels` | 任意の最後に取得成功したmodel一覧。省略／`null`はキャッシュなし、空配列`[]`も有効 |
 
-`cachedModels`の各要素は`id`、`maximumPromptTokens`、`maximumContextWindowTokens`を持つobjectです。`id`は有効で重複のないmodel ID、各上限値は正の整数または`null`（未取得）で、一覧は最大512件です。保存時にキャッシュが`null`なら項目を省略します。**schemaは`1`のまま**で、項目のない旧設定も読み込めます。ただし、`cachedModels`未対応の旧実装は同schemaの未知項目として拒否する場合があり、旧実装でも読める保証ではありません。
+`cachedModels`の各要素は`id`、`maximumPromptTokens`、`maximumContextWindowTokens`を持つobjectです。`id`は有効で重複のないmodel ID、各上限値は正の整数または`null`（未取得）で、一覧は最大4096件です。4096件を超える一覧は保存せず（選択は全件できます）。保存時にキャッシュが`null`なら項目を省略します。**schemaは`1`のまま**で、項目のない旧設定も読み込めます。ただし、`cachedModels`未対応の旧実装は同schemaの未知項目として拒否する場合があり、旧実装でも読める保証ではありません。
 
 採点定義にはID・name・revision、sheet／質問文行／回答行範囲、base／special／類似度係数／丸め、設問名・text・mapping・配点・enabled、evaluator／criterionのID・種類・range・weight、組込template版、Custom Prompt、固有評価・適用済みPrompt等を含みます。ID・順序・decimal値・Unicode・改行・Promptを保持する保存で、checkpointの代用や複数profileの保管庫ではありません。
 

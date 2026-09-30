@@ -619,7 +619,7 @@ lock fileやglobal reservation serviceは追加しない。
 ### 10.4 Results
 
 - `ExecutionRunContext`／`RunSummary.Snapshot`に由来する「前回の実行結果」を保持し、入力・次回draftを編集しても再評価しない。final／partial、件数、cleanup warning、入力identityを確認できた段階を表示する。取消・checkpoint失敗をfinal commit直前の不変確認済みとは表示しない。
-- `RowScoreList`は`VisibleRowScores`の学生行ページ。元行番号、最終点、固有点、類似減点、行状態、設問別得点概要を示す。`ResultsList`は選択行の`SelectedRowCriteria`、その隣に選択criterionの単一editorを置く。設問数に比例して横へ列や全件editorを増やさない。
+- `RowScoreList`は`VisibleRowScores`の学生行ページ。元行番号、最終点、固有点、類似減点、行状態、設問別得点概要を示す。設問別得点は、snapshotの設問文（Excel見出し由来）の空白を単一半角空白へ正規化した`<設問文>: <点>`を` · `で連結する（`ResultsOutputViewModel.QuestionLabel`、FR-RS-01〜03）。設問文が空白のみなら表示名、次にIDへ代替する。基準editor先頭に設問文の原文全文（`ResultsCriterionQuestionText`）を表示する。`ResultsList`は選択行の`SelectedRowCriteria`、その隣に選択criterionの単一editorを置く。設問数に比例して横へ列や全件editorを増やさない。
 - `Results`が元の`ResultsCriterionViewModel` collectionを所有し、`SelectedRowCriteria`も同じ参照を使う。ページ移動では表示ページ内の行を再選択するが、ページ外のoverrideも元collectionに保持する。再計算で行previewを作り直しても、同じ行のcriterion editorを不要に初期化しない。
 - 「元の行番号」→移動は存在するsource rowだけを対象にする。不正・空のtextでは`GoToRowNumber=null`として旧有効値を実行対象に残さず、Enterも同じ移動commandを使う。一覧のEnter／double tapは詳細表示へ進む。
 - `NextOverrideErrorCommand`は全`Results`から次のエラーを探し、ページ外でも元行・criterion・詳細表示へ移る。残り1件でも再移動でき、Viewは対象criterionをscrollして表示する。

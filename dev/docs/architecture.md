@@ -144,6 +144,8 @@ runはExecutionの明示buttonからだけ開始する。command-line引数、�
 - login processの強制終了はlogin取消またはアプリ終了時だけとし、serviceが開始・所有した当該processに限定する。正常完了を含め、終了確認後に所有processを解放する。process tree全体や名前一致でkillせず、ブラウザー、他CLI、workbook、credential storeに触れない。logout・credential削除・失効を行わない。終了未確認のprocessは所有を保持して二重起動を防ぎ、認証確認・評価を止めるが、GUI／Excel読込／mapping／設計は継続可能にし、safeな状態と再試行案内を表示する。
 - CLI欠落・不一致は配布物の再取得／ZIP再展開を案内する。PATH上の別CLIやintegrity検証緩和で回避しない。自己更新抑止とlogin後の明示再確認で固定CLI identityを維持する。
 
+**実行中の速報値（§11.12）:** `DurableQuantificationOrchestrator.RunAsync`の任意引数`livePreview`（`Action<LivePreviewUpdate>`）が、評価計画の確定時に対象行範囲と1行あたり項目数を、checkpointから再開する場合は保存済み行を`LivePreviewItems.Restored`で、以後は`DurableEvaluationScheduler.EvaluateRowAsync`の`LivePreviewRowTracker`が項目単位（Prompt組立後＝評価中、結果検証後＝確定）の不変snapshotを、worker threadから通知する。`QuantificationRunBoundary`の5引数`RunAsync`で`ExecutionViewModel`へ渡り、既存の進捗と同じ`SynchronizationContext`・run連番の門番でUIへ適用され、`LiveQuantificationPreviewViewModel`（全行のObservableCollection、選択行と評価中の行の既定表示、run終了時の中断／未処理化、2,000／200文字上限）が保持し、`ExecutionView`の速報値領域（`LivePreviewRowsList`・`LivePreviewDetail`）が表示する。通知は表示専用で、失敗は握りつぶし、checkpoint・出力workbook・ログの内容、AI呼出し数、再試行を変えない。次のrun開始（`ResetProgress`）、入力・定義の変更、`Dispose`で破棄する。
+
 ### 6.2 設定5カテゴリと編集先
 
 `SettingsView`は既存Input／Design／Execution VMを束ねる。カテゴリ別VMや第三の採点draftを作らず、主画面と同じ入力欄を二重配置しない。

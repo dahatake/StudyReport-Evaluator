@@ -188,7 +188,7 @@ SimilarityはLLMへ送らず、NFKC正規化・空白／句読点／記号除去
 
 ![結果一覧。fake runの100行とfake score。表示されたfinal pathは実workbook作成の証拠ではない](images/06-results-review.png)
 
-1. 一覧で**元の行／最終点／固有点／類似減点／状態／設問別得点**、上部でfinal／partialと警告を確認します。成功・回答空欄・取消・未処理／未確定・技術エラーを区別し、完了件数を成功件数とはみなしません。
+1. 一覧で**元の行／最終点／固有点／類似減点／状態／設問別得点**（設問は内部IDでなく、元のExcelの質問文で表示）、上部でfinal／partialと警告を確認します。成功・回答空欄・取消・未処理／未確定・技術エラーを区別し、完了件数を成功件数とはみなしません。
 2. **前／次**のページ切替や**元の行番号 → 移動**で対象行を選び、**詳細・override**で設問・評価方法・criterionを選びます。選択した1 criterionのAI raw、range、status、overrideと、適用値・正規化・Final raw等の計算previewを確認できます。理由・根拠の本文は出力workbookで確認します。
 3. 編集可能な通常criterionへrange内の任意overrideを入力します。空欄に戻すと解除され、AI rawは保持します。**エラー … 件・次へ**でページ外を含む問題箇所へ移動して修正できます。固有評価・類似度のoverride欄はありません。
 4. **別名 workbook 出力**へ既存directory内の未使用の`.xlsx` pathを指定し、**検証して出力**を選びます。成功後の**保存済み修正版**とpathを確認してください。入力・既存final／partialは上書きしません。
@@ -255,6 +255,8 @@ finalは入力workbookの全sheetを保持し、次を追加します。
 
 同名sheetが入力にある場合は既存sheetを変更せず、` (2)`等の一意名を使います。partialは入力全体と`Quantification_Checkpoint`を含みます。
 
+**結果Excelの各sheet・各列の意味**（`Final_Score`の見方、`Override`欄、空欄と0の違い、状態コード、計算例）は、ITに詳しくない先生向けに[実行結果Excelの見方](docs/result-excel-description.md)へまとめています。
+
 ## データとprivacy
 
 回答データとしてAIへ送るのは、処理に必要なcurrent rowの選択済みprimary／supporting／special sourceだけです。処理に応じてQuestion text、Prompt、criterion metadata、Reference、closed schema metadataも送ります。他row、非選択列、workbook pathは通常payloadへ含めません。
@@ -297,6 +299,7 @@ final/partialには入力全体、Prompt、Reference、AI結果が含まれ得�
 - [はじめに](docs/getting-started.md)
 - [設定の保存と適用](docs/settings.md)
 - [機能と点数](docs/features.md)
+- [実行結果Excelの見方（先生向け）](docs/result-excel-description.md)
 - [Custom evaluator](docs/custom-evaluator-guide.md)
 - [技術アーキテクチャとカスタマイズ](docs/technical-guid.md)
 - [Promptファイルから起動](docs/prompt-launch.md)

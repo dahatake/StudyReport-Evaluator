@@ -185,7 +185,8 @@ public sealed class DurableQuantificationOrchestrator
         DurableQuantificationRunRequest request,
         Action<DurableEvaluationProgress>? progress = null,
         CancellationToken cancellationToken = default,
-        AdaptiveEvaluationConcurrencyLimiter? concurrencyLimiter = null)
+        AdaptiveEvaluationConcurrencyLimiter? concurrencyLimiter = null,
+        Action<LivePreviewUpdate>? livePreview = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Run);
@@ -319,6 +320,37 @@ public sealed class DurableQuantificationOrchestrator
             });
         ImmutableArray<CheckpointReference>.Builder references = checkpoint.References.ToBuilder();
         ImmutableArray<CheckpointCompletedRow>.Builder completedRows = checkpoint.CompletedRows.ToBuilder();
+        Action<LivePreviewRow>? rowPreview = null;
+        if (livePreview is not null)
+        {
+            int firstDataRow = plan.Mapping.FirstDataRow;
+            int lastDataRow = plan.Mapping.LastDataRow;
+            int itemsPerRow = plan.Items.Count(item => item.SourceRowNumber == firstDataRow)
+                + snapshot.Definition.Questions
+                    .Where(question => question.Enabled)
+                    .Sum(question => 1 + question.SpecialEvaluations.Count(special => special.Enabled));
+            rowPreview = row => ReportPreview(
+                livePreview,
+                new LivePreviewUpdate
+                {
+                    FirstDataRow = firstDataRow,
+                    LastDataRow = lastDataRow,
+                    ItemsPerRow = itemsPerRow,
+                    Row = row,
+                });
+            ReportPreview(
+                livePreview,
+                new LivePreviewUpdate
+                {
+                    FirstDataRow = firstDataRow,
+                    LastDataRow = lastDataRow,
+                    ItemsPerRow = itemsPerRow,
+                });
+            foreach (CheckpointCompletedRow restored in completedRows)
+            {
+                rowPreview(LivePreviewItems.Restored(snapshot.Definition, restored));
+            }
+        }
 
         for (int index = references.Count; index < referenceTotal; index++)
         {
@@ -421,7 +453,8 @@ public sealed class DurableQuantificationOrchestrator
                                 rowCancellation.IsCancellationRequested ? "CANCELLING" : "EVALUATING_ROW");
                         },
                         rowCancellation.Token,
-                        concurrencyLimiter);
+                        concurrencyLimiter,
+                        rowPreview);
                     inFlightRows.Add(rowIndex, task);
                 }
 
@@ -1149,6 +1182,18 @@ public sealed class DurableQuantificationOrchestrator
             operationTotal,
             inFlight,
             statusCode);
+
+    private static void ReportPreview(Action<LivePreviewUpdate> livePreview, LivePreviewUpdate update)
+    {
+        try
+        {
+            livePreview(update);
+        }
+        catch
+        {
+            // Presentation observers cannot alter durable state.
+        }
+    }
 
     private static void Report(
         Action<DurableEvaluationProgress>? progress,

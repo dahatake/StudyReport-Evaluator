@@ -640,6 +640,7 @@ function Get-SingleFileDocumentationPaths {
         'docs/troubleshooting.md',
         'docs/settings.md',
         'docs/third-party-notices.md',
+        'docs/result-excel-description.md',
         'images/README.md',
         'images/architecture-overview.svg',
         'images/technical-architecture.svg',

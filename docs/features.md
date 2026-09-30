@@ -12,7 +12,7 @@
 |---|---|---|
 | 入力（Input） | `.xlsx`のread-only読込、回答sheet、質問文の行1/2、回答範囲、対象設問、有効状態、主回答列、選択した設問文 | **設定 → 入力詳細**で補助列、列候補、設問名、追加・複製・並替え・削除 |
 | 採点設計（Design） | Base／Special／類似度減点係数、選択設問の絶対配点・有効状態、全有効設問を含む配点合計・過不足、評価方法・評価項目の概要 | **設定 → 通常評価**でKnowledge／Customとcriterionの詳細、**固有評価**でsource・Prompt、**読込Prompt**で取込本文と適用先 |
-| 実行（Execution） | 起動時のGitHubログイン自動確認と自動ログイン、認証の明示確認・ログイン、新規／checkpoint再開、中断からの再開準備、開始・停止、進捗、今回ジョブのコスト詳細・ジョブログ。モデル・並列度・実効出力先は読取専用の有効値表示 | **設定 → 共通**で通常モデル、並列度、指定出力先を編集。診断も共通で確認 |
+| 実行（Execution） | 起動時のGitHubログイン自動確認と自動ログイン、認証の明示確認・ログイン、新規／checkpoint再開、中断からの再開準備、開始・停止、進捗、**Excelの学生行と1:1・全件の速報値（対象の文字列・Prompt・生の定量値、「実測」の直下）**、今回ジョブのコスト詳細・ジョブログ。モデル・並列度・実効出力先は読取専用の有効値表示 | **設定 → 共通**で通常モデル、並列度、指定出力先を編集。診断も共通で確認 |
 | 結果（Results） | 行一覧、選択行の詳細、1 criterionずつの任意override、エラー移動、別名workbook出力、対応ジョブのコスト詳細・ジョブログ | 結果とoverride、別名出力pathの編集は**結果画面のまま**。設定へは移しません |
 
 入力の**入力詳細…**、採点設計の**設問の詳細／通常評価／固有評価／読込Prompt (件数)**、実行の**変更**から、該当する設定カテゴリを1操作で開けます。設問を対象にする入口では、表示名やページ上の位置ではなく同じ設問ID（`questionId`）を保ちます。**設定から戻る**で編集内容を保持して元のステップへ戻ります。
@@ -186,7 +186,7 @@ statusは原因を示し、失敗を0点へ変換しません。
 
 ## 結果の一覧・詳細とoverride
 
-1. **結果**の一覧で、元のExcel行番号、最終点、固有点、類似減点、状態、設問別得点を確認します。**前／次**でページを切り替え、**元の行番号 → 移動**で対象行へ移動できます。完了件数は成功件数とは別です。
+1. **結果**の一覧で、元のExcel行番号、最終点、固有点、類似減点、状態、設問別得点を確認します。設問別得点の各設問は、内部IDではなく元のExcelの質問文（設問文）で表示します。詳細では、選択した基準の設問文を原文のまま全文表示します。**前／次**でページを切り替え、**元の行番号 → 移動**で対象行へ移動できます。完了件数は成功件数とは別です。
 2. 行を選んで**詳細・override**を開き、その行の設問・評価方法・criterionを選びます。全criterionの編集欄を並べるのではなく、選んだ**1 criterion**のAI raw、range、status、override、適用値と計算previewを表示します。
 3. 編集可能なcriterionにだけ任意overrideを入力します。run開始時のsnapshotのeffective range内で検証し、不正な非空値では出力を止めます。**エラー n 件・次へ**で、別ページも含めた該当行・設問・評価方法・criterionへ移動して修正できます。
 4. **一覧に戻る**やページ切替でも入力済みoverrideは保持します。**未保存の override あり**は修正版が未保存という表示で、元のfinalを変更したという意味ではありません。保存する場合は別名の新規`.xlsx`を指定して**検証して出力**を選びます。入力と既存の完成版は上書きしません。
@@ -216,7 +216,7 @@ partial削除だけが失敗した場合、validなfinalは無効になりませ
 | `Quantification_Results` | row別raw、reason、evidence、status、formula、Final score |
 | `Quantification_Run` | input/definition/runtime identity、model、reasoning effort、時刻、件数、観測usage |
 
-入力に同名sheetがある場合、既存sheetを保持して新しいsheetに` (2)`等を付けます。formula cellにはapp previewのcached valueを保存し、formula対応spreadsheetで開いた際にfull calculationを要求する設定を入れます。
+入力に同名sheetがある場合、既存sheetを保持して新しいsheetに` (2)`等を付けます。各sheetの列の意味は[実行結果Excelの見方](result-excel-description.md)にまとめています。formula cellにはapp previewのcached valueを保存し、formula対応spreadsheetで開いた際にfull calculationを要求する設定を入れます。
 
 ## 上限
 

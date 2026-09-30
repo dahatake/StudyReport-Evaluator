@@ -23,6 +23,7 @@ public sealed class ModelCatalogTests
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(512)]
+    [InlineData(4096)]
     public async Task Cache_round_trip_preserves_order_ids_and_nullable_limits_at_count_boundaries(int count)
     {
         using CatalogHarness harness = new();
@@ -124,7 +125,7 @@ public sealed class ModelCatalogTests
             "prompt-negative" => [new("model-a", -1, 1)],
             "context-zero" => [new("model-a", 1, 0)],
             "context-negative" => [new("model-a", 1, -1)],
-            "too-many" => [.. Enumerable.Range(0, 513).Select(index => new CachedCopilotModel($"model-{index}", 1, 1))],
+            "too-many" => [.. Enumerable.Range(0, 4097).Select(index => new CachedCopilotModel($"model-{index}", 1, 1))],
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 
@@ -584,6 +585,25 @@ public sealed class ModelCatalogTests
         Assert.True(harness.Execution.CanStart);
         Assert.Empty(changes);
         Assert.Equal(1, harness.Authentication.CallCount);
+        harness.AssertNoLoginOrRun();
+    }
+
+    [Fact]
+    public async Task Catalog_over_the_cache_limit_stays_fully_selectable_but_is_not_cached()
+    {
+        using CatalogHarness harness = new();
+        int count = ApplicationSettings.MaximumCachedModels + 1;
+        string[] ids = [.. Enumerable.Range(0, count).Select(index => $"model-{index}")];
+        await harness.Settings.InitializeAsync(TestContext.Current.CancellationToken);
+        harness.Authentication.Handler = _ => Task.FromResult(Available(Catalog(ids)));
+
+        await harness.Execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+        harness.Execution.SelectedModelId = ids[^1];
+
+        Assert.Equal(ids, harness.Execution.AvailableModelIds);
+        Assert.Equal(ids[^1], harness.Execution.SelectedModelId);
+        Assert.Null(harness.Execution.CachedModels);
+        Assert.False(Directory.Exists(harness.Root));
         harness.AssertNoLoginOrRun();
     }
 

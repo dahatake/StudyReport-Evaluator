@@ -266,7 +266,8 @@
                    AutomationProperties.Name="次回新規runの実効出力先・読取専用"
                    ToolTip.Tip="次回新規runの実効出力先です。今回／前回runの出力条件とは別です。再開には左のpartialパスを使用します。長い値は欄内を横スクロールし、全文を選択・コピーできます。" />
         </Grid>
-        <ScrollViewer x:Name="ExecutionProgressScroll" Grid.Row="1"
+        <Grid x:Name="ExecutionProgressBody" Grid.Row="1" RowDefinitions="3*,4*" RowSpacing="4">
+        <ScrollViewer x:Name="ExecutionProgressScroll"
                       HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="4">
             <TextBox x:Name="CurrentRunOutputTextBox" Classes="single-line"
@@ -298,12 +299,48 @@
                        ToolTip.Tip="実行中に報告された参照回答と学生行の進捗です。予定単位数や送信回数とは別です。" />
           </StackPanel>
         </ScrollViewer>
+        <Grid x:Name="ExecutionLivePreview" Grid.Row="1" RowDefinitions="Auto,*" RowSpacing="4"
+              AutomationProperties.AutomationId="ExecutionLivePreview"
+              AutomationProperties.Name="速報値・Excelの行ごとの対象の文字列とPromptと定量値">
+          <TextBlock x:Name="LivePreviewHeading" Text="{Binding LivePreview.HeadingText}" Classes="label"
+                     AutomationProperties.AutomationId="ExecutionLivePreviewHeading"
+                     ToolTip.Tip="AIまたはローカル計算が返した生の値で、最終評点ではありません。配点とFinalScoreはExcel数式が計算します。文字列・Prompt・理由は画面だけに表示し、保存しません。" />
+          <Grid Grid.Row="1" ColumnDefinitions="2*,3*" ColumnSpacing="6">
+            <ListBox x:Name="LivePreviewRowsList" ItemsSource="{Binding LivePreview.Rows}"
+                     SelectedItem="{Binding LivePreview.SelectedRow, Mode=TwoWay}" TabIndex="73"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     AutomationProperties.AutomationId="ExecutionLivePreviewList"
+                     AutomationProperties.Name="速報値・Excelの学生行の一覧（全件）"
+                     ToolTip.Tip="行を選ぶと右に対象の文字列・Prompt・定量値を表示します。選ばない場合は評価中の行を表示します。矢印キーでも選べます。">
+              <ListBox.ItemsPanel>
+                <ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate>
+              </ListBox.ItemsPanel>
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="viewModels:LivePreviewRowViewModel">
+                  <StackPanel AutomationProperties.Name="{Binding AutomationName}">
+                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding StateLine}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding ValueSummary}" Classes="muted" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBox x:Name="LivePreviewDetail" Grid.Column="1" IsReadOnly="True" TabIndex="74"
+                     Text="{Binding LivePreview.DetailText, Mode=OneWay}"
+                     AcceptsReturn="True" TextWrapping="Wrap" VerticalAlignment="Stretch"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     AutomationProperties.AutomationId="ExecutionLivePreviewDetail"
+                     AutomationProperties.Name="選択した行の対象の文字列・Prompt・定量値の全文・読取専用"
+                     ToolTip.Tip="対象の文字列・Prompt・定量値・理由です。スクロールと全文の選択・コピーができます。" />
+          </Grid>
+        </Grid>
+        </Grid>
         <TextBlock x:Name="ReservedPathsLabel" Grid.Row="2" Text="予約名（ファイル作成済みとは限りません）" Classes="muted" />
         <Grid Grid.Row="3" ColumnDefinitions="110,*" ColumnSpacing="8">
           <TextBlock Text="final（予約名）" Classes="label" />
           <TextBox x:Name="ReservedFinalPathTextBox" Grid.Column="1" Classes="single-line"
                    Text="{Binding ReservedFinalPath, Mode=OneWay}" IsReadOnly="True" PlaceholderText="run開始時に予約"
-                   TabIndex="73" AutomationProperties.AutomationId="ExecutionReservedFinalPath"
+                   TabIndex="75" AutomationProperties.AutomationId="ExecutionReservedFinalPath"
                    AutomationProperties.Name="finalの予約パス・作成完了とは別・読取専用"
                    ToolTip.Tip="finalの予約名です。作成・検証の成否は実行状態で確認してください。長いパスも全文を選択・コピーできます。" />
         </Grid>
@@ -311,7 +348,7 @@
           <TextBlock Text="partial（予約名）" Classes="label" />
           <TextBox x:Name="PartialPathTextBox" Grid.Column="1" Classes="single-line"
                    Text="{Binding PartialPath, Mode=OneWay}" IsReadOnly="True" PlaceholderText="run開始時に予約"
-                   TabIndex="74" AutomationProperties.AutomationId="ExecutionPartialPath"
+                   TabIndex="76" AutomationProperties.AutomationId="ExecutionPartialPath"
                    AutomationProperties.Name="partial checkpointの予約パス・保存完了とは別・読取専用"
                    ToolTip.Tip="partial checkpointの予約名です。保存の成否は実行状態で確認してください。長いパスも全文を選択・コピーできます。" />
         </Grid>

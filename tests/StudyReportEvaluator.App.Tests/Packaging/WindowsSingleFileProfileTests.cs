@@ -23,6 +23,7 @@ public sealed class WindowsSingleFileProfileTests
         "docs/troubleshooting.md",
         "docs/settings.md",
         "docs/third-party-notices.md",
+        "docs/result-excel-description.md",
         "images/README.md",
         "images/architecture-overview.svg",
         "images/technical-architecture.svg",
@@ -109,8 +110,8 @@ public sealed class WindowsSingleFileProfileTests
         string repositoryRoot = FindRepositoryRoot();
         XElement[] contentItems = LoadContentItemGroup(LoadProfile()).Elements().ToArray();
 
-        Assert.Equal(24, RequiredDocumentationFiles.Length);
-        Assert.Equal(24, contentItems.Length);
+        Assert.Equal(25, RequiredDocumentationFiles.Length);
+        Assert.Equal(25, contentItems.Length);
         Assert.All(contentItems, item => Assert.Equal("Content", item.Name.ToString()));
 
         foreach (string requiredFile in RequiredDocumentationFiles)
@@ -162,7 +163,7 @@ public sealed class WindowsSingleFileProfileTests
             .Select(entry => entry.TrimEnd(',').Trim('\'').Replace('\\', '/'))
             .ToArray();
 
-        Assert.Equal(24, paths.Length);
+        Assert.Equal(25, paths.Length);
         Assert.Equal(
             RequiredDocumentationFiles.OrderBy(path => path, StringComparer.Ordinal).ToArray(),
             paths.OrderBy(path => path, StringComparer.Ordinal).ToArray());

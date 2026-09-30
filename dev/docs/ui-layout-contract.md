@@ -32,6 +32,8 @@ T01〜T38はREVIEWED、T39はBLOCKED。F02の最終0.8.6再検証は本同期時
 
 2026-09-17のExecution追加: `ExecutionPickResumeCheckpoint`、`ExecutionResumeInterruptedRun`、`ExecutionValidateResumeCheckpoint`、`ExecutionApplyCheckpointInput`、`ExecutionApplyCheckpointModel`、`ExecutionResumeFindings`、`ExecutionResumeFindingDetail`。再開元編集→確認→項目一覧／全文詳細を局所scrollに置き、Start／中断を固定する。再開準備はAIを開始しない。`ResumeWorkflowTests`でpicker取消と繰返しwindow closeをheadless確認済み。追加後のnative DPI／Narrator／全レイアウト再測定は未実施で、過去の§5の成功を流用しない。
 
+2026-09-30のExecution追加（§11.12）: 右列の進捗領域を`ExecutionProgressBody`（上3：`ExecutionProgressScroll`の局所scroll、下4：`ExecutionLivePreview`）へ分け、「実測」（`ExecutionDurableProgress`）の直下に`ExecutionLivePreviewHeading`・`ExecutionLivePreviewList`（`LivePreviewRowsList`、仮想化した全件一覧）・`ExecutionLivePreviewDetail`（`LivePreviewDetail`、読取専用の全文）を置く。TabIndexは一覧73・詳細74で、予約path（final／partial）は75／76へ移した。`LivePreviewViewTests`で1180×800・1024×720の収まり、命名、500行の仮想化をheadless確認済み。native DPI／Narratorは未実施。
+
 固定の「1 入力 / 2 採点設計 / 3 実行 / 4 結果」を維持する。設定は同じwindowの独立した内容画面で、第5ステップ、modal、drawerではない。元ステップと同じ対象を保って1操作で開き、元の対象とfocusへ戻る。同じ入力欄を二重配置しない。
 
 | 画面 | 主画面の最小責務 | 設定で扱う詳細 |

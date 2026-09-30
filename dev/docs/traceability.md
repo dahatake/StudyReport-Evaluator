@@ -173,6 +173,11 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | AC-038 | 中断後の再開準備、開始前検証、明示条件適用、有限close drain | W-01/W-02/U-03 | ResumeWorkflowTests 14件、ResumeAdmissionEvaluatorTests 8件（2026-09-24時点の件数。2026-09-17の局所記録は8件・2件） | VERIFIED_SCOPED |
 | AC-039 | 今回ジョブのAI使用量を画面とJSONLで確認、未取得をゼロ化しない、項目別取得元・試行番号・終端結果・内訳不一致の保持、原単位維持 | J-01 + U-03 | JobUsageTrackerTests／SdkUsageAdapterTests／UsageProvenanceTests／AttemptOutcomeLoggingTests／JobCostBackendTests／JobCostViewTests／CostAttemptLifecycleTests。2026-09-18の局所記録を参照。実AI・課金照合・AIクレジット換算・nativeは未実施 | VERIFIED_SCOPED |
 | AC-040 | 起動時の既存GitHubログイン自動確認、資格情報がない場合だけ1回の自動login、取消・失敗後の非再試行、環境変数での自動login抑止、AI・model fallbackの非自動化、token非収集 | U-03 + App composition | CopilotLoginCommandTestsの起動時自動ログイン試験（`Startup_*`、`Automatic_login_is_enabled_unless_the_environment_value_opts_out`、`Opening_the_window_runs_startup_authentication_exactly_once`）。実CLI・実ブラウザー・実資格情報は未実施 | VERIFIED_SCOPED |
+| AC-041 | 結果画面の設問別得点を内部IDでなくExcel由来の設問文（空白正規化）で表示、空白のみの設問文は表示名・IDへ代替、詳細の基準editorに設問文の原文全文を表示、表示が採点・overrideを変更しない | U-04 | ResultsQuestionTextTests、および既存ResultsPresentationTests／ResultsOutputViewTestsの設問別得点assert | VERIFIED_SCOPED |
+| AC-042 | 実行中の速報値表示: 学生行と1:1の全件一覧、Prompt・criterion別の生値・固有・類似度、空回答・失敗・取消・再開の区別、上限と注記、checkpoint・logへの非保存 | U-04 | LivePreviewSchedulerTests／LivePreviewOrchestratorTests／LivePreviewViewModelTests／LivePreviewViewTests。実AI・native表示は未実施 | VERIFIED_SCOPED |
+| AC-043 | 利用できる全modelの選択: SDK列挙の全件（`auto`含む）を順序どおり選択可能、`disabled`と不正IDだけ除外し他modelの列挙を継続、cache上限4096件と超過時の非保存・全件選択 | U-03 + App settings | CopilotModelEnumerationTests／ModelCatalogTests。実accountでの列挙確認は未実施 | VERIFIED_SCOPED |
+| AC-044 | 利用者向けガイドの「設問の詳細」画面説明の構造（見出し、画像参照1回、ラベル、注意点） | DOC | DocumentationContractTests（Getting_started_explains_the_question_details_screen_for_teachers） | VERIFIED_SCOPED |
+| AC-045 | 結果Excel説明文書の存在・リンク・固定文言と公開文書一覧の整合 | DOC | ResultExcelDescriptionTests／DocumentationContractTests／Packaging系試験 | VERIFIED_SCOPED |
 
 ## Test requirement mapping
 
@@ -217,6 +222,8 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | TR-37 | 中断後の再開準備、partial picker取消、開始前の項目別検証、明示入力／model反映、有限close drain（AC-038） | ResumeWorkflowTests／ResumeAdmissionEvaluatorTests。実AI・別process・OS shutdownは別境界 | VERIFIED_SCOPED |
 | TR-38 | 使用量の取得成功／一部欠落／全欠落、明示0と未取得、イベント重複・順序逆転・final複数通知、再試行と4 operation、項目別取得元、内訳不一致、下方訂正、overflow／負数、JSONLのcanary非記録・容量上限・保存失敗時の観測値保持（AC-039） | JobUsageTrackerTests／SdkUsageAdapterTests／UsageProvenanceTests／AttemptOutcomeLoggingTests／JobCostBackendTests／JobCostViewTests／CostAttemptLifecycleTests。symlink保護は通常のhostでは権限不足でSKIP、Windows Sandboxの管理者userではPASS（2026-09-24）、実AI・課金照合は別境界 | VERIFIED_SCOPED |
 | TR-39 | 既存資格情報あり／なし、`CliUnavailable`等での非login、取消後の非再試行、進行中確認への合流、dispose後、確認失敗の封じ込め、環境変数解釈、Opened時の1回実行（AC-040） | CopilotLoginCommandTests。fake認証境界・fake login processのみで実CLI・実ブラウザーは別境界 | VERIFIED_SCOPED |
+| TR-40 | 結果画面の設問別得点が正規化した設問文を使いID・表示名を含まないこと、空白正規化、空白のみの設問文の代替、未確定`—`、複数設問の順序と同一設問文の非統合、詳細の原文全文表示、表示による採点・出力・入力hashの不変（AC-041） | ResultsQuestionTextTests、および既存ResultsPresentationTests／ResultsOutputViewTests | VERIFIED_SCOPED |
+| TR-41 | 速報値: 全行の待機中一覧、項目単位の更新順序、Promptと`RenderedPrompt`の一致、空回答・固有配点0・AI失敗・取消・行read失敗、再開前に完了した行、取消後の中断・未処理、run間・入力変更・破棄での消去、2,000／200文字上限と注記、20,000行の全件保持、canary非漏洩・checkpoint非保存・追加AI呼出し0、1180×800／1024×720の収まりと仮想化（AC-042） | LivePreviewSchedulerTests／LivePreviewOrchestratorTests／LivePreviewViewModelTests／LivePreviewViewTests。fake行source・fake AI・fake boundaryのみ。実AI・native表示は別境界 | VERIFIED_SCOPED |
 
 ## Mandatory safety surfaces
 

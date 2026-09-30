@@ -532,23 +532,40 @@ internal sealed class SdkCopilotAuthenticationRuntime : ICopilotAuthenticationRu
     {
         EnsureReady();
         IList<ModelInfo> models = await _client.ListModelsAsync(cancellationToken).ConfigureAwait(false);
+        return MapAvailableModels(models);
+    }
+
+    // Every enumerated model is selectable except malformed IDs and models the account's policy disables.
+    // One unusable entry must not fail the whole enumeration.
+    internal static IReadOnlyList<CopilotModelAvailability> MapAvailableModels(IEnumerable<ModelInfo>? models)
+    {
         List<CopilotModelAvailability> available = [];
-        foreach (ModelInfo model in models)
+        foreach (ModelInfo? model in models ?? [])
         {
-            if (model.Id is not null)
+            if (model?.Id is not { } id
+                || !IsUsableModelId(id)
+                || string.Equals(model.Policy?.State, "disabled", StringComparison.OrdinalIgnoreCase))
             {
-                ModelLimits? limits = model.Capabilities?.Limits;
-                available.Add(new CopilotModelAvailability(
-                    model.Id,
-                    limits?.MaxPromptTokens,
-                    limits?.MaxContextWindowTokens,
-                    model.SupportedReasoningEfforts,
-                    model.DefaultReasoningEffort));
+                continue;
             }
+
+            ModelLimits? limits = model.Capabilities?.Limits;
+            available.Add(new CopilotModelAvailability(
+                id,
+                limits?.MaxPromptTokens,
+                limits?.MaxContextWindowTokens,
+                model.SupportedReasoningEfforts,
+                model.DefaultReasoningEffort));
         }
 
         return available.AsReadOnly();
     }
+
+    private static bool IsUsableModelId(string id) =>
+        !string.IsNullOrWhiteSpace(id)
+        && id.Length <= 256
+        && string.Equals(id, id.Trim(), StringComparison.Ordinal)
+        && !id.Any(char.IsControl);
 
     public async Task<IReadOnlyList<string>> ListModelIdsAsync(
         CancellationToken cancellationToken) =>

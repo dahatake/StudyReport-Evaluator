@@ -145,6 +145,14 @@ public interface IQuantificationRunBoundary
         Action<EvaluationProgress>? progress,
         Action<JobCostSnapshot>? costChanged,
         CancellationToken cancellationToken) => RunAsync(request, progress, cancellationToken);
+
+    // Boundaries without a live preview simply never report one.
+    Task<RunSummary> RunAsync(
+        QuantificationRunRequest request,
+        Action<EvaluationProgress>? progress,
+        Action<JobCostSnapshot>? costChanged,
+        Action<LivePreviewUpdate>? livePreview,
+        CancellationToken cancellationToken) => RunAsync(request, progress, costChanged, cancellationToken);
 }
 
 public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
@@ -152,12 +160,19 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
     public Task<RunSummary> RunAsync(
         QuantificationRunRequest request,
         Action<EvaluationProgress>? progress,
-        CancellationToken cancellationToken) => RunAsync(request, progress, null, cancellationToken);
+        CancellationToken cancellationToken) => RunAsync(request, progress, null, null, cancellationToken);
 
     public Task<RunSummary> RunAsync(
         QuantificationRunRequest request,
         Action<EvaluationProgress>? progress,
         Action<JobCostSnapshot>? costChanged,
+        CancellationToken cancellationToken) => RunAsync(request, progress, costChanged, null, cancellationToken);
+
+    public Task<RunSummary> RunAsync(
+        QuantificationRunRequest request,
+        Action<EvaluationProgress>? progress,
+        Action<JobCostSnapshot>? costChanged,
+        Action<LivePreviewUpdate>? livePreview,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -174,7 +189,7 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
             string status = "RUN_FAILED";
             try
             {
-                RunSummary summary = await RunCoreAsync(request, progress, usage, cancellationToken)
+                RunSummary summary = await RunCoreAsync(request, progress, livePreview, usage, cancellationToken)
                     .ConfigureAwait(false);
                 status = summary.StatusCode;
                 return summary;
@@ -197,6 +212,7 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
     private static async Task<RunSummary> RunCoreAsync(
         QuantificationRunRequest request,
         Action<EvaluationProgress>? progress,
+        Action<LivePreviewUpdate>? livePreview,
         JobUsageTracker usage,
         CancellationToken cancellationToken)
     {
@@ -244,7 +260,8 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
             },
             value => progress?.Invoke(ToLegacyProgress(value)),
             cancellationToken,
-            concurrencyLimiter).ConfigureAwait(false);
+            concurrencyLimiter,
+            livePreview).ConfigureAwait(false);
     }
 
     public override string ToString() =>
@@ -461,6 +478,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
 
     public JobCostViewModel Cost { get; } = new();
 
+    public LiveQuantificationPreviewViewModel LivePreview { get; } = new();
     public ExecutionViewModel()
         : this(
             new CopilotExecutionAuthenticationBoundary(),
@@ -1601,6 +1619,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 request,
                 progress => ReportProgress(progress, observerContext, currentProgressSequence),
                 OnCostChanged,
+                preview => ReportPreview(preview, observerContext, currentProgressSequence),
                 token);
             if (disposed) return;
             Interlocked.Increment(ref progressSequence);
@@ -1648,6 +1667,11 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         {
             try
             {
+                if (!disposed)
+                {
+                    LivePreview.Finish();
+                }
+
                 if (!disposed && jobSequence == Volatile.Read(ref costSequence) && latestCost is { } finalCost)
                 {
                     Cost.Apply(finalCost);
@@ -1690,6 +1714,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
 
         disposed = true;
         closing = true;
+        LivePreview.Reset();
         InvalidateResumePreflight(clearCheckpoint: true);
         TryCancel(checkpointInputCancellation);
         Interlocked.Increment(ref authenticationSequence);
@@ -1897,7 +1922,9 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
 
                 ImmutableArray<CachedCopilotModel> next = [.. result.Models.Select(model =>
                     new CachedCopilotModel(model.Id, model.MaximumPromptTokens, model.MaximumContextWindowTokens))];
-                if (CachedModels is not { } previous || !previous.SequenceEqual(next))
+                // An over-limit catalog stays selectable but is not cached, so it cannot invalidate the settings file.
+                if (next.Length <= ApplicationSettings.MaximumCachedModels
+                    && (CachedModels is not { } previous || !previous.SequenceEqual(next)))
                 {
                     CachedModels = next;
                     OnPropertyChanged(nameof(CachedModels));
@@ -1978,6 +2005,33 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         }
 
         observerContext.Post(_ => ApplyProgress(progress, sequence), null);
+    }
+
+    private void ReportPreview(
+        LivePreviewUpdate update,
+        SynchronizationContext? observerContext,
+        long sequence)
+    {
+        if (observerContext is null || ReferenceEquals(observerContext, SynchronizationContext.Current))
+        {
+            ApplyPreview(update, sequence);
+            return;
+        }
+
+        observerContext.Post(_ => ApplyPreview(update, sequence), null);
+    }
+
+    private void ApplyPreview(LivePreviewUpdate update, long sequence)
+    {
+        if (disposed || !IsRunning || sequence != Volatile.Read(ref progressSequence)) return;
+        try
+        {
+            LivePreview.Apply(update);
+        }
+        catch
+        {
+            // The preview is presentation only and cannot fail a run.
+        }
     }
 
     private void ApplyProgress(EvaluationProgress progress, long sequence)
@@ -2063,6 +2117,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         rowTotal = 0;
         reservedFinalPath = string.Empty;
         partialPath = string.Empty;
+        LivePreview.Reset();
         OnPropertiesChanged(
             nameof(ProgressTotal),
             nameof(ProgressCompleted),

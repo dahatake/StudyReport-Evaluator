@@ -12,6 +12,7 @@ F02の最終版再検証は本同期時点では親担当で未完了です。�
 |---|---|---|
 | [実装状態](implementation-status.md) | 開発、QA、リリース | 現在の実装済みsurface、生成gate、post-gate gap closure |
 | [アプリケーション版管理手順](version-management.md) | 開発、QA、リリース | SemVer、版変更tool、検証、tag、GitHub Release、failure handling |
+| [GitHub.comリリース作成手順書](release.md) | リリース | tag、Release candidate、clean-host、承認付きpublishの操作手順とfailure対応 |
 | [アーキテクチャ](architecture.md) | 開発、アーキテクト | dependency、run、Copilot、UI、output data flow |
 | [詳細設計書](detailed-design.md) | 開発、アーキテクト、QA | v4 domain、AI operation、formula、checkpoint、UI、Windows/macOS delivery設計 |
 | [UI・設定のlayout契約](ui-layout-contract.md) | UI開発、QA | T01契約履歴、T26 headless測定、T27実file E2E、T28画像、T39追加native／人手確認の分離 |

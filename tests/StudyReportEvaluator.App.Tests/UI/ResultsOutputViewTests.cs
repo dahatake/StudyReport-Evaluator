@@ -147,8 +147,8 @@ public sealed class ResultsOutputViewTests
         Assert.Null(cancelled.EffectiveRaw);
         Assert.Null(cancelled.NormalizedScore);
         Assert.Null(cancelled.OverallScore);
-        Assert.Equal("Q1: 1", viewModel.RowScores[0].QuestionEarnedText);
-        Assert.Equal("Q1: —", viewModel.RowScores[1].QuestionEarnedText);
+        Assert.Equal("Question text Q1: 1", viewModel.RowScores[0].QuestionEarnedText);
+        Assert.Equal("Question text Q1: —", viewModel.RowScores[1].QuestionEarnedText);
         Assert.True(viewModel.CanExport);
 
         await viewModel.ExportAsync(TestContext.Current.CancellationToken);
@@ -935,7 +935,7 @@ public sealed class ResultsOutputViewTests
         Assert.True(Required<TextBox>(host.View, "OutputPathTextBox").IsEffectivelyEnabled);
         Execute(Required<Button>(host.View, "ShowDetailButton"));
         Assert.Equal("99", ById<TextBlock>(host.View, "ResultsSelectedFinalScore").Text);
-        Assert.Equal("Q1: 1", ById<TextBlock>(host.View, "ResultsQuestionEarnedFull").Text);
+        Assert.Equal("Question text Q1: 1", ById<TextBlock>(host.View, "ResultsQuestionEarnedFull").Text);
         Assert.Equal(99m, viewModel.SelectedRowCriteria[0].OverallScore);
         AssertCriterionTexts(host.View, viewModel.SelectedRowCriteria[0]);
         AssertUniqueAutomationIds(host.View);
@@ -1045,8 +1045,8 @@ public sealed class ResultsOutputViewTests
             Assert.Null(preparation.Rows[1].Questions[0].Similarity!.AiRaw);
             // Presentation distinguishes unknown input without changing workbook formulas.
             Assert.Equal(0m, Cached(11, ResultsSheetWriter.QuestionEarnedSuffix));
-            Assert.Equal("Q1: 40", viewModel.RowScores[0].QuestionEarnedText);
-            Assert.Equal("Q1: —", viewModel.RowScores[1].QuestionEarnedText);
+            Assert.Equal("Question text Q1: 40", viewModel.RowScores[0].QuestionEarnedText);
+            Assert.Equal("Question text Q1: —", viewModel.RowScores[1].QuestionEarnedText);
             Assert.Null(Cached(11, ResultsSheetWriter.SimilarityPenaltySuffix));
             Assert.Null(Cached(11, ResultsSheetWriter.FinalRawHeader));
             Assert.Null(Cached(11, ResultsSheetWriter.FinalScoreHeader));
@@ -1056,7 +1056,7 @@ public sealed class ResultsOutputViewTests
             Assert.Equal(emptyPrimary ? 20m : 60m, Cached(11, ResultsSheetWriter.FinalRawHeader));
             Assert.Equal(emptyPrimary ? 20m : 60m, Cached(11, ResultsSheetWriter.FinalScoreHeader));
             Assert.Equal(emptyPrimary ? 0m : 40m, Cached(11, ResultsSheetWriter.QuestionEarnedSuffix));
-            Assert.Equal(emptyPrimary ? "Q1: 0" : "Q1: 40", viewModel.RowScores[1].QuestionEarnedText);
+            Assert.Equal(emptyPrimary ? "Question text Q1: 0" : "Question text Q1: 40", viewModel.RowScores[1].QuestionEarnedText);
             Assert.Equal(0m, Cached(11, ResultsSheetWriter.SimilarityPenaltySuffix));
         }
 
@@ -1078,7 +1078,7 @@ public sealed class ResultsOutputViewTests
         viewModel.Results[0].OverrideText = "8";
         RenderUi();
         Assert.Equal(84m, viewModel.RowScores[0].FinalScore);
-        Assert.Equal("Q1: 64", viewModel.RowScores[0].QuestionEarnedText);
+        Assert.Equal("Question text Q1: 64", viewModel.RowScores[0].QuestionEarnedText);
         Required<TextBox>(host.View, "GoToRowTextBox").Text = "11";
         Execute(Required<Button>(host.View, "GoToRowButton"));
         Assert.Equal("未処理・未確定", ById<TextBlock>(host.View, "ResultsRowStatus-11").Text);
@@ -1087,7 +1087,7 @@ public sealed class ResultsOutputViewTests
         Assert.Equal("未処理・未確定", ById<TextBlock>(host.View, "ResultsSelectedRowStatus").Text);
         Assert.Equal("—", ById<TextBlock>(host.View, "ResultsSelectedFinalRaw").Text);
         Assert.Equal("—", ById<TextBlock>(host.View, "ResultsSelectedFinalScore").Text);
-        Assert.Equal("Q1: —", ById<TextBlock>(host.View, "ResultsQuestionEarnedFull").Text);
+        Assert.Equal("Question text Q1: —", ById<TextBlock>(host.View, "ResultsQuestionEarnedFull").Text);
         Assert.Equal(ResultsStatusCodes.Cancelled, ById<TextBlock>(host.View, "ResultsCriterionStatus").Text);
         Assert.False(Assert.Single(ActiveOverrideEditors(host.View)).IsEffectivelyEnabled);
         foreach (string id in new[] { "ResultsCriterionAiRaw", "ResultsCriterionEffective", "ResultsCriterionNormalized", "ResultsCriterionEvaluator", "ResultsCriterionQuestion", "ResultsCriterionOverall" })
@@ -1119,7 +1119,7 @@ public sealed class ResultsOutputViewTests
 
         Assert.Equal("63", ById<TextBlock>(host.View, "ResultsSelectedFinalRaw").Text);
         Assert.Equal("63", ById<TextBlock>(host.View, "ResultsSelectedFinalScore").Text);
-        Assert.Equal("Q1: 35", ById<TextBlock>(host.View, "ResultsQuestionEarnedFull").Text);
+        Assert.Equal("Question text Q1: 35", ById<TextBlock>(host.View, "ResultsQuestionEarnedFull").Text);
         Assert.Equal("成功", ById<TextBlock>(host.View, "ResultsSelectedRowStatus").Text);
         Assert.Equal("final workbookは作成されていません。partial checkpointを確認してください。",
             ById<TextBlock>(host.View, "ExportStatus").Text);
@@ -1132,7 +1132,7 @@ public sealed class ResultsOutputViewTests
         Required<TextBox>(host.View, "GoToRowTextBox").Text = "11";
         Execute(Required<Button>(host.View, "GoToRowButton"));
         Assert.Equal(checkpointFailure ? "—" : "63", ById<TextBlock>(host.View, "ResultsSelectedFinalScore").Text);
-        Assert.Equal(checkpointFailure ? "Q1: —" : "Q1: 35", ById<TextBlock>(host.View, "ResultsQuestionEarnedFull").Text);
+        Assert.Equal(checkpointFailure ? "Question text Q1: —" : "Question text Q1: 35", ById<TextBlock>(host.View, "ResultsQuestionEarnedFull").Text);
         Assert.Equal(checkpointFailure ? "未処理・未確定" : "成功", ById<TextBlock>(host.View, "ResultsSelectedRowStatus").Text);
         Assert.False(Required<Button>(host.View, "ExportButton").IsEffectivelyEnabled);
         Assert.Equal(string.Empty, viewModel.LastSuccessfulExportPath);

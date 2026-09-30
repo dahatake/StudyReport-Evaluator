@@ -27,8 +27,34 @@ public sealed class DocumentationContractTests
         "docs/privacy-and-data-handling.md",
         "docs/troubleshooting.md",
         "docs/third-party-notices.md",
+        "docs/result-excel-description.md",
         "images/README.md",
     ];
+
+    [Fact]
+    public void Getting_started_explains_the_question_details_screen_for_teachers()
+    {
+        string document = Read("docs/getting-started.md");
+        int design = document.IndexOf("## 2. 採点設計", StringComparison.Ordinal);
+        int execution = document.IndexOf("## 3. 実行", StringComparison.Ordinal);
+        int section = document.IndexOf("### 「設問の詳細」を押した後の画面", StringComparison.Ordinal);
+        Assert.True(design >= 0 && design < section && section < execution);
+        Assert.Single(Regex.Matches(document, "### 「設問の詳細」を押した後の画面"));
+
+        string body = document[section..execution];
+        Assert.Single(Regex.Matches(body, @"!\[[^\]]+\]\(\.\./images/02-input-mapping\.png\)"));
+        Assert.True(File.Exists(Path.Combine(FindRepositoryRoot(), "images", "02-input-mapping.png")));
+        Assert.Equal(8, Directory.EnumerateFiles(Path.Combine(FindRepositoryRoot(), "images"), "*.png").Count());
+        AssertContainsAll(
+            body,
+            "設問", "追加", "複製", "上へ", "下へ", "削除", "設問名", "設問文", "補助列", "補助に含める",
+            "列候補の詳細", "候補一式を再適用", "設定から戻る", "設定を保存",
+            "**基本の使い方**", "**注意してください**",
+            "手で直した設定や設問文は置き換わる",
+            "配点は自動では調整されません",
+            "「1. 入力」で変更します",
+            "保存もされず、編集内容の破棄もされません");
+    }
 
     [Fact]
     public void Public_documents_exist_are_nonempty_and_have_no_broken_local_links()
@@ -77,14 +103,15 @@ public sealed class DocumentationContractTests
     [Fact]
     public void Public_document_inventory_and_settings_notice_links_are_explicit()
     {
-        Assert.Equal(12, PublicDocumentPaths.Length);
-        Assert.Equal(12, PublicDocumentPaths.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(13, PublicDocumentPaths.Length);
+        Assert.Equal(13, PublicDocumentPaths.Distinct(StringComparer.Ordinal).Count());
         Assert.Equal(new[]
         {
             "README.md", "docs/README.md", "docs/getting-started.md", "docs/settings.md",
             "docs/features.md", "docs/custom-evaluator-guide.md", "docs/technical-guid.md",
             "docs/prompt-launch.md", "docs/privacy-and-data-handling.md",
-            "docs/troubleshooting.md", "docs/third-party-notices.md", "images/README.md",
+            "docs/troubleshooting.md", "docs/third-party-notices.md",
+            "docs/result-excel-description.md", "images/README.md",
         }, PublicDocumentPaths);
 
         // Fixed entry points, not expectations collected from the links under test.
@@ -95,9 +122,11 @@ public sealed class DocumentationContractTests
                      ("README.md", "docs/settings.md"),
                      ("README.md", "docs/third-party-notices.md"),
                      ("README.md", "docs/technical-guid.md"),
+                     ("README.md", "docs/result-excel-description.md"),
                      ("docs/README.md", "../README.md"),
                      ("docs/README.md", "settings.md"),
                      ("docs/README.md", "technical-guid.md"),
+                     ("docs/README.md", "result-excel-description.md"),
                      ("docs/getting-started.md", "settings.md"),
                      ("docs/settings.md", "../images/08-settings.png"),
                  })
@@ -336,6 +365,7 @@ public sealed class DocumentationContractTests
                      "docs/getting-started.md",
                      "docs/custom-evaluator-guide.md",
                      "docs/privacy-and-data-handling.md",
+                     "docs/result-excel-description.md",
                  })
         {
             Assert.Contains(EthicsWarningText.Message, Read(path), StringComparison.Ordinal);
@@ -578,7 +608,7 @@ public sealed class DocumentationContractTests
             "保存済み設定を読み直して**`cachedModels`だけを置き換え**",
             "未保存の希望model・並列度・出力先・採点定義は保存しません",
             "`cachedModels`の各要素は`id`、`maximumPromptTokens`、`maximumContextWindowTokens`を持つobject",
-            "各上限値は正の整数または`null`（未取得）で、一覧は最大512件",
+            "各上限値は正の整数または`null`（未取得）で、一覧は最大4096件",
             "保存時にキャッシュが`null`なら項目を省略します",
             "**schemaは`1`のまま**で、項目のない旧設定も読み込めます",
             "キャッシュにcredential・account情報・login状態は保存しません",
@@ -827,6 +857,7 @@ public sealed class DocumentationContractTests
                      ("docs/prompt-launch.md", "未公開候補`0.8.6`（UNRELEASED・単一EXE）", "現在の公開版`v0.8.1`（ZIP）"),
                      ("docs/privacy-and-data-handling.md", "現在のソースの`0.8.6`候補", "公開`v0.8.1`はZIP配布"),
                      ("docs/troubleshooting.md", "UNRELEASED（未公開）の`0.8.6`候補", "公開`v0.8.1`はZIP配布"),
+                     ("docs/result-excel-description.md", "UNRELEASED（未リリース）の`0.8.6`候補", "現在の公開版は`0.8.1`です"),
                      ("images/README.md", "UNRELEASED（未リリース）の`0.8.6`候補", "公開`0.8.1`の画面を示すものではありません"),
                  })
         {
@@ -954,7 +985,7 @@ public sealed class DocumentationContractTests
             "sample/realdata.xlsx",
             "469,995",
             "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D");
-        AssertSequentialTableIds(requirements, "AC-", 40);
+        AssertSequentialTableIds(requirements, "AC-", 45);
         AssertSequentialTableIds(ledger, "C-", 47);
         AssertContainsAll(ledger, "VERIFIED", "BLOCKED", "EXCLUDED");
         AssertContainsAll(
@@ -1181,9 +1212,9 @@ public sealed class DocumentationContractTests
             "CHの欠落、`FAIL`、`NOT_RUN`",
             "ADV-01/ADV-02の`NOT_RUN`は許容");
 
-        AssertSequentialTableIds(traceability, "AC-", 40);
+        AssertSequentialTableIds(traceability, "AC-", 45);
         Assert.Equal(
-            Enumerable.Range(1, 39),
+            Enumerable.Range(1, 41),
             Regex.Matches(
                     traceability,
                     @"^\| TR-(\d{2}) \|",
@@ -1293,6 +1324,7 @@ public sealed class DocumentationContractTests
             "docs/troubleshooting.md",
             "docs/settings.md",
             "docs/third-party-notices.md",
+            "docs/result-excel-description.md",
             "images/README.md",
             "images/architecture-overview.svg",
             "images/technical-architecture.svg",
@@ -1306,9 +1338,9 @@ public sealed class DocumentationContractTests
             "images/07-output-export.png",
             "images/08-settings.png",
         ];
-        Assert.Equal(24, expected.Length);
-        Assert.Equal(24, expected.Distinct(StringComparer.OrdinalIgnoreCase).Count());
-        Assert.Equal(12, PublicDocumentPaths.Length);
+        Assert.Equal(25, expected.Length);
+        Assert.Equal(25, expected.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Equal(13, PublicDocumentPaths.Length);
         Assert.Equal(
             PublicDocumentPaths.Order(StringComparer.Ordinal),
             expected.Where(path => path.EndsWith(".md", StringComparison.Ordinal)).Order(StringComparer.Ordinal));
@@ -1374,8 +1406,8 @@ public sealed class DocumentationContractTests
         void AssertPublicPaths(IEnumerable<string> paths)
         {
             string[] actual = paths.Select(path => path.Replace('\\', '/')).ToArray();
-            Assert.Equal(24, actual.Length);
-            Assert.Equal(24, actual.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.Equal(25, actual.Length);
+            Assert.Equal(25, actual.Distinct(StringComparer.OrdinalIgnoreCase).Count());
             Assert.DoesNotContain(actual, path => string.Equals(
                 Path.GetFileName(path), "setting.txt", StringComparison.OrdinalIgnoreCase));
             Assert.DoesNotContain(actual, path => path.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase));

@@ -219,6 +219,11 @@
                                   Focusable="True" AutomationProperties.Name="選択基準の全文・raw・override・計算プレビュー。空欄は0ではありません">
                       <StackPanel Spacing="4">
                         <TextBlock TextWrapping="Wrap"><Run Text="{Binding QuestionName}" /><Run Text=" / " /><Run Text="{Binding EvaluatorName}" /><Run Text=" / " /><Run Text="{Binding CriterionName}" /></TextBlock>
+                        <StackPanel>
+                          <TextBlock Text="設問文（元のExcel）" Classes="label" />
+                          <TextBlock Text="{Binding QuestionText}" TextWrapping="Wrap"
+                                     AutomationProperties.AutomationId="ResultsCriterionQuestionText" />
+                        </StackPanel>
                         <Grid ColumnDefinitions="64,*,130" ColumnSpacing="8">
                           <StackPanel><TextBlock Text="AI raw" Classes="label" /><TextBlock Text="{Binding AiRawText}" Classes="value" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionAiRaw" /></StackPanel>
                           <TextBox Grid.Column="1" Height="44"

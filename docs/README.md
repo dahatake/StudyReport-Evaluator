@@ -23,6 +23,7 @@ StudyReport Evaluatorは、標準`.xlsx`の回答をGitHub Copilotで定量化�
 | 初めて利用する教員・採点者 | [はじめに](getting-started.md) | 準備、起動、メイン4step、ページ切替、実行・再開、結果一覧／詳細・override |
 | 詳細設定を編集・再利用する人 | [設定ガイド](settings.md) | 5カテゴリ、元画面への復帰、`setting.txt`への明示保存、保存定義の明示適用、平文保存の注意 |
 | 評価方法を設計する人 | [機能と点数](features.md) | 配点、4つのAI処理、status、Excel出力 |
+| 結果のExcelを読む教員・採点者 | [実行結果Excelの見方](result-excel-description.md) | 4つのsheetと各列の意味、最終点、Override欄、空欄と0、状態コード、計算例 |
 | 独自の評価観点を作る人 | [Custom evaluator](custom-evaluator-guide.md) | 通常Custom評価と固有評価のPrompt |
 | Promptファイルで準備する人 | [Promptファイルから起動](prompt-launch.md) | `--input`、複数`--prompt`、明示適用 |
 | 情報管理・運用担当 | [データとprivacy](privacy-and-data-handling.md) | AIへ送る情報、log、final/partialの機密性 |

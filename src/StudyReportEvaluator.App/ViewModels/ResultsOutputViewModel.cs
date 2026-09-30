@@ -485,6 +485,8 @@ public sealed class ResultsCriterionViewModel : UiObservableObject
 
     public string QuestionName => Question.DisplayName;
 
+    public string QuestionText => Question.QuestionText;
+
     public string EvaluatorName => Evaluator.DisplayName;
 
     public string CriterionName => Criterion.DisplayName;
@@ -1337,7 +1339,7 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
                         questionScores[question.Id],
                         question.Points)),
                 definition.RoundingDigits);
-            List<(string QuestionId, decimal? Earned)> questionEarned = [];
+            List<(string Label, decimal? Earned)> questionEarned = [];
             List<decimal?> similarityPenalties = [];
             List<decimal?> specialQuestionRates = [];
             foreach (QuestionDefinition question in definition.Questions.Where(item => item.Enabled))
@@ -1359,7 +1361,7 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
                     rate,
                     question.Points,
                     definition.RoundingDigits);
-                questionEarned.Add((question.Id, earned));
+                questionEarned.Add((QuestionLabel(question), earned));
 
                 // Match ResultsSheetWriter: only a missing legacy object gets a default.
                 // A durable CANCELLED/error object with AiRaw=null must stay unevaluated.
@@ -1407,7 +1409,7 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
                 string.Join(
                     " · ",
                     questionEarned.Select(item =>
-                        $"{item.QuestionId}: {(item.Earned?.ToString("G29", CultureInfo.InvariantCulture) ?? "—")}")),
+                        $"{item.Label}: {(item.Earned?.ToString("G29", CultureInfo.InvariantCulture) ?? "—")}")),
                 specialEarned,
                 totalPenalty,
                 finalRaw,
@@ -1426,6 +1428,24 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         }
 
         RefreshPresentation(selectedRow);
+    }
+
+    // FR-RS-02/03: the snapshot question text (Excel header cell) with whitespace collapsed;
+    // blank text falls back to the display name, then the ID.
+    internal static string QuestionLabel(QuestionDefinition question)
+    {
+        foreach (string candidate in new[] { question.QuestionText, question.DisplayName })
+        {
+            string collapsed = string.Join(
+                ' ',
+                (candidate ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            if (collapsed.Length > 0)
+            {
+                return collapsed;
+            }
+        }
+
+        return question.Id;
     }
 
     private static QuestionResultInput CreateDisplayQuestionInput(

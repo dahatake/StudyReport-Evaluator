@@ -502,7 +502,8 @@ public sealed class EvaluationScheduler
         string modelId,
         CancellationToken cancellationToken,
         int? maximumPromptTokens = null,
-        int? maximumContextWindowTokens = null)
+        int? maximumContextWindowTokens = null,
+        Action<SafeEvaluationPayload>? payloadBuilt = null)
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(item);
@@ -557,6 +558,8 @@ public sealed class EvaluationScheduler
         {
             return Cancelled(item, scorable: true, scorableKnown: true);
         }
+
+        payloadBuilt?.Invoke(payload);
 
         // The model-relative budget is skipped inside the validator when the SDK publishes no
         // limit, but the model-independent app-owned ceiling always applies.

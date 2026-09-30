@@ -21,6 +21,7 @@ public sealed class WindowsInstallerPackageTests
         "docs/troubleshooting.md",
         "docs/settings.md",
         "docs/third-party-notices.md",
+        "docs/result-excel-description.md",
         "images/README.md",
         "images/architecture-overview.svg",
         "images/technical-architecture.svg",
@@ -286,8 +287,8 @@ public sealed class WindowsInstallerPackageTests
             .Select(capture => capture.Value.Replace('\\', '/'))
             .ToArray();
 
-        Assert.Equal(24, ExpectedPublicPayloadPaths.Length);
-        Assert.Equal(24, actualPaths.Length);
+        Assert.Equal(25, ExpectedPublicPayloadPaths.Length);
+        Assert.Equal(25, actualPaths.Length);
         HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
         foreach (string path in actualPaths)
         {

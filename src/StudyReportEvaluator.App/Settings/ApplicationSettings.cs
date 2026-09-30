@@ -14,6 +14,8 @@ public sealed record ApplicationSettings
 {
     public const int CurrentSchemaVersion = 1;
 
+    public const int MaximumCachedModels = 4096;
+
     [JsonRequired]
     [JsonPropertyName("schemaVersion")]
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;

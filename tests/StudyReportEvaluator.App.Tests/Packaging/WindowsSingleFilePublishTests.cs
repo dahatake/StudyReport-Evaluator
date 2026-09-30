@@ -312,7 +312,7 @@ public sealed class WindowsSingleFilePublishTests
     public async Task Extracted_bundle_layout_reuses_integrity_checks_without_requiring_static_host_files()
     {
         await AssertFunctionsSucceedAsync(ExtractedLayoutSetup + "\n" + """
-            if (@(Get-SingleFileDocumentationPaths).Count -ne 24) { throw 'The extracted fixture must contain all 24 public documentation files.' }
+            if (@(Get-SingleFileDocumentationPaths).Count -ne 25) { throw 'The extracted fixture must contain all 25 public documentation files.' }
             Assert-SafePublishLayout -PublishDirectory $publish -ExtractedBundle
             if (-not $script:cliLayoutChecked) { throw 'Bundled CLI validation was bypassed.' }
             foreach ($absent in @("$ApplicationName.exe", 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll')) {
@@ -335,6 +335,7 @@ public sealed class WindowsSingleFilePublishTests
     [InlineData("docs/features.md")]
     [InlineData("docs/settings.md")]
     [InlineData("docs/third-party-notices.md")]
+    [InlineData("docs/result-excel-description.md")]
     [InlineData("docs/technical-guid.md")]
     [InlineData("images/architecture-overview.svg")]
     [InlineData("images/technical-architecture.svg")]
@@ -438,6 +439,7 @@ public sealed class WindowsSingleFilePublishTests
             "docs/troubleshooting.md",
             "docs/settings.md",
             "docs/third-party-notices.md",
+            "docs/result-excel-description.md",
             "images/README.md",
             "images/architecture-overview.svg",
             "images/technical-architecture.svg",
@@ -451,7 +453,7 @@ public sealed class WindowsSingleFilePublishTests
             "images/07-output-export.png",
             "images/08-settings.png",
         ];
-        Assert.Equal(24, expected.Length);
+        Assert.Equal(25, expected.Length);
         expected = expected.Order(StringComparer.Ordinal).ToArray();
         string profilePath = Path.Combine(FindRepositoryRoot(), "src", "StudyReportEvaluator.App", "Properties", "PublishProfiles", "WindowsSingleFile.pubxml");
         string[] profilePaths = XDocument.Load(profilePath).Descendants("Content")
@@ -464,7 +466,7 @@ public sealed class WindowsSingleFilePublishTests
         AssertSucceeded(result);
         string[] actual = result.StandardOutput.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
             .Order(StringComparer.Ordinal).ToArray();
-        Assert.Equal(24, actual.Length);
+        Assert.Equal(25, actual.Length);
         Assert.Equal(expected, actual);
     }
 

@@ -884,7 +884,13 @@ public sealed class ExecutionViewTests
             ScrollViewer scroll = Required<ScrollViewer>(harness.View, name);
             Assert.True(double.IsFinite(scroll.Bounds.Height));
             Assert.True(scroll.Extent.Width <= scroll.Viewport.Width + 1d, name);
-            Assert.True(scroll.Extent.Height <= scroll.Viewport.Height + 1d, name);
+            // 950x450 is below the 1024x720 minimum: the progress block shares its column with the
+            // speed-report list (FR-LP-01), so it may scroll locally here. The 1024x720 fit is asserted
+            // in LivePreviewViewTests.
+            if (name != "ExecutionProgressScroll")
+            {
+                Assert.True(scroll.Extent.Height <= scroll.Viewport.Height + 1d, name);
+            }
         }
 
         foreach (string name in new[] { "ChangeExecutionSettingsButton", "StartRunButton", "CancelRunButton" })

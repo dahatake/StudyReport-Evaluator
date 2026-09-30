@@ -263,7 +263,7 @@ public sealed class SettingsFileStore
         {
             if (settings.CachedModels is { } models)
             {
-                if (models.IsDefault || models.Length > 512)
+                if (models.IsDefault || models.Length > ApplicationSettings.MaximumCachedModels)
                 {
                     return false;
                 }

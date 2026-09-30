@@ -115,7 +115,7 @@ public sealed class DurableQuantificationOrchestratorTests
             Assert.Equal(0.2m, row.SimilarityPenalty);
             Assert.Equal(97.2m, row.FinalRaw);
             Assert.Equal(97.2m, row.FinalScore);
-            Assert.Contains("Q1: 1.4", row.QuestionEarnedText, StringComparison.Ordinal);
+            Assert.Contains("Question text Q1: 1.4", row.QuestionEarnedText, StringComparison.Ordinal);
         });
     }
 

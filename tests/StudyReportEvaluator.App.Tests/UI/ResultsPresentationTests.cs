@@ -673,7 +673,7 @@ public sealed class ResultsPresentationTests
         Assert.False(viewModel.HasUnsavedOverrides);
         Assert.Equal(mixedPoints ? 2 : 1, viewModel.Results.Count);
         decimal? expectedOverall = mixedPoints ? 50m : null;
-        string expectedEarned = mixedPoints ? "Q0: 0 · Q1: 40" : "Q0: 0";
+        string expectedEarned = mixedPoints ? "Question text Q0: 0 · Question text Q1: 40" : "Question text Q0: 0";
         Assert.Equal(expectedEarned, Assert.Single(viewModel.RowScores).QuestionEarnedText);
         Assert.Null(viewModel.RowScores[0].FinalScore);
         Assert.All(viewModel.Results, item =>
@@ -701,7 +701,7 @@ public sealed class ResultsPresentationTests
             positive.OverrideText = "11";
             Assert.True(viewModel.HasOverrideErrors);
             Assert.Null(positive.EffectiveRaw);
-            Assert.Equal("Q0: 0 · Q1: —", viewModel.RowScores[0].QuestionEarnedText);
+            Assert.Equal("Question text Q0: 0 · Question text Q1: —", viewModel.RowScores[0].QuestionEarnedText);
             Assert.All(viewModel.Results, item =>
             {
                 Assert.Null(item.OverallScore);
@@ -711,7 +711,7 @@ public sealed class ResultsPresentationTests
             positive.OverrideText = "10";
             Assert.Equal(100m, positive.QuestionScore);
             expectedOverall = 100m;
-            expectedEarned = "Q0: 0 · Q1: 80";
+            expectedEarned = "Question text Q0: 0 · Question text Q1: 80";
         }
 
         Assert.False(viewModel.HasOverrideErrors);
@@ -777,14 +777,14 @@ public sealed class ResultsPresentationTests
         Assert.Equal(0m, row.SpecialEarned);
         if (empty)
         {
-            Assert.Equal(mixedPoints ? "Q0: 0 · Q1: 0" : "Q0: 0", row.QuestionEarnedText);
+            Assert.Equal(mixedPoints ? "Question text Q0: 0 · Question text Q1: 0" : "Question text Q0: 0", row.QuestionEarnedText);
             Assert.Equal(0m, row.SimilarityPenalty);
             Assert.Equal(mixedPoints ? 20m : 100m, row.FinalRaw);
             Assert.Equal(mixedPoints ? 20m : 100m, row.FinalScore);
         }
         else
         {
-            Assert.Equal(mixedPoints ? "Q0: — · Q1: —" : "Q0: —", row.QuestionEarnedText);
+            Assert.Equal(mixedPoints ? "Question text Q0: — · Question text Q1: —" : "Question text Q0: —", row.QuestionEarnedText);
             Assert.Null(row.SimilarityPenalty);
             Assert.Null(row.FinalRaw);
             Assert.Null(row.FinalScore);
@@ -816,7 +816,7 @@ public sealed class ResultsPresentationTests
         viewModel.Load(context);
 
         Assert.Equal(mixedPoints ? 60m : 100m, Assert.Single(viewModel.RowScores).FinalScore);
-        Assert.Equal(mixedPoints ? "Q0: 0 · Q1: 40" : "Q1: 0", viewModel.RowScores[0].QuestionEarnedText);
+        Assert.Equal(mixedPoints ? "Question text Q0: 0 · Question text Q1: 40" : "Question text Q1: 0", viewModel.RowScores[0].QuestionEarnedText);
         ResultsCriterionViewModel zero = viewModel.Results.Single(item => item.QuestionId == (mixedPoints ? "Q0" : "Q1"));
         Assert.Equal(5m, zero.AiRawScore);
         Assert.True(zero.CanOverride);
@@ -825,11 +825,11 @@ public sealed class ResultsPresentationTests
 
         Assert.Equal(80m, zero.QuestionScore);
         Assert.Equal(mixedPoints ? 60m : 100m, viewModel.RowScores[0].FinalScore);
-        Assert.Equal(mixedPoints ? "Q0: 0 · Q1: 40" : "Q1: 0", viewModel.RowScores[0].QuestionEarnedText);
+        Assert.Equal(mixedPoints ? "Question text Q0: 0 · Question text Q1: 40" : "Question text Q1: 0", viewModel.RowScores[0].QuestionEarnedText);
         if (mixedPoints)
         {
             viewModel.Results.Single(item => item.QuestionId == "Q1").OverrideText = "10";
-            Assert.Equal("Q0: 0 · Q1: 80", viewModel.RowScores[0].QuestionEarnedText);
+            Assert.Equal("Question text Q0: 0 · Question text Q1: 80", viewModel.RowScores[0].QuestionEarnedText);
         }
 
         Assert.Equal(100m, viewModel.RowScores[0].FinalRaw);
@@ -870,7 +870,7 @@ public sealed class ResultsPresentationTests
         {
             ResultsRowScoreViewModel row = viewModel.RowScores.Single(item => item.SourceRowNumber == completed.SourceRowNumber);
             Assert.Equal(ResultsRowStatus.Success, row.Status);
-            Assert.Equal("Q1: 35", row.QuestionEarnedText);
+            Assert.Equal("Question text Q1: 35", row.QuestionEarnedText);
             Assert.Equal(8m, row.SpecialEarned);
             Assert.Equal(0m, row.SimilarityPenalty);
             Assert.Equal(63m, row.FinalRaw);
@@ -882,7 +882,7 @@ public sealed class ResultsPresentationTests
         {
             ResultsRowScoreViewModel unfinished = viewModel.RowScores[1];
             Assert.Equal(ResultsRowStatus.Unprocessed, unfinished.Status);
-            Assert.Equal("Q1: —", unfinished.QuestionEarnedText);
+            Assert.Equal("Question text Q1: —", unfinished.QuestionEarnedText);
             Assert.Null(unfinished.SpecialEarned);
             Assert.Null(unfinished.SimilarityPenalty);
             Assert.Null(unfinished.FinalRaw);
@@ -895,7 +895,7 @@ public sealed class ResultsPresentationTests
         Assert.Null(viewModel.RowScores[0].FinalScore);
         Assert.Equal(checkpointFailure ? (decimal?)null : 63m, viewModel.RowScores[1].FinalScore);
         viewModel.Results[0].OverrideText = "8";
-        Assert.Equal("Q1: 56", viewModel.RowScores[0].QuestionEarnedText);
+        Assert.Equal("Question text Q1: 56", viewModel.RowScores[0].QuestionEarnedText);
         Assert.Equal(84m, viewModel.RowScores[0].FinalRaw);
         Assert.Equal(84m, viewModel.RowScores[0].FinalScore);
         Assert.False(viewModel.HasOverrideErrors);
@@ -946,7 +946,7 @@ public sealed class ResultsPresentationTests
         Assert.Equal("未処理・未確定", unfinished.StatusText);
         // Workbook Answer_Present=0 remains zero; the UI must distinguish unknown input
         // from a completed empty answer. The fixed zero special budget is unchanged.
-        Assert.Equal("Q1: —", unfinished.QuestionEarnedText);
+        Assert.Equal("Question text Q1: —", unfinished.QuestionEarnedText);
         Assert.Equal(0m, unfinished.SpecialEarned);
         Assert.Null(unfinished.SimilarityPenalty);
         Assert.Null(unfinished.FinalRaw);
@@ -973,7 +973,7 @@ public sealed class ResultsPresentationTests
         ResultsRowScoreViewModel empty = Assert.Single(emptyViewModel.RowScores);
         Assert.Equal(ResultsRowStatus.Empty, empty.Status);
         Assert.Equal("回答空欄", empty.StatusText);
-        Assert.Equal("Q1: 0", empty.QuestionEarnedText);
+        Assert.Equal("Question text Q1: 0", empty.QuestionEarnedText);
         Assert.Equal(0m, empty.SpecialEarned);
         Assert.Equal(0m, empty.SimilarityPenalty);
         Assert.Equal((decimal)basePoints, empty.FinalRaw);
@@ -1052,8 +1052,8 @@ public sealed class ResultsPresentationTests
         Assert.Equal(ResultsRowStatus.Cancelled, viewModel.RowScores[0].Status);
         Assert.Equal("取消", viewModel.RowScores[0].StatusText);
         Assert.Equal(ResultsRowStatus.Unprocessed, viewModel.RowScores[1].Status);
-        Assert.Equal("Q1: —", viewModel.RowScores[0].QuestionEarnedText);
-        Assert.Equal("Q1: —", viewModel.RowScores[1].QuestionEarnedText);
+        Assert.Equal("Question text Q1: —", viewModel.RowScores[0].QuestionEarnedText);
+        Assert.Equal("Question text Q1: —", viewModel.RowScores[1].QuestionEarnedText);
         Assert.All(viewModel.Results, item => Assert.Null(item.OverallScore));
 
         using ResultsOutputViewModel legacySuccess = await CreateViewModelAsync(rowCount: 1);
