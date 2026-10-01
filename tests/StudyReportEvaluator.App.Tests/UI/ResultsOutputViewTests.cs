@@ -8,7 +8,6 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
-using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using DocumentFormat.OpenXml.Packaging;
@@ -268,7 +267,8 @@ public sealed class ResultsOutputViewTests
             workbook.Path,
             "model-test",
             U04TestSupport.RuntimeIdentity(),
-            reasoningEffort: "low");
+            reasoningEffort: "low",
+            contextTier: "long-context");
 
         Assert.True(output.AssessPath(workbook.Path, finalPath).IsValid);
         ResultsOutputResult result = await output.ExportAsync(
@@ -313,6 +313,9 @@ public sealed class ResultsOutputViewTests
         Row effortRow = runSheet.Descendants<Row>().Single(row => row.Elements<Cell>()
             .Any(cell => cell.InlineString?.InnerText == "ReasoningEffort"));
         Assert.Contains(effortRow.Elements<Cell>(), cell => cell.InlineString?.InnerText == "low");
+        Row contextRow = runSheet.Descendants<Row>().Single(row => row.Elements<Cell>()
+            .Any(cell => cell.InlineString?.InnerText == "ContextTier"));
+        Assert.Contains(contextRow.Elements<Cell>(), cell => cell.InlineString?.InnerText == "long-context");
         Assert.DoesNotContain(workbook.Path, result.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
@@ -614,18 +617,17 @@ public sealed class ResultsOutputViewTests
         using ResultsViewHost host = new(viewModel);
         ListBox rows = Required<ListBox>(host.View, "RowScoreList");
         Control firstRow = Assert.IsAssignableFrom<Control>(rows.ContainerFromIndex(0));
-        TextBlock summary = Assert.Single(firstRow.GetVisualDescendants().OfType<TextBlock>(), text => text.Classes.Contains("question-summary"));
-        Assert.Equal(viewModel.RowScores[0].QuestionEarnedText, summary.Text);
-        Assert.Equal(TextWrapping.NoWrap, summary.TextWrapping);
-        Assert.Equal(TextTrimming.CharacterEllipsis, summary.TextTrimming);
-        Grid columns = Assert.IsType<Grid>(summary.Parent);
-        Assert.Equal(6, columns.ColumnDefinitions.Count);
-        Assert.Equal(6, columns.Children.Count);
-        TextBlock status = Assert.Single(columns.Children.OfType<TextBlock>(), text => text.Classes.Contains("row-status"));
+        TextBlock status = Assert.Single(firstRow.GetVisualDescendants().OfType<TextBlock>(), text => text.Classes.Contains("row-status"));
+        Grid columns = Assert.IsType<Grid>(status.Parent);
+        Assert.Equal(5, columns.ColumnDefinitions.Count);
+        Assert.Equal(5, columns.Children.Count);
         Assert.Equal(4, Grid.GetColumn(status));
         Assert.Equal("成功", status.Text);
-        Assert.Equal(5, Grid.GetColumn(summary));
         Assert.Equal("—", Assert.Single(columns.Children.OfType<TextBlock>(), text => Grid.GetColumn(text) == 1).Text);
+        Assert.DoesNotContain(
+            rows.GetVisualDescendants().OfType<TextBlock>(),
+            text => (text.Text ?? string.Empty).Contains("Q10:", StringComparison.Ordinal)
+                || text.Text == viewModel.RowScores[0].QuestionEarnedText);
         AssertMeasuredPage(host.View, viewModel);
 
         Execute(Required<Button>(host.View, "ShowDetailButton"));

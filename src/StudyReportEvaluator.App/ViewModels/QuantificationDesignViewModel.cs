@@ -1636,7 +1636,10 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
     {
         int count = GetEvaluator(questionId, evaluatorId).Criteria.Length;
         string criterionId = NewId("criterion");
-        CriterionDefinition criterion = CreateDefaultCriterion(criterionId, count + 1);
+        CriterionDefinition criterion = CreateDefaultCriterion(
+            criterionId,
+            count + 1,
+            GetEvaluator(questionId, evaluatorId).Type);
         UpdateEvaluator(questionId, evaluatorId, evaluator => evaluator.AddCriterion(criterion));
         return FindEvaluatorItem(questionId, evaluatorId).Criteria.Single(item => item.Id == criterionId);
     }
@@ -2398,7 +2401,7 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             Type = type,
             Weight = 1m,
             Range = new ScoreRange(0m, 10m),
-            Criteria = [CreateDefaultCriterion(NewId("criterion"), 1)],
+            Criteria = [CreateDefaultCriterion(NewId("criterion"), 1, type)],
             BuiltInTemplateVersion = type == EvaluatorType.KnowledgeCoverage
                 ? BuiltInPromptTemplates.KnowledgeTemplateVersion
                 : null,
@@ -2408,11 +2411,14 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             Enabled = true,
         };
 
-    private static CriterionDefinition CreateDefaultCriterion(string criterionId, int ordinal) => new()
+    private static CriterionDefinition CreateDefaultCriterion(
+        string criterionId,
+        int ordinal,
+        EvaluatorType evaluatorType) => new()
     {
         Id = criterionId,
         DisplayName = $"評価項目 {ordinal.ToString(CultureInfo.InvariantCulture)}",
-        Description = "評価する知識ポイントまたは観点を記述してください。",
+        Description = DefaultCriterionDescriptions.For(evaluatorType),
         Weight = 1m,
         Range = null,
         Enabled = true,

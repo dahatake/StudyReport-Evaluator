@@ -323,6 +323,7 @@ public sealed class ConfigAndRunSheetWriterTests
         Assert.Equal("GitHub.Copilot.SDK/1.0.11", records["CopilotSdkIdentity"].InnerText);
         Assert.Equal("copilot/1.0.82", records["CopilotCliIdentity"].InnerText);
         Assert.Equal("synthetic-model", records["ModelIdentity"].InnerText);
+        Assert.Equal("default", records["ContextTier"].InnerText);
         Assert.StartsWith("DocumentFormat.OpenXml/3.5.1", records["OpenXmlSdkIdentity"].InnerText, StringComparison.Ordinal);
         Assert.Equal("6", records["PlannedEvaluationCount"].InnerText);
         Assert.Equal("5", records["CompletedEvaluationCount"].InnerText);

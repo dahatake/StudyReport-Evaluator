@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using StudyReportEvaluator.App.Navigation;
+using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Tests.Workflow;
 using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.App.ViewModels;
@@ -18,6 +19,32 @@ namespace StudyReportEvaluator.App.Tests.UI;
 
 public sealed class ResumeWorkflowTests
 {
+    [Fact]
+    public async Task Checkpoint_model_action_restores_effort_and_context_before_explicit_resume()
+    {
+        using Fixture fixture = new("high", "long-context");
+        CopilotModelAvailability model = new("model-test", 272_000, 400_000,
+            ["low", "high"], "low", 1_000_000);
+        using ExecutionViewModel vm = new(new RecordingAuthenticationBoundary(new ExecutionAuthenticationSnapshot(
+            ExecutionAuthenticationState.Available, [model], U04TestSupport.RuntimeIdentity())), fixture.Runner);
+        vm.Configure(fixture.Definition, new WorkbookMetadataReader().Read(fixture.Workbook.Path), fixture.Workbook.Path);
+        await vm.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+        vm.IsResumeMode = true;
+        vm.ResumePartialPath = fixture.Checkpoint.PartialPath;
+        await vm.PrepareResumeAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(CheckpointAdmissionStatusCodes.ModelMismatch, vm.ResumeReport?.BlockingStatusCode);
+        Assert.Equal(0, fixture.Runner.CallCount);
+        vm.ApplyCheckpointModelCommand.Execute(null);
+        Assert.Equal("high", vm.SelectedModelReasoningEffort);
+        Assert.Equal("long-context", vm.SelectedContextTier);
+        await vm.PrepareResumeAsync(TestContext.Current.CancellationToken);
+        Assert.True(vm.CanStart);
+        Assert.Equal(0, fixture.Runner.CallCount);
+        await vm.StartAsync(TestContext.Current.CancellationToken);
+        Assert.Equal("high", fixture.Runner.LastRequest?.ReasoningEffort);
+        Assert.Equal("long-context", fixture.Runner.LastRequest?.ContextTier);
+    }
+
     [Theory]
     [InlineData(true, false)]
     [InlineData(true, true)]
@@ -405,13 +432,15 @@ public sealed class ResumeWorkflowTests
         public RunSummary Summary { get; }
         public RecordingRunBoundary Runner { get; }
 
-        public Fixture()
+        public Fixture(string? effort = null, string? tier = null)
         {
             QuantificationSnapshot snapshot = QuantificationSnapshot.Create(Definition);
             var runtime = U04TestSupport.RuntimeIdentity();
             InputSnapshot input = new InputSnapshotService().Capture(Workbook.Path);
             Checkpoint = new CheckpointEnvelope
             {
+                ReasoningEffort = effort,
+                ContextTier = tier,
                 InputPath = Workbook.Path, Input = input,
                 DefinitionCanonicalJson = snapshot.CanonicalJson, DefinitionSha256 = snapshot.Sha256,
                 NormalModelId = "model-test",

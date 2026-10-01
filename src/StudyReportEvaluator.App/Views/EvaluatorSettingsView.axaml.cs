@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using StudyReportEvaluator.App.ViewModels;
 
@@ -166,13 +167,13 @@ public sealed partial class EvaluatorSettingsView : UserControl
 
             foreach (string name in new[] { "QuestionSelector", "EvaluatorSelector", "CriterionSelector" })
             {
-                if (this.FindControl<ComboBox>(name) is { } selector)
+                if (this.FindControl<SelectingItemsControl>(name) is { } selector)
                 {
                     // T09 pattern: reapply even an unchanged reference after items settle.
                     // Publish candidates first, then selection, without a temporary null
                     // in the owner or replacing the production compiled binding.
-                    BindingOperations.GetBindingExpressionBase(selector, ComboBox.ItemsSourceProperty)?.UpdateTarget();
-                    BindingOperations.GetBindingExpressionBase(selector, ComboBox.SelectedItemProperty)?.UpdateTarget();
+                    BindingOperations.GetBindingExpressionBase(selector, ItemsControl.ItemsSourceProperty)?.UpdateTarget();
+                    BindingOperations.GetBindingExpressionBase(selector, SelectingItemsControl.SelectedItemProperty)?.UpdateTarget();
                 }
             }
         }
@@ -184,7 +185,7 @@ public sealed partial class EvaluatorSettingsView : UserControl
 
     private void HandleTargetSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (!attached || refreshingSelection || sender is not ComboBox selector
+        if (!attached || refreshingSelection || sender is not SelectingItemsControl selector
             || DataContext is not QuantificationDesignViewModel design)
         {
             return;

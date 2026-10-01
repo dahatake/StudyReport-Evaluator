@@ -1619,9 +1619,8 @@ public sealed class InputViewModel : UiObservableObject
         {
             Id = NewId("criterion"),
             DisplayName = studentPrompt ? "具体性と実行可能性" : "知識ポイント 1",
-            Description = studentPrompt
-                ? "必要な視点を引き出す具体性、論理性、実行可能性"
-                : "回答内で説明・関係・適用を確認する知識ポイント",
+            Description = DefaultCriterionDescriptions.For(
+                studentPrompt ? EvaluatorType.CustomPrompt : EvaluatorType.KnowledgeCoverage),
             Weight = 1m,
             Range = null,
             Enabled = true,

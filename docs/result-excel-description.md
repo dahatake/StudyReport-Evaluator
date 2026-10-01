@@ -195,6 +195,8 @@ AIの点に納得できない評価項目は、`.Override`の欄に先生が点�
 
 アプリの「結果」画面でも`Override`を入力でき、別名のExcelとして保存できます。手順は[はじめに](getting-started.md)を参照してください。
 
+アプリの「結果」画面の詳細では、Excelを開かなくても、選んだ学生の回答（元のシートの主回答列・補助列）と、評価項目ごとの`AI_Raw`・`Reason`・`Evidence`・`Evidence_Source`、評価項目の説明を並べて確認できます。表示される理由・根拠は、このシートの同じ列の値と同じです。
+
 ## 6. 点数が決まるまでの流れと計算例
 
 ### 6.1 流れ
@@ -363,6 +365,7 @@ Final_Score = 75
 | `CopilotCliIdentity` | 使った同梱のAI実行部品（GitHub Copilot CLI）の版。 |
 | `ModelIdentity` | 評価に使ったAIモデル。`auto`は自動選択。 |
 | `ReasoningEffort` | AIにどの程度深く考えさせたか。指定がなければ`未指定`。 |
+| `ContextTier` | 共通設定で選んだ入力の容量区分。`default`は既定、`long-context`は拡張。すべてのAI評価で同じ区分を使う。 |
 | `OpenXmlSdkIdentity` | Excelファイルを書く部品の版。 |
 | `StartedAtUtc` | 実行を始めた日時（UTC）。日本時間は9時間進めた時刻。 |
 | `EndedAtUtc` | 実行を終えた日時（UTC）。 |

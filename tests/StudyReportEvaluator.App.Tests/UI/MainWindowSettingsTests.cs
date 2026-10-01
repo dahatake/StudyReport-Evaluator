@@ -180,7 +180,7 @@ public sealed class MainWindowSettingsTests
         Assert.Equal(expectedCategory, fixture.Shell.Settings.SelectedCategory);
         Assert.Equal(step, fixture.Shell.CurrentStep);
         AssertOnlyCurrentEditor(fixture);
-        Assert.Same(ById<ComboBox>(settings, expectedCategory switch
+        Assert.Same(ById<Control>(settings, expectedCategory switch
         {
             SettingsCategory.Mapping => "MappingSettingsQuestions",
             SettingsCategory.Evaluation => "EvaluatorSettingsQuestions",

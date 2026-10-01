@@ -82,12 +82,12 @@
                         AutomationProperties.AutomationId="SettingsCommonFieldsScroll"
                         AutomationProperties.Name="共通設定の本文"
                         ToolTip.Tip="通常サイズでは全項目を表示します。長い説明や狭い表示では本文をスクロールできます。">
-            <Grid Margin="8,4" RowDefinitions="44,44,44,Auto,Auto" RowSpacing="4">
+            <Grid Margin="8,4" RowDefinitions="44,44,44,Auto,Auto,Auto,Auto" RowSpacing="4">
               <Grid ColumnDefinitions="90,*,56,88" ColumnSpacing="8">
                 <TextBlock Text="通常モデル" Classes="settings-label" />
                 <ComboBox Grid.Column="1" ItemsSource="{Binding Execution.AvailableModelIds}"
                           SelectedItem="{Binding Execution.SelectedModelId, Mode=TwoWay}"
-                          HorizontalAlignment="Stretch" MaxDropDownHeight="220" PlaceholderText="実行画面で状態を確認"
+                          HorizontalAlignment="Stretch" MaxDropDownHeight="220" PlaceholderText="下の「Copilot 状態を確認」を押してください"
                           TabIndex="10" AutomationProperties.AutomationId="ExecutionModel"
                           AutomationProperties.Name="通常評価で使用するモデル"
                           ToolTip.Tip="保存済み一覧を復元し、起動時とログイン後に更新します。認証未確認の一覧だけでは実行できません。ここでは認証やAI評価を開始しません。" />
@@ -115,30 +115,73 @@
                          AutomationProperties.Name="次回の実効出力先・読取専用"
                          ToolTip.Tip="現在の指定と入力から決まる出力先です。全文を選択・コピーできます。この表示を指定値として保存しません。" />
               </Grid>
-              <Grid Grid.Row="3" RowDefinitions="44,44" RowSpacing="4"
+              <StackPanel Grid.Row="6" Spacing="4">
+                <Grid ColumnDefinitions="90,*,100,*,104" ColumnSpacing="8">
+                  <TextBlock Text="思考レベル" Classes="settings-label" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding Execution.ReasoningEffortOptions}"
+                            SelectedItem="{Binding Execution.SelectedReasoningEffortOption, Mode=TwoWay}"
+                            IsEnabled="{Binding Execution.CanSelectReasoningEffort}"
+                            PlaceholderText="{Binding Execution.SelectedModelReasoningEffortText}"
+                            HorizontalAlignment="Stretch" TabIndex="21"
+                            AutomationProperties.AutomationId="ExecutionReasoningEffort"
+                            AutomationProperties.Name="通常・参照・固有評価で使用する思考レベル"
+                            ToolTip.Tip="選択モデルが対応する値だけを表示します。高い思考レベルでは使用量が変わり得ます。変更は次回実行用です。" />
+                  <TextBlock Grid.Column="2" Text="Context Size" Classes="settings-label" />
+                  <ComboBox Grid.Column="3" ItemsSource="{Binding Execution.ContextSizeOptions}"
+                            SelectedItem="{Binding Execution.SelectedContextSizeOption, Mode=TwoWay}"
+                            IsEnabled="{Binding Execution.CanSelectContextSize}"
+                            PlaceholderText="{Binding Execution.SelectedContextSizeText}"
+                            HorizontalAlignment="Stretch" TabIndex="22"
+                            AutomationProperties.AutomationId="ExecutionContextSize"
+                            AutomationProperties.Name="通常・参照・固有評価で使用するコンテキストサイズ"
+                            ToolTip.Tip="SDKが公開した入力promptのtoken枠です。出力込みの総contextとは異なります。拡張では使用量が変わり得ます。変更だけではAIを呼びません。" />
+                  <Button Grid.Column="4" Content="既定に戻す" Command="{Binding Execution.ResetModelOptionsCommand}"
+                          TabIndex="23" AutomationProperties.AutomationId="ExecutionResetModelOptions"
+                          AutomationProperties.Name="選択モデルの思考レベルとコンテキストサイズを既定に戻す"
+                          ToolTip.Tip="現在モデルの明示希望だけを取り消します。対応がなくなった場合も未指定へ復旧できます。変更は次回用で、永続化には設定を保存が必要です。" />
+                </Grid>
+              </StackPanel>
+              <StackPanel Grid.Row="3" Spacing="2"
+                          AutomationProperties.AutomationId="SettingsCopilotLoginPanel">
+                <TextBlock Text="{Binding Execution.AuthenticationStatusText}" TextWrapping="Wrap"
+                           AutomationProperties.AutomationId="SettingsCopilotAuthenticationStatus" />
+                <WrapPanel ItemSpacing="4" LineSpacing="4">
+                  <Button Content="Copilot 状態を確認" Command="{Binding Execution.CheckAuthenticationCommand}" TabIndex="14"
+                          AutomationProperties.AutomationId="SettingsCheckCopilotAuthentication"
+                          AutomationProperties.Name="既存 Copilot CLI login と model を確認"
+                          ToolTip.Tip="既存loginと利用可能モデルを確認します。ログインや定量化は開始しません。" />
+                  <Button Content="GitHubにログイン" Command="{Binding Execution.LoginCommand}" TabIndex="15"
+                          AutomationProperties.AutomationId="SettingsStartCopilotLogin"
+                          AutomationProperties.Name="GitHubにログイン"
+                          ToolTip.Tip="同梱 CLI を直接起動し、別のブラウザーで認証します。このアプリはパスワードやトークンを取得・保存しません。完了後にモデル一覧を自動更新します。" />
+                  <Button Content="ログインを取り消す" Command="{Binding Execution.CancelLoginCommand}" TabIndex="16"
+                          AutomationProperties.AutomationId="SettingsCancelCopilotLogin"
+                          AutomationProperties.Name="ログインを取り消す"
+                          ToolTip.Tip="このアプリが所有するログイン処理だけを取り消します。外部のCLIやブラウザーは終了しません。" />
+                </WrapPanel>
+                <TextBlock Text="{Binding Execution.LoginStatusText}" TextWrapping="Wrap"
+                           AutomationProperties.AutomationId="SettingsCopilotLoginStatus" />
+              </StackPanel>
+              <Grid Grid.Row="4" ColumnDefinitions="90,*,84,*,84,60" ColumnSpacing="8"
                     IsEnabled="{Binding CanEditDefinition, FallbackValue=False}"
                     AutomationProperties.AutomationId="SettingsDefinitionFields">
-                <Grid ColumnDefinitions="90,*" ColumnSpacing="8">
                   <TextBlock Text="採点定義名" Classes="settings-label" />
-                  <TextBox Grid.Column="1" Text="{Binding Design.DefinitionName, Mode=TwoWay}" TabIndex="14"
+                  <TextBox Grid.Column="1" Text="{Binding Design.DefinitionName, Mode=TwoWay}" TabIndex="17"
                            AutomationProperties.AutomationId="DesignDefinitionName"
                            AutomationProperties.Name="採点定義の名前"
                            ToolTip.Tip="現在の採点定義の名前です。共通の実行設定ではなくDesignのdraftを編集します。" />
-                </Grid>
-                <Grid Grid.Row="1" ColumnDefinitions="90,*,84,88" ColumnSpacing="8">
-                  <TextBlock Text="定義revision" Classes="settings-label" />
-                  <TextBox Grid.Column="1" Text="{Binding Design.Revision, Mode=TwoWay}" TabIndex="15"
+                  <TextBlock Grid.Column="2" Text="定義revision" Classes="settings-label" />
+                  <TextBox Grid.Column="3" Text="{Binding Design.Revision, Mode=TwoWay}" TabIndex="18"
                            AutomationProperties.AutomationId="DesignRevision"
                            AutomationProperties.Name="採点定義のrevision"
                            ToolTip.Tip="採点定義の改訂を識別する値です。アプリや設定ファイル形式のバージョンではありません。" />
-                  <TextBlock Grid.Column="2" Text="丸めの桁数" Classes="settings-label" />
-                  <TextBox Grid.Column="3" Text="{Binding Design.RoundingDigits, Mode=TwoWay}" TabIndex="16"
+                  <TextBlock Grid.Column="4" Text="丸めの桁数" Classes="settings-label" />
+                  <TextBox Grid.Column="5" Text="{Binding Design.RoundingDigits, Mode=TwoWay}" TabIndex="19"
                            AutomationProperties.AutomationId="DesignRoundingDigits"
                            AutomationProperties.Name="採点定義の丸め桁数"
                            ToolTip.Tip="採点定義で用いる小数部の丸め桁数を入力します。既存の定義検証で有効性を確認します。" />
-                </Grid>
               </Grid>
-              <TextBlock Grid.Row="4" Text="{Binding DefinitionAvailabilityText}"
+              <TextBlock Grid.Row="5" Text="{Binding DefinitionAvailabilityText}"
                          IsVisible="{Binding !CanEditDefinition, FallbackValue=True}" TextWrapping="Wrap"
                          AutomationProperties.AutomationId="SettingsCommonDefinitionAvailability"
                          AutomationProperties.Name="{Binding DefinitionAvailabilityText}" />

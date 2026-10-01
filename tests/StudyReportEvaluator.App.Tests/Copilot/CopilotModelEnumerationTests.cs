@@ -6,6 +6,54 @@ namespace StudyReportEvaluator.App.Tests.Copilot;
 
 public sealed class CopilotModelEnumerationTests
 {
+    [Theory]
+    [InlineData(272_000L, 1_000_000L, 272_000, 1_000_000)]
+    [InlineData(null, 1_000_000L, 100_000, 1_000_000)]
+    [InlineData(0L, 1_000_000L, 100_000, 1_000_000)]
+    [InlineData(272_000L, 272_000L, 272_000, null)]
+    [InlineData(272_000L, -1L, 272_000, null)]
+    [InlineData(272_000L, 2_147_483_648L, 272_000, null)]
+    public void Tier_budgets_come_from_pinned_sdk_metadata_without_inventing_capacities(
+        long? standard, long? extended, int expectedStandard, int? expectedExtended)
+    {
+        ModelInfo model = Model("fresh-model", prompt: 100_000, context: 400_000);
+#pragma warning disable GHCP001
+        model.Billing = new ModelBilling
+        {
+            TokenPrices = new GitHub.Copilot.Rpc.ModelBillingTokenPrices
+            {
+                MaxPromptTokens = standard,
+                LongContext = new GitHub.Copilot.Rpc.ModelBillingTokenPricesLongContext { MaxPromptTokens = extended },
+            },
+        };
+#pragma warning restore GHCP001
+        CopilotModelAvailability result = Assert.Single(SdkCopilotAuthenticationRuntime.MapAvailableModels([model]));
+        Assert.Equal(expectedStandard, result.MaximumPromptTokens);
+        Assert.Equal(expectedExtended, result.LongContextPromptTokens);
+        Assert.Equal(400_000, result.MaximumContextWindowTokens);
+    }
+
+    [Fact]
+    public void Legacy_budget_metadata_is_used_only_when_new_budget_is_absent_and_false_support_flag_wins()
+    {
+        ModelInfo model = Model("fresh-model", efforts: ["low", "high"]);
+        model.Capabilities.Supports.ReasoningEffort = false;
+#pragma warning disable GHCP001
+        model.Billing = new ModelBilling
+        {
+            TokenPrices = new GitHub.Copilot.Rpc.ModelBillingTokenPrices
+            {
+                ContextMax = 272_000,
+                LongContext = new GitHub.Copilot.Rpc.ModelBillingTokenPricesLongContext { ContextMax = 1_000_000 },
+            },
+        };
+#pragma warning restore GHCP001
+        CopilotModelAvailability result = Assert.Single(SdkCopilotAuthenticationRuntime.MapAvailableModels([model]));
+        Assert.False(result.SupportsReasoningEffort);
+        Assert.Equal(272_000, result.MaximumPromptTokens);
+        Assert.Equal(1_000_000, result.LongContextPromptTokens);
+    }
+
     [Fact]
     public void Every_enumerated_model_is_selectable_in_sdk_order_including_auto_and_unknown_policy()
     {

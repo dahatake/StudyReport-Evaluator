@@ -87,7 +87,14 @@ public sealed class CompactWorkflowLayoutTests(ITestOutputHelper output)
                     SettingsCategory.Evaluation => "EvaluatorSettingsQuestions",
                     _ => "SpecialSettingsQuestions",
                 };
-                SelectLastComboItem(window, ById<ComboBox>(settings, selectorId));
+                if (category == SettingsCategory.Evaluation)
+                {
+                    SelectLastTab(window, ById<ListBox>(settings, selectorId));
+                }
+                else
+                {
+                    SelectLastComboItem(window, ById<ComboBox>(settings, selectorId));
+                }
             }
             else if (category == SettingsCategory.ImportedPrompts)
             {
@@ -577,6 +584,15 @@ public sealed class CompactWorkflowLayoutTests(ITestOutputHelper output)
             default:
                 throw new ArgumentException("A production paged view is required.", nameof(view));
         }
+    }
+
+    private static void SelectLastTab(Window window, ListBox selector)
+    {
+        Assert.NotEmpty(selector.Items);
+        Assert.True(selector.Focus(NavigationMethod.Tab));
+        selector.SelectedItem = selector.Items[selector.Items.Count - 1];
+        Assert.Same(selector.Items[selector.Items.Count - 1], selector.SelectedItem);
+        AssertFullyInside(selector, window);
     }
 
     private static void SelectLastComboItem(Window window, ComboBox selector)

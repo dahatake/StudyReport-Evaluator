@@ -171,7 +171,7 @@ public sealed class ResultExcelDescriptionTests
 
         List<string> runFields = ReadColumn(reopened, names.RunSheetName, "A");
         Assert.Equal("Field", runFields[0]);
-        Assert.Equal(26, runFields.Count);
+        Assert.Equal(27, runFields.Count);
         foreach (string field in runFields.Skip(1))
         {
             Assert.Matches(new Regex($@"^\| `{Regex.Escape(field)}` \|", RegexOptions.Multiline), description);

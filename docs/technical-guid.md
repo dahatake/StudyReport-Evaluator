@@ -103,6 +103,9 @@ loginと状態確認は別操作です。
 - process exit code 0は認証成功の証明ではありません。
 - `CopilotAuthenticationService`が別processで`StartAsync`、`PingAsync`、`GetAuthStatusAsync`、認証済みなら`ListModelsAsync`を実行します。
 - `ExecutionViewModel`はmodel IDに加え、SDKが返したprompt／context上限をrun preflightへ渡します。
+- 共通設定の思考レベルとContext Sizeは`ModelOptionPolicy`と認証済みmodel metadataから構築します。全modelをSDK順に残し、reasoning非対応でもmodelを除外しません。拡張prompt枠は固定SDKのbilling metadataから取得するため、そのaccessだけ実験的型の`GHCP001`を抑止しています。SDK更新時はtier別枠とJSON契約の回帰が必要です。
+- モデル別明示選択は`modelPreferences`として明示保存し、catalog自動保存とは分離します。run開始時のimmutable requestから共通`EphemeralEvaluationRunnerOptions.ContextTier`を構築し、Normal／Reference／Specialの全retryに同じSDK tierを渡します。拡張時はdefault総context上限を容量検査に混ぜません。
+- checkpoint schema2に省略可能な`contextTier`を追加し、旧checkpointの既定tier（null）を保持します。追記・再開ではmodel・effort・tierが一致することを検査し、Run sheetとoverride出力にも`ContextTier`を引き継ぎます。既定はSDKへ未指定、拡張は`long-context`です。
 
 login、状態確認、model列挙はnetwork通信を伴い得ます。AI評価callが0件でも外部通信0件とは限りません。
 

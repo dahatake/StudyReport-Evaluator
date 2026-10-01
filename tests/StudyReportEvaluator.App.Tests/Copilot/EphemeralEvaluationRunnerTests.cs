@@ -10,6 +10,25 @@ namespace StudyReportEvaluator.App.Tests.Copilot;
 
 public sealed class EphemeralEvaluationRunnerTests
 {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("long-context")]
+    public async Task Selected_effort_and_context_tier_are_carried_into_every_normal_retry(string? tier)
+    {
+        FakeTransportFactory factory = new(static (_, _, _) => Task.CompletedTask);
+        EphemeralEvaluationRunner runner = new(factory,
+            new EphemeralEvaluationRunnerOptions(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1), contextTier: tier));
+        var result = await runner.EvaluateAsync(CreatePayload(), "model-test", "high", TestContext.Current.CancellationToken);
+        Assert.Equal(2, result.AttemptCount);
+        Assert.All(factory.Transports, transport =>
+        {
+            SessionConfig config = Assert.Single(transport.SessionConfigs);
+            Assert.Equal("high", config.ReasoningEffort);
+            Assert.Equal(ModelOptionPolicy.ToSdkContextTier(tier), config.ContextTier);
+            Assert.Equal([EvaluationSchemaFactory.ToolName], config.AvailableTools);
+        });
+    }
+
     [Fact]
     public async Task Valid_tool_submission_is_returned_after_dispose_and_explicit_delete()
     {

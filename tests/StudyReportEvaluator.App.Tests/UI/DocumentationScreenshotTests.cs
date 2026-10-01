@@ -278,7 +278,8 @@ public sealed class DocumentationScreenshotTests
                     : new ResultsOutputPathAssessment(ResultsOutputStatusCodes.OutputPathInvalid, isValid: false, targetExists: false),
             Export = (_, _) => throw new InvalidOperationException("Documentation captures must not export a workbook."),
         };
-        ResultsOutputViewModel results = new(output);
+        // Synthetic student answers: documentation captures never read a real input workbook.
+        ResultsOutputViewModel results = new(output, answerSource: new ScreenshotAnswerSource());
         MainWindowViewModel viewModel = new(
             new WorkflowNavigator(),
             input,
@@ -576,6 +577,8 @@ public sealed class DocumentationScreenshotTests
             outputCandidate.Text = SafeReviewedPath;
             Render();
             Assert.Same(firstResult, results.SelectedCriterion);
+            Assert.Equal(ResultsAnswerState.Loaded, firstResult.StudentAnswerState);
+            Assert.Equal("Synthetic reason", firstResult.ReasonText);
             Assert.Equal("9", firstResult.OverrideText);
             Assert.Equal(8m, firstResult.AiRawScore);
             Assert.Equal(9m, firstResult.EffectiveRaw);
@@ -732,6 +735,20 @@ public sealed class DocumentationScreenshotTests
                 }));
         }
     }
+    private sealed class ScreenshotAnswerSource : IResultsAnswerSource
+    {
+        public Task<ResultsAnswerReadResult> ReadAsync(
+            ResultsAnswerRequest request,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(ResultsAnswerReadResult.Loaded(request.Columns.Select(column =>
+                new KeyValuePair<string, string?>(
+                    column,
+                    FormattableString.Invariant($"合成回答（Excel {request.SourceRowNumber} 行・列 {column}）。\n機械学習はデータから規則を学ぶ手法です。")))));
+        }
+    }
+
     private sealed class ScreenshotCheckpointStore : ICheckpointStore
     {
         private CheckpointEnvelope? current;

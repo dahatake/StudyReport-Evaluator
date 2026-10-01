@@ -23,6 +23,8 @@ public sealed record RunSheetMetadata
 
     public string? ReasoningEffort { get; init; }
 
+    public string? ContextTier { get; init; }
+
     public required DateTimeOffset StartedAtUtc { get; init; }
 
     public required DateTimeOffset EndedAtUtc { get; init; }
@@ -83,6 +85,7 @@ public sealed class RunSheetWriter
         AppendInlineRecord(sheetData, ref rowNumber, "CopilotCliIdentity", metadata.CopilotCliIdentity);
         AppendInlineRecord(sheetData, ref rowNumber, "ModelIdentity", metadata.ModelIdentity);
         AppendInlineRecord(sheetData, ref rowNumber, "ReasoningEffort", metadata.ReasoningEffort ?? "未指定");
+        AppendInlineRecord(sheetData, ref rowNumber, "ContextTier", metadata.ContextTier ?? ModelOptionPolicy.DefaultContextTier);
         AppendInlineRecord(sheetData, ref rowNumber, "OpenXmlSdkIdentity", GetOpenXmlSdkIdentity());
         AppendInlineRecord(
             sheetData,
@@ -130,6 +133,7 @@ public sealed class RunSheetWriter
         }
 
         ValidateUtc(metadata.StartedAtUtc, nameof(metadata.StartedAtUtc));
+        _ = ModelOptionPolicy.ToSdkContextTier(metadata.ContextTier);
         ValidateUtc(metadata.EndedAtUtc, nameof(metadata.EndedAtUtc));
 
         if (metadata.EndedAtUtc < metadata.StartedAtUtc)

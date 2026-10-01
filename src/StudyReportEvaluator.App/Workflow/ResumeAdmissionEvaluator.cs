@@ -67,7 +67,8 @@ public static class ResumeAdmissionEvaluator
         string? inputPath,
         string? modelId,
         string? reasoningEffort,
-        CheckpointRuntimeIdentity? runtime)
+        CheckpointRuntimeIdentity? runtime,
+        string? contextTier = null)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         bool partialMatches = PathsEqual(checkpoint.PartialPath, requestedPartialPath);
@@ -79,6 +80,7 @@ public static class ResumeAdmissionEvaluator
         bool modelMatches = modelId is not null
             && string.Equals(checkpoint.NormalModelId, modelId, StringComparison.Ordinal)
             && string.Equals(checkpoint.ReferenceModelId, modelId, StringComparison.Ordinal)
+            && string.Equals(checkpoint.ContextTier, contextTier, StringComparison.Ordinal)
             && string.Equals(checkpoint.ReasoningEffort, reasoningEffort, StringComparison.Ordinal);
         bool runtimeMatches = runtime is not null && RuntimeCompatible(checkpoint.Runtime, runtime);
         // A different definition cannot be used to interpret saved row structure.
@@ -93,7 +95,7 @@ public static class ResumeAdmissionEvaluator
             Finding(ResumeAdmissionItem.Definition, definitionMatches, CheckpointAdmissionStatusCodes.DefinitionMismatch,
                 "採点設計が一致しています。", "採点設計が未設定、または checkpoint と異なります。中断時の設計へ戻すか、新規実行を選んでください。"),
             Finding(ResumeAdmissionItem.NormalModel, modelMatches, CheckpointAdmissionStatusCodes.ModelMismatch,
-                "モデルとreasoning effortが一致しています。", "モデルまたはreasoning effortが checkpoint と異なります。利用可能な同一モデルを明示的に選択し、reasoning effortを再確認してください。"),
+                "モデル・思考レベル・Context Sizeが一致しています。", "モデル・思考レベル・Context Sizeが checkpoint と異なります。共通設定で中断時の選択値を確認してください。"),
             Finding(ResumeAdmissionItem.Runtime, runtimeMatches, CheckpointAdmissionStatusCodes.RuntimeMismatch,
                 "アプリと CLI / SDK の版が一致しています。", "認証状態が未確認、またはアプリ／CLI／SDK の版が異なります。状態を再確認し、版が異なる場合は中断時の版を使用してください。"),
             Finding(ResumeAdmissionItem.CheckpointShape, shapeMatches, CheckpointStatusCodes.Invalid,

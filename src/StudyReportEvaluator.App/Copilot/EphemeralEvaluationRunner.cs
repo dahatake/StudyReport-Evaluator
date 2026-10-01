@@ -27,7 +27,8 @@ public sealed class EphemeralEvaluationRunnerOptions
         TimeSpan? cleanupTimeout = null,
         int maxConcurrency = DefaultMaxConcurrency,
         IEvaluationConcurrencyObserver? concurrencyObserver = null,
-        IRetryDelayProvider? retryDelayProvider = null)
+        IRetryDelayProvider? retryDelayProvider = null,
+        string? contextTier = null)
     {
         AttemptTimeout = attemptTimeout ?? DefaultAttemptTimeout;
         CleanupTimeout = cleanupTimeout ?? DefaultCleanupTimeout;
@@ -44,6 +45,7 @@ public sealed class EphemeralEvaluationRunnerOptions
         MaxConcurrency = maxConcurrency;
         ConcurrencyObserver = concurrencyObserver;
         RetryDelayProvider = retryDelayProvider;
+        ContextTier = ModelOptionPolicy.ToSdkContextTier(contextTier);
     }
 
     public TimeSpan AttemptTimeout { get; }
@@ -55,6 +57,8 @@ public sealed class EphemeralEvaluationRunnerOptions
     public IEvaluationConcurrencyObserver? ConcurrencyObserver { get; }
 
     internal IRetryDelayProvider? RetryDelayProvider { get; }
+
+    public ContextTier? ContextTier { get; }
 }
 
 public interface IEphemeralCopilotTransportFactory
@@ -165,7 +169,8 @@ public sealed class EphemeralEvaluationRunner
             payload,
             modelId,
             reasoningEffort,
-            CreateSessionId());
+            CreateSessionId(),
+            _options.ContextTier);
     }
 
     private static string CreateSessionId() =>
@@ -208,7 +213,8 @@ internal sealed class CopilotEvaluationAttempt : IEphemeralEvaluationAttempt
         SafeEvaluationPayload payload,
         string modelId,
         string? reasoningEffort,
-        string sessionId)
+        string sessionId,
+        ContextTier? contextTier = null)
     {
         ArgumentNullException.ThrowIfNull(transport);
         ArgumentNullException.ThrowIfNull(schemaFactory);
@@ -221,6 +227,7 @@ internal sealed class CopilotEvaluationAttempt : IEphemeralEvaluationAttempt
         _sessionConfig.SessionId = sessionId;
         _sessionConfig.Model = modelId;
         _sessionConfig.ReasoningEffort = reasoningEffort;
+        _sessionConfig.ContextTier = contextTier;
         _messageOptions = new MessageOptions
         {
             Prompt = payload.RenderedPrompt,

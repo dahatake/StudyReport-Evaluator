@@ -221,7 +221,8 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
         AdaptiveEvaluationConcurrencyLimiter concurrencyLimiter = new(request.MaxConcurrency);
         EphemeralEvaluationRunnerOptions runnerOptions = new(
             maxConcurrency: request.MaxConcurrency,
-            concurrencyObserver: concurrencyLimiter);
+            concurrencyObserver: concurrencyLimiter,
+            contextTier: request.ContextTier);
         await using SharedCopilotClientPool sharedClient = new(new CopilotClientFactory());
         EphemeralEvaluationRunner runner = new(
             new SdkEphemeralCopilotTransportFactory(sharedClient, usage, UsageOperation.Normal),
@@ -353,7 +354,8 @@ public sealed class ExecutionRunContext
         string modelId,
         CopilotRuntimeIdentity runtimeIdentity,
         JobCostSnapshot? cost = null,
-        string? reasoningEffort = null)
+        string? reasoningEffort = null,
+        string? contextTier = null)
     {
         Summary = summary ?? throw new ArgumentNullException(nameof(summary));
         ArgumentException.ThrowIfNullOrWhiteSpace(inputPath);
@@ -375,6 +377,8 @@ public sealed class ExecutionRunContext
         InputPath = Path.GetFullPath(inputPath);
         ModelId = modelId;
         ReasoningEffort = reasoningEffort;
+        _ = ModelOptionPolicy.ToSdkContextTier(contextTier);
+        ContextTier = contextTier;
         Cost = cost;
     }
 
@@ -385,6 +389,8 @@ public sealed class ExecutionRunContext
     public string ModelId { get; }
 
     public string? ReasoningEffort { get; }
+
+    public string? ContextTier { get; }
 
     public CopilotRuntimeIdentity RuntimeIdentity { get; }
 
@@ -576,7 +582,8 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
     /// null は SDK が選択中 model の上限を公開していないことを表す。
     public int? SelectedModelPromptTokenLimit =>
         SelectedModelId is string id && modelsById.TryGetValue(id, out CopilotModelAvailability? model)
-            ? model.EffectivePromptTokenLimit
+            ? SelectedContextTier == ModelOptionPolicy.LongContextTier
+                ? model.LongContextPromptTokens : model.EffectivePromptTokenLimit
             : null;
 
     public string SelectedModelLimitText => SelectedModelId is null
@@ -585,16 +592,11 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
             ? $"{limit.ToString("N0", CultureInfo.InvariantCulture)} tokens"
             : "SDK未公開・事前検証なし";
 
-    public string? SelectedModelReasoningEffort =>
-        SelectedModelId is string id && modelsById.TryGetValue(id, out CopilotModelAvailability? model)
-            ? ReasoningEffortPolicy.ResolveReasoningEffort(
-                [model.ToModelInfo()],
-                id,
-                ReasoningEffortPolicy.DefaultPreferredReasoningEffort)
-            : null;
+    public string? SelectedModelReasoningEffort => selectedReasoningEffortOption?.Value;
 
     public string SelectedModelReasoningEffortText => SelectedModelId is null
         ? "未選択"
+        : reasoningPreferenceUnavailable ? "選択した思考レベルは現在利用できません"
         : SelectedModelReasoningEffort ?? "未指定（model非対応またはauto）";
 
     public string AuthenticationStatusText => AuthenticationState switch
@@ -1074,6 +1076,11 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
 
         MaxConcurrency = settings.MaxConcurrency;
         OutputDirectoryOverride = settings.OutputDirectoryOverride;
+        modelPreferences = settings.ModelPreferences;
+        OnPropertyChanged(nameof(ModelPreferences));
+        RefreshModelOptions();
+        InvalidateResumePreflight();
+        Revalidate();
         if (!hasRefreshedModels && settings.CachedModels is { } cached)
         {
             CachedModels = cached;
@@ -1550,8 +1557,10 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
             InputPath = runInputPath,
             ModelId = runModelId,
             ReasoningEffort = SelectedModelReasoningEffort,
-            MaximumPromptTokens = runModel.EffectivePromptTokenLimit,
-            MaximumContextWindowTokens = runModel.EffectivePromptTokenLimit is null
+            ContextTier = SelectedContextTier,
+            MaximumPromptTokens = SelectedModelPromptTokenLimit,
+            MaximumContextWindowTokens = SelectedContextTier == ModelOptionPolicy.LongContextTier
+                || runModel.EffectivePromptTokenLimit is null
                 ? null
                 : runModel.MaximumContextWindowTokens ?? runModel.EffectivePromptTokenLimit,
             MaxConcurrency = MaxConcurrency,
@@ -1612,6 +1621,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 nameof(CurrentRunModelId),
                 nameof(CurrentRunMaxConcurrency),
                 nameof(CurrentRunReasoningEffortText),
+                nameof(CurrentRunContextTierText),
                 nameof(CurrentRunLimitText),
                 nameof(CurrentRunOutputSummary));
             Revalidate();
@@ -1631,7 +1641,8 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 runModelId,
                 runRuntimeIdentity,
                 latestCost,
-                request.ReasoningEffort);
+                request.ReasoningEffort,
+                request.ContextTier);
             LastRunContext = context;
             RaiseRunCompleted(context);
         }
@@ -1853,6 +1864,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         updatingModelSelection = true;
         try
         {
+            RefreshModelOptions();
             if (preferenceChanged)
             {
                 OnPropertyChanged(nameof(PreferredModelId));
@@ -1886,6 +1898,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
             selectedModelId = null;
             // Keep the last catalog visible, but discard all effective authorization/capacity.
             modelsById.Clear();
+            RefreshModelOptions();
             OnPropertiesChanged(
                 nameof(AvailableModelIds),
                 nameof(SelectedModelId),
@@ -1939,6 +1952,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
             }
 
             selectedModelId = ResolveSelectedModelId();
+            RefreshModelOptions();
             OnPropertiesChanged(
                 nameof(AvailableModelIds),
                 nameof(SelectedModelId),
@@ -2328,6 +2342,13 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 break;
         }
 
+
+        if (reasoningPreferenceUnavailable)
+            AddError(errors, new ExecutionTechnicalError("MODEL_REASONING_EFFORT_UNAVAILABLE", "ReasoningEffort",
+                "保存した思考レベルは現在利用できません。共通設定で対応する値を選び直してください。"));
+        if (contextPreferenceUnavailable)
+            AddError(errors, new ExecutionTechnicalError("MODEL_CONTEXT_TIER_UNAVAILABLE", "ContextTier",
+                "保存した Context Size は現在利用できません。共通設定で対応する値を選び直してください。"));
 
         if (runtimeErrorCode is not null)
         {

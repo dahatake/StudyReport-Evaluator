@@ -35,7 +35,8 @@ public sealed class CopilotModelAvailability
         int? maximumPromptTokens,
         int? maximumContextWindowTokens,
         IEnumerable<string>? supportedReasoningEfforts = null,
-        string? defaultReasoningEffort = null)
+        string? defaultReasoningEffort = null,
+        int? longContextPromptTokens = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         if (id.Length > 256
@@ -48,6 +49,9 @@ public sealed class CopilotModelAvailability
         Id = id;
         MaximumPromptTokens = PositiveOrNull(maximumPromptTokens);
         MaximumContextWindowTokens = PositiveOrNull(maximumContextWindowTokens);
+        LongContextPromptTokens = longContextPromptTokens is > 0
+            && (MaximumPromptTokens is null || longContextPromptTokens > MaximumPromptTokens)
+                ? longContextPromptTokens : null;
         SupportedReasoningEfforts = Array.AsReadOnly((supportedReasoningEfforts ?? [])
             .Where(ReasoningEffortPolicy.IsSafeReasoningEffort)
             .Distinct(StringComparer.Ordinal)
@@ -62,6 +66,8 @@ public sealed class CopilotModelAvailability
     public int? MaximumPromptTokens { get; }
 
     public int? MaximumContextWindowTokens { get; }
+
+    public int? LongContextPromptTokens { get; }
 
     public IReadOnlyList<string> SupportedReasoningEfforts { get; }
 
@@ -552,14 +558,27 @@ internal sealed class SdkCopilotAuthenticationRuntime : ICopilotAuthenticationRu
             ModelLimits? limits = model.Capabilities?.Limits;
             available.Add(new CopilotModelAvailability(
                 id,
-                limits?.MaxPromptTokens,
+                DefaultPromptBudget(model) ?? limits?.MaxPromptTokens,
                 limits?.MaxContextWindowTokens,
-                model.SupportedReasoningEfforts,
-                model.DefaultReasoningEffort));
+                model.Capabilities?.Supports?.ReasoningEffort == true ? model.SupportedReasoningEfforts : null,
+                model.DefaultReasoningEffort,
+                LongPromptBudget(model)));
         }
 
         return available.AsReadOnly();
     }
+
+    // The pinned SDK exposes tier budgets through experimental billing metadata.
+#pragma warning disable GHCP001
+    private static int? DefaultPromptBudget(ModelInfo model) =>
+        TokenBudget(model.Billing?.TokenPrices?.MaxPromptTokens ?? model.Billing?.TokenPrices?.ContextMax);
+
+    private static int? LongPromptBudget(ModelInfo model) =>
+        TokenBudget(model.Billing?.TokenPrices?.LongContext?.MaxPromptTokens
+            ?? model.Billing?.TokenPrices?.LongContext?.ContextMax);
+#pragma warning restore GHCP001
+
+    private static int? TokenBudget(long? value) => value is > 0 and <= int.MaxValue ? (int)value : null;
 
     private static bool IsUsableModelId(string id) =>
         !string.IsNullOrWhiteSpace(id)

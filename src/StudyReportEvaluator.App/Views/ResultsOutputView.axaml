@@ -133,13 +133,12 @@
         RowDefinitions="*,44" RowSpacing="4">
         <Grid x:Name="ResultsListPanel" IsVisible="{Binding !IsDetailVisible}"
               RowDefinitions="24,*" RowSpacing="4">
-          <Grid Margin="8,0" ColumnDefinitions="68,82,96,96,112,*" ColumnSpacing="8">
+          <Grid Margin="8,0" ColumnDefinitions="68,82,96,96,*" ColumnSpacing="8">
             <TextBlock Text="元の行" Classes="label" />
             <TextBlock Grid.Column="1" Text="最終点" Classes="label" />
             <TextBlock Grid.Column="2" Text="固有点" Classes="label" />
             <TextBlock Grid.Column="3" Text="類似減点" Classes="label" />
             <TextBlock Grid.Column="4" Text="状態" Classes="label" />
-            <TextBlock Grid.Column="5" Text="設問別得点（詳細で全文）" Classes="label" TextTrimming="CharacterEllipsis" />
           </Grid>
           <ListBox x:Name="RowScoreList" Grid.Row="1" Padding="0" BorderThickness="0"
                    ItemsSource="{Binding VisibleRowScores}" SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
@@ -150,7 +149,7 @@
             <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="viewModels:ResultsRowScoreViewModel">
-                <Grid ColumnDefinitions="68,82,96,96,112,*" ColumnSpacing="8"
+                <Grid ColumnDefinitions="68,82,96,96,*" ColumnSpacing="8"
                       AutomationProperties.AutomationId="{Binding SourceRowNumber, StringFormat='ResultsRow-{0}'}"
                       AutomationProperties.Name="{Binding SourceRowNumber, StringFormat='元のExcel {0} 行の採点結果'}">
                   <TextBlock Text="{Binding SourceRowNumber}" TextTrimming="CharacterEllipsis" />
@@ -160,8 +159,6 @@
                   <TextBlock Grid.Column="4" Text="{Binding StatusText}" TextTrimming="CharacterEllipsis"
                              ToolTip.Tip="{Binding StatusText}" Classes="row-status"
                              AutomationProperties.AutomationId="{Binding SourceRowNumber, StringFormat='ResultsRowStatus-{0}'}" />
-                  <TextBlock Grid.Column="5" Classes="question-summary" Text="{Binding QuestionEarnedText}"
-                             TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
                 </Grid>
               </DataTemplate>
             </ListBox.ItemTemplate>
@@ -190,13 +187,13 @@
             </ContentControl.ContentTemplate>
           </ContentControl>
 
-          <Grid Grid.Row="1" ColumnDefinitions="2*,3*" ColumnSpacing="8">
+          <Grid Grid.Row="1" ColumnDefinitions="*,3*" ColumnSpacing="8">
             <ListBox x:Name="ResultsList" ItemsSource="{Binding SelectedRowCriteria}"
                      SelectedItem="{Binding SelectedCriterion, Mode=TwoWay}"
                      Padding="0" BorderThickness="0" Focusable="True"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
                      AutomationProperties.AutomationId="ResultsReviewList"
-                     AutomationProperties.Name="選択学生の設問・評価・基準。基準を選ぶと隣の単一編集欄に表示">
+                     AutomationProperties.Name="選択学生の設問・評価・基準。基準を選ぶと隣に学生の回答と評価内容を表示">
               <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="viewModels:ResultsCriterionViewModel">
@@ -215,39 +212,79 @@
                 <DataTemplate x:DataType="viewModels:ResultsCriterionViewModel">
                   <Border Classes="card" AutomationProperties.AutomationId="{Binding AutomationId}"
                           AutomationProperties.Name="{Binding AccessibleSummary}">
-                    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
-                                  Focusable="True" AutomationProperties.Name="選択基準の全文・raw・override・計算プレビュー。空欄は0ではありません">
-                      <StackPanel Spacing="4">
-                        <TextBlock TextWrapping="Wrap"><Run Text="{Binding QuestionName}" /><Run Text=" / " /><Run Text="{Binding EvaluatorName}" /><Run Text=" / " /><Run Text="{Binding CriterionName}" /></TextBlock>
-                        <StackPanel>
-                          <TextBlock Text="設問文（元のExcel）" Classes="label" />
-                          <TextBlock Text="{Binding QuestionText}" TextWrapping="Wrap"
-                                     AutomationProperties.AutomationId="ResultsCriterionQuestionText" />
-                        </StackPanel>
-                        <Grid ColumnDefinitions="64,*,130" ColumnSpacing="8">
-                          <StackPanel><TextBlock Text="AI raw" Classes="label" /><TextBlock Text="{Binding AiRawText}" Classes="value" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionAiRaw" /></StackPanel>
-                          <TextBox Grid.Column="1" Height="44"
-                                   Text="{Binding OverrideText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                   IsEnabled="{Binding CanOverride}" Classes.invalid="{Binding HasOverrideError}"
-                                   PlaceholderText="override（任意）"
-                                   AutomationProperties.AutomationId="{Binding AutomationId, StringFormat='{}{0}-Override'}"
-                                   AutomationProperties.Name="任意 override。空欄または range 内の数値" />
-                          <StackPanel Grid.Column="2">
-                            <TextBlock Text="{Binding RangeText}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionRange" />
-                            <TextBlock Text="{Binding StatusCode}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionStatus" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                                    MinHeight="44" Focusable="True"
+                                    AutomationProperties.AutomationId="ResultsCriterionAnswerPane"
+                                    AutomationProperties.Name="回答欄。選択した設問の設問文と学生の回答（元のExcel）の全文">
+                        <StackPanel Spacing="4">
+                          <StackPanel>
+                            <TextBlock Text="設問文（元のExcel）" Classes="label" />
+                            <TextBlock Text="{Binding QuestionText}" TextWrapping="Wrap"
+                                       AutomationProperties.AutomationId="ResultsCriterionQuestionText" />
                           </StackPanel>
-                        </Grid>
-                        <TextBlock Text="{Binding OverrideError}" IsVisible="{Binding HasOverrideError}" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TechnicalBorderBrush}" AutomationProperties.AutomationId="ResultsCriterionOverrideError" />
-                        <UniformGrid Columns="5" ColumnSpacing="8">
-                          <StackPanel><TextBlock Text="適用値" Classes="label" /><TextBlock Text="{Binding EffectiveRawText}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionEffective" /></StackPanel>
-                          <StackPanel><TextBlock Text="正規化" Classes="label" /><TextBlock Text="{Binding NormalizedScoreText}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionNormalized" /></StackPanel>
-                          <StackPanel><TextBlock Text="評価" Classes="label" /><TextBlock Text="{Binding EvaluatorScoreText}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionEvaluator" /></StackPanel>
-                          <StackPanel><TextBlock Text="設問" Classes="label" /><TextBlock Text="{Binding QuestionScoreText}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionQuestion" /></StackPanel>
-                          <StackPanel><TextBlock Text="総合" Classes="label" /><TextBlock Text="{Binding OverallScoreText}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionOverall" /></StackPanel>
-                        </UniformGrid>
-                      </StackPanel>
-                    </ScrollViewer>
+                          <StackPanel>
+                            <TextBlock Text="学生の回答（元のExcel）" Classes="label" />
+                            <TextBlock Text="{Binding StudentAnswerText}" TextWrapping="Wrap"
+                                       AutomationProperties.AutomationId="ResultsCriterionStudentAnswer"
+                                       AutomationProperties.Name="学生の回答" />
+                          </StackPanel>
+                        </StackPanel>
+                      </ScrollViewer>
+                      <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                                    MinHeight="44" Focusable="True"
+                                    AutomationProperties.AutomationId="ResultsCriterionEvaluationPane"
+                                    AutomationProperties.Name="評価欄。AIの点・override・理由・根拠・評価項目の説明・計算プレビュー。空欄は0ではありません">
+                        <StackPanel Spacing="4">
+                          <TextBlock TextWrapping="Wrap"><Run Text="{Binding QuestionName}" /><Run Text=" / " /><Run Text="{Binding EvaluatorName}" /><Run Text=" / " /><Run Text="{Binding CriterionName}" /></TextBlock>
+                          <Grid ColumnDefinitions="64,*,120" ColumnSpacing="8">
+                            <StackPanel><TextBlock Text="AI raw" Classes="label" /><TextBlock Text="{Binding AiRawText}" Classes="value" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionAiRaw" /></StackPanel>
+                            <TextBox Grid.Column="1" Height="44"
+                                     Text="{Binding OverrideText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     IsEnabled="{Binding CanOverride}" Classes.invalid="{Binding HasOverrideError}"
+                                     PlaceholderText="override（任意）"
+                                     AutomationProperties.AutomationId="{Binding AutomationId, StringFormat='{}{0}-Override'}"
+                                     AutomationProperties.Name="任意 override。空欄または range 内の数値" />
+                            <StackPanel Grid.Column="2">
+                              <TextBlock Text="{Binding RangeText}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionRange" />
+                              <TextBlock Text="{Binding StatusCode}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionStatus" />
+                            </StackPanel>
+                          </Grid>
+                          <TextBlock Text="{Binding OverrideError}" IsVisible="{Binding HasOverrideError}" TextWrapping="Wrap"
+                                     Foreground="{DynamicResource TechnicalBorderBrush}" AutomationProperties.AutomationId="ResultsCriterionOverrideError" />
+                          <StackPanel>
+                            <TextBlock Text="評価の理由（Reason）" Classes="label" />
+                            <TextBlock Text="{Binding ReasonText}" TextWrapping="Wrap"
+                                       AutomationProperties.AutomationId="ResultsCriterionReason"
+                                       AutomationProperties.Name="評価の理由" />
+                          </StackPanel>
+                          <StackPanel>
+                            <TextBlock Text="根拠となる回答の引用（Evidence）" Classes="label" />
+                            <TextBlock Text="{Binding EvidenceText}" TextWrapping="Wrap"
+                                       AutomationProperties.AutomationId="ResultsCriterionEvidence"
+                                       AutomationProperties.Name="根拠となる回答の引用" />
+                          </StackPanel>
+                          <StackPanel>
+                            <TextBlock Text="根拠の場所（Evidence_Source）" Classes="label" />
+                            <TextBlock Text="{Binding EvidenceSourceText}" TextWrapping="Wrap"
+                                       AutomationProperties.AutomationId="ResultsCriterionEvidenceSource" />
+                          </StackPanel>
+                          <StackPanel>
+                            <TextBlock Text="評価項目の説明（採点設計）" Classes="label" />
+                            <TextBlock Text="{Binding CriterionDescriptionText}" TextWrapping="Wrap"
+                                       AutomationProperties.AutomationId="ResultsCriterionDescription"
+                                       AutomationProperties.Name="評価項目の説明" />
+                          </StackPanel>
+                          <UniformGrid Columns="5" ColumnSpacing="8">
+                            <StackPanel><TextBlock Text="適用値" Classes="label" /><TextBlock Text="{Binding EffectiveRawText}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionEffective" /></StackPanel>
+                            <StackPanel><TextBlock Text="正規化" Classes="label" /><TextBlock Text="{Binding NormalizedScoreText}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionNormalized" /></StackPanel>
+                            <StackPanel><TextBlock Text="評価" Classes="label" /><TextBlock Text="{Binding EvaluatorScoreText}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionEvaluator" /></StackPanel>
+                            <StackPanel><TextBlock Text="設問" Classes="label" /><TextBlock Text="{Binding QuestionScoreText}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionQuestion" /></StackPanel>
+                            <StackPanel><TextBlock Text="総合" Classes="label" /><TextBlock Text="{Binding OverallScoreText}" TextWrapping="Wrap" AutomationProperties.AutomationId="ResultsCriterionOverall" /></StackPanel>
+                          </UniformGrid>
+                        </StackPanel>
+                      </ScrollViewer>
+                    </Grid>
                   </Border>
                 </DataTemplate>
               </ContentControl.ContentTemplate>

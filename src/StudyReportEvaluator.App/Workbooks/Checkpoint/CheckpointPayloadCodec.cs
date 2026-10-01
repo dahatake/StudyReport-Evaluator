@@ -109,6 +109,8 @@ internal static class CheckpointPayloadCodec
         }
 
         ValidateRuntime(envelope.Runtime);
+        if (envelope.ContextTier is not (null or ModelOptionPolicy.LongContextTier))
+            throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
         ValidateCanonicalPath(envelope.FinalPath, ".xlsx");
         ValidateCanonicalPath(envelope.PartialPath, ".partial.xlsx");
         if (envelope.FinalPath.EndsWith(".partial.xlsx", StringComparison.OrdinalIgnoreCase)

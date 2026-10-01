@@ -24,6 +24,10 @@ public sealed record ApplicationSettings
     [JsonPropertyName("preferredModelId")]
     public string? PreferredModelId { get; init; }
 
+    [JsonPropertyName("modelPreferences")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableArray<ModelSelectionPreference>? ModelPreferences { get; init; }
+
     /// <summary>The requested concurrency, validated as 1 through 16 by the settings store.</summary>
     [JsonPropertyName("maxConcurrency")]
     public int MaxConcurrency { get; init; } = EphemeralEvaluationRunnerOptions.DefaultMaxConcurrency;
@@ -47,4 +51,9 @@ public sealed record ApplicationSettings
 public sealed record CachedCopilotModel(string Id, int? MaximumPromptTokens, int? MaximumContextWindowTokens)
 {
     public override string ToString() => $"{nameof(CachedCopilotModel)} {{ Content = <redacted> }}";
+}
+
+public sealed record ModelSelectionPreference(string ModelId, string? ReasoningEffort, string ContextTier)
+{
+    public override string ToString() => $"{nameof(ModelSelectionPreference)} {{ Content = <redacted> }}";
 }

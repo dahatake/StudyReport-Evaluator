@@ -473,25 +473,25 @@ public sealed class EvaluatorSettingsViewTests
         {
             window.Show();
             Render();
-            ComboBox[] selectors = Selectors(view);
+            SelectingItemsControl[] selectors = Selectors(view);
             BindingExpressionBase?[] bindings = selectors.Select(selector =>
-                BindingOperations.GetBindingExpressionBase(selector, ComboBox.SelectedItemProperty)).ToArray();
+                BindingOperations.GetBindingExpressionBase(selector, SelectingItemsControl.SelectedItemProperty)).ToArray();
             BindingExpressionBase?[] itemBindings = selectors.Select(selector =>
-                BindingOperations.GetBindingExpressionBase(selector, ComboBox.ItemsSourceProperty)).ToArray();
+                BindingOperations.GetBindingExpressionBase(selector, ItemsControl.ItemsSourceProperty)).ToArray();
             Assert.All(bindings, binding => Assert.NotNull(binding));
             Assert.All(itemBindings, binding => Assert.NotNull(binding));
             List<(QuestionDesignItemViewModel? Question, EvaluatorDesignItemViewModel? Evaluator,
                 CriterionDesignItemViewModel? Criterion)> observedSelections = [];
-            foreach (ComboBox selector in selectors)
+            foreach (SelectingItemsControl selector in selectors)
             {
                 selector.SelectionChanged += (_, _) => observedSelections.Add(
                     (owner.SelectedQuestion, question.SelectedEvaluator, evaluator.SelectedCriterion));
             }
 
             QuantificationDefinition before = owner.Draft;
-            foreach (ComboBox selector in selectors)
+            foreach (SelectingItemsControl selector in selectors)
             {
-                selector.SetCurrentValue(ComboBox.SelectedItemProperty, null);
+                selector.SetCurrentValue(SelectingItemsControl.SelectedItemProperty, null);
             }
 
             Assert.Same(question, owner.SelectedQuestion);
@@ -522,8 +522,8 @@ public sealed class EvaluatorSettingsViewTests
             AssertCanonical(incoming, owner.Draft);
             for (int index = 0; index < selectors.Length; index++)
             {
-                Assert.Same(bindings[index], BindingOperations.GetBindingExpressionBase(selectors[index], ComboBox.SelectedItemProperty));
-                Assert.Same(itemBindings[index], BindingOperations.GetBindingExpressionBase(selectors[index], ComboBox.ItemsSourceProperty));
+                Assert.Same(bindings[index], BindingOperations.GetBindingExpressionBase(selectors[index], SelectingItemsControl.SelectedItemProperty));
+                Assert.Same(itemBindings[index], BindingOperations.GetBindingExpressionBase(selectors[index], ItemsControl.ItemsSourceProperty));
             }
 
             question.MoveDownCommand.Execute(null);
@@ -761,11 +761,10 @@ public sealed class EvaluatorSettingsViewTests
                 AutomationProperties.GetAutomationId(control) == owner.Questions[0].Evaluators[0].Criteria[0].NameAutomationId);
             AssertUniqueIds(view);
             AssertInputContract(view);
-            Assert.All(Selectors(view), selector => Assert.InRange(selector.MaxDropDownHeight, 44d, 220d));
+            Assert.All(Selectors(view).OfType<ComboBox>(), selector => Assert.InRange(selector.MaxDropDownHeight, 44d, 220d));
 
-            ComboBox questions = Required<ComboBox>(view, "QuestionSelector");
+            ListBox questions = Required<ListBox>(view, "QuestionSelector");
             Assert.True(questions.Focus(NavigationMethod.Tab));
-            Assert.Equal(new Thickness(3d), questions.BorderThickness);
             Press(window, Key.Tab);
             Assert.Same(Required<ComboBox>(view, "EvaluatorSelector"), window.FocusManager?.GetFocusedElement());
             TextBox name = ById<TextBox>(view, criterion.NameAutomationId);
@@ -909,22 +908,22 @@ public sealed class EvaluatorSettingsViewTests
     private static T ById<T>(Control root, string id) where T : Control =>
         Assert.Single(root.GetVisualDescendants().OfType<T>(), control => AutomationProperties.GetAutomationId(control) == id);
 
-    private static ComboBox[] Selectors(Control view) =>
+    private static SelectingItemsControl[] Selectors(Control view) =>
     [
-        Required<ComboBox>(view, "QuestionSelector"),
+        Required<ListBox>(view, "QuestionSelector"),
         Required<ComboBox>(view, "EvaluatorSelector"),
         Required<ComboBox>(view, "CriterionSelector"),
     ];
 
     private static void Select(Control view, string selectorName, object item)
     {
-        Required<ComboBox>(view, selectorName).SetCurrentValue(ComboBox.SelectedItemProperty, item);
+        Assert.IsAssignableFrom<SelectingItemsControl>(view.FindControl<Control>(selectorName)).SetCurrentValue(SelectingItemsControl.SelectedItemProperty, item);
         Render();
     }
 
     private static void AssertSelectors(Control view, QuantificationDesignViewModel owner)
     {
-        ComboBox[] selectors = Selectors(view);
+        SelectingItemsControl[] selectors = Selectors(view);
         Assert.Same(owner.Questions, selectors[0].ItemsSource);
         Assert.Same(owner.SelectedQuestion, selectors[0].SelectedItem);
         Assert.Same(owner.SelectedQuestion?.Evaluators, selectors[1].ItemsSource);

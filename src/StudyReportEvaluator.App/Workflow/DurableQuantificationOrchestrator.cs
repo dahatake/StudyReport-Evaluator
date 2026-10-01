@@ -197,6 +197,7 @@ public sealed class DurableQuantificationOrchestrator
         ArgumentException.ThrowIfNullOrWhiteSpace(run.InputPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(run.ModelId);
         EphemeralEvaluationRunner.ValidateReasoningEffort(run.ReasoningEffort);
+        _ = ModelOptionPolicy.ToSdkContextTier(run.ContextTier);
         _ = new EvaluationSchedulerOptions(run.MaxConcurrency);
 
         Report(progress, DurableEvaluationStage.Preparing, 0, 0, 0, 0, 0, 0, 0, "PREPARING");
@@ -253,6 +254,7 @@ public sealed class DurableQuantificationOrchestrator
                 NormalModelId = run.ModelId,
                 ReferenceModelId = run.ModelId,
                 ReasoningEffort = run.ReasoningEffort,
+                ContextTier = run.ContextTier,
                 Runtime = request.Runtime,
                 FinalPath = reservation.FinalPath,
                 PartialPath = reservation.PartialPath,
@@ -288,7 +290,8 @@ public sealed class DurableQuantificationOrchestrator
                 run.InputPath,
                 run.ModelId,
                 run.ReasoningEffort,
-                request.Runtime).BlockingStatusCode;
+                request.Runtime,
+                run.ContextTier).BlockingStatusCode;
             if (admissionError is not null)
             {
                 throw new QuantificationRunException(admissionError);

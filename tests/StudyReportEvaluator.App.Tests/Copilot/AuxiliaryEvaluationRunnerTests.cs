@@ -10,6 +10,32 @@ namespace StudyReportEvaluator.App.Tests.Copilot;
 
 public sealed class AuxiliaryEvaluationRunnerTests
 {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("long-context")]
+    public async Task Selected_effort_and_context_tier_are_carried_into_reference_and_special_retries(string? tier)
+    {
+        EphemeralEvaluationRunnerOptions options = new(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1), contextTier: tier);
+        RecordingFactory reference = new(AuxiliaryEvaluationSchemaFactory.ReferenceToolName, ReferenceJson(), invokeTool: false);
+        RecordingFactory special = new(AuxiliaryEvaluationSchemaFactory.SpecialToolName, SpecialJson(), invokeTool: false);
+        var referenceResult = await new ReferenceAnswerEvaluationRunner(reference, options).EvaluateAsync(
+            new SafeReferenceAnswerPayload("Q1", "synthetic prompt"), "model-test", "high", TestContext.Current.CancellationToken);
+        var specialResult = await new SpecialEvaluationRunner(special, options).EvaluateAsync(
+            AuxiliaryEvaluationSchemaFactoryTests.CreateSpecialPayload(), "model-test", "high", TestContext.Current.CancellationToken);
+        Assert.Equal(2, referenceResult.AttemptCount);
+        Assert.Equal(2, specialResult.AttemptCount);
+        foreach (RecordingFactory factory in new[] { reference, special })
+        {
+            Assert.All(factory.Transports, transport =>
+            {
+                SessionConfig config = Assert.Single(transport.Configs);
+                Assert.Equal("high", config.ReasoningEffort);
+                Assert.Equal(ModelOptionPolicy.ToSdkContextTier(tier), config.ContextTier);
+                Assert.Single(config.AvailableTools!);
+            });
+        }
+    }
+
     [Fact]
     public async Task Reference_runner_uses_auto_one_tool_and_complete_cleanup()
     {

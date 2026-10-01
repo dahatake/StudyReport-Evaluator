@@ -45,6 +45,7 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
     private bool loading;
     private bool restoringPreferences;
     private bool preferredModelEdited;
+    private bool modelOptionsEdited;
     private bool maxConcurrencyEdited;
     private bool outputDirectoryEdited;
     private bool saving;
@@ -352,6 +353,7 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
                         Execution.ApplySettings(loaded with
                         {
                             PreferredModelId = preferredModelEdited ? Execution.PreferredModelId : loaded.PreferredModelId,
+                            ModelPreferences = modelOptionsEdited ? Execution.ModelPreferences : loaded.ModelPreferences,
                             MaxConcurrency = maxConcurrencyEdited ? Execution.MaxConcurrency : loaded.MaxConcurrency,
                             OutputDirectoryOverride = outputDirectoryEdited
                                 ? Execution.OutputDirectoryOverride : loaded.OutputDirectoryOverride,
@@ -402,6 +404,7 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
                 // Later explicit reloads track only edits made during that read. A cancelled
                 // initialization stays pending and must retain its edit history for retry.
                 preferredModelEdited = false;
+                modelOptionsEdited = false;
                 maxConcurrencyEdited = false;
                 outputDirectoryEdited = false;
             }
@@ -655,6 +658,7 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
 
         if (string.IsNullOrEmpty(args.PropertyName)
             || args.PropertyName is nameof(ExecutionViewModel.PreferredModelId)
+                or nameof(ExecutionViewModel.ModelPreferences)
                 or nameof(ExecutionViewModel.MaxConcurrency) or nameof(ExecutionViewModel.OutputDirectoryOverride))
         {
             if (!restoringPreferences && (!initialized || loading))
@@ -662,6 +666,7 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
                 // Only exact persisted-property notifications identify an explicit edit;
                 // selection/authentication refreshes and unchanged setter calls do not.
                 preferredModelEdited |= args.PropertyName == nameof(ExecutionViewModel.PreferredModelId);
+                modelOptionsEdited |= args.PropertyName == nameof(ExecutionViewModel.ModelPreferences);
                 maxConcurrencyEdited |= args.PropertyName == nameof(ExecutionViewModel.MaxConcurrency);
                 outputDirectoryEdited |= args.PropertyName == nameof(ExecutionViewModel.OutputDirectoryOverride);
             }
@@ -696,6 +701,7 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
     private ApplicationSettings CaptureSettings() => new()
     {
         PreferredModelId = Execution.PreferredModelId,
+        ModelPreferences = Execution.ModelPreferences,
         MaxConcurrency = Execution.MaxConcurrency,
         OutputDirectoryOverride = Execution.OutputDirectoryOverride,
         Definition = !Input.HasLoadedWorkbook ? StoredDefinition

@@ -89,12 +89,14 @@ public sealed partial class ExecutionView : UserControl
                 && e.PropertyName is not (nameof(ExecutionViewModel.SelectedModelId)
                     or nameof(ExecutionViewModel.SelectedModelLimitText)
                     or nameof(ExecutionViewModel.SelectedModelReasoningEffortText)
+                    or nameof(ExecutionViewModel.SelectedContextSizeText)
                     or nameof(ExecutionViewModel.PreferredModelId)
                     or nameof(ExecutionViewModel.MaxConcurrency)
                     or nameof(ExecutionViewModel.HasCurrentRun)
                     or nameof(ExecutionViewModel.CurrentRunModelId)
                     or nameof(ExecutionViewModel.CurrentRunMaxConcurrency)
                     or nameof(ExecutionViewModel.CurrentRunReasoningEffortText)
+                    or nameof(ExecutionViewModel.CurrentRunContextTierText)
                     or nameof(ExecutionViewModel.CurrentRunLimitText)
                     or nameof(ExecutionViewModel.IsRunning)
                     or nameof(ExecutionViewModel.OutputDirectoryOverride))))
@@ -119,9 +121,9 @@ public sealed partial class ExecutionView : UserControl
 
     private void RefreshPresentation()
     {
-        string nextConditions = $"次回 {owner?.SelectedModelId ?? "未選択"} 並列{owner?.MaxConcurrency.ToString(CultureInfo.InvariantCulture) ?? "—"} · effort: {owner?.SelectedModelReasoningEffortText ?? "未確認"} · 希望: {owner?.PreferredModelId ?? "未指定"} · 上限: {owner?.SelectedModelLimitText ?? "未確認"}";
+        string nextConditions = $"次回 {owner?.SelectedModelId ?? "未選択"} 並列{owner?.MaxConcurrency.ToString(CultureInfo.InvariantCulture) ?? "—"} · effort: {owner?.SelectedModelReasoningEffortText ?? "未確認"} · Context Size: {owner?.SelectedContextSizeText ?? "未確認"} · 希望: {owner?.PreferredModelId ?? "未指定"} · 上限: {owner?.SelectedModelLimitText ?? "未確認"}";
         this.FindControl<TextBox>("EffectiveModelTextBox")!.Text = owner is { HasCurrentRun: true } current
-            ? $"{(current.IsRunning ? "実行中" : "前回run")} {current.CurrentRunModelId} 並列{current.CurrentRunMaxConcurrency?.ToString(CultureInfo.InvariantCulture)} · effort: {current.CurrentRunReasoningEffortText} · 上限: {current.CurrentRunLimitText} / {nextConditions}"
+            ? $"{(current.IsRunning ? "実行中" : "前回run")} {current.CurrentRunModelId} 並列{current.CurrentRunMaxConcurrency?.ToString(CultureInfo.InvariantCulture)} · effort: {current.CurrentRunReasoningEffortText} · context: {current.CurrentRunContextTierText} · 上限: {current.CurrentRunLimitText} / {nextConditions}"
             : nextConditions;
         string reasoningEffort = owner?.SelectedModelId is null
             ? "未選択"

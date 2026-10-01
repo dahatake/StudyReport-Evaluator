@@ -105,6 +105,8 @@ public sealed record QuantificationRunRequest
 
     public string? ReasoningEffort { get; init; }
 
+    public string? ContextTier { get; init; }
+
     /// null は SDK が当該 model の上限を公開していないことを表す。
     public int? MaximumPromptTokens { get; init; }
 

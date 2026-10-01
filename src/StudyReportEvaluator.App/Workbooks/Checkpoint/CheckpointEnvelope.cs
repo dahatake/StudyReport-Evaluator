@@ -147,6 +147,9 @@ public sealed record CheckpointEnvelope
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ReasoningEffort { get; init; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ContextTier { get; init; }
+
     public required CheckpointRuntimeIdentity Runtime { get; init; }
 
     public required string FinalPath { get; init; }

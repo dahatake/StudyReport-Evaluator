@@ -818,7 +818,7 @@ public sealed class SettingsViewTests
         SelectCategory(harness, SettingsCategory.Common);
         Assert.Same(ById<ComboBox>(harness.View, "ExecutionModel"), harness.Window.FocusManager?.GetFocusedElement());
         WrapPanel tabStrip = Assert.Single(ById<TabControl>(harness.View, "SettingsCommonTabs")
-            .GetVisualDescendants().OfType<WrapPanel>());
+            .GetVisualDescendants().OfType<WrapPanel>(), panel => panel.Children.All(child => child is TabItem));
         Assert.Equal(KeyboardNavigationMode.Once, KeyboardNavigation.GetTabNavigation(tabStrip));
         Assert.Equal(0, tabStrip.TabIndex);
         TextBox lastField = ById<TextBox>(harness.View, "DesignRoundingDigits");
@@ -868,6 +868,23 @@ public sealed class SettingsViewTests
         };
     }
 
+    [AvaloniaFact]
+    public async Task Common_settings_hosts_copilot_login_bound_to_the_execution_commands()
+    {
+        using SettingsHarness harness = new(withStore: false);
+        await harness.LoadInputAsync();
+        harness.Show();
+        ShowCommonTab(harness, 0);
+
+        Assert.True(ById<StackPanel>(harness.View, "SettingsCopilotLoginPanel").IsEffectivelyVisible);
+        Assert.Same(harness.Settings.Execution.CheckAuthenticationCommand, ById<Button>(harness.View, "SettingsCheckCopilotAuthentication").Command);
+        Assert.Same(harness.Settings.Execution.LoginCommand, ById<Button>(harness.View, "SettingsStartCopilotLogin").Command);
+        Assert.Same(harness.Settings.Execution.CancelLoginCommand, ById<Button>(harness.View, "SettingsCancelCopilotLogin").Command);
+        Assert.Equal(harness.Settings.Execution.AuthenticationStatusText, ById<TextBlock>(harness.View, "SettingsCopilotAuthenticationStatus").Text);
+        Assert.Equal(harness.Settings.Execution.LoginStatusText, ById<TextBlock>(harness.View, "SettingsCopilotLoginStatus").Text);
+        AssertUniqueIds(harness.View);
+        AssertPassive(harness);
+    }
     private static void SelectCategory(SettingsHarness harness, SettingsCategory category)
     {
         Button button = ById<Button>(harness.View, "SettingsCategory" + category);

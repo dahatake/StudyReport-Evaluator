@@ -10,6 +10,24 @@ namespace StudyReportEvaluator.App.Tests.Workflow;
 
 public sealed class ResumeAdmissionEvaluatorTests
 {
+    [Theory]
+    [InlineData(null, null, true)]
+    [InlineData("long-context", "long-context", true)]
+    [InlineData(null, "long-context", false)]
+    [InlineData("long-context", null, false)]
+    public void Resume_requires_the_same_context_tier(string? saved, string? requested, bool expected)
+    {
+        var definition = Definition();
+        var snapshot = QuantificationSnapshot.Create(definition);
+        var plan = new EvaluationPlanBuilder().Build(snapshot, U01TestSupport.ValidateMapping(definition).Mapping!);
+        InputSnapshot input = new(new string('A', 64), 123, DateTimeOffset.UnixEpoch);
+        var checkpoint = Envelope(snapshot, input, Runtime()) with { ContextTier = saved };
+        var report = ResumeAdmissionEvaluator.Evaluate(checkpoint, checkpoint.PartialPath, snapshot, plan, input,
+            checkpoint.InputPath, checkpoint.NormalModelId, null, Runtime(), requested);
+        Assert.Equal(expected, report.CanResume);
+        Assert.Equal(expected ? null : CheckpointAdmissionStatusCodes.ModelMismatch, report.BlockingStatusCode);
+    }
+
     [Fact]
     public void Matching_checkpoint_is_admitted()
     {

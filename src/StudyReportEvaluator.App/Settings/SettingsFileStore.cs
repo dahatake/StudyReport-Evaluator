@@ -261,6 +261,22 @@ public sealed class SettingsFileStore
 
         try
         {
+            if (settings.ModelPreferences is { } preferences)
+            {
+                if (preferences.IsDefault || preferences.Length > ApplicationSettings.MaximumCachedModels)
+                    return false;
+                HashSet<string> preferenceIds = new(StringComparer.Ordinal);
+                foreach (ModelSelectionPreference? preference in preferences)
+                {
+                    if (preference is null || !preferenceIds.Add(preference.ModelId)
+                        || preference.ContextTier is not (ModelOptionPolicy.DefaultContextTier or ModelOptionPolicy.LongContextTier))
+                        return false;
+                    EphemeralEvaluationRunner.ValidateModelId(preference.ModelId);
+                    EphemeralEvaluationRunner.ValidateReasoningEffort(preference.ReasoningEffort);
+                    ValidateUtf8Text(preference.ModelId, preference.ReasoningEffort);
+                }
+            }
+
             if (settings.CachedModels is { } models)
             {
                 if (models.IsDefault || models.Length > ApplicationSettings.MaximumCachedModels)

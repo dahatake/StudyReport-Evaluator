@@ -571,6 +571,7 @@ public sealed class DocumentationContractTests
         [
             ("schemaVersion", "必須の整数`1`"),
             ("preferredModelId", "通常modelの希望ID、または`null`。利用可能と確認した実行状態ではない"),
+            ("modelPreferences", "任意のモデル別明示選択の配列。最大4096件、重複ID不可。各項目は`modelId`、`reasoningEffort`（未指定はnull）、`contextTier`（`default`／`long-context`）。省略／nullは未編集。旧設定はそのまま読めます。cache自動保存には未保存の編集を混ぜません"),
             ("maxConcurrency", "1〜16、既定8"),
             ("outputDirectoryOverride", "明示した完全修飾の絶対出力path、または`null`。自動算出`result`は保存しない"),
             ("definition", "任意の採点定義**1件**、または`null`"),
@@ -699,7 +700,7 @@ public sealed class DocumentationContractTests
             Read("README.md"),
             "実行画面の**モデル・並列度・実効出力先は読取専用**",
             "**変更 → 設定の共通**",
-            "保存希望modelが利用不可なら未選択のままで、別modelへfallbackしません",
+            "保存希望model・選択値が利用不可なら自動fallbackせず、選び直しを求めます",
             "希望IDの復元は認証済み・利用可能という判定ではありません",
             "空欄（`outputDirectoryOverride: null`）",
             "保存した明示指定は再起動・入力変更後も保持",
@@ -985,7 +986,7 @@ public sealed class DocumentationContractTests
             "sample/realdata.xlsx",
             "469,995",
             "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D");
-        AssertSequentialTableIds(requirements, "AC-", 46);
+        AssertSequentialTableIds(requirements, "AC-", 52);
         AssertSequentialTableIds(ledger, "C-", 47);
         AssertContainsAll(ledger, "VERIFIED", "BLOCKED", "EXCLUDED");
         AssertContainsAll(
@@ -1212,9 +1213,9 @@ public sealed class DocumentationContractTests
             "CHの欠落、`FAIL`、`NOT_RUN`",
             "ADV-01/ADV-02の`NOT_RUN`は許容");
 
-        AssertSequentialTableIds(traceability, "AC-", 46);
+        AssertSequentialTableIds(traceability, "AC-", 52);
         Assert.Equal(
-            Enumerable.Range(1, 41),
+            Enumerable.Range(1, 47),
             Regex.Matches(
                     traceability,
                     @"^\| TR-(\d{2}) \|",

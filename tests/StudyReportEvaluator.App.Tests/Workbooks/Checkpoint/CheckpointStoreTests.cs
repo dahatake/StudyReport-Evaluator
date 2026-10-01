@@ -18,6 +18,34 @@ namespace StudyReportEvaluator.App.Tests.Workbooks.Checkpoint;
 
 public sealed class CheckpointStoreTests
 {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("long-context")]
+    public void Context_tier_round_trips_and_cannot_change_during_append(string? tier)
+    {
+        using TemporaryWorkbook input = X01SyntheticWorkbookFactory.Create();
+        CheckpointEnvelope envelope = CreateEnvelope(input) with { ContextTier = tier };
+        CheckpointStore store = new();
+        Assert.True(store.Create(envelope, TestContext.Current.CancellationToken).IsSuccess);
+        Assert.Equal(tier, store.Load(envelope.PartialPath, TestContext.Current.CancellationToken).Envelope!.ContextTier);
+        byte[] before = File.ReadAllBytes(envelope.PartialPath);
+        Assert.False(store.Update(envelope with { ContextTier = tier is null ? "long-context" : null },
+            TestContext.Current.CancellationToken).IsSuccess);
+        Assert.Equal(before, File.ReadAllBytes(envelope.PartialPath));
+    }
+
+    [Theory]
+    [InlineData("default")]
+    [InlineData("invalid")]
+    [InlineData("")]
+    public void Invalid_or_noncanonical_checkpoint_context_tier_is_rejected_before_writes(string tier)
+    {
+        using TemporaryWorkbook input = X01SyntheticWorkbookFactory.Create();
+        CheckpointEnvelope envelope = CreateEnvelope(input) with { ContextTier = tier };
+        Assert.False(new CheckpointStore().Create(envelope, TestContext.Current.CancellationToken).IsSuccess);
+        Assert.False(File.Exists(envelope.PartialPath));
+    }
+
     private static readonly DateTimeOffset StartedAtUtc =
         new(2026, 9, 2, 5, 30, 0, TimeSpan.Zero);
 

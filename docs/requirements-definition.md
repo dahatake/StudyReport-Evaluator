@@ -9,7 +9,7 @@
 | 出力 | 入力を変更せず作成する別の標準 `.xlsx` 1ファイル |
 | 対応環境 | Windows 11 x64。macOS、Linux、Windows Arm64は現版の正式公開対象外 |
 | UI / Runtime | Avalonia `12.1.1` / .NET `10.0.11` self-contained。build SDK `10.0.400`を固定 |
-| AI | GitHub Copilot SDK for .NET `1.0.11` / bundled CLI `1.0.79`を固定。参照回答・通常評価・固有評価は利用者選択modelと同じrun-level reasoning effort。類似度はローカル計算 |
+| AI | GitHub Copilot SDK for .NET `1.0.11` / bundled CLI `1.0.79`を固定。参照回答・通常評価・固有評価は利用者選択model・思考レベル・Context Sizeをrunで統一（§11.18）。類似度はローカル計算 |
 | 旧版 | v4.5の業務・入力・採点・数式・checkpoint・privacy・delivery境界をcarry forwardし、承認されたUI簡素化・設定保存・復元の差分だけを追加。v3.0はv4.0により全面的にsupersede済み |
 
 > 本版は、要求所有者が2026-09-07に[UI・設定保存プランv2](../dev/docs/archive/work/20260907-ui-settings-redesign-plan-v2.md)のD01〜D20デフォルト・全実装を明示承認した差分を反映する。元プランの承認待ち表記は履歴であり、後続指示を優先する。最小実装契約と測定範囲は[UI layout contract](../dev/docs/ui-layout-contract.md)へ分離する。D17の当初上書き「全タスク完了後だけUnreleased追記、続いて製品PATCH `0.8.4` → `0.8.5`」と「T01では製品版・CHANGELOGを変更しない」は履歴として保持する。さらに後続の利用者不在時の自律続行指示により、T39をBLOCKEDのままF01／F02を進める。F01はREVIEWED、親担当による製品PATCHは反映済みだが、G4・全タスク完了・公開PASSを意味しない。以後のF02最終再検証は[実行記録](../dev/docs/archive/work/20260907-ui-settings-execution-record.md)の最新欄を正本とする。
@@ -284,7 +284,7 @@ $$
 - 上限が不明でも、app-owned requestの絶対上限とretry込みattempt上限は常に適用する。
 - 実効modelの上限が既知か不明かを実行画面に明示する。
 - 1 attemptごとにrestricted sessionを使用し、app-owned structured result toolだけを公開する。
-- reasoning effort（SDK `SessionConfig.ReasoningEffort`）は、run開始時に選択modelの対応値から1つだけ解決し、同じrunの参照回答生成・通常評価・固有評価のすべてへ同じ値を指定する（採点の一貫性のため）。希望値は`low`とし、非対応なら`none < minimal < low < medium < high < xhigh < max`の順序で最も近い対応値（同距離は高い側）を選ぶ。`none`はreasoningを無効化するため既定にしない。`auto`、reasoning effort非対応、対応値未列挙のmodelでは、すべてのoperationで未指定とする（指定するとsession作成が失敗するため）。このとき実際に使われたeffortはSDKから観測できない。これを理由にrunを拒否せず、別modelへfallbackしない。解決した値（または未指定）はcheckpoint、Run sheet、Reference sheet、ジョブログへ記録し、再開時は同じmodelと値を要求する（11.9節）。
+- reasoning effort（SDK `SessionConfig.ReasoningEffort`）は§11.18の利用者選択値をrun開始時に固定し、同じrunの参照回答生成・通常評価・固有評価のすべてへ同じ値を指定する。未編集時だけ希望`low`を`none < minimal < low < medium < high < xhigh < max`の最も近い対応値（同距離は高い側）へ解決する。`auto`、reasoning effort非対応、対応値未列挙のmodelでは未指定とする。実際に使われたeffortはSDKから観測できない場合がある。指定値（または未指定）はcheckpoint、Run sheet、Reference sheet、ジョブログへ記録し、再開時は同じmodelと値を要求する（11.9節）。Context Sizeのtierも§11.18に従い同一runで固定する。
 - shell、filesystem、Web、GitHub write、MCP、ambient memoryを公開しない。
 - finite timeout、有限retry、cancel、session cleanupを必須とする。
 
@@ -488,7 +488,7 @@ $$
 
 | ID | 優先度 | 要求 |
 |---|---|---|
-| FR-XD-01 | MUST | `docs/result-excel-description.md`を作成し、final workbookの4つのapp-owned sheetそれぞれの目的と、次の全列・全項目の意味を説明する。①`Quantification_Results`: 先頭`SourceRow`、評価項目ごとの10列（`.Scorable`〜`.Status`）、`.Evaluator_Score`、設問ごとの4列（`.Answer_Present`〜`.Question_Earned`）、固有評価の6列と`.Special_Question_Rate`、類似度の6列（`.Similarity_AI_Raw`〜`.Similarity_Peer_Row`）、末尾の`Base_Points`／`Special_Earned`／`Final_Raw`／`Final_Score`。②`Quantification_References`: A〜H列の8列。③`Quantification_Config`: A〜AG列の33列と`RecordType`の全値（`DEFINITION`、`CANONICAL_JSON`、`QUESTION`、`SUPPORTING_SOURCE`、`EVALUATOR`、`CRITERION`、`SPECIAL_EVALUATION`、`SPECIAL_SUPPORTING_SOURCE`）。④`Quantification_Run`: `Field`列の25項目。列名・列記号・並び・literal／formulaの区別は実装（§8、§9.2、`ResultsSheetWriter`／`ConfigSheetWriter`／`ReferenceAnswersSheetWriter`／`RunSheetWriter`）と一致させる。 |
+| FR-XD-01 | MUST | `docs/result-excel-description.md`を作成し、final workbookの4つのapp-owned sheetそれぞれの目的と、次の全列・全項目の意味を説明する。①`Quantification_Results`: 先頭`SourceRow`、評価項目ごとの10列（`.Scorable`〜`.Status`）、`.Evaluator_Score`、設問ごとの4列（`.Answer_Present`〜`.Question_Earned`）、固有評価の6列と`.Special_Question_Rate`、類似度の6列（`.Similarity_AI_Raw`〜`.Similarity_Peer_Row`）、末尾の`Base_Points`／`Special_Earned`／`Final_Raw`／`Final_Score`。②`Quantification_References`: A〜H列の8列。③`Quantification_Config`: A〜AG列の33列と`RecordType`の全値（`DEFINITION`、`CANONICAL_JSON`、`QUESTION`、`SUPPORTING_SOURCE`、`EVALUATOR`、`CRITERION`、`SPECIAL_EVALUATION`、`SPECIAL_SUPPORTING_SOURCE`）。④`Quantification_Run`: `Field`列の26項目（FR-MO-07の`ContextTier`を含む）。列名・列記号・並び・literal／formulaの区別は実装（§8、§9.2、`ResultsSheetWriter`／`ConfigSheetWriter`／`ReferenceAnswersSheetWriter`／`RunSheetWriter`）と一致させる。 |
 | FR-XD-02 | MUST | 文書はITに詳しくない大学・高校の教員を読者とし、専門用語（評価項目、正規化、数式セル、識別コード等）を初出で平易に説明する。次を含める。①最終点数（`Final_Score`）を最初に見る場所として案内する。②元sheetと結果sheetの行番号が同じであること。③`AI_Raw`／`Override`／`Effective_Raw`の関係と、`Override`欄の入力制約（範囲外・空回答行は入力不可）。④§8の式による点数の流れと、数値入りの計算例（基礎点60、2設問各20点、係数0.1、`Final_Raw`75）。⑤空欄と0の違い（§2.2の6）。⑥`ResultsStatusCodes`の12個の状態コードすべての意味と対応の目安。⑦§8.6の手動変更（基礎点・固有評価配点・類似度減点係数・設問配点）と合計100の条件、および実行時に`SpecialPoints`が0だった場合に後から増やすと`Final_Score`がblankになること。 |
 | FR-XD-03 | MUST | 文書の冒頭に教育上の警告文（§11.2の固定文言）、対象版の注記（UNRELEASED `0.8.6`候補、公開版`0.8.1`）を表示し、機密性（結果Excelは入力と同等以上に機密、§14）、入力Excelを変更しないこと、AIの点・類似度は採点の材料で最終判断は利用者が行うこと、類似度は不正行為の証明ではないことを明記する。 |
 | FR-XD-04 | MUST | `README.md`の本文（「出力と再開」）に、文書の目的を示す1文以上の説明とリンクを置き、「ガイド」の一覧にもリンクを置く。`docs/README.md`の読者別ガイド、`docs/getting-started.md`と`docs/features.md`のfinal workbookの節からもリンクする。 |
@@ -588,7 +588,8 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 4. **結果**
    - 完了／一部失敗／取消を明示
    - finalまたはpartial path
-   - 行ごとのQuestionEarned、SpecialEarned、SimilarityPenalty、FinalRaw、FinalScore。設問別の点は設問IDでなく、元のExcel由来の設問文で示す（§11.11）
+   - 一覧（プレビュー）では行ごとのFinalScore、SpecialEarned、SimilarityPenalty、行状態だけを示し、設問別得点は示さない（FR-RS-06）。詳細で、選択行のFinalRawと設問別のQuestionEarnedを、設問IDでなく元のExcel由来の設問文で示す（§11.11）
+   - 詳細で、選択した基準について設問文と学生の回答（元のExcel）、AIの点・理由・根拠・根拠の場所・評価項目の説明（§11.19）
    - criterion overrideの確認と、override反映版を既存fileへ上書きせず任意の別workbookとして出力する操作
 
 ### 11.1 完了表示
@@ -739,10 +740,31 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 | FR-MS-01 | MUST | 「通常モデル」の選択肢は、利用できるmodelの全件を、SDKが返した順序で1件ずつ表示する。`auto`を含む。件数の上限で切り捨てず、同一IDが複数返った場合は最初の1件だけを表示する。SDKの新しいmodel IDは、アプリ更新なしで選択肢に現れる。 |
 | FR-MS-02 | MUST | 選択肢から除外するのは次の2種類だけとする。(a) IDが不正: null・空・空白のみ・前後に空白・制御文字（`char.IsControl`）を含む・257文字以上。(b) `policy.state`が、大文字小文字を区別しない`disabled`（そのaccountでポリシー上無効）。`enabled`、未設定（null）、`unconfigured`、未知の値はすべて選択可能とする。 |
 | FR-MS-03 | MUST | 除外対象のmodelが混在しても、他のmodelの列挙と認証確認を失敗させない。除外により認証確認が`RuntimeFailed`になったり、一覧全体が空になったりしない（除外後に0件なら、通常どおり0件の`Available`）。 |
-| FR-MS-04 | MUST | 選択したmodelの上限（prompt／context）とreasoning effortの扱いは§7.1の既存規則に従う。非表示・非対応を理由にmodelを選択肢から外さない。 |
+| FR-MS-04 | MUST | 選択したmodelの上限（prompt／context）とreasoning effortの扱いは§7.1・§11.18に従う。非表示・非対応を理由にmodelを選択肢から外さない。 |
 | FR-MS-05 | MUST | setting.txtの`cachedModels`（表示専用cache）の上限は4096件とする。4096件を超える一覧はcacheへ保存せず（既存cacheと保存済み設定を変更しない）、その一覧は選択肢として全件を利用できる。cacheが4096件を超えるsetting.txtは不正として読み込まない。 |
 
 例: SDKが`[auto, claude-sonnet-5, gpt-5.6-sol, grok-4.5(policy未設定), old-model(policy=disabled), "bad id "]`を返した場合、選択肢は`[auto, claude-sonnet-5, gpt-5.6-sol, grok-4.5]`の4件である（`old-model`はFR-MS-02(b)、`"bad id "`はFR-MS-02(a)で除外）。
+
+### 11.18 思考レベル・Context Sizeの選択（2026-10-01追加）
+
+出典: 依頼原文（ログイン後に利用できる全モデルの表示・選択、思考レベルとContext Sizeの選択）、既存の§11.13、`src/StudyReportEvaluator.App/Copilot/ReasoningEffortPolicy.cs`、固定SDK `1.0.11`の公式[Types.cs](https://github.com/github/copilot-sdk/blob/v1.0.11/dotnet/src/Types.cs)と[生成RPC型](https://github.com/github/copilot-sdk/blob/v1.0.11/dotnet/src/Generated/Rpc.cs)（確認日2026-10-01）。
+
+| ID | 優先度 | 要求 |
+|---|---|---|
+| FR-MO-01 | MUST | 共通設定で「通常モデル」の全件選択（FR-MS-01〜05）を維持し、ログイン正常終了後の認証・一覧確認成功で最新一覧へ更新する。取得失敗時は旧一覧を表示専用として残し、実効model・思考レベル・contextの選択を解除し、認証失敗と再確認方法を表示する。空一覧は空のままで新規AI実行不可。固定model名や件数による絞込みはしない。 |
+| FR-MO-02 | MUST | 共通設定に「思考レベル」（AutomationId `ExecutionReasoningEffort`）の選択欄を設ける。`auto`以外でSDKが対応を報告した値を重複なしで選べる。順序は`none, minimal, low, medium, high, xhigh, max`、それ以外の安全な値は末尾へOrdinal昇順。表示は順に「なし」「最小」「低」「中」「高」「非常に高い」「最大」、未知値は原値。SDKのdefaultが一致した選択肢には` (Default)`を付ける。未編集時だけ§7.1の既定解決を使う。非対応・未列挙・`auto`は選択不可で「未指定（model非対応またはauto）」を表示し、SDKへnullを送る。metadata内の対応フラグがfalseなら値が列挙されても非対応とする。 |
+| FR-MO-03 | MUST | 「Context Size」（AutomationId `ExecutionContextSize`）の選択欄を設ける。既定tierは全modelで利用でき、SDKの既定prompt budget（`billing.tokenPrices.maxPromptTokens`、なければ`capabilities.limits.max_prompt_tokens`）を表示する。`billing.tokenPrices.longContext.maxPromptTokens`が正のintで、既定prompt budgetが既知ならそれより大きい場合だけ拡張tierを追加する。廃止された`contextMax`は新項目が未設定のときだけ使う。表示は1,000,000の整数倍を`1M`、1,000の整数倍を`272K`、それ以外を不変カルチャー整数、既定に` (Default)`を付ける。未知容量は「SDK未公開 (Default)」。ここでの容量は入力promptのtoken枠であり、出力込み総contextと同一とは保証しない旨を説明する。`auto`は既定のみ。任意容量、固定1Mの推測、拡張の自動選択はしない。 |
+| FR-MO-04 | MUST | 明示編集した思考レベルとcontext tierをmodel IDごとに保持し、別modelへ漏らさない。`setting.txt` schema整数1に任意`modelPreferences`配列（最大4096、ID重複不可）を追加する。各objectは`modelId`（既存ID制約）、`reasoningEffort`（nullまたは既存安全文字列制約）、`contextTier`（`default`または`long-context`）のみ。null配列は保存時省略、旧fileはそのまま読める。明示「設定を保存」で永続化し、一覧cache自動保存に未保存編集を混入しない。読込中の明示編集を読込結果で上書きしない。不正file・保存失敗時は既存bytesと編集値を保持しエラーを表示する。 |
+| FR-MO-05 | MUST | 再取得で明示選択値が利用不能になった場合は希望値を保持し、該当欄は未選択、`MODEL_REASONING_EFFORT_UNAVAILABLE`または`MODEL_CONTEXT_TIER_UNAVAILABLE`を表示して実行を拒否する。黙って別値へ変更しない。有効な値の選び直し、または「既定に戻す」（AutomationId `ExecutionResetModelOptions`）の明示操作で、そのmodelの明示希望を削除して復旧できる。reasoning対応自体がなくなり欄が無効でも、この操作で未指定へ復旧できる。リセットは現在modelだけに作用し、保存は明示操作、実行中条件は変えない。model変更・欄の変更・リセットだけで認証・AI通信を始めない。 |
+| FR-MO-06 | MUST | run開始時にmodel、effort、context tier、選択tierのprompt budgetをimmutable requestへ固定する。通常・参照・固有評価と全retryのSDK sessionへ同じeffortとContextTierを渡す。既定tierは既存挙動のnull（未指定）、拡張はSDK `ContextTier.LongContext`。事前容量検査には選択tierのprompt上限を使い、拡張時に既定総context上限で誤って制限しない。絶対request上限・timeout・有限retry・restricted tools・入力read-onlyは変えない。次回設定の変更は実行中requestへ影響しない。 |
+| FR-MO-07 | MUST | checkpointへ任意`contextTier`（既定nullで省略、拡張`long-context`）を保存し、追記時と再開事前検査でmodel・effort・tierの一致を要求する。既存schema2・既定tierのcheckpointは変更せず読める。不一致は`CHECKPOINT_MODEL_MISMATCH`で送信前に拒否する。「中断時のモデルを選択」は利用可能な場合だけeffort・tierも復元する。最終Run sheetの`Field`に`ContextTier`を追加（既定`default`）、実行画面で現在runと次回設定を区別してtierを表示する。 |
+| NFR-MO-01 | MUST | 2つの選択欄は日本語Accessible NameとToolTipを持ち、keyboardで到達でき、44 DIP以上の操作寸法を維持する。共通設定本文の局所scrollで最小viewportでも全項目へ到達できる。実APIを呼ぶ試験・課金を伴う評価・実資格情報の採取は受入自動化に用いない。拡張contextや高い思考レベルで使用量が変わり得ることを表示し、自動で有料処理を開始しない。 |
+
+例: model Aがeffort `[low, medium, high]`、既定`medium`、prompt枠272000・拡張1000000を返す場合、思考レベルは`低, 中 (Default), 高`、Context Sizeは`272K (Default), 1M`。利用者が`高`と`1M`を選ぶと全評価sessionへ`high`と`long-context`を指定する。model B（reasoning非対応、上限未知）へ切り替えてもmodel Aの希望値は残り、Bではeffort未指定・既定contextとなる。
+
+技術選択: 固定SDKの型付きmetadataと`SessionConfig.ContextTier`を再利用する。独自model一覧、model名に依存した容量表、BYOK、SDK更新、追加依存は採用しない。
+
+検証記録（2026-10-01）: 最終差分は`artifacts/test/model-options/verified/model-options-acceptance-verified.trx`で498/498成功（skip 0）。思考非対応化後の明示resetも含む。reset追加前の全体deterministic回帰はCore 199件・App 2006件成功、既存のsymlink権限・opt-in単一EXE artifactの2件は環境前提不足でskip（`artifacts/test/model-options/final-regression/model-options-regression-final.trx`はAppの証跡、Coreはrunner出力）。実account・実課金・native本人login・clean-host・公開gateの成功へ読み替えない。
 
 ### 11.14 教師向け手順「設問の詳細」の説明（2026-09-30追加）
 
@@ -775,15 +797,39 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 | ID | 優先度 | 要求 |
 |---|---|---|
-| FR-RS-01 | MUST | 「4 結果」の一覧の「設問別得点」列と、選択行の詳細の「設問別得点の全文」は、run snapshotの有効な設問ごとに`<設問文>: <獲得点>`を、snapshotの設問順に区切り文字` · `（半角空白・U+00B7・半角空白）で連結して表示する。設問ID・表示名（例: `質問 1`）を設問文の代わりに表示しない。 |
-| FR-RS-02 | MUST | 一覧・詳細の設問別得点で使う`<設問文>`は、snapshotの設問文（原文）から、連続する空白（半角・全角空白、タブ、CR、LFを含むUnicode空白）を1個の半角空白へ置換し、前後の空白を除いたものとする。省略記号への短縮や文字数上限を設けない（一覧の列幅に収まらない部分だけ表示上の`…`で切り、全文は詳細で確認できる）。`<獲得点>`は従来どおり（有効桁29の不変カルチャ表記。未確定・未評価は`—`）とする。 |
+| FR-RS-01 | MUST | 「4 結果」の選択行の詳細の「設問別得点の全文」（`ResultsQuestionEarnedFull`）は、run snapshotの有効な設問ごとに`<設問文>: <獲得点>`を、snapshotの設問順に区切り文字` · `（半角空白・U+00B7・半角空白）で連結して表示する。設問ID・表示名（例: `質問 1`）を設問文の代わりに表示しない。（2026-10-01変更: 表示先から一覧の「設問別得点」列を除いた。FR-RS-06） |
+| FR-RS-02 | MUST | 詳細の設問別得点で使う`<設問文>`は、snapshotの設問文（原文）から、連続する空白（半角・全角空白、タブ、CR、LFを含むUnicode空白）を1個の半角空白へ置換し、前後の空白を除いたものとする。省略記号への短縮や文字数上限を設けず、詳細の欄内で折り返して全文を表示する（欄の高さを超える分は欄内の縦scrollで確認できる）。`<獲得点>`は従来どおり（有効桁29の不変カルチャ表記。未確定・未評価は`—`）とする。 |
 | FR-RS-03 | MUST | 設問文が空または空白のみの有効な設問（通常は入力検証で発生しない）は、その設問の表示名を`<設問文>`の代わりに使う。表示名も空白のみの場合は設問IDを使う。 |
-| FR-RS-04 | MUST | 選択行の詳細で、選択した基準の編集領域の先頭に「設問文（元のExcel）」として、当該設問の設問文を原文のまま（改行を保持し、正規化・短縮しない）折り返して全文表示する。 |
+| FR-RS-04 | MUST | 選択行の詳細で、選択した基準の回答欄（§11.19 FR-RV-01の左側の欄）の先頭に「設問文（元のExcel）」として、当該設問の設問文を原文のまま（改行を保持し、正規化・短縮しない）折り返して全文表示する。（2026-10-01変更: 表示位置を「編集領域の先頭」から回答欄の先頭へ変更） |
 | FR-RS-05 | MUST | 本表示は読取専用であり、採点値、override、Excel出力、checkpoint、AI送信内容、ジョブログ、設定ファイルを変更しない。設問文をapplication logへ記録しない（§14）。 |
+| FR-RS-06 | MUST | 「4 結果」の一覧（`RowScoreList`、詳細を開く前の学生行のプレビュー）は、見出し・各行とも左から「元の行」「最終点」「固有点」「類似減点」「状態」の5列だけを、この順に表示する。設問別得点（見出し「設問別得点」、設問文・獲得点の連結文字列）を一覧の見出し・行・tooltipに表示しない。設問数が増えても一覧の列数は5のままとする。選択行の設問別得点は詳細の`ResultsQuestionEarnedFull`（FR-RS-01）で確認する。本要求は表示だけを変更し、`QuestionEarned`の計算・Excel出力・checkpoint・overrideを変更しない（FR-RS-05）。（2026-10-01追加: 依頼原文「[4.結果・出力]画面の、[設問別得点]は、削除してください。プレビューで表示するには情報量が多すぎるためです。」、A-RS-04） |
 
-例（設問文が`レポート課題1：\n機械学習とは何か`と`課題2：活用例`の2問で、獲得点が2と未確定）: 一覧の設問別得点は`レポート課題1： 機械学習とは何か: 2 · 課題2：活用例: —`。
+例（設問文が`レポート課題1：\n機械学習とは何か`と`課題2：活用例`の2問で、獲得点が2と未確定）: 詳細の設問別得点は`レポート課題1： 機械学習とは何か: 2 · 課題2：活用例: —`。一覧の当該行は`元の行 / 最終点 / 固有点 / 類似減点 / 状態`の5値だけで、この文字列を含まない。
 
-境界・例外: 別設問が同じ設問文を持つ場合も設問順で並べ、統合しない。設問文に` · `や`:`を含む場合も加工しない。学生の回答本文は入力workbookをこの画面で再読込する必要があり、privacy境界（§14）と実行後の元本非接触を保つため、本版では表示しない（§23 A-RS-01）。
+境界・例外: 別設問が同じ設問文を持つ場合も設問順で並べ、統合しない。設問文に` · `や`:`を含む場合も加工しない。学生の回答本文と、評価の理由・根拠は§11.19で詳細に表示する（2026-10-01にA-RS-01の「回答本文を表示しない」を覆した）。
+
+### 11.19 結果画面での学生の回答と評価内容の表示（2026-10-01追加）
+
+出典: 依頼原文（2026-10-01「添付の実行後の画面での評価状況で表示される文字や情報を以下にしてください。設問に対して、学生の回答と、その回答をどう評価したのか?これは作成するExcelで作成されている情報です。中高校の先生や大学の先生が生徒のテストへの回答やレポートの評価をする際に、自分の設定の確認をするという目的で表示させたいです。」と、「4 結果・出力」の一覧・詳細の画面写真）、`src/StudyReportEvaluator.App/Views/ResultsOutputView.axaml`の従来の詳細（設問文・AI raw・override・計算previewだけで、回答本文・理由・根拠は出力workbookでしか確認できなかった）、`docs/result-excel-description.md` 5.3節（`.Reason`・`.Evidence`・`.Evidence_Source`・`.Evidence_SourceColumn`の意味）。
+
+目的: 先生が、学生の回答に対して自分の採点設計（評価項目）がどう適用されたかを、Excelを開かずに結果画面の詳細で確認できるようにする。表示する評価内容は、結果Excelの`Quantification_Results`に書く値と同じ出所（runの採用済みAI結果とrun snapshot）を使う。学生の回答は、結果Excelの元のシートと同じ内容である入力Excelの当該セルを、実行時と同一であることを確かめてから表示する。
+
+用語: **回答列**とは、選択した基準が属する設問の主回答列と、その設問の補助列（run snapshotの順）である。AIへ送った回答と同じ列であり、それ以外の列・他の行は表示しない（A-RV-01）。
+
+| ID | 優先度 | 要求 |
+|---|---|---|
+| FR-RV-01 | MUST | 「4 結果」の詳細（「詳細・override」で開く画面）で、選択した基準の表示領域（Automation ID は従来どおり基準の`AutomationId`）を左右2つの欄に分ける。左の**回答欄**（`ResultsCriterionAnswerPane`）には上から「設問文（元のExcel）」（`ResultsCriterionQuestionText`、FR-RS-04）と「学生の回答（元のExcel）」（`ResultsCriterionStudentAnswer`）を置く。右の**評価欄**（`ResultsCriterionEvaluationPane`）には上から、`設問表示名 / 評価方法表示名 / 基準表示名`の見出し、従来のAI raw・override入力・range・status、overrideエラー、「評価の理由（Reason）」（`ResultsCriterionReason`）、「根拠となる回答の引用（Evidence）」（`ResultsCriterionEvidence`）、「根拠の場所（Evidence_Source）」（`ResultsCriterionEvidenceSource`）、「評価項目の説明（採点設計）」（`ResultsCriterionDescription`）、従来の計算preview（適用値・正規化・評価・設問・総合）を置く。両欄はそれぞれ独立した縦の局所scrollを持ち、横scrollを出さず折り返す。一覧画面の表示は変えない。 |
+| FR-RV-02 | MUST | 「学生の回答（元のExcel）」は、回答列ごとに1ブロックを主回答列→補助列（snapshot順）の順で並べる。各ブロックは見出し行`[列 {列記号} · 主回答]`または`[列 {列記号} · 補助]`と、次の行からのセル値で構成する。セル値は改行を含め原文のまま（正規化・短縮・文字数上限なし）とし、値が無い・空文字・空白文字だけの場合は`（空欄）`とする。ブロック間は空行1つ（改行2つ）で区切り、改行は`\n`で表す。列記号は大文字（例: `D`）。 |
+| FR-RV-03 | MUST | 学生の回答は、そのrunの入力Excel（`ExecutionRunContext.InputPath`）の、run snapshotの`SourceSheet`・当該元行番号・回答列のセルを読取専用で読む。読む前と読んだ後の2回、入力ファイルのSHA-256・バイト数・最終更新日時（UTC）を算出し、いずれもrunの`RunSummary.InputSnapshot`と一致した場合だけ表示する。読込は詳細が表示されていて学生行が選択されているときに、その1行だけを対象として開始し、一覧表示中や他の行には行わない。成功した行の回答は同じ実行結果を表示している間だけ記憶し、同じ行を再表示しても読み直さない。 |
+| FR-RV-04 | MUST | 学生の回答の状態表示は次の文言とする。読込中: `学生の回答を読み込んでいます…`。入力Excelが実行時と一致しない: `入力Excelが実行時から変更されているため、学生の回答を表示できません。元のExcelまたは結果Excelで確認してください。`。ファイルが無い・開けない・読めない・形式不正・シートが無い等: `入力Excelを読み取れないため、学生の回答を表示できません（移動・削除・ほかのアプリで使用中など）。元のExcelまたは結果Excelで確認してください。`。失敗は記憶せず、行の再選択または詳細の再表示で読み直す。失敗時に以前の行の回答や部分的な値を表示しない。 |
+| FR-RV-05 | MUST | 評価内容は、runの採用済み通常評価結果（`Quantification_Results`の`.AI_Raw`・`.Reason`・`.Evidence`・`.Evidence_Source`・`.Evidence_SourceColumn`・`.Status`に書く値と同じもの）とrun snapshotの基準定義から作る。①「評価の理由（Reason）」: 採用済み結果があればReasonを原文のまま。Reasonが空または空白だけなら`（理由は空欄です）`。採用済み結果が無い場合、statusが`EMPTY`なら`回答が空欄のため、AIで評価していません。`、`CANCELLED`なら`取消または未処理のため、評価していません。`、その他は`技術的な失敗（{status}）のため、評価結果はありません。`。②「根拠となる回答の引用（Evidence）」: 採用済み結果のEvidenceが空でなければ原文のまま、空なら`（引用なし）`、採用済み結果が無ければ`—`。③「根拠の場所（Evidence_Source）」: `PRIMARY_ANSWER`は`主回答（列 {列記号}）`、`SUPPORTING_COLUMN`は`補助（列 {列記号}）`（列記号は`Evidence_SourceColumn`の値。空なら括弧部分を付けず`主回答`／`補助`）、`NONE`は`なし`、採用済み結果が無ければ`—`。④「評価項目の説明（採点設計）」: snapshotの基準の説明を原文のまま。空または空白だけなら`（説明は未設定です）`。 |
+| FR-RV-06 | MUST | 本表示は読取専用であり、採点値、override、Excel出力、checkpoint、AI送信内容・回数（追加のAI呼出しは0件）、ジョブログ、設定ファイルを変更しない。入力Excelのバイト列と最終更新日時を変更しない。 |
+| SEC-RV-01 | MUST | 学生の回答・理由・根拠・基準の説明は、メモリと画面だけに置く。application log、ジョブ単位JSON Linesログ、checkpoint、setting.txt、その他のファイルへ書かない。型の`ToString()`、例外メッセージ、Automation の Name、状態表示の文言へ回答本文やファイルパスを含めない。記憶した回答は、別の実行結果を読み込んだとき、または結果画面のViewModelを破棄したときに破棄する。 |
+| NFR-RV-01 | MUST | ファイルの読込とハッシュ計算はUIスレッド外で行い、画面操作を待たせない。読込中に行の選択を変えた・詳細を閉じた・別の実行結果を読み込んだ場合、古い読込の結果を画面へ反映しない（最新の要求の結果だけを反映する）。最小1024×720 DIPの詳細表示で、override入力欄はviewport内に収まり、回答欄・評価欄は高さ44 DIP以上で横にはみ出さない。 |
+
+例（主回答列`D`の値が`機械学習は\nデータから学ぶ。`、補助列`F`が空のとき）: 「学生の回答（元のExcel）」は`[列 D · 主回答]\n機械学習は\nデータから学ぶ。\n\n[列 F · 補助]\n（空欄）`。採用済み結果が`RawScore=3`、`Reason=用語の説明が正確`、`Evidence=データから学ぶ`、`EvidenceSource=PRIMARY_ANSWER`、`EvidenceSourceColumnId=D`なら、評価欄は理由`用語の説明が正確`、引用`データから学ぶ`、場所`主回答（列 D）`。
+
+境界・例外: 固有評価と類似度の項目別の値・理由は詳細に追加しない（行の固有点・類似減点は従来どおり一覧と詳細の見出し行に出る、A-RV-02）。結果Excel（final／partial）を読みに行かない（A-RV-03）。入力Excelが別のアプリで書込み用に開かれていて共有読取できない場合は、読み取れない場合の文言になる。
 
 ### 11.15 実行準備部品の入力画面への集約（2026-10-01追加）
 
@@ -821,7 +867,50 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 | FR-STEP-02 | MUST | 状態文は、stepのbuttonのAccessible Name（`InputStep.AccessibleName`等）にも含まれ、画面上の表示と同じ「設定済み」とする。画面内・利用者向け文書に、同じ状態を指す「訪問済み」を残さない。 |
 | FR-STEP-03 | MUST | 「設定済み」は従来の「訪問済み」と同じ判定（過去に表示した）であり、値の保存・検証成功・準備完了・処理成功を意味しない。判定・アイコン（◉）・色・遷移規則は変えない。 |
 
+### 11.17 共通設定へのCopilotログイン操作の追加（2026-10-01追加）
+
+出典: 依頼原文（2026-10-01「GitHub Copilotへのログイン画面がありません。…アプリケーションの起動時に私が介在しなくても自動的にログインを行うようにしているかを確認してください。もしそうでなければ、ログインする機能を添付の[設定]の[共通設定]の中に追加してください。」）。調査結果: 起動時の自動確認・自動loginは§11.10（FR-AL-01〜08）で実装済み。ただしログイン状態・操作は入力画面の実行準備部品（§11.15）にしかなく、設定の共通設定から到達できなかった。自動loginが失敗・抑止された場合（既存資格情報なし、CLI利用不可、環境変数での抑止）に利用者がモデル一覧を更新する手段を共通設定へ追加する。
+
+| ID | 優先度 | 要求 |
+|---|---|---|
+| FR-SETLOGIN-01 | MUST | 設定画面の「共通設定」タブ（`SettingsCommonEditTab`）の本文に、モデル・出力先の行の直下（採点定義名の上）へ、GitHub Copilotログイン区画（Automation ID `SettingsCopilotLoginPanel`）を表示する。区画は、認証状態文（`SettingsCopilotAuthenticationStatus`、`ExecutionViewModel.AuthenticationStatusText`）、ログイン状態文（`SettingsCopilotLoginStatus`、`LoginStatusText`）、「Copilot 状態を確認」（`SettingsCheckCopilotAuthentication`、`CheckAuthenticationCommand`）、「GitHubにログイン」（`SettingsStartCopilotLogin`、`LoginCommand`）、「ログインを取り消す」（`SettingsCancelCopilotLogin`、`CancelLoginCommand`）を持つ。 |
+| FR-SETLOGIN-02 | MUST | 区画のボタンは入力画面の実行準備部品と同じ`ExecutionViewModel`の同じコマンドに結び付ける。動作・有効条件・二重開始／評価中開始の防止・所有processだけの取消・token非収集は§11.3、§11.10、SEC-AL-01〜02のとおりで、新しいlogin経路・独自OAuth・token入力欄を追加しない。設定画面の表示・遷移・保存・読込から認証確認やloginを自動開始しない。 |
+| FR-SETLOGIN-03 | MUST | ログイン後のモデル一覧更新は共通設定の「通常モデル」（`ExecutionModel`）へ反映される。「通常モデル」のプレースホルダーは「下の「Copilot 状態を確認」を押してください」とする。 |
+
+例: 起動時の自動loginで資格情報が得られず一覧が保存済みのままのとき、利用者は設定→共通設定で「GitHubにログイン」を押し、ブラウザーで認証すると「通常モデル」の一覧が更新される。
+### 11.18 通常評価の設問タブ（2026-10-01追加）
+
+設定の「通常評価」（2.定量化設計の「通常評価」タブと同じ内容）で、編集する設問の切替手段をcombobox（ドロップダウン）からタブへ変更する。
+
+| ID | 優先度 | 要求 |
+|---|---|---|
+| FR-QT-01 | MUST | 通常評価の画面（Automation ID `EvaluatorSettingsView`）の設問の選択は、ドロップダウンではなくタブで行う。Automation ID `EvaluatorSettingsQuestions`の設問選択部品は`ComboBox`であってはならず、設問1件につき1つのタブを表示する。 |
+| FR-QT-02 | MUST | 各タブの文字は、その設問の表示名（`QuestionDesignItemViewModel.DisplayName`、例: `質問 1`）とする。設問の並び順は`Questions`の順と同じ。長い名前は240 DIP幅で省略記号で切り、全文はToolTipで確認できる。設問選択部品のAccessible Nameは「通常評価を編集する設問」とする。 |
+| FR-QT-03 | MUST | タブを選ぶと`SelectedQuestion`がその設問になり、評価方法・評価項目・編集欄は選んだ設問の内容へ切り替わる。`SelectedQuestion`が別の経路（入力の同期、並替え、他画面）で変わったときは、タブの選択が追従する。選択の解除（null選択）では`SelectedQuestion`を変えず、設問本文・配点・採点定義（`Draft`）は選択操作で変わらない。 |
+| FR-QT-04 | MUST | 設問が0件のときは、従来の「設問を選択してください。設問がない場合は、設問の設定で追加してください。」を表示する。 |
+| FR-QT-05 | MUST | タブ領域は、最小window（1024×720 DIP）と200%表示でも外側スクロールを要せず横へはみ出さない。タブが1行に収まらないときは折り返して最大2行（92 DIP）まで表示し、超える分は局所の縦スクロールで到達できる。各タブの高さは44 DIP以上、文字は14 DIPで、keyboard（Tab）でタブ領域へ到達でき、設定画面を開いた直後の初期focusは設問タブ領域とする。評価方法・評価項目の選択部品（combobox）は変更しない。 |
+
 例: 「1 入力」を開いた後に「2 採点設計」へ進むと、「1 入力」のbuttonの2行目は「設定済み」、「2 採点設計」は「現在・選択中」、「3 実行」「4 結果」は「未着手」。
+
+### 11.20 評価項目の説明の初期値（2026-10-01追加）
+
+出典: 依頼原文（2026-10-01「[2.定量化設計]の画面の[通常評価]の中の、画面右側の[評価項目]の説明の初期値を、[評価方法]に対応して以下としてください。」。Knowledge Coverの場合・Prompt 分析の場合の2本文）。
+
+通常評価の評価項目の「説明」（`CriterionDefinition.Description`、画面右側の「説明」欄）の初期値を、その評価項目が属する評価方法（evaluator）の種類で決める。種類との対応は次の2つだけとし、本文は`DefaultCriterionDescriptions`（Core）を唯一の定義とする。改行は`\n`（LF）、末尾に改行・空白を付けない。`{論点}`と`xxx`は利用者が書き換えるための文字どおりの記載であり、置換しない。
+
+| 評価方法の種類 | 初期値の本文 |
+|---|---|
+| `KNOWLEDGE_COVERAGE`（Knowledge Cover） | `学生が作成したレポートを高度に分析・解析をしてそれぞれの{論点}について説明がされているかどうかの評価を行ってください。`＋改行＋`論点:`＋改行＋`- xxx`＋改行＋`- xxx`＋改行＋`- xxx` |
+| `CUSTOM_PROMPT`（Prompt 分析） | `学生が作成したPromptについて高度に分析・解析をして{論点}を導き出そうとしているかの評価を行ってください。`＋改行＋`論点:`＋改行＋`- xxx`＋改行＋`- xxx`＋改行＋`- xxx` |
+
+| ID | 優先度 | 要求 |
+|---|---|---|
+| FR-CD-01 | MUST | 通常評価で評価項目を新規に作る次の経路は、評価方法の種類に対応する上表の本文を説明の初期値とする。①評価項目の「追加」（既存の評価方法へ追加。種類は追加先の評価方法の現在の種類）、②評価方法の追加時に自動で作る最初の評価項目、③採点定義を新規に作る既定（Knowledge Cover）、④入力画面で列の対応から提案する設問の最初の評価項目（学生のPrompt列の候補はCustom＝Prompt 分析、それ以外はKnowledge Cover）。 |
+| FR-CD-02 | MUST | 初期値は新規作成時だけに設定する。既存の評価項目の説明、利用者が編集した説明、保存定義・読込定義の説明、評価項目の複製、評価方法の種類の変更（Knowledge Cover↔Prompt 分析）は、説明を書き換えない。種類の変更後に追加する評価項目は、変更後の種類の本文を使う。 |
+| FR-CD-03 | MUST | 評価項目の名前・重み・range・個別の範囲の初期値は変えない。初期値の説明は必須入力検査（空白でない）と文字数上限を満たし、定義の検証エラーを増やさない。 |
+
+例: 評価方法が`Prompt 分析`の質問で評価項目の「追加」を押すと、新しい評価項目の説明は`学生が作成したPromptについて…評価を行ってください。`で始まる4行の本文になる。同じ質問の評価方法を`Knowledge Cover`へ変えても既存の説明は変わらず、その後に追加した評価項目だけ`学生が作成したレポートを…`で始まる本文になる。
+
 ## 12. Promptファイルからの起動
 
 ### 12.1 command line
@@ -946,6 +1035,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 - untrusted textはExcel string cellとして保存し、formulaとして実行しない。
 - outputとpartial workbookは元本全体、Prompt、AI結果を保持するため、元本と同等以上に機密として扱う。
 - 実行画面の速報値（§11.12）の対象の文字列・Prompt・AI理由・根拠は画面とメモリだけに置き、log・checkpoint・setting.txtへ新たに保存しない（SEC-LP-01）。
+- 結果画面の詳細は、選択した1行の回答列だけを入力Excelから読取専用で再読込し、実行時のSHA-256・サイズ・更新日時と一致した場合だけ表示する。回答・理由・根拠は画面とメモリだけに置く（§11.19、SEC-RV-01）。
 - app-owned cloud backend、database、telemetry本文送信を追加しない。
 - checkpointは暗号化containerではない。保存先のaccess controlは利用者のOS権限に従う。
 - runtime抽出cacheと利用者workbook／CLI credential storeを分離する。配布・展開・起動のために利用者workbookを移動・削除しない。アプリはcacheの再帰削除、旧版の自動掃除、credential削除を行わない。
@@ -1085,15 +1175,21 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | AC-038 | 中断後は部分結果のpartial pathと再開準備を表示し、同一セッションでは明示操作で、再起動後はpartial選択またはpath指定で再開条件を開始前に項目別検証する。不一致時はcheckpointを変更せず開始しない。入力・modelだけは明示操作で合わせられ、採点設計・runtimeは自動変更しない。window close時は有限時間の中断待機後に閉じる。 |
 | AC-039 | 実行・結果画面とジョブ単位のローカルJSON Linesログで、今回の開始操作に対応するAI使用量（入力・出力・推論・キャッシュtoken、`nano-AI units`、premium request消費量）を、AIを呼ぶ3 operation（参照回答・通常評価・固有評価）と再試行・失敗・取消・未保存行を含めて確認できる。未取得は0や推定値にせず理由とともに示し、明示0・未送信・送信状況不明・部分取得を区別する。項目別の取得元、試行番号・相関ID・終端結果、モデル内訳と総量の不一致を保持し、内訳を総量へ加算・配賦しない。SDK報告の原単位を保ち、換算根拠のないAIクレジット・通貨表示をしない。ログは数値・生成ID・閉じたコードだけを記録し、保存失敗でも観測済み表示と採点を壊さない。 |
 | AC-040 | 事前条件: fake認証境界とfake login processを注入した`ExecutionViewModel`（実CLI・実ブラウザー・実資格情報は使わない）。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~CopilotLoginCommandTests"`。期待結果（exit code 0）: ①window表示（Opened）で認証確認が1回だけ実行される（FR-AL-01）。②`Available`ならlogin processの起動0回・resolver呼出0回・状態文に「自動的にログインしました」（FR-AL-02）。③`AuthRequired`ならlogin processがちょうど1回起動し、完了後に認証を再確認し、2回目の起動時処理は何もしない（FR-AL-03、FR-AL-04）。④`CliUnavailable`／`RuntimeFailed`／`Cancelled`ではlogin起動0回で再試行案内を表示する（FR-AL-03、FR-AL-07）。⑤自動login中の「ログインを取り消す」で所有processだけを`Kill(false)`で1回終了し、再自動起動しない（FR-AL-04、FR-AL-05）。⑥run呼出0回・model fallbackなし（FR-AL-06）。⑦環境変数値`0`／`false`（大文字小文字・前後空白を無視）でlogin起動0回、未設定・空・その他値は有効（FR-AL-08）。⑧状態文・`ToString()`にcanary（token、device code、path、例外名）を含まない（SEC-AL-01〜02）。⑨dispose後・手動確認中・確認失敗時に例外を漏らさずloginを開始しない（FR-AL-07、NFR-AL-01）。証跡: テスト結果（.trx）。実資格情報での確認はAC-040に含めず、§18外の本人確認とする。 |
-| AC-041 | 事前条件: 設問文が`Question text Q1`（設問ID `Q1`、表示名`Question Q1`）等の合成runと、改行・連続空白・全角空白を含む設問文、空白のみの設問文を持つ合成run。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultsQuestionTextTests"`。期待結果（exit code 0）: ①`RowScores[].QuestionEarnedText`が`<正規化した設問文>: <獲得点>`を設問順に` · `連結した値と完全一致し、設問IDまたは表示名を含まない（FR-RS-01、FR-RS-02）。②改行・タブ・全角空白を含む設問文は単一半角空白へ正規化され前後空白が除かれる。未確定の設問は`—`（FR-RS-02）。③空白のみの設問文は表示名、表示名も空白のみならIDを使う（FR-RS-03）。④実viewの一覧の設問別得点と詳細の`ResultsQuestionEarnedFull`が同じ文字列で、詳細の基準編集領域の`ResultsCriterionQuestionText`が原文（改行保持）である（FR-RS-01、FR-RS-04）。⑤表示しただけで未保存overrideが生じず、snapshotの設問文が原文のまま（正規化されない）である（FR-RS-05）。証跡: テスト結果（.trx）。実画面のスクリーンショット確認は§18外とする。 |
+| AC-041 | 事前条件: 設問文が`Question text Q1`（設問ID `Q1`、表示名`Question Q1`）等の合成runと、改行・連続空白・全角空白を含む設問文、空白のみの設問文を持つ合成run。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultsQuestionTextTests|FullyQualifiedName~ResultsOutputViewTests"`。期待結果（exit code 0）: ①`RowScores[].QuestionEarnedText`が`<正規化した設問文>: <獲得点>`を設問順に` · `連結した値と完全一致し、設問IDまたは表示名を含まない（FR-RS-01、FR-RS-02）。②改行・タブ・全角空白を含む設問文は単一半角空白へ正規化され前後空白が除かれる。未確定の設問は`—`（FR-RS-02）。③空白のみの設問文は表示名、表示名も空白のみならIDを使う（FR-RS-03）。④実viewの詳細の`ResultsQuestionEarnedFull`が選択行の`QuestionEarnedText`と同じ文字列で、詳細の基準編集領域の`ResultsCriterionQuestionText`が原文（改行保持）である（FR-RS-01、FR-RS-04）。⑤表示しただけで未保存overrideが生じず、snapshotの設問文が原文のまま（正規化されない）である（FR-RS-05）。⑥実viewの一覧（`RowScoreList`）の見出しのTextBlockが`元の行`・`最終点`・`固有点`・`類似減点`・`状態`の5個だけでこの順に並び、各行のGridが列定義5・子5で、一覧の見出し・行のどのTextBlockのTextとtooltipにも`設問別得点`と`QuestionEarnedText`の値（設問文）を含まない。10設問の合成runでも一覧の列は5のままで、詳細の`ResultsQuestionEarnedFull`には全10設問が出る（FR-RS-06、FR-RS-01）。証跡: テスト結果（.trx）。実画面のスクリーンショット確認は§18外とする。 |
 | AC-042 | 事前条件: fake行source・fake AI runner・fake checkpoint storeと、fake run boundaryを注入した`ExecutionViewModel`／`ExecutionView`（実CLI・実AI・実資格情報は使わない）。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~LivePreview"`。期待結果（exit code 0）: ①評価計画確定後、対象行と同数（先頭行〜末尾行、昇順、欠落・重複なし）の全行が「待機中」で並ぶ（FR-LP-02、FR-LP-03）。②1行の評価で、AIへ渡した`RenderedPrompt`と一致するPrompt、主回答・補助列のセル値、criterion別RawScore・理由・根拠、固有Score、類似度がFR-LP-04どおり詳細に出る。Prompt組立後・応答前は「AI評価中」で対象の文字列とPromptが出て、応答後に値が入る（FR-LP-04、FR-LP-05）。③空回答は`空回答: AIへ送信せず0点相当`、固有配点0は`未実行`、AI失敗は`失敗（AI_TIMEOUT）: 値は空欄`で、0や成功値を出さない（FR-LP-05）。④一覧の要約が`通常 8,6 / 固有 0.8 / 類似 0.42`形式になり、項目数・状態が更新される（FR-LP-03）。⑤checkpoint再開では再開済み行が「再開前に完了」でcheckpointの値を表示し、対象の文字列・Promptは保存されていない旨を示す（FR-LP-06）。⑥取消・失敗で終わると評価途中の行が「中断」、未着手が「未処理」になり、次のrun開始・入力変更で破棄される（FR-LP-07）。⑦2,000文字超の値は`先頭 2,000 文字`注記つきで切り詰められ、保持合計が32,000,000文字を超えると以後は200文字になる（FR-LP-08）。⑧見出しが`速報値（Excel 行ごと・{N} 行）`で、20,000行でも全件が一覧に入り、Controlは仮想化される（FR-LP-01、FR-LP-02、FR-LP-09、NFR-LP-01）。⑨canary文字列が`ToString()`・logに現れず、追加のAI呼出しが0件、checkpointに速報値用の追加フィールドがない（SEC-LP-01、SEC-LP-02）。⑩1024×720で「実測」表示・予約名・主要操作がviewport内に収まり、速報値の行一覧・詳細が日本語Accessible Nameを持つ（NFR-LP-01）。証跡: テスト結果（.trx）、`docs/images`の実行画面screenshot。 |
 | AC-043 | 事前条件: 実CLI・実資格情報を使わない。SDKの`ModelInfo`をfakeとして与える。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~CopilotModelEnumerationTests|FullyQualifiedName~ModelCatalogTests"`。期待結果（exit code 0）: ①`auto`、policy未設定、`unconfigured`、大文字の`ENABLED`を含む全modelがSDK順に選択肢となり、上限・reasoning effortが保持される（FR-MS-01、FR-MS-04）。②1000件でも切り捨てない（FR-MS-01）。③`disabled`（大文字小文字不問）は除外され他modelは残る（FR-MS-02、FR-MS-03）。④null・空・空白のみ・前後空白・制御文字・257文字のIDは除外され、例外なく他modelが残る。256文字は残る（FR-MS-02、FR-MS-03）。⑤null・空の列挙は空一覧になる（FR-MS-03）。⑥cache 4096件は保存・復元でき、4097件の保存は`InvalidSettings`で既存fileを変更しない（FR-MS-05）。⑦4097件の一覧は全件を選択でき、最後のmodelを選択でき、cacheと設定fileは作られない（FR-MS-01、FR-MS-05）。証跡: テスト結果（.trx）。実accountでの列挙件数の確認は§18外の本人確認とする。 |
 | AC-044 | 事前条件: リポジトリルート。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~DocumentationContractTests"`。期待結果（exit code 0）: ①`docs/getting-started.md`で、`## 2. 採点設計`と`## 3. 実行`の間に、FR-DOC-01の見出しの小節が1つある（FR-DOC-01）。②その小節が`../images/02-input-mapping.png`を1回だけ参照し、参照先が存在する。`images/`のPNGは8枚のまま（FR-DOC-02）。③小節にFR-DOC-03の14個のラベルがすべて含まれる（FR-DOC-03）。④小節に`基本の使い方`と`注意してください`の見出し文言、FR-DOC-04の4つの注意点がある（FR-DOC-04）。証跡: テスト結果（.trx）。実画面との一致はAC-022の画像生成手順に従い、本ACは文書の構造だけを判定する。 |
-| AC-045 | 対応要求: FR-XD-01〜06。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultExcelDescriptionTests"`、`--filter "FullyQualifiedName~DocumentationContractTests"`、`--filter "FullyQualifiedName~Packaging"`の3回（いずれも同じprojectで、`--filter`の値だけを替える）。期待結果（exit code 0）: ①`docs/result-excel-description.md`が存在し、`README.md`（本文と「ガイド」）と`docs/README.md`からリンクされ、全local linkと見出しanchorが解決する（FR-XD-04）。②文書に警告文の固定文言、`UNRELEASED`、`0.8.6`、公開版`0.8.1`、4つのsheet名が含まれ、`dev/docs`と実装の型名を含まない（FR-XD-03、FR-XD-05）。③`ResultsSheetWriter`のsuffix定数・列見出し定数の全値と、`ResultsStatusCodes`の12個の全値、`PRIMARY_ANSWER`／`SUPPORTING_COLUMN`／`NONE`が文書にある（FR-XD-01、FR-XD-02）。④実際に書いたConfig sheet（見出し33列の列記号と名前、全`RecordType`）、References sheet（8列）、Run sheet（`Field`25項目）の値がすべて文書の表にある（FR-XD-01）。⑤文書が単一EXE・ZIP・MSIXの公開文書allowlist（scripts・pubxml・試験の期待一覧）に含まれ、抽出後の全local linkが解決する（FR-XD-05）。証跡: テスト結果（.trx）。文章の平易さ（FR-XD-02）は自動判定できないため、レビュー者が教員の視点で通読し、専門用語が初出で説明されていることを確認する（許容差なし）。 |
+| AC-045 | 対応要求: FR-XD-01〜06。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultExcelDescriptionTests"`、`--filter "FullyQualifiedName~DocumentationContractTests"`、`--filter "FullyQualifiedName~Packaging"`の3回（いずれも同じprojectで、`--filter`の値だけを替える）。期待結果（exit code 0）: ①`docs/result-excel-description.md`が存在し、`README.md`（本文と「ガイド」）と`docs/README.md`からリンクされ、全local linkと見出しanchorが解決する（FR-XD-04）。②文書に警告文の固定文言、`UNRELEASED`、`0.8.6`、公開版`0.8.1`、4つのsheet名が含まれ、`dev/docs`と実装の型名を含まない（FR-XD-03、FR-XD-05）。③`ResultsSheetWriter`のsuffix定数・列見出し定数の全値と、`ResultsStatusCodes`の12個の全値、`PRIMARY_ANSWER`／`SUPPORTING_COLUMN`／`NONE`が文書にある（FR-XD-01、FR-XD-02）。④実際に書いたConfig sheet（見出し33列の列記号と名前、全`RecordType`）、References sheet（8列）、Run sheet（`Field`26項目）の値がすべて文書の表にある（FR-XD-01、FR-MO-07）。⑤文書が単一EXE・ZIP・MSIXの公開文書allowlist（scripts・pubxml・試験の期待一覧）に含まれ、抽出後の全local linkが解決する（FR-XD-05）。証跡: テスト結果（.trx）。文章の平易さ（FR-XD-02）は自動判定できないため、レビュー者が教員の視点で通読し、専門用語が初出で説明されていることを確認する（許容差なし）。 |
 | AC-046 | 対応要求: FR-PREP-01〜07、FR-STEP-01〜03。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）、Avalonia headless。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~PreparationOnInputTests|FullyQualifiedName~MainWindowTests|FullyQualifiedName~ExecutionViewTests"`。期待結果（exit code 0）: ①メインwindowの「1 入力」に§11.15の表の全Automation IDの部品が存在し、「3 実行」には0件である（FR-PREP-01、FR-PREP-02）。②入力画面の切替button（初期は閉）で実行準備の区画が開閉し、開閉で入力値が保持される（FR-PREP-01）。入力画面の「Copilot 状態を確認」「GitHubにログイン」「ログインを取り消す」「checkpoint から再開」がメインwindowの`ExecutionViewModel`のcommand・状態へ結び付き、操作結果が「3 実行」の判断に反映され、画面往復後も保持される（FR-PREP-03、FR-PREP-05）。③入力画面を単体表示すると実行準備部品は表示されず、既存の入力部品の配置・寸法試験が変わらず成功する（FR-PREP-07、FR-PREP-04）。④「1 入力」の初期focusがファイルpath入力、実行画面が実行画面内の部品である（FR-PREP-06）。⑤step状態文が、現在以外の過去表示済みstepで「設定済み」、現在は「現在・選択中」、未表示は「未着手」で、Accessible Nameにも同じ文言が入り、「訪問済み」がどのstepにも出ない（FR-STEP-01〜03）。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
+| AC-047 | 対応要求: FR-SETLOGIN-01〜03。事前条件: Avalonia headless、fake認証境界。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~Common_settings_hosts_copilot_login"`。期待結果（exit code 0）: 共通設定タブに`SettingsCopilotLoginPanel`と3つのボタン・2つの状態文が存在し、各ボタンのCommandが`ExecutionViewModel`の対応コマンドと同一で、状態文が`ExecutionViewModel`の文字列と一致し、設定画面を開いただけでは認証確認・loginが開始されない。証跡: テスト結果（.trx）。 |
+| AC-048 | 対応要求: FR-QT-01〜05。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）、Avalonia headless、設問が4件以上の採点定義。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~EvaluatorSettingsViewTests|FullyQualifiedName~CompactWorkflowLayoutTests|FullyQualifiedName~MainWindowSettingsTests"`。期待結果（exit code 0）: ①Automation ID `EvaluatorSettingsQuestions`は`ComboBox`ではなく設問タブ部品で、各設問に1タブが設問の順に並び、タブ文字が設問の表示名である（FR-QT-01、FR-QT-02）。②タブを選ぶと`SelectedQuestion`が変わり、評価方法・評価項目・編集欄がその設問の内容へ切り替わる。`SelectedQuestion`を外部から変更するとタブの選択が追従する（FR-QT-03）。③null選択や入力の同期・並替え後も、ownerの選択は保持され、タブのitemsは`Questions`と同一である（FR-QT-03）。④設問0件では設問なしの案内が表示される（FR-QT-04）。⑤最小window（1024×720 DIP）と200%表示で、タブ領域が横へはみ出さず、各タブの高さが44 DIP以上である（FR-QT-05）。⑥タブ部品にkeyboard（Tab）で到達でき、設定画面を開いた直後の初期focusが設問タブ部品である（FR-QT-05）。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
+| AC-049 | 対応要求: FR-MO-01〜05、NFR-MO-01。事前条件: fake認証・Avalonia headless、実通信なし。リポジトリルートで`dotnet test tests\StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ModelOptionsTests|FullyQualifiedName~CopilotModelEnumerationTests|FullyQualifiedName~ModelCatalogTests|FullyQualifiedName~SettingsViewTests|FullyQualifiedName~SettingsAccessibilityTests" --logger trx`を実行。期待: exit 0、SDK順の全model（4097件目も選択可）、重複・disabled・不正ID境界、空一覧、認証失敗からの復旧、思考の順序・defaultラベル・未知値・非対応・auto、272K/1Mと未知容量・int境界、model切替と再取得での無効選択block、設定の旧形式・保存復元・不正値・保存失敗・自動cache保存の非混入・読込競合を検証。選択欄を実画面へbindし、44 DIP・Accessible Name・keyboard到達・局所scrollを検証。証跡: TRXとassertした選択値・型・順序・不変file bytes。 |
+| AC-050 | 対応要求: FR-MO-06〜07。事前条件: fake transportと合成workbook、実通信なし。`dotnet test tests\StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ModelOptionsTests|FullyQualifiedName~EphemeralEvaluationRunnerTests|FullyQualifiedName~AuxiliaryEvaluationRunnerTests|FullyQualifiedName~Resume|FullyQualifiedName~Checkpoint|FullyQualifiedName~ResultExcelDescriptionTests|FullyQualifiedName~ExecutionSettingsTests|FullyQualifiedName~ConfigAndRunSheetWriterTests|FullyQualifiedName~ResultsOutputViewTests" --logger trx`。期待: exit 0、全3種sessionとretryが選択effort/tierを保持、既定tierはnull、拡張prompt budgetへ容量検査が追従、実行中変更は次回だけ、checkpoint round-tripと追記のtier一致・不正tier拒否、旧schema2は既定tier、tier不一致は送信0で`CHECKPOINT_MODEL_MISMATCH`、復元操作でeffort/tierを復旧、Runの26項目と`ContextTier`出力・説明の一致、override出力へのtier継承、入力bytes不変。証跡: TRX、fake sessionのconfig、checkpointと出力assert。 |
+| AC-051 | 対応要求: FR-RV-01〜06、SEC-RV-01、NFR-RV-01、FR-RS-04。事前条件: リポジトリのsource、Avalonia headless、合成definition（主回答列`A`・補助列`B`）と合成run、fakeの入力identity境界・行source、および一時directoryに作った合成`.xlsx`（実CLI・実AI・実資格情報・`sample/`は使わない）。操作: リポジトリルートで`dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultsAnswerReviewTests|FullyQualifiedName~ResultsQuestionTextTests|FullyQualifiedName~ResultsOutputViewTests|FullyQualifiedName~ResponsiveLayoutTests|FullyQualifiedName~PrimaryJourneyAccessibilityTests"`。期待結果（exit code 0）: ①詳細を開くと選択行の基準の`StudentAnswerText`がFR-RV-02の形式（`[列 A · 主回答]\n{値}\n\n[列 B · 補助]\n{値}`、空セルは`（空欄）`、改行保持）と完全一致し、実viewの`ResultsCriterionStudentAnswer`に同じ文字列が出る（FR-RV-01、FR-RV-02）。②一覧表示中は読込0回、詳細表示で選択行の1行だけを読み、同じ行の再表示で読み直さない。入力identityの確認が読込の前後2回行われる（FR-RV-03）。③identity不一致・読込例外で、FR-RV-04の各文言になり、値を出さない。失敗後の再選択で再読込する（FR-RV-04）。④理由・引用・根拠の場所・説明が、成功・引用なし・`NONE`・`SUPPORTING_COLUMN`・空回答・取消・技術失敗の各場合にFR-RV-05の文字列と完全一致し、`ResultsCriterionReason`／`ResultsCriterionEvidence`／`ResultsCriterionEvidenceSource`／`ResultsCriterionDescription`に表示される（FR-RV-05）。⑤表示によって未保存overrideが生じず、出力境界の呼出し0回・`Results`の採点値不変、合成`.xlsx`のバイト列と更新日時が不変で、実ファイルから読んだ回答が表示される（FR-RV-06、FR-RV-03）。⑥読込中に別の行を選んだ・別の実行結果を読み込んだ場合、古い結果が反映されない（NFR-RV-01）。⑦回答・理由・根拠のcanary文字列とファイルパスが、`ToString()`、状態文言、Automation の Name に現れない（SEC-RV-01）。⑧1024×720 DIPの詳細で、override入力欄がviewport内、回答欄・評価欄が高さ44 DIP以上で横にはみ出さず、Automation IDが一意である（NFR-RV-01、FR-RV-01）。⑨設問文は回答欄の先頭に原文で出る（FR-RS-04）。既存のResults系UI試験が引き続き成功する。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
+| AC-052 | 対応要求: FR-CD-01〜03。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）、合成workbook。操作: リポジトリルートで`dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~DefaultCriterionDescriptionTests"`。期待結果（exit code 0）: ①`DefaultCriterionDescriptions.For`が§11.20の2本文と完全一致し、未対応の種類は`ArgumentOutOfRangeException`（FR-CD-01）。②新規の採点定義の最初の評価項目と、Knowledge Coverの評価項目の「追加」・評価方法の追加で作る評価項目がKnowledge Cover本文、Prompt 分析（Custom）の評価方法への追加・その評価方法の最初の評価項目がPrompt 分析本文である（FR-CD-01）。③評価方法の種類を変えても既存の説明は不変で、その後の追加だけ変更後の種類の本文になり、利用者が編集した説明は評価項目の追加で上書きされない（FR-CD-02）。④入力画面の提案設問は、学生のPrompt列がPrompt 分析本文、それ以外がKnowledge Cover本文で、検証エラーが0件である（FR-CD-01、FR-CD-03）。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
 ## 19. Test requirements
 
-以下の番号は追跡ID `TR-01`〜`TR-44`に対応する。既存番号を維持し、中断・再開導線の37、ジョブコスト表示の38、起動時の自動Copilotログインの39、結果画面の設問文表示の40、実行中の速報値表示の41、利用できる全modelの選択の42、結果Excelの解説文書の43を末尾へ追加する。T01時点の未実装・試験NOT_RUNは履歴であり、現在の実装・局所検証は[traceability](../dev/docs/traceability.md)のVERIFIED_SCOPEDに限定する。過去の試験結果と現在の局所検証は同追跡表で区別し、異なる対象集合を合算して全体合格にしない。
+以下の番号は追跡ID `TR-01`〜`TR-47`に対応する。既存番号を維持し、中断・再開導線の37、ジョブコスト表示の38、起動時の自動Copilotログインの39、結果画面の設問文表示の40、実行中の速報値表示の41、利用できる全modelの選択の42、結果Excelの解説文書の43、実行準備部品の集約の44、通常評価の設問タブの45、結果画面での学生の回答と評価内容の表示の46、評価項目の説明の初期値の47を末尾へ追加する。T01時点の未実装・試験NOT_RUNは履歴であり、現在の実装・局所検証は[traceability](../dev/docs/traceability.md)のVERIFIED_SCOPEDに限定する。過去の試験結果と現在の局所検証は同追跡表で区別し、異なる対象集合を合算して全体合格にしない。
 
 **0.8.4での記録済み結果:** T35の対象文書試験は4/4成功・敵対的レビュー済み（`artifacts/test/ui-settings/t35/t35-reviewed.trx`、指摘0）。T36の文書・画像contract全体は別scopeで、独自の`artifacts/test/ui-settings/t36/t36-current.trx`が21/21成功・REVIEWED。T37は`artifacts/test/ui-settings/t37/t37.trx`の9/9（実ZIP＋MSIX静的契約）、T38は`artifacts/test/ui-settings/t38/t38.trx`の114/114とP06実EXE 7/7・P07 `PASS_DEVELOPMENT`。T39の自動回帰は`artifacts/test/ui-settings/t39/reviewed/`の2026-09-07の2 TRXでCore 190＋App 1702＝1892/1892、skip 0。初回1失敗→fixture修正→126/126・レビュー指摘0→全体再実行成功の履歴を保持する。MSIX実物は`artifacts/package/mechanism/StudyReportEvaluator-win-x64.unsigned.test.evidence.json`の`PASS_MECHANISM`（256 entries、0.8.4.0）で、install／公開の成功ではない。
 
@@ -1142,7 +1238,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 
 39. 起動時の自動Copilotログインのdeterministic test。既存資格情報あり（login process起動0）、資格情報なし（自動login1回・完了後の再確認・以後の再実行なし）、`CliUnavailable`／`RuntimeFailed`／`Cancelled`でのlogin非開始、利用者取消後の非再試行、dispose後・手動確認中の非実行、確認失敗の封じ込め、環境変数の解釈（未設定・空・`0`・`false`・大文字小文字・空白）、window表示（Opened）で1回だけ開始されること、AI送信0件、状態文・ToStringへのcanary非混入をfake境界で検証する。実CLI・実ブラウザー・実資格情報は使わない（AC-040）。
 
-40. 結果画面の設問文表示のdeterministic test。一覧・詳細の設問別得点が正規化した設問文を使い、ID・表示名を含まないこと、空白正規化、空白のみの設問文の代替、未確定`—`、複数設問の順序と同一設問文の非統合、詳細の原文全文表示、表示によるsnapshot設問文・未保存overrideの不変を検証する（AC-041）。
+40. 結果画面の設問文表示のdeterministic test。詳細の設問別得点が正規化した設問文を使い、ID・表示名を含まないこと、空白正規化、空白のみの設問文の代替、未確定`—`、複数設問の順序と同一設問文の非統合、詳細の原文全文表示、表示によるsnapshot設問文・未保存overrideの不変、一覧が5列（元の行・最終点・固有点・類似減点・状態）だけで設問別得点の見出し・値・tooltipを含まないこと（設問数10でも同じ）を検証する（AC-041）。
 
 41. 実行中の速報値表示のdeterministic test。scheduler（項目単位の更新順序、Prompt一致、空回答・固有配点0・AI失敗・取消、追加AI呼出し0）、orchestrator（全行の待機中一覧、再開前に完了した行、取消後の中断・未処理、checkpointへの追加保存なし）、ViewModel（要約形式、選択行と評価中の行の既定表示の詳細、2,000／200文字上限と注記、20,000行の全件保持、run間の破棄、canary非漏洩）、View（Automation ID、局所scroll、1024×720の収まり、仮想化）をfake境界で検証する。実AI・実課金・実資格情報は使わない（AC-042）。
 
@@ -1150,6 +1246,10 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 
 43. 結果Excelの解説文書のdeterministic test。文書の存在、README・利用者index・各ガイドからのリンク、警告文・版注記・sheet名、`ResultsSheetWriter`の列定数と`ResultsStatusCodes`の全値、実際に書いたConfig・References・Run sheetの見出し・列記号・`Field`名・`RecordType`の全値が文書にあること、公開文書allowlist（scripts・pubxml・package試験）への収録を検証する。実CLI・実AI・実資格情報は使わない（AC-045、FR-XD-01〜06）。
 44. 実行準備部品の入力画面集約とstep状態文「設定済み」のheadless UI試験。メインwindowで入力・実行画面のAutomation ID所在、`ExecutionViewModel`への結び付き、単体表示時の非表示、focus、状態文とAccessible Nameを検証する。実CLI・実AI・実資格情報は使わない（AC-046、FR-PREP-01〜07、FR-STEP-01〜03）。
+45. 通常評価の設問タブのheadless UI試験。設問名の表示、選択の双方向反映、null選択・入力同期での選択保持、最小window内の収まり、keyboard到達を検証する（AC-048、FR-QT-01〜05）。
+46. 結果画面での学生の回答と評価内容の表示のdeterministic test。fakeの入力identity境界・行sourceで回答の書式・空欄・改行、詳細表示時だけの1行読込と行単位の記憶、読込前後のidentity確認、不一致・例外の文言と再試行、古い読込の破棄、理由・引用・根拠の場所・説明の全分岐、表示による採点値・override・出力の不変、canary非漏洩を検証し、一時directoryの合成`.xlsx`で実ファイル読込とバイト列・更新日時の不変を確認する。実CLI・実AI・実資格情報は使わない（AC-051、FR-RV-01〜06、SEC-RV-01、NFR-RV-01）。
+
+47. 評価項目の説明の初期値のdeterministic test。評価方法の種類別の本文の完全一致、新規定義・評価項目の追加・評価方法の追加・入力画面の提案設問での初期値、種類変更と利用者編集で既存の説明が変わらないこと、検証エラー0件を検証する。実CLI・実AI・実資格情報は使わない（AC-052、FR-CD-01〜03）。
 
 ## 20. 外部仕様出典
 
@@ -1202,11 +1302,13 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | 実行コスト表示・ジョブログ | App `Usage`の集計と`Logging`のJSONL writer、Execution／Resultsが共有するコストView（AC-039、TR-38）。JobUsageTracker／SdkUsageAdapter／UsageProvenance／JobCostBackend／JobCostView testsで局所検証済み（VERIFIED_SCOPED）。実AI・実課金照合・AIクレジット換算・native確認は未実施 |
 | 実行中の速報値表示 | `DurableEvaluationScheduler`／`DurableQuantificationOrchestrator`の`LivePreviewUpdate`通知、`LiveQuantificationPreviewViewModel`、`ExecutionView`の速報値領域（AC-042、TR-41、FR-LP-01〜09／SEC-LP-01〜02／NFR-LP-01）。LivePreview試験で局所検証。実AI・native表示は未実施 |
 | 起動時の自動Copilotログイン | `ExecutionViewModel.RunStartupAuthenticationAsync`と`App.AttachStartupAuthentication`（AC-040、TR-39、FR-AL-01〜08／SEC-AL-01〜03）。CopilotLoginCommandTestsの起動時自動ログイン試験で局所検証。実CLI・実ブラウザー・実資格情報での確認は未実施（本人操作が必要） |
-| 結果画面の設問文表示 | `ResultsOutputViewModel`（設問別得点・基準の設問文）と`ResultsOutputView`（AC-041、TR-40、FR-RS-01〜05）。ResultsQuestionTextTestsと既存Results系UI試験で局所検証 |
+| 結果画面の設問文表示 | `ResultsOutputViewModel`（設問別得点・基準の設問文）と`ResultsOutputView`（AC-041、TR-40、FR-RS-01〜06。一覧は設問別得点を表示しない5列）。ResultsQuestionTextTestsと既存Results系UI試験で局所検証 |
 | 利用できる全modelの選択 | `SdkCopilotAuthenticationRuntime.MapAvailableModels`、`ExecutionViewModel`のcache反映、`SettingsFileStore`のcache上限（AC-043、TR-42、FR-MS-01〜05）。CopilotModelEnumerationTests・ModelCatalogTestsで局所検証。実accountでの列挙確認は未実施（本人操作が必要） |
 | 結果Excelの解説文書 | `docs/result-excel-description.md`、README・利用者indexからのリンク、公開文書allowlist（`WindowsSingleFile.pubxml`と各package／publish script）、`ResultExcelDescriptionTests`（AC-045、TR-43、FR-XD-01〜06）。実装の列定数・実際に書いたsheetとの一致とpackage収録を局所検証。文章の平易さはレビュー者の通読 |
 | 実行準備部品の集約・step状態文 | `InputView`＋`ExecutionPreparationPanel`（左列の移設先）、`MainWindow`のExecutionViewModel結線、`MainWindowViewModel`のstep状態文（AC-046、TR-44、FR-PREP-01〜07／FR-STEP-01〜03）。PreparationOnInputTests・MainWindowTests・ExecutionViewTestsで局所検証 |
-## 22. Approval record
+| 通常評価の設問タブ | `EvaluatorSettingsView`の`QuestionSelector`（ListBox、AC-048、TR-45、FR-QT-01〜05）。EvaluatorSettingsViewTests・CompactWorkflowLayoutTests・MainWindowSettingsTestsで局所検証 |
+| 結果画面の学生の回答と評価内容 | `ResultsAnswerSource`（入力identity確認つきの1行読込）、`ResultsOutputViewModel`（詳細表示時の読込・行単位の記憶・古い読込の破棄）、`ResultsCriterionViewModel`（回答・理由・引用・根拠の場所・説明の文言）、`ResultsOutputView`の回答欄・評価欄（AC-051、TR-46、FR-RV-01〜06／SEC-RV-01／NFR-RV-01）。ResultsAnswerReviewTestsと既存Results系UI試験で局所検証 |
+| 評価項目の説明の初期値 | `DefaultCriterionDescriptions`（Core）、`QuantificationDesignViewModel`の評価項目・評価方法の追加、`InputViewModel`の提案設問（AC-052、TR-47、FR-CD-01〜03）。DefaultCriterionDescriptionTestsで局所検証 |## 22. Approval record
 
 | 項目 | 内容 |
 |---|---|
@@ -1232,25 +1334,40 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | Results question text source | 2026-09-30の要求所有者依頼「[4.結果・出力]の画面で、questionの文字列は、元のExcelのデータを表示してください。どの文字列が評価されたのかを私が理解しやすくするためです。元の学生のレポートを見ないと判断ができません。」。§11（結果の記述）を改訂し、§11.11（FR-RS-01〜05）、AC-041、TR-40を追加した。削除した要求IDはない。設問別得点の表示だけを設問IDから設問文へ変更し、採点・出力・checkpoint・設定の契約は変更しない。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Live preview source | 2026-09-30の要求所有者依頼「実行中の画面で、現在、どの文字列を、どんなPromptで、どう定量化したのかを、画面右側の中央あたりの{実測}の下に表示してください。元のExcelデータの1行と1:1になるように速報値として表示をしてください。全件を表示します。」。不明点は利用者不在のため§23のA-LPを採用し、§11.12・AC-042・TR-41として追加した |
 | All-models selection source | 2026-09-30の要求所有者依頼「私がGitHub Copilotで利用できる全てのモデルを選択できるようにしてください。」。§7.1を改訂し、§11.13（FR-MS-01〜05）、AC-043、TR-42を追加した。変更した要求: cache件数上限512→4096（FR-MS-05、旧上限を規定するIDはなく本文の記載だけ）。削除した要求IDはない。不明点は利用者不在のため§23のA-MSを採用した。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Model options source | 2026-10-01: 機能追加・変更「ログイン後の全モデル表示、思考レベルとContext Sizeの選択」。追加FR-MO-01〜07、NFR-MO-01、AC-049〜050。変更FR-MS-04、FR-XD-01、AC-045（Run 26項目）、§7.1。削除IDなし。既存の全model・自動login・入力不変・採点・privacy境界を維持。製品版・公開版は変更しない。固定SDKでcontext tierを指定できることを確認し、実課金呼出しは行わずfakeで検証する。 |
 | Question details guide source | 2026-09-30の要求所有者依頼「`## 2. 採点設計`に、{設問の詳細}を押した後の詳細設定の画面の使い方の説明についてもスクリーンショットもつけて記載をしてください。文章は大学や高校の教員が理解できるようにしてください。」。§11.14（FR-DOC-01〜04）、AC-044を追加した。削除した要求IDはない。アプリの挙動は変更しない。不明点は§23のA-DOCを採用した |
 | Result Excel guide source | 2026-09-30の要求所有者依頼「実行結果のExcelシートの詳細な解説を、ITに詳しくない大学・高校の教授や先生が理解できるような説明用のドキュメントを作成して`/docs/result-excel-description.md`に保存をして、`/README.md`から適切な文章とリンクもつけてください。」。§9.4（FR-XD-01〜06）、AC-045、TR-43を追加した。削除した要求IDはない。アプリの挙動・出力Excelの形式は変更しない。不明点は利用者不在のため§23のA-XDを採用した。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Preparation relocation source | 2026-10-01の要求所有者依頼「[3.実行]画面の中の、左型の[GitHub Copilot CLIへのログイン]などの全ての画面コンポーネントを、「1.入力」の画面の中に移動させてください。」「画面上部の[訪問済み]の表現を[設定済み]に変更してください。」。§11.15（FR-PREP-01〜07）、§11.16（FR-STEP-01〜03）、AC-046、TR-44を追加し、§3.2・§11・§11.4の該当記述を更新した。削除した要求IDはない（「訪問済み」の表示文言をFR-STEP-01へ置換）。ViewModelの振る舞い、認証・再開の契約、永続化は変更しない。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Question tabs source | 2026-10-01の要求所有者依頼「画面の[2.定量化設定]の[通常評価]で、各設問がコンボボックスで切り替えられるようになっています。これをタブで切り替えられるようにしてください。タブには設問名を表示してください。」。§11.18（FR-QT-01〜05）、AC-048、TR-45を追加した。削除した要求IDはない。選択状態・編集内容・保存の契約は変更しない。不明点は利用者不在のため§23のA-QTを採用した。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Results answer review source | 2026-10-01: 機能変更・追加。依頼原文「添付の実行後の画面での評価状況で表示される文字や情報を以下にしてください。設問に対して、学生の回答と、その回答をどう評価したのか?これは作成するExcelで作成されている情報です。…自分の設定の確認をするという目的で表示させたいです。」。追加: §11.19（FR-RV-01〜06、SEC-RV-01、NFR-RV-01）、AC-051、TR-46、§21の追跡行、§23のA-RV-01〜05。変更: FR-RS-04（設問文の表示位置を回答欄の先頭へ）、§11.11の境界・例外、§11の結果の記述、§14（結果画面の1行再読込）、A-RS-01（回答本文を表示しない仮定を覆した）。削除した要求IDはない。採点・出力workbook・checkpoint・設定・AI送信の契約は変更しない。不明点は利用者不在のため§23のA-RVを採用した。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Criterion description defaults source | 2026-10-01の要求所有者依頼「[2.定量化設計]の画面の[通常評価]の中の、画面右側の[評価項目]の説明の初期値を、[評価方法]に対応して以下としてください。」（Knowledge Cover／Prompt 分析の各本文）。機能変更。追加: §11.20（FR-CD-01〜03）、AC-052、TR-47、§21の追跡行、§23のA-CD-01〜03。変更: 評価項目の説明の従来の初期値（「評価する知識ポイントまたは観点を記述してください。」、入力画面の提案設問の「回答内で説明・関係・適用を確認する知識ポイント」「必要な視点を引き出す具体性、論理性、実行可能性」）を§11.20の本文へ置換した。削除した要求IDはない。評価項目の名前・重み・range、AI Prompt、採点・出力・checkpoint・保存の契約は変更しない。不明点は利用者不在のため§23のA-CDを採用した。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Results list question score removal source | 2026-10-01: 機能削除・変更。依頼原文「[4.結果・出力]画面の、[設問別得点]は、削除してください。プレビューで表示するには情報量が多すぎるためです。」と、「4 結果・出力」の一覧の画面写真。追加: FR-RS-06（一覧は5列だけで設問別得点を表示しない）、§23のA-RS-04。変更: FR-RS-01（表示先を詳細だけに）、FR-RS-02（一覧の省略表示の記述を削除）、§11.11の例、§11の結果の記述、AC-041（操作のfilterと④⑥）、TR-40、§21の追跡行、A-RS-03（前提の一覧表示が無くなったため適用外と記録）。削除した要求IDはない（一覧の「設問別得点」列はFR-RS-01の表示先の一部だったため、IDを削除せず表示先を変更した）。`QuestionEarned`の計算、詳細の設問別得点、出力workbook、checkpoint、override、設定、AI送信の契約は変更しない。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Meaning | repository要求baselineの承認記録。実装完了・試験成功・release存在・tag／push／draft／公開操作の承認、組織の法務・教育・security承認または電子署名を意味しない |
 
 ## 23. 仮定・未解決事項
 
-本節は2026-09-30の起動時自動login依頼（A-AL）、結果画面の設問文表示依頼（A-RS）、実行中の速報値表示依頼（A-LP）、利用できる全modelの選択依頼（A-MS）、結果Excelの解説文書依頼（A-XD）で選んだ仮定を記録する。TBD、BLOCKED、競合はない。
+本節は2026-09-30の起動時自動login依頼（A-AL）、結果画面の設問文表示依頼（A-RS）、実行中の速報値表示依頼（A-LP）、利用できる全modelの選択依頼（A-MS）、結果Excelの解説文書依頼（A-XD）、通常評価の設問タブ依頼（A-QT）、2026-10-01の結果画面での学生の回答と評価内容の表示依頼（A-RV）、評価項目の説明の初期値依頼（A-CD）、結果一覧の設問別得点の削除依頼（A-RS-04）で選んだ仮定を記録する。TBD、BLOCKED、競合はない。
 
 | ID | 種別 | 内容 |
 |---|---|---|
+| A-MO-01 | [ASSUMPTION] | 添付のContext SizeはSDKの入力prompt枠（token budget）として表示する。根拠: 固定SDKはdefault/long-contextの2tierを指定でき、billing metadataにtier別prompt枠があるが拡張の総contextは公開されない。影響: 272K/1MはSDKがその値を返す場合だけ現れ、全modelで同じ2択を保証しない。覆す条件: tier別総contextの公式metadataが提供された場合。 |
+| A-MO-02 | [ASSUMPTION] | 未編集の思考レベルは既存の希望low、contextはdefaultを維持する。明示選択はmodel別に保存する。根拠: 既存のコスト・一貫性方針を保ち、model切替で非対応設定を漏らさない。影響: SDKのDefault表示と初期のlow選択は異なる場合がある。覆す条件: 初期値をSDK defaultへ合わせる依頼。 |
+| A-MO-03 | [ASSUMPTION] | context metadataの実験的SDK型は固定1.0.11に限定し、該当accessだけGHCP001を抑止する。根拠: 同versionで型とJSON契約を確認済み。影響: SDK更新時にmetadata・serialization回帰を再検証する。覆す条件: stable APIの提供。実accountの全model権限・請求額・Windows native本人loginの確認は外部前提で、本変更はfakeによるAC-049〜050の検証であり公開gateの解除ではない。 |
+| A-MO-04 | [ASSUMPTION] | 共通設定の既存950×450 DIP slotを保つため、採点定義名・revision・丸めの3項目を同じ1行へまとめ、空いた高さに思考レベルとContext Sizeを配置する。根拠: 既存44 DIP・body340 DIP・footer内包のcontractを維持する。影響: 項目の役割・保存・keyboard既存順は変わらず、長い名前はTextBox内で横scrollする。覆す条件: 別の配置を求められた場合。 |
 | A-AL-01 | [ASSUMPTION] | 「PCやMacにログインしているアカウント」は、OS利用者ごとに同梱CLIが解決する既存GitHub資格情報（§11.10の解決順）と解釈する。根拠: GitHub Copilot CLIの公式資料（確認日2026-09-30）に、Windows／macOSのサインインアカウントをCopilotへ直接連携する手段は記載されておらず、アプリがOSアカウントからGitHubの資格情報を作る実装は独自認証providerとなり§17.2・SEC-AL-01に反する。影響: OSサインインだけではGitHubへログインしない。覆す条件: GitHubがOSサインイン連携を提供した場合。 |
 | A-AL-02 | [ASSUMPTION] | 既存資格情報がない場合の「可能な限り利用者が何もしない」は、起動時にCLIのブラウザー認証を1回自動で開始し、利用者がブラウザーで承認するだけの状態にすることとする。根拠: 資格情報がない状態でCLIがlogin対話なしに認証することはできない。影響: 起動時にブラウザーが開く。覆す条件: 起動時のブラウザー自動起動が不適切と判断された場合、環境変数の既定値を無効へ変更する。 |
 | A-AL-03 | [ASSUMPTION] | 自動loginは1アプリ起動につき1回とし、取消・失敗後は自動再試行しない。根拠: 取消した利用者へ認証画面を繰り返し提示しない安全側の動作。覆す条件: 再試行間隔・回数を利用者が指定した場合。 |
 | A-AL-04 | [ASSUMPTION] | 任意の抑止手段として環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`を採用し、設定画面・setting.txtの項目は追加しない。根拠: 既存のsetting.txt schema・§17.2「必須環境変数」を増やさず、後から低コストで変更できる。覆す条件: 利用者向けの設定UIが必要になった場合。 |
 | A-AL-05 | [ASSUMPTION] | macOSでも同じ実装経路（Avalonia／同梱CLI）が動く想定だが、macOSは現版の正式公開対象外（§17.2）であり、実測していない。影響: macOSでの動作は保証しない。 |
-| A-RS-01 | [ASSUMPTION] | 依頼の「questionの文字列」は、結果画面の設問別得点に出ていた内部設問ID（`question-<hash>`）を指し、「元のExcelのデータ」はその設問に対応するExcelの質問文（質問文行×主回答列のセル、§4.3の9）と解釈する。学生の回答本文の表示は依頼文から一意に読み取れず、run後にExcelを再読込する必要が生じるため本版では実装しない。根拠: 画面の実例と依頼文の「どの文字列が評価されたのか」、privacy境界（§14）。影響: 設問の識別はできるが回答本文は画面に出ない。覆す条件: 回答本文の表示が必要と確認された場合は、別要求として入力の再読込とprivacy要求を定義する。 |
+| A-RS-01 | [ASSUMPTION] | 依頼の「questionの文字列」は、結果画面の設問別得点に出ていた内部設問ID（`question-<hash>`）を指し、「元のExcelのデータ」はその設問に対応するExcelの質問文（質問文行×主回答列のセル、§4.3の9）と解釈する。学生の回答本文の表示は依頼文から一意に読み取れず、run後にExcelを再読込する必要が生じるため本版では実装しない。根拠: 画面の実例と依頼文の「どの文字列が評価されたのか」、privacy境界（§14）。影響: 設問の識別はできるが回答本文は画面に出ない。覆す条件: 回答本文の表示が必要と確認された場合は、別要求として入力の再読込とprivacy要求を定義する。（2026-10-01: 覆す条件が成立し、回答本文の表示は§11.19・A-RV-01〜05で定義した。設問IDを設問文へ置き換える解釈は維持する） |
 | A-RS-02 | [ASSUMPTION] | 表示する設問文は、run開始時のsnapshotが持つ設問文（利用者が手動編集した場合はその値）とする。Excelセルの現在値を結果表示時に再読込しない。根拠: 前回の実行結果を現在のdraft・入力から再評価しない原則（§2.2の5、§11.8）。覆す条件: 元セルの現在値の表示が必要になった場合。 |
-| A-RS-03 | [ASSUMPTION] | 一覧の設問別得点の文字列は、設問文を長さ制限せず連結し、列幅を超える分は既存の表示上の省略記号に任せる。根拠: 全文は詳細で確認でき、業務上の文字数上限を決める根拠がない。覆す条件: 一覧の列構成の変更要望。 |
+| A-RS-03 | [ASSUMPTION] | 一覧の設問別得点の文字列は、設問文を長さ制限せず連結し、列幅を超える分は既存の表示上の省略記号に任せる。根拠: 全文は詳細で確認でき、業務上の文字数上限を決める根拠がない。覆す条件: 一覧の列構成の変更要望。（2026-10-01: 覆す条件が成立し、一覧から設問別得点を除いた（FR-RS-06、A-RS-04）。本仮定は詳細の全文表示には不要となり、適用外） |
+| A-RS-04 | [ASSUMPTION] | 依頼の「[4.結果・出力]画面の[設問別得点]」は、添付画面の一覧（プレビュー）にある見出し「設問別得点（詳細で全文）」の列を指すと解釈し、一覧の見出しと各行の値だけを削除する。詳細（「詳細・override」）の選択行1件分の設問別得点の全文（`ResultsQuestionEarnedFull`、FR-RS-01）は残す。削除した列の幅は「状態」列へ回す。根拠: 依頼の理由が「プレビューで表示するには情報量が多すぎる」であり、詳細は選択した1行だけを縦scroll付きで表示するため一覧の情報量の問題に当たらない。削除した見出し自体が「詳細で全文」と詳細での確認を案内していた。影響: 設問別の点は詳細を開くか出力workbookで確認する。覆す条件: 詳細の設問別得点の削除、または一覧への短い要約（例: 合計だけ）の表示を求められた場合。 |
+| A-RV-01 | [ASSUMPTION] | 依頼の「学生の回答」は、選択した基準が属する設問の主回答列と補助列（AIへ送った列）の当該行のセル値と解釈する。根拠: 評価の根拠（`Evidence_Source`）が指しうるのはこの2種類の列だけで（`docs/result-excel-description.md` 5.3節）、§14は他の列・他の行をAIへ送らない。影響: 氏名等の非選択列は表示しない。覆す条件: 行の他の列の表示を求められた場合（privacyの再検討が必要）。 |
+| A-RV-02 | [ASSUMPTION] | 「その回答をどう評価したのか」は、通常評価の基準ごとのAIの点・理由・根拠の引用・根拠の場所と、先生が設定した評価項目の説明（採点設計）・既存の計算previewと解釈する。固有評価と類似度の項目別の値・理由は詳細に追加しない。根拠: 依頼の目的は「自分の設定（評価項目）の確認」で、既存の詳細は通常評価の基準単位の画面である。固有評価・類似度は行の固有点・類似減点として既に表示され、項目別の詳細は結果Excelにある。影響: 固有評価の理由・類似度の値は画面では確認できない。覆す条件: 固有評価・類似度の項目別表示を求められた場合。 |
+| A-RV-03 | [ASSUMPTION] | 回答の読込元は、結果Excelではなくrunの入力Excelとし、実行時のSHA-256・サイズ・更新日時との一致を読込前後で確認する。根拠: 結果Excelの元のシートは入力の写しで内容は同じだが、取消・部分結果・出力失敗のrunにはfinal workbookが無い。入力は全runに存在し、実行時のidentity（`RunSummary.InputSnapshot`）で同一性を確かめられる。影響: 入力Excelを移動・変更した後は回答を表示できない（文言で結果Excelでの確認を案内する）。覆す条件: 結果Excelからの読込を求められた場合。 |
+| A-RV-04 | [ASSUMPTION] | 読込は詳細表示中の選択行1行だけとし、成功した行の回答をその実行結果の表示中だけメモリに記憶する。根拠: 一覧の全行を読むと最大20,000行の再読込とメモリ保持が必要になり、必要な行だけに限る方が安全側である。影響: 初めて開く行は短時間「読み込んでいます…」になる。覆す条件: 一覧に回答の抜粋を出す要望。 |
+| A-RV-05 | [ASSUMPTION] | 回答・理由・引用は文字数で切り詰めない。根拠: 1セルの上限はExcel仕様の32,767文字で、表示は選択した1行だけのため速報値（FR-LP-08）のような累積上限が不要。覆す条件: 実測で表示性能に問題が出た場合。 |
 | A-LP-01 | [ASSUMPTION] | 依頼の「どの文字列を」は、各評価項目が使う選択済みの主回答列・補助列の当該行のセル値と解釈する。根拠: 評価Promptに実際に埋め込まれ、AIまたはローカル計算へ渡る文字列はこれだけである（§14）。影響: 選択されていない列や他行の値は出ない。覆す条件: 行全体のセル値の表示を求められた場合（プライバシー上の再検討が必要）。 |
 | A-LP-02 | [ASSUMPTION] | 「速報値」は、AIまたはローカル計算が返した生の定量値（RawScore・Score・Similarity）と理由・根拠とし、QuestionEarned・SpecialEarned・SimilarityPenalty・FinalRaw・FinalScoreは含めない。根拠: これらはExcel数式の計算結果であり（§8）、アプリ内で数式を再実装すると出力workbookの値と食い違う恐れがある。影響: 速報値は最終評点の予測ではない。覆す条件: 仮点の表示を求められた場合。 |
 | A-LP-03 | [ASSUMPTION] | 「元のExcelデータの1行と1:1」の対象は学生行だけとし、行に対応しない参照回答の生成は一覧に含めない。参照回答は類似度項目の比較文字列としてだけ表示する。根拠: 参照回答は設問単位で同一runの全学生に共有される。影響: 参照回答生成のPromptは画面に出ない（進捗は「実測: 参照 a / b」）。覆す条件: 参照回答のPrompt表示を求められた場合。 |
@@ -1267,3 +1384,8 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | A-PREP-01 | [ASSUMPTION] | 「左型」は「左側（左列）」と解釈し、対象を従来の「3 実行」画面の左列（Copilot認証、checkpoint再開、出力方針文、技術的な問題）の全部品とする。右列・上部の実行条件要約・下部の開始／中断・前後移動は移さない。根拠: 依頼文の「全ての画面コンポーネント」と提示画像の左列。影響: 技術的な問題の一覧も入力画面に移る。覆す条件: 技術的な問題を実行画面に残す指示があった場合は§11.15の表の「実行前の判断」行を分ける。
 | A-PREP-02 | [ASSUMPTION] | 配置は「1 入力」の本文内に、ファイルpath行の切替buttonで開閉する区画として置く。根拠: 通常画面は外側スクロール不要（§11.5）で、最小window（1024×720 DIP）の本文に入力部品と実行準備部品を同時に置く余地がないため。影響: 実行準備部品は常時は見えない。覆す条件: 利用者が別の配置（常時表示の右列等）を指定した場合。 |
 | A-STEP-01 | [ASSUMPTION] | 「訪問済み」を指す「設定済み」は表示文言だけの変更とし、内部の状態名（`WorkflowStepState.Visited`）・CSS class・判定は変えない。根拠: 依頼は「表現」の変更であり、意味の変更（設定の保存・検証成功）を求めていない。影響: 「設定済み」は設定値が有効であることを保証しない（FR-STEP-03）。覆す条件: 実際の設定完了を表す判定が必要な場合は別要求で判定を定義する。 |
+| A-QT-01 | [ASSUMPTION] | 「タブ」は、設問ごとに1つのタブ項目（表示名のみ）を横に並べる選択部品と解釈し、選択した設問の内容を別の内容領域へ切り替える既存の構造（評価方法・評価項目の選択、基本／Promptの編集タブ）を変えない。根拠: 依頼は設問の切替手段の変更だけを求めている。影響: 評価方法・評価項目の選択はcomboboxのままである。覆す条件: それらもタブ化する指示があった場合。 |
+| A-QT-02 | [ASSUMPTION] | タブが多く1行に収まらない場合は折り返して最大2行まで表示し、超える分は設問タブ領域の縦スクロールで到達させる。根拠: 最小window（1024×720 DIP）で外側スクロールを不要に保つ（§11.5）。覆す条件: 横スクロール等の別方式を指定された場合。 |
+| A-CD-01 | [ASSUMPTION] | 依頼の「評価方法: `Knowledge Cover`」は評価方法の種類`KNOWLEDGE_COVERAGE`、「`Prompt 分析`」は種類`CUSTOM_PROMPT`と解釈し、評価方法の表示名ではなく種類で本文を決める。根拠: 評価方法の表示名は利用者が自由に変更でき（既定名は「Knowledge coverage」「Knowledge 1」「Custom 1」「Prompt 分析」など複数）、種類は2つに固定されている。影響: 利用者が追加したCustom評価方法の評価項目もPrompt 分析本文になる。覆す条件: 表示名ごとに本文を変える指示があった場合。 |
+| A-CD-02 | [ASSUMPTION] | 依頼文のKnowledge Cover本文の「行ってださい」は誤字と判断し、「行ってください」で実装する。それ以外の文字（`{論点}`、`論点:`、`- xxx`）は依頼どおりとする。根拠: 同じ依頼のPrompt 分析本文が「行ってください」であり、意図が明らかな誤記。影響: 依頼原文と1文字（「だ」→「く」）異なる。覆す条件: 原文どおりの綴りを求められた場合は`DefaultCriterionDescriptions.Knowledge`を直す。 |
+| A-CD-03 | [ASSUMPTION] | 「初期値」は新規作成時の値であり、保存済み・読込済みの採点定義や既存の評価項目の説明は書き換えない。本文中の`{論点}`はAI Promptのplaceholderではなく説明文中の記載で、評価項目の説明はPromptへ値として挿入されるため再解釈されない（§5.4）。根拠: 既存データの暗黙の書換えは利用者の編集を失わせる。影響: 既存の定義の説明は従来のままである。覆す条件: 既存の説明の一括更新を求められた場合。 |

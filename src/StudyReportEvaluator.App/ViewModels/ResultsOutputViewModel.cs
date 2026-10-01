@@ -375,6 +375,7 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
                 + ";sha256=" + context.RuntimeIdentity.CliSha256,
             ModelIdentity = context.ModelId,
             ReasoningEffort = context.ReasoningEffort,
+            ContextTier = context.ContextTier,
             StartedAtUtc = summary.StartedAtUtc,
             EndedAtUtc = summary.EndedAtUtc,
             PlannedEvaluationCount = summary.PlannedOperationCount,
@@ -432,7 +433,15 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
 
 public sealed class ResultsCriterionViewModel : UiObservableObject
 {
+    internal const string AnswerLoadingText = "学生の回答を読み込んでいます…";
+    internal const string AnswerInputChangedText =
+        "入力Excelが実行時から変更されているため、学生の回答を表示できません。元のExcelまたは結果Excelで確認してください。";
+    internal const string AnswerUnavailableText =
+        "入力Excelを読み取れないため、学生の回答を表示できません（移動・削除・ほかのアプリで使用中など）。元のExcelまたは結果Excelで確認してください。";
+    internal const string BlankCellText = "（空欄）";
+
     private readonly Action<ResultsCriterionViewModel> overrideChanged;
+    private readonly CriterionQuantificationResult? acceptedResult;
     private string overrideText = string.Empty;
     private string? overrideError;
     private decimal? effectiveRaw;
@@ -440,6 +449,8 @@ public sealed class ResultsCriterionViewModel : UiObservableObject
     private decimal? evaluatorScore;
     private decimal? questionScore;
     private decimal? overallScore;
+    private ResultsAnswerState studentAnswerState = ResultsAnswerState.Loading;
+    private string studentAnswerText = AnswerLoadingText;
 
     internal ResultsCriterionViewModel(
         int sourceRowNumber,
@@ -449,7 +460,8 @@ public sealed class ResultsCriterionViewModel : UiObservableObject
         bool canOverride,
         decimal? aiRawScore,
         string statusCode,
-        Action<ResultsCriterionViewModel> overrideChanged)
+        Action<ResultsCriterionViewModel> overrideChanged,
+        CriterionQuantificationResult? acceptedResult = null)
     {
         if (sourceRowNumber < 1)
         {
@@ -467,6 +479,7 @@ public sealed class ResultsCriterionViewModel : UiObservableObject
         AiRawScore = aiRawScore;
         StatusCode = statusCode;
         Range = criterion.Range ?? evaluator.Range;
+        this.acceptedResult = acceptedResult;
     }
 
     internal QuestionDefinition Question { get; }
@@ -503,6 +516,39 @@ public sealed class ResultsCriterionViewModel : UiObservableObject
 
     public string RangeText =>
         $"{Range.Minimum.ToString(CultureInfo.InvariantCulture)} ～ {Range.Maximum.ToString(CultureInfo.InvariantCulture)}";
+
+    public ResultsAnswerState StudentAnswerState => studentAnswerState;
+
+    public string StudentAnswerText => studentAnswerText;
+
+    // FR-RV-05: the same accepted values that the Results sheet writes to .Reason/.Evidence/.Evidence_Source.
+    public string ReasonText => acceptedResult is { } result
+        ? string.IsNullOrWhiteSpace(result.Reason) ? "（理由は空欄です）" : result.Reason
+        : StatusCode switch
+        {
+            ResultsStatusCodes.Empty => "回答が空欄のため、AIで評価していません。",
+            ResultsStatusCodes.Cancelled => "取消または未処理のため、評価していません。",
+            _ => $"技術的な失敗（{StatusCode}）のため、評価結果はありません。",
+        };
+
+    public string EvidenceText => acceptedResult is { } result
+        ? string.IsNullOrEmpty(result.Evidence) ? "（引用なし）" : result.Evidence
+        : "—";
+
+    public string EvidenceSourceText => acceptedResult is { } result
+        ? result.EvidenceSource switch
+        {
+            EvidenceSourceKind.PrimaryAnswer => WithColumn("主回答", result.EvidenceSourceColumnId),
+            EvidenceSourceKind.SupportingColumn => WithColumn("補助", result.EvidenceSourceColumnId),
+            _ => "なし",
+        }
+        : "—";
+
+    public string CriterionDescriptionText => string.IsNullOrWhiteSpace(Criterion.Description)
+        ? "（説明は未設定です）"
+        : Criterion.Description;
+
+    internal IEnumerable<string> AnswerColumns => QuestionAnswerColumns(Question);
 
     public string OverrideText
     {
@@ -576,8 +622,46 @@ public sealed class ResultsCriterionViewModel : UiObservableObject
         SetPreviewProperty(ref overallScore, nextOverallScore, nameof(OverallScore), nameof(OverallScoreText));
     }
 
+    internal void SetStudentAnswer(
+        ResultsAnswerState state,
+        IReadOnlyDictionary<string, string?>? cells = null)
+    {
+        string text = state switch
+        {
+            ResultsAnswerState.Loaded => FormatAnswer(cells ?? throw new ArgumentNullException(nameof(cells))),
+            ResultsAnswerState.InputChanged => AnswerInputChangedText,
+            ResultsAnswerState.Unavailable => AnswerUnavailableText,
+            _ => AnswerLoadingText,
+        };
+        SetProperty(ref studentAnswerState, state, nameof(StudentAnswerState));
+        SetProperty(ref studentAnswerText, text, nameof(StudentAnswerText));
+    }
+
+    internal static IEnumerable<string> QuestionAnswerColumns(QuestionDefinition question) =>
+        question.SupportingSourceColumns
+            .Prepend(question.PrimarySourceColumn)
+            .Select(column => column.ToUpperInvariant())
+            .Distinct(StringComparer.Ordinal);
+
     public override string ToString() =>
         $"{nameof(ResultsCriterionViewModel)} {{ SourceRowNumber = {SourceRowNumber.ToString(CultureInfo.InvariantCulture)}, StatusCode = {StatusCode}, Content = <redacted> }}";
+
+    // FR-RV-02: one block per answer column, primary first, original text, blank as （空欄）.
+    private string FormatAnswer(IReadOnlyDictionary<string, string?> cells)
+    {
+        string primary = Question.PrimarySourceColumn.ToUpperInvariant();
+        return string.Join(
+            "\n\n",
+            AnswerColumns.Select(column =>
+            {
+                string kind = string.Equals(column, primary, StringComparison.Ordinal) ? "主回答" : "補助";
+                string? value = cells.TryGetValue(column, out string? found) ? found : null;
+                return $"[列 {column} · {kind}]\n{(string.IsNullOrWhiteSpace(value) ? BlankCellText : value)}";
+            }));
+    }
+
+    private static string WithColumn(string label, string? column) =>
+        string.IsNullOrWhiteSpace(column) ? label : $"{label}（列 {column}）";
 
     private void SetPreviewProperty(
         ref decimal? field,
@@ -604,6 +688,8 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent;
 
     private readonly IResultsOutputBoundary outputBoundary;
+    private readonly IResultsAnswerSource answerSource;
+    private readonly Dictionary<int, ImmutableDictionary<string, string?>> answerCache = [];
     private readonly WeightedScoreCalculator scoreCalculator = new();
     private readonly ObservableCollection<ResultsCriterionViewModel> resultItems = [];
     private readonly ObservableCollection<ResultsRowScoreViewModel> rowScoreItems = [];
@@ -636,6 +722,10 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
     private string lastExportCode = ResultsOutputStatusCodes.Ready;
     private CancellationTokenSource? exportCancellation;
     private long exportSequence;
+    private CancellationTokenSource? answerCancellation;
+    private int? answerRequestRow;
+    private long answerSequence;
+    private Task pendingStudentAnswerTask = Task.CompletedTask;
     private bool disposed;
 
     public ResultsOutputViewModel()
@@ -645,10 +735,12 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
 
     public ResultsOutputViewModel(
         IResultsOutputBoundary outputBoundary,
-        ExecutionRunContext? context = null)
+        ExecutionRunContext? context = null,
+        IResultsAnswerSource? answerSource = null)
     {
         this.outputBoundary = outputBoundary
             ?? throw new ArgumentNullException(nameof(outputBoundary));
+        this.answerSource = answerSource ?? new ResultsAnswerSource();
         Results = new ReadOnlyObservableCollection<ResultsCriterionViewModel>(resultItems);
         RowScores = new ReadOnlyObservableCollection<ResultsRowScoreViewModel>(rowScoreItems);
         VisibleRowScores = new ReadOnlyObservableCollection<ResultsRowScoreViewModel>(visibleRowScoreItems);
@@ -798,10 +890,14 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         {
             if (SetProperty(ref isDetailVisible, value))
             {
+                RefreshStudentAnswers();
                 RaiseCommandStates();
             }
         }
     }
+
+    // Completes when the latest student-answer read has been applied or discarded.
+    internal Task PendingStudentAnswerTask => pendingStudentAnswerTask;
 
     public bool HasUnsavedOverrides
     {
@@ -1050,6 +1146,8 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         ObjectDisposedException.ThrowIf(disposed, this);
         ArgumentNullException.ThrowIfNull(runContext);
         Interlocked.Increment(ref exportSequence);
+        CancelAnswerRead();
+        answerCache.Clear();
         context = runContext;
         Cost.Reset();
         if (runContext.Cost is { } cost) Cost.Apply(cost);
@@ -1187,6 +1285,8 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         Interlocked.Increment(ref exportSequence);
         exportCancellation?.Cancel();
         exportCancellation?.Dispose();
+        CancelAnswerRead();
+        answerCache.Clear();
         RaiseCommandStates();
     }
 
@@ -1219,7 +1319,8 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
                     canOverride,
                     criterionResult?.RawScore,
                     unit.StatusCode,
-                    OverrideChanged));
+                    OverrideChanged,
+                    criterionResult));
             }
         }
     }
@@ -1617,10 +1718,130 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
             IsDetailVisible = false;
         }
 
+        RefreshStudentAnswers();
+
         // Reassert selection after the visible collection resets, even when the row reference survives.
         // Do not reset the criterion editors for a score refresh on the same source row.
         OnPropertyChanged(nameof(SelectedRow));
         RaiseCommandStates();
+    }
+
+    // FR-RV-03/04, NFR-RV-01: read only the selected row while the detail is visible;
+    // remember successful rows for this result and apply only the latest request.
+    private void RefreshStudentAnswers()
+    {
+        if (disposed || context is null || !isDetailVisible || selectedRow is null)
+        {
+            CancelAnswerRead();
+            return;
+        }
+
+        int rowNumber = selectedRow.SourceRowNumber;
+        if (answerCache.TryGetValue(rowNumber, out ImmutableDictionary<string, string?>? cached))
+        {
+            CancelAnswerRead();
+            ApplyStudentAnswers(rowNumber, ResultsAnswerState.Loaded, cached);
+            return;
+        }
+
+        if (answerCancellation is not null && answerRequestRow == rowNumber)
+        {
+            return;
+        }
+
+        CancelAnswerRead();
+        ApplyStudentAnswers(rowNumber, ResultsAnswerState.Loading, null);
+        string[] columns = context.Summary.Snapshot.Definition.Questions
+            .Where(question => question.Enabled)
+            .SelectMany(ResultsCriterionViewModel.QuestionAnswerColumns)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (columns.Length == 0)
+        {
+            ApplyStudentAnswers(rowNumber, ResultsAnswerState.Unavailable, null);
+            return;
+        }
+
+        ResultsAnswerRequest request = new(
+            context.InputPath,
+            context.Summary.InputSnapshot,
+            context.Summary.Snapshot.Definition.SourceSheet,
+            rowNumber,
+            columns);
+        CancellationTokenSource cancellation = new();
+        long sequence = Interlocked.Increment(ref answerSequence);
+        answerCancellation = cancellation;
+        answerRequestRow = rowNumber;
+        pendingStudentAnswerTask = ReadStudentAnswersAsync(request, sequence, cancellation);
+    }
+
+    private async Task ReadStudentAnswersAsync(
+        ResultsAnswerRequest request,
+        long sequence,
+        CancellationTokenSource cancellation)
+    {
+        ResultsAnswerReadResult result;
+        try
+        {
+            result = await answerSource.ReadAsync(request, cancellation.Token)
+                ?? ResultsAnswerReadResult.Unavailable;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch
+        {
+            result = ResultsAnswerReadResult.Unavailable;
+        }
+
+        if (disposed || sequence != Interlocked.Read(ref answerSequence))
+        {
+            return;
+        }
+
+        answerCancellation = null;
+        answerRequestRow = null;
+        if (result.State == ResultsAnswerState.Loaded)
+        {
+            answerCache[request.SourceRowNumber] = result.Cells;
+            ApplyStudentAnswers(request.SourceRowNumber, ResultsAnswerState.Loaded, result.Cells);
+        }
+        else
+        {
+            ApplyStudentAnswers(
+                request.SourceRowNumber,
+                result.State == ResultsAnswerState.InputChanged
+                    ? ResultsAnswerState.InputChanged
+                    : ResultsAnswerState.Unavailable,
+                null);
+        }
+    }
+
+    private void CancelAnswerRead()
+    {
+        Interlocked.Increment(ref answerSequence);
+        CancellationTokenSource? previous = answerCancellation;
+        answerCancellation = null;
+        answerRequestRow = null;
+        try
+        {
+            previous?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
+
+    private void ApplyStudentAnswers(
+        int sourceRowNumber,
+        ResultsAnswerState state,
+        IReadOnlyDictionary<string, string?>? cells)
+    {
+        foreach (ResultsCriterionViewModel item in resultItems.Where(item => item.SourceRowNumber == sourceRowNumber))
+        {
+            item.SetStudentAnswer(state, cells);
+        }
     }
 
     private void RefreshPathAssessment()

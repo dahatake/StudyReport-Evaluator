@@ -165,6 +165,7 @@ public sealed class WorkbookDurableRunFinalizer : IDurableRunFinalizer
                 + ";sha256=" + checkpoint.Runtime.CliSha256,
             ModelIdentity = checkpoint.NormalModelId,
             ReasoningEffort = checkpoint.ReasoningEffort,
+            ContextTier = checkpoint.ContextTier,
             StartedAtUtc = summary.StartedAtUtc,
             EndedAtUtc = summary.EndedAtUtc,
             PlannedEvaluationCount = summary.PlannedOperationCount,

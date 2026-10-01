@@ -57,11 +57,12 @@ public sealed partial class ExecutionViewModel
         QuantificationDefinition? Definition, WorkbookMetadata? Metadata, string InputPath,
         string? ModelId, CopilotRuntimeIdentity? Runtime, ExecutionAuthenticationState Authentication,
         string PartialPath, bool ResumeMode, int Concurrency, string? OutputDirectory,
-        string? ReasoningEffort);
+        string? ReasoningEffort, string? ContextTier);
 
     private ResumeValidationIdentity CaptureResumeIdentity() => new(
         definition, workbookMetadata, inputPath, selectedModelId, runtimeIdentity, AuthenticationState,
-        resumePartialPath, isResumeMode, maxConcurrency, outputDirectoryOverride, SelectedModelReasoningEffort);
+        resumePartialPath, isResumeMode, maxConcurrency, outputDirectoryOverride, SelectedModelReasoningEffort,
+        SelectedContextTier);
 
     public async Task PrepareResumeAsync(CancellationToken cancellationToken = default)
     {
@@ -128,7 +129,7 @@ public sealed partial class ExecutionViewModel
                 : null;
             ResumeAdmissionReport report = ResumeAdmissionEvaluator.Evaluate(loaded.Envelope,
                 identity.PartialPath, snapshot, plan, input, identity.InputPath, identity.ModelId,
-                identity.ReasoningEffort, runtime);
+                identity.ReasoningEffort, runtime, identity.ContextTier);
             if (!IsCurrentResumeInspection(sequence, identity)) return;
             resumeReport = report;
             validatedResumeIdentity = identity;
@@ -320,7 +321,16 @@ public sealed partial class ExecutionViewModel
             return;
         }
         SelectedModelId = checkpoint.NormalModelId;
-        SetResumeValidationText("中断時のモデルを選択しました。再開条件を再確認してください。");
+        string tier = checkpoint.ContextTier ?? ModelOptionPolicy.DefaultContextTier;
+        if (checkpoint.ReasoningEffort is { } effort
+                && !ReasoningEffortOptions.Any(option => option.Value == effort)
+            || !ContextSizeOptions.Any(option => option.Tier == tier))
+        {
+            SetResumeValidationText("中断時の思考レベルまたは Context Size は現在利用できません。共通設定と Copilot 状態を確認してください。");
+            return;
+        }
+        SaveModelOptions(checkpoint.ReasoningEffort, tier);
+        SetResumeValidationText("中断時のモデル・思考レベル・Context Size を選択しました。再開条件を再確認してください。");
     }
 
     public async Task StopAndDrainAsync(TimeSpan timeout)

@@ -60,6 +60,7 @@ public sealed class ReferenceAnswerEvaluationRunner
     {
         SessionConfig config = schemaFactory.CreateReferenceSessionConfig(payload, out SubmitReferenceAnswerTool collector);
         config.ReasoningEffort = reasoningEffort;
+        config.ContextTier = options.ContextTier;
         return new CopilotAuxiliaryAttempt<ReferenceAnswerResult>(
             transportFactory.Create()
                 ?? throw new InvalidOperationException("The transport factory returned no transport."),
@@ -126,6 +127,7 @@ public sealed class SpecialEvaluationRunner
     {
         SessionConfig config = schemaFactory.CreateSpecialSessionConfig(payload, out SubmitSpecialQuantificationTool collector);
         config.ReasoningEffort = reasoningEffort;
+        config.ContextTier = options.ContextTier;
         return new CopilotAuxiliaryAttempt<SpecialQuantificationResult>(
             transportFactory.Create()
                 ?? throw new InvalidOperationException("The transport factory returned no transport."),

@@ -13,7 +13,8 @@ using Control = Avalonia.Controls.Control;
 
 namespace StudyReportEvaluator.App.Tests.UI;
 
-// AC-041 / FR-RS-01..05: the results screen shows the Excel-derived question text, not the question ID.
+// AC-041 / FR-RS-01..06: the results screen shows the Excel-derived question text, not the question ID,
+// and only the detail (not the row list preview) shows per-question scores.
 public sealed class ResultsQuestionTextTests
 {
     private const string FirstText = "レポート課題1：\r\n機械学習\t とは何か\u3000";
@@ -100,6 +101,51 @@ public sealed class ResultsQuestionTextTests
                 ResultsCriterionViewModel first = viewModel.SelectedRowCriteria[0];
                 Assert.Equal(FirstText, first.QuestionText);
                 Assert.Equal(FirstText, ById<TextBlock>(view, "ResultsCriterionQuestionText").Text);
+            }
+            finally
+            {
+                window.Close();
+            }
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Row_list_preview_shows_only_five_columns_without_question_scores()
+    {
+        (_, ResultsOutputViewModel viewModel) = await CreateAsync(FirstText, SecondText);
+        using (viewModel)
+        {
+            Window window = new() { Width = 950, Height = 450, Content = new ResultsOutputView(viewModel) };
+            window.Show();
+            try
+            {
+                ResultsOutputView view = Assert.IsType<ResultsOutputView>(window.Content);
+                ListBox rows = Assert.IsType<ListBox>(view.FindControl<ListBox>("RowScoreList"));
+                Grid listPanel = Assert.IsType<Grid>(view.FindControl<Grid>("ResultsListPanel"));
+                Grid header = Assert.IsType<Grid>(listPanel.Children[0]);
+
+                Assert.Equal(5, header.ColumnDefinitions.Count);
+                Assert.Equal(
+                    new[] { "元の行", "最終点", "固有点", "類似減点", "状態" },
+                    header.Children.OfType<TextBlock>().OrderBy(Grid.GetColumn).Select(text => text.Text ?? string.Empty).ToArray());
+                Assert.Equal(5, header.Children.Count);
+
+                Control firstRow = Assert.IsAssignableFrom<Control>(rows.ContainerFromIndex(0));
+                Grid rowGrid = Assert.Single(
+                    firstRow.GetVisualDescendants().OfType<Grid>(),
+                    grid => AutomationProperties.GetAutomationId(grid) == "ResultsRow-2");
+                Assert.Equal(5, rowGrid.ColumnDefinitions.Count);
+                Assert.Equal(5, rowGrid.Children.Count);
+
+                string questionScores = viewModel.RowScores.First(row => row.SourceRowNumber == 2).QuestionEarnedText;
+                foreach (TextBlock text in listPanel.GetVisualDescendants().OfType<TextBlock>())
+                {
+                    string shown = (text.Text ?? string.Empty) + "\n" + (ToolTip.GetTip(text)?.ToString() ?? string.Empty);
+                    Assert.DoesNotContain("設問別得点", shown, StringComparison.Ordinal);
+                    Assert.DoesNotContain(questionScores, shown, StringComparison.Ordinal);
+                    Assert.DoesNotContain("課題2：活用例", shown, StringComparison.Ordinal);
+                    Assert.DoesNotContain("機械学習", shown, StringComparison.Ordinal);
+                }
             }
             finally
             {
