@@ -582,7 +582,41 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
             Assert.True(await WaitForExitAsync(app.Process, TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken),
                 $"{app.Scenario}: graceful close timed out.");
             Assert.Equal(0, app.Process.ExitCode);
+            WaitForOwnedProcessesToExit();
             AssertDataUnchanged();
+        }
+
+        private void WaitForOwnedProcessesToExit()
+        {
+            // The startup status-check CLI can outlive the app briefly while holding inherited run handles.
+            string prefix = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Root)) + Path.DirectorySeparatorChar;
+            DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+            while (true)
+            {
+                bool running = false;
+                foreach (Process candidate in Process.GetProcessesByName("copilot"))
+                {
+                    using (candidate)
+                    {
+                        try
+                        {
+                            running |= candidate.MainModule?.FileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) == true;
+                        }
+                        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException)
+                        {
+                            // Exited or inaccessible processes are not owned by this run.
+                        }
+                    }
+                }
+
+                if (!running)
+                {
+                    return;
+                }
+
+                Assert.True(DateTimeOffset.UtcNow < deadline, "The bundled CLI started from this run did not exit after the application closed.");
+                Thread.Sleep(250);
+            }
         }
 
         internal async Task AssertHostFailureAsync(AppInstance app, string expectedHostMessage)
@@ -607,26 +641,27 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
         {
             Assert.All(applications, app => Assert.True(app.Process.HasExited));
             AssertInside(Root, CacheDirectory);
-            DeletePlainDirectory(CacheDirectory);
+            RetryTransientIo(() => DeletePlainDirectory(CacheDirectory), () => Directory.Exists(CacheDirectory));
             string destination = Path.Combine(Root, "移動した package");
             Assert.False(Directory.Exists(destination));
-            MoveDirectoryWithTransientRetry(PackageDirectory, destination);
+            string source = PackageDirectory;
+            RetryTransientIo(() => Directory.Move(source, destination), () => Directory.Exists(source) && !Directory.Exists(destination));
             PackageDirectory = destination;
         }
 
-        private static void MoveDirectoryWithTransientRetry(string source, string destination)
+        private static void RetryTransientIo(Action operation, Func<bool> canRetry)
         {
-            // Antivirus scans can briefly hold a just-exited EXE; an atomic rename is retried within a bound.
+            // Antivirus scans can briefly hold just-exited files; only an unchanged operation is retried.
             DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(30);
             while (true)
             {
                 try
                 {
-                    Directory.Move(source, destination);
+                    operation();
                     return;
                 }
                 catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
-                    && DateTimeOffset.UtcNow < deadline && Directory.Exists(source) && !Directory.Exists(destination))
+                    && DateTimeOffset.UtcNow < deadline && canRetry())
                 {
                     Thread.Sleep(250);
                 }
@@ -696,7 +731,7 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
             {
                 try { AssertWorkbookLocationsAfterExit(); }
                 catch (Exception exception) { failures.Add(exception); }
-                try { DeletePlainDirectory(Root); }
+                try { RetryTransientIo(() => DeletePlainDirectory(Root), () => Directory.Exists(Root)); }
                 catch (Exception exception) { failures.Add(exception); }
             }
 

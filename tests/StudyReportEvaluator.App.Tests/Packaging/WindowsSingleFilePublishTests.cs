@@ -576,7 +576,7 @@ public sealed class WindowsSingleFilePublishTests
             }
             if (-not $rejected -or (Test-Path -LiteralPath $probe)) { throw 'Failed probe did not clean its owned trace/cache.' }
             if ((Get-Sha256Hex -Path $exe) -cne $hash) { throw 'Publish input was changed by failed validation.' }
-            """, [.. LayoutFunctions, "Get-Sha256Hex", "Set-SingleFileProbeEnvironment", "Invoke-TransientFileOperation", "Assert-SingleFileApplicationLaunch"]);
+            """, [.. LayoutFunctions, "Get-Sha256Hex", "Set-SingleFileProbeEnvironment", "Wait-OwnedProbeProcessesExit", "Invoke-TransientFileOperation", "Assert-SingleFileApplicationLaunch"]);
     }
 
     [Fact]

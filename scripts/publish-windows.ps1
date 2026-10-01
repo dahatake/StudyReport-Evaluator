@@ -1090,6 +1090,34 @@ function Wait-NoStartupChildProcesses {
     }
 }
 
+function Wait-OwnedProbeProcessesExit {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ProbeDirectory,
+
+        [int] $TimeoutSeconds = 30
+    )
+
+    # The bundled CLI started by the startup status check can outlive the app briefly and keeps
+    # inherited probe handles (host trace) open; only processes running from this probe are awaited.
+    $prefix = [System.IO.Path]::TrimEndingDirectorySeparator([System.IO.Path]::GetFullPath($ProbeDirectory)) +
+        [System.IO.Path]::DirectorySeparatorChar
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ($true) {
+        $owned = @(Get-CimInstance -ClassName Win32_Process -Property ProcessId, ExecutablePath -OperationTimeoutSec 5 -ErrorAction Stop |
+            Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase) })
+        if ($owned.Count -eq 0) {
+            return
+        }
+
+        if ([DateTimeOffset]::UtcNow -ge $deadline) {
+            throw 'Processes started from the single-file probe did not exit after the application closed.'
+        }
+
+        Start-Sleep -Milliseconds 250
+    }
+}
+
 function Invoke-TransientFileOperation {
     param(
         [Parameter(Mandatory)]
@@ -1232,6 +1260,7 @@ function Assert-SingleFileApplicationLaunch {
         }
 
         Assert-ApplicationLaunch -PublishDirectory $isolatedDirectory -SingleFileProbeDirectory $ProbeDirectory
+        Wait-OwnedProbeProcessesExit -ProbeDirectory $ProbeDirectory
         $appBase = Get-SingleFileExtractionDirectory -ProbeDirectory $ProbeDirectory
         Assert-SafePublishLayout -PublishDirectory $appBase -ExtractedBundle
         foreach ($assembly in @("$ApplicationName.dll", 'StudyReportEvaluator.Core.dll')) {
