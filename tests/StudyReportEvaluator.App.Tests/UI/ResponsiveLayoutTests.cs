@@ -670,6 +670,7 @@ public sealed class ResponsiveLayoutTests(ITestOutputHelper output)
                 if (results.ViewModel.IsLoaded)
                 {
                     State("ResultsRunIdentity", TextWrapping.NoWrap, ellipsis: true);
+                    State("ResultsRunMetrics", TextWrapping.NoWrap, ellipsis: true);
                     State("ResultsSnapshotCaption", TextWrapping.NoWrap);
                 }
                 break;

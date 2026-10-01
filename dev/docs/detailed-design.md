@@ -852,7 +852,7 @@ checkpointとRun sheetへ次を保存する。
 - tempとpartialはtarget directoryの既存OS access controlを継承し、より広いpermissionへ変更しない。
 - ジョブ単位のコスト観測は`App/Usage`が所有し、application logとは別の`Logging/JobCostLogger`がUTF-8 JSON Linesへ数値・生成ID・閉じたコードだけを書く。閉じたDTOを経由し、SDK応答全文・例外本文を渡さない（[ADR-0018](adr/0018-job-cost-observability.md)）。
 - 集計は開始操作ごとのジョブへ閉じ、attemptの累計は置換で更新する。イベント合計とセッション累計、モデル別内訳とセッション総量を加算せず、不一致は不一致のまま記録する。
-- 単位はSDK報告の原単位（`nano-AI units`、premium request消費量）を保持し、AIクレジット・通貨へ換算しない。`AggregationScope`と`UnitPolicy`を固定コードで記録する。
+- 単位はSDK報告の原単位（`nano-AI units`、premium request消費量）を保持し、通貨へ換算しない。`AggregationScope`と`UnitPolicy`を固定コードで記録する。AIクレジット（nano-AI units ÷ 1,000,000,000）と結果画面の総実行時間は`Usage/RunMetricsFormatter`が表示時だけ計算し、JSONLへは記録しない（要求§11.21、ADR-0018追補）。
 - ログのI/O障害・容量上限・記録欠落はUIの独立表示とし、評価・retry・cleanup・checkpointの結果へ影響させない。
 
 ## 15. Error code

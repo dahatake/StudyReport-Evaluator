@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Windows.Input;
 using DocumentFormat.OpenXml.Packaging;
 using StudyReportEvaluator.App.Copilot;
+using StudyReportEvaluator.App.Usage;
 using StudyReportEvaluator.App.Workflow;
 using StudyReportEvaluator.App.Workbooks.Checkpoint;
 using StudyReportEvaluator.App.Workbooks.Validation;
@@ -959,6 +960,13 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         ? $"入力: {Path.GetFileName(run.InputPath)} · 開始: {run.Summary.StartedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture)} · 終了: {run.Summary.EndedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture)}"
         : string.Empty;
 
+    // Display-only projection of the loaded job's cost record (§11.21); null cost is reported, not zeroed.
+    public string RunMetricsText => context is { } run ? RunMetricsFormatter.DescribeRun(run.Cost) : string.Empty;
+
+    public string RunMetricsToolTip => context is null
+        ? string.Empty
+        : RunMetricsText + Environment.NewLine + RunMetricsFormatter.AiCreditNote;
+
     public int PlannedEvaluationCount => context?.Summary.PlannedOperationCount ?? 0;
 
     public int CompletedEvaluationCount => context?.Summary.CompletedOperationCount ?? 0;
@@ -1179,6 +1187,8 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
             nameof(DurableOutputText),
             nameof(IsInputUnchanged),
             nameof(RunIdentityText),
+            nameof(RunMetricsText),
+            nameof(RunMetricsToolTip),
             nameof(PlannedEvaluationCount),
             nameof(CompletedEvaluationCount),
             nameof(FailureCount),

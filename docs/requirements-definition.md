@@ -587,6 +587,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
    - 実行開始の判断結果と、「定量化を開始」「中断」
 4. **結果**
    - 完了／一部失敗／取消を明示
+   - 見出し行に、今回のジョブの総実行時間（`HH:MM:SS`）とAIクレジット（§11.21）
    - finalまたはpartial path
    - 一覧（プレビュー）では行ごとのFinalScore、SpecialEarned、SimilarityPenalty、行状態だけを示し、設問別得点は示さない（FR-RS-06）。詳細で、選択行のFinalRawと設問別のQuestionEarnedを、設問IDでなく元のExcel由来の設問文で示す（§11.11）
    - 詳細で、選択した基準について設問文と学生の回答（元のExcel）、AIの点・理由・根拠・根拠の場所・評価項目の説明（§11.19）
@@ -782,7 +783,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 - 「3 実行」「4 結果」でExcelを開かずに、今回のAI処理で観測できた使用量を確認できる。対象は開始操作ごとのジョブ1件で、入力・出力・推論・キャッシュのtoken数、SDKが報告した`nano-AI units`、premium request消費量、観測状態を示す。
 - 通常評価・参照回答生成・固有評価と、それぞれの再試行を対象とする。類似度評価はローカル計算（§7.5）でAIを呼ばないため、使用量は発生しない。成功・技術失敗・取消・timeout・出力失敗、checkpointへ保存されなかった行で観測できた値も今回ジョブに残す。
 - 取得できない値は理由とともに未取得として示し、0や推定値へ置き換えない。明示的な0、未送信、送信状況不明、最後の呼び出しのみの部分取得を区別する。
-- 単位はSDK報告の原単位を保持し、AIクレジット・通貨へ換算しない。換算根拠を確認できるまでAIクレジットの数値を表示しない。
+- 単位はSDK報告の原単位を保持し、通貨へ換算しない。AIクレジットはnano-AI unitsからの表示時換算だけを§11.21（FR-CR-01〜04）に従って示す（2026-10-01変更: 旧規定「換算根拠を確認できるまでAIクレジットの数値を表示しない」を置き換えた）。
 - 同一attemptの累計は置換で更新し、イベント合計とセッション累計、モデル別内訳とセッション総量を加算しない。内訳と総量が一致しない場合は不一致として示し、配賦・補正で一致させない。
 - 項目ごとに取得元（イベント／最終RPC／最後の呼び出しのみ）と部分取得を保持する。再試行は別attemptとして数え、試行番号・相関ID・終端結果を記録する。
 - ジョブ単位のUTF-8 JSON Linesログを利用者別のローカル領域へ作り、数値・生成ID・閉じたコードだけを記録する。回答・Prompt・reason・evidence・学生識別子・実path・credentialを記録せず、モデル名は匿名化した識別子だけを保存する。ジョブcontextとattemptごとに、アプリが指定したrun-level reasoning effort（例: `low`、未指定はnull）を記録する。
@@ -910,6 +911,26 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 | FR-CD-03 | MUST | 評価項目の名前・重み・range・個別の範囲の初期値は変えない。初期値の説明は必須入力検査（空白でない）と文字数上限を満たし、定義の検証エラーを増やさない。 |
 
 例: 評価方法が`Prompt 分析`の質問で評価項目の「追加」を押すと、新しい評価項目の説明は`学生が作成したPromptについて…評価を行ってください。`で始まる4行の本文になる。同じ質問の評価方法を`Knowledge Cover`へ変えても既存の説明は変わらず、その後に追加した評価項目だけ`学生が作成したレポートを…`で始まる本文になる。
+
+### 11.21 結果画面の総実行時間とAIクレジット（2026-10-01追加）
+
+出典: 依頼原文（2026-10-01「実行結果の画面に以下の情報を付与してください。定量化のジョブの総実行時間(HH:MM:SS)/AI Credit (これは金額のコストに関わるので大変重要)」と「4 結果・出力」の画面写真）、§11.9、`src/StudyReportEvaluator.App/Usage/JobUsageTracker.cs`、GitHub Docs [Usage and billing metrics（Copilot SDK）](https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/usage-and-billing)と固定SDK `1.0.11`の同文書[usage-and-billing.md](https://github.com/github/copilot-sdk/blob/v1.0.11/docs/features/usage-and-billing.md)（`totalNanoAiu`は「AI credit cost, in nano-AI units」、例は`÷ 1e9`）、GitHub Docs [Usage-based billing for individuals](https://docs.github.com/en/copilot/concepts/billing-and-usage/individuals/billing)（AIクレジットの定義）、SDK [nodejs/src/workflow.ts](https://github.com/github/copilot-sdk/blob/main/nodejs/src/workflow.ts)（`NANO_AIU_PER_AIU = 1_000_000_000`）。いずれも確認日2026-10-01。
+
+本節の**ジョブ**は§11.9と同じ「定量化を開始」または再開の1操作に対応するジョブ1件である。値の正本は、結果画面へ読み込んだ実行結果に付属するそのジョブのコスト記録（`JobCostSnapshot`、以下「コスト記録」）とする。本節は§11.9の旧規定「換算根拠を確認できるまでAIクレジットの数値を表示しない」を置き換える（A-CR-01）。
+
+| ID | 優先度 | 要求 |
+|---|---|---|
+| FR-RT-01 | MUST | 「4 結果」の見出し行で、件数要約（`ResultsRunSummary`）の右に`ResultsRunMetrics`（TextBlock）を置き、実行結果を読み込んでいる間だけ`総実行時間 {時間} · AIクレジット {クレジット}`を表示する（区切りは半角空白・U+00B7・半角空白）。未読込時は空文字で非表示。ToolTipとAccessible Nameは本文の後に改行とFR-CR-04の注記を続けた文とする。1024×720 DIP以上の通常画面で省略記号なしに全文が見える。 |
+| FR-RT-02 | MUST | `{時間}`はコスト記録の`EndedAtUtc − StartedAtUtc`（ジョブ開始から、参照回答・評価・類似度・最終workbook確定・cleanup・使用量記録の終了まで）。経過時間の秒未満を切り捨てた整数秒Tから、HH＝floor(T÷3600)を2桁以上で0埋め（100時間以上は桁を増やす）、MM＝floor((T mod 3600)÷60)、SS＝T mod 60を各2桁0埋めとし、`HH:MM:SS`を不変カルチャで示す。コスト記録がない、開始・終了時刻のどちらかがない（未終了）、差が負のときは`—（未計測）`とする。 |
+| FR-CR-01 | MUST | AIクレジット＝コスト記録の`nano-AI units`ジョブ合計（§11.9の「nano-AI units（SDK報告値）」と同じ値）÷ 1,000,000,000。decimalで計算し、小数第5位を四捨五入（`MidpointRounding.AwayFromZero`）した小数4桁を、不変カルチャ・3桁区切り`,`・常に小数4桁（書式`#,##0.0000`）で示す。合計が正で丸め結果が0のときは`<0.0001`、合計が0のときは`0.0000`とする。 |
+| FR-CR-02 | MUST | `ResultsRunMetrics`の`{クレジット}`は、次の上から最初に当てはまる形とする。コスト記録なし→`—（コスト記録なし）`。送信試行0→`—（AI送信なし）`。nano-AI units未取得（null）→`—（未取得）`。コスト記録が未終了、nano-AI unitsの観測状態がない、または部分取得（観測完了の試行数＜送信試行数）→`{値}（一部取得）`。それ以外→`{値}`。未取得を0へ置き換えない。 |
+| FR-CR-03 | MUST | 「3 実行」「4 結果」で共有するコスト要約（`ExecutionCostSummary`／`ResultsCostSummary`）の2行目を`AIクレジット {値}（SDK報告値から換算・観測 {観測試行数}/{送信試行数} 試行・観測完了｜部分取得）`、未取得は`AIクレジット —（未取得）`とする。コスト詳細の`nano-AI units（SDK報告値）`の行の直後に`AIクレジット（nano-AI units ÷ 1,000,000,000。SDK報告値からの換算で請求確定額ではありません） {同じ形}`を追加する。ジョブログ表示（`LogText`の各行）のAIクレジット欄は`／AIクレジット {値}（SDK報告値から換算・部分取得｜観測完了）`、未取得は`／AIクレジット —（未取得）`とし、部分取得の判定は同じ行の`nano-AI units`と同じにする。`{値}`の書式はFR-CR-01。 |
+| FR-CR-04 | MUST | AIクレジットが観測値の換算であり、請求確定額・アカウント全体の利用量・残量ではないことを示す。`ResultsRunMetrics`の注記は`GitHub Copilot SDKが報告したnano-AI unitsを1,000,000,000で割ったAIクレジットです。今回のジョブで観測できた値だけで、請求確定額ではありません。`とする。円・ドル等の通貨への換算とプラン残量の表示はしない。 |
+| NFR-CR-01 | MUST | 本表示のためにAIを呼ばず、GitHubの課金・利用量APIへ問い合わせず、追加のnetwork通信をしない。JSONLログのschema・記録項目、Excel出力、checkpoint、設定ファイルを変えない（AIクレジットは記録済みのnano-AI unitsから表示時に計算する）。表示の失敗・未取得で採点・出力の成否を変えない。 |
+
+例: コスト記録が開始`2026-10-01T03:34:24.100Z`、終了`2026-10-01T03:36:33.900Z`（経過129.8秒）、nano-AI units合計`12345678901`、24試行すべて観測完了 → `総実行時間 00:02:09 · AIクレジット 12.3457`、コスト要約2行目は`AIクレジット 12.3457（SDK報告値から換算・観測 24/24 試行・観測完了）`。同じ値で1試行が部分取得 → `総実行時間 00:02:09 · AIクレジット 12.3457（一部取得）`。経過360000秒・nano-AI units `50000` → `総実行時間 100:00:00 · AIクレジット 0.0001`。nano-AI units `49999` → `AIクレジット <0.0001`。nano-AI units `1234567890000000` → `1,234,567.8900`。
+
+境界・例外: 再開した実行では今回の再開ジョブだけの時間・クレジットを示し、中断前のジョブの値を加算しない（A-RT-01）。`ResultsRunIdentity`の「開始」「終了」はcheckpointのrun開始時刻と評価終了時刻であり、総実行時間と一致しないことがある。
 
 ## 12. Promptファイルからの起動
 
@@ -1107,7 +1128,8 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 - 4ステップを維持した同一window内の設定5カテゴリ、通常最小サイズの外側スクロール不要、ページ切替と長文／狭小／拡大の到達性例外
 - 利用者別setting.txtへの共通設定＋採点定義1件の明示保存、検証後の保存定義明示適用、明示出力先復元とnull時だけの入力隣接result
 - 値・対象・ページ・カテゴリの往復保持、保存model希望IDと実効選択の分離、現在run／次回draft／前回結果の区別
-- 実行・結果画面とジョブ単位ローカルJSON Linesログによる今回ジョブのAI使用量表示（SDK報告の原単位のみ、AIクレジット・通貨換算なし）
+- 実行・結果画面とジョブ単位ローカルJSON Linesログによる今回ジョブのAI使用量表示（SDK報告の原単位と、表示時に換算したAIクレジット。通貨換算なし）
+- 結果画面の見出し行への、今回のジョブの総実行時間（`HH:MM:SS`）とAIクレジットの表示（§11.21）
 
 ### 17.2 out of scope
 
@@ -1173,7 +1195,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | AC-036 | 保存定義はExcel読込後の明示操作で、保存headerのmetadata・sheet・行・列・定義全体を検証してからInput／Designへ一括適用する。失敗・取消時は現在状態とfileを変更せず、成功時はID・順序・設問text・Prompt・配点を保持する。Imported Prompt一覧は不変、run中の一括適用は禁止し、既存checkpoint admissionを緩めない。 |
 | AC-037 | 設定を第5ステップにせず、同じ対象へ1操作で移動し、値・対象ID・ページ・カテゴリ・入力途中の編集を保持して戻れる。希望modelは明示確認後だけ実効選択にし、不在なら未選択・no fallback、確認失敗だけで保存希望を消さない。遷移・設定読込／保存／適用・login完了で認証確認／login／runを自動開始せず（起動時の自動確認・自動loginだけは§11.10・AC-040に従う）、実行中の次回draft編集は現在snapshotへ混入しない。全画面で進捗・停止を保持し、設定中完了は結果通知だけとする。前回結果・override・未保存修正版を次回設定から分離する。 |
 | AC-038 | 中断後は部分結果のpartial pathと再開準備を表示し、同一セッションでは明示操作で、再起動後はpartial選択またはpath指定で再開条件を開始前に項目別検証する。不一致時はcheckpointを変更せず開始しない。入力・modelだけは明示操作で合わせられ、採点設計・runtimeは自動変更しない。window close時は有限時間の中断待機後に閉じる。 |
-| AC-039 | 実行・結果画面とジョブ単位のローカルJSON Linesログで、今回の開始操作に対応するAI使用量（入力・出力・推論・キャッシュtoken、`nano-AI units`、premium request消費量）を、AIを呼ぶ3 operation（参照回答・通常評価・固有評価）と再試行・失敗・取消・未保存行を含めて確認できる。未取得は0や推定値にせず理由とともに示し、明示0・未送信・送信状況不明・部分取得を区別する。項目別の取得元、試行番号・相関ID・終端結果、モデル内訳と総量の不一致を保持し、内訳を総量へ加算・配賦しない。SDK報告の原単位を保ち、換算根拠のないAIクレジット・通貨表示をしない。ログは数値・生成ID・閉じたコードだけを記録し、保存失敗でも観測済み表示と採点を壊さない。 |
+| AC-039 | 実行・結果画面とジョブ単位のローカルJSON Linesログで、今回の開始操作に対応するAI使用量（入力・出力・推論・キャッシュtoken、`nano-AI units`、premium request消費量）を、AIを呼ぶ3 operation（参照回答・通常評価・固有評価）と再試行・失敗・取消・未保存行を含めて確認できる。未取得は0や推定値にせず理由とともに示し、明示0・未送信・送信状況不明・部分取得を区別する。項目別の取得元、試行番号・相関ID・終端結果、モデル内訳と総量の不一致を保持し、内訳を総量へ加算・配賦しない。SDK報告の原単位を保ち、通貨表示をしない。AIクレジットはnano-AI unitsから§11.21の規則で換算して示す（2026-10-01変更）。ログは数値・生成ID・閉じたコードだけを記録し、保存失敗でも観測済み表示と採点を壊さない。 |
 | AC-040 | 事前条件: fake認証境界とfake login processを注入した`ExecutionViewModel`（実CLI・実ブラウザー・実資格情報は使わない）。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~CopilotLoginCommandTests"`。期待結果（exit code 0）: ①window表示（Opened）で認証確認が1回だけ実行される（FR-AL-01）。②`Available`ならlogin processの起動0回・resolver呼出0回・状態文に「自動的にログインしました」（FR-AL-02）。③`AuthRequired`ならlogin processがちょうど1回起動し、完了後に認証を再確認し、2回目の起動時処理は何もしない（FR-AL-03、FR-AL-04）。④`CliUnavailable`／`RuntimeFailed`／`Cancelled`ではlogin起動0回で再試行案内を表示する（FR-AL-03、FR-AL-07）。⑤自動login中の「ログインを取り消す」で所有processだけを`Kill(false)`で1回終了し、再自動起動しない（FR-AL-04、FR-AL-05）。⑥run呼出0回・model fallbackなし（FR-AL-06）。⑦環境変数値`0`／`false`（大文字小文字・前後空白を無視）でlogin起動0回、未設定・空・その他値は有効（FR-AL-08）。⑧状態文・`ToString()`にcanary（token、device code、path、例外名）を含まない（SEC-AL-01〜02）。⑨dispose後・手動確認中・確認失敗時に例外を漏らさずloginを開始しない（FR-AL-07、NFR-AL-01）。証跡: テスト結果（.trx）。実資格情報での確認はAC-040に含めず、§18外の本人確認とする。 |
 | AC-041 | 事前条件: 設問文が`Question text Q1`（設問ID `Q1`、表示名`Question Q1`）等の合成runと、改行・連続空白・全角空白を含む設問文、空白のみの設問文を持つ合成run。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultsQuestionTextTests|FullyQualifiedName~ResultsOutputViewTests"`。期待結果（exit code 0）: ①`RowScores[].QuestionEarnedText`が`<正規化した設問文>: <獲得点>`を設問順に` · `連結した値と完全一致し、設問IDまたは表示名を含まない（FR-RS-01、FR-RS-02）。②改行・タブ・全角空白を含む設問文は単一半角空白へ正規化され前後空白が除かれる。未確定の設問は`—`（FR-RS-02）。③空白のみの設問文は表示名、表示名も空白のみならIDを使う（FR-RS-03）。④実viewの詳細の`ResultsQuestionEarnedFull`が選択行の`QuestionEarnedText`と同じ文字列で、詳細の基準編集領域の`ResultsCriterionQuestionText`が原文（改行保持）である（FR-RS-01、FR-RS-04）。⑤表示しただけで未保存overrideが生じず、snapshotの設問文が原文のまま（正規化されない）である（FR-RS-05）。⑥実viewの一覧（`RowScoreList`）の見出しのTextBlockが`元の行`・`最終点`・`固有点`・`類似減点`・`状態`の5個だけでこの順に並び、各行のGridが列定義5・子5で、一覧の見出し・行のどのTextBlockのTextとtooltipにも`設問別得点`と`QuestionEarnedText`の値（設問文）を含まない。10設問の合成runでも一覧の列は5のままで、詳細の`ResultsQuestionEarnedFull`には全10設問が出る（FR-RS-06、FR-RS-01）。証跡: テスト結果（.trx）。実画面のスクリーンショット確認は§18外とする。 |
 | AC-042 | 事前条件: fake行source・fake AI runner・fake checkpoint storeと、fake run boundaryを注入した`ExecutionViewModel`／`ExecutionView`（実CLI・実AI・実資格情報は使わない）。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~LivePreview"`。期待結果（exit code 0）: ①評価計画確定後、対象行と同数（先頭行〜末尾行、昇順、欠落・重複なし）の全行が「待機中」で並ぶ（FR-LP-02、FR-LP-03）。②1行の評価で、AIへ渡した`RenderedPrompt`と一致するPrompt、主回答・補助列のセル値、criterion別RawScore・理由・根拠、固有Score、類似度がFR-LP-04どおり詳細に出る。Prompt組立後・応答前は「AI評価中」で対象の文字列とPromptが出て、応答後に値が入る（FR-LP-04、FR-LP-05）。③空回答は`空回答: AIへ送信せず0点相当`、固有配点0は`未実行`、AI失敗は`失敗（AI_TIMEOUT）: 値は空欄`で、0や成功値を出さない（FR-LP-05）。④一覧の要約が`通常 8,6 / 固有 0.8 / 類似 0.42`形式になり、項目数・状態が更新される（FR-LP-03）。⑤checkpoint再開では再開済み行が「再開前に完了」でcheckpointの値を表示し、対象の文字列・Promptは保存されていない旨を示す（FR-LP-06）。⑥取消・失敗で終わると評価途中の行が「中断」、未着手が「未処理」になり、次のrun開始・入力変更で破棄される（FR-LP-07）。⑦2,000文字超の値は`先頭 2,000 文字`注記つきで切り詰められ、保持合計が32,000,000文字を超えると以後は200文字になる（FR-LP-08）。⑧見出しが`速報値（Excel 行ごと・{N} 行）`で、20,000行でも全件が一覧に入り、Controlは仮想化される（FR-LP-01、FR-LP-02、FR-LP-09、NFR-LP-01）。⑨canary文字列が`ToString()`・logに現れず、追加のAI呼出しが0件、checkpointに速報値用の追加フィールドがない（SEC-LP-01、SEC-LP-02）。⑩1024×720で「実測」表示・予約名・主要操作がviewport内に収まり、速報値の行一覧・詳細が日本語Accessible Nameを持つ（NFR-LP-01）。証跡: テスト結果（.trx）、`docs/images`の実行画面screenshot。 |
@@ -1187,9 +1209,11 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | AC-050 | 対応要求: FR-MO-06〜07。事前条件: fake transportと合成workbook、実通信なし。`dotnet test tests\StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ModelOptionsTests|FullyQualifiedName~EphemeralEvaluationRunnerTests|FullyQualifiedName~AuxiliaryEvaluationRunnerTests|FullyQualifiedName~Resume|FullyQualifiedName~Checkpoint|FullyQualifiedName~ResultExcelDescriptionTests|FullyQualifiedName~ExecutionSettingsTests|FullyQualifiedName~ConfigAndRunSheetWriterTests|FullyQualifiedName~ResultsOutputViewTests" --logger trx`。期待: exit 0、全3種sessionとretryが選択effort/tierを保持、既定tierはnull、拡張prompt budgetへ容量検査が追従、実行中変更は次回だけ、checkpoint round-tripと追記のtier一致・不正tier拒否、旧schema2は既定tier、tier不一致は送信0で`CHECKPOINT_MODEL_MISMATCH`、復元操作でeffort/tierを復旧、Runの26項目と`ContextTier`出力・説明の一致、override出力へのtier継承、入力bytes不変。証跡: TRX、fake sessionのconfig、checkpointと出力assert。 |
 | AC-051 | 対応要求: FR-RV-01〜06、SEC-RV-01、NFR-RV-01、FR-RS-04。事前条件: リポジトリのsource、Avalonia headless、合成definition（主回答列`A`・補助列`B`）と合成run、fakeの入力identity境界・行source、および一時directoryに作った合成`.xlsx`（実CLI・実AI・実資格情報・`sample/`は使わない）。操作: リポジトリルートで`dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultsAnswerReviewTests|FullyQualifiedName~ResultsQuestionTextTests|FullyQualifiedName~ResultsOutputViewTests|FullyQualifiedName~ResponsiveLayoutTests|FullyQualifiedName~PrimaryJourneyAccessibilityTests"`。期待結果（exit code 0）: ①詳細を開くと選択行の基準の`StudentAnswerText`がFR-RV-02の形式（`[列 A · 主回答]\n{値}\n\n[列 B · 補助]\n{値}`、空セルは`（空欄）`、改行保持）と完全一致し、実viewの`ResultsCriterionStudentAnswer`に同じ文字列が出る（FR-RV-01、FR-RV-02）。②一覧表示中は読込0回、詳細表示で選択行の1行だけを読み、同じ行の再表示で読み直さない。入力identityの確認が読込の前後2回行われる（FR-RV-03）。③identity不一致・読込例外で、FR-RV-04の各文言になり、値を出さない。失敗後の再選択で再読込する（FR-RV-04）。④理由・引用・根拠の場所・説明が、成功・引用なし・`NONE`・`SUPPORTING_COLUMN`・空回答・取消・技術失敗の各場合にFR-RV-05の文字列と完全一致し、`ResultsCriterionReason`／`ResultsCriterionEvidence`／`ResultsCriterionEvidenceSource`／`ResultsCriterionDescription`に表示される（FR-RV-05）。⑤表示によって未保存overrideが生じず、出力境界の呼出し0回・`Results`の採点値不変、合成`.xlsx`のバイト列と更新日時が不変で、実ファイルから読んだ回答が表示される（FR-RV-06、FR-RV-03）。⑥読込中に別の行を選んだ・別の実行結果を読み込んだ場合、古い結果が反映されない（NFR-RV-01）。⑦回答・理由・根拠のcanary文字列とファイルパスが、`ToString()`、状態文言、Automation の Name に現れない（SEC-RV-01）。⑧1024×720 DIPの詳細で、override入力欄がviewport内、回答欄・評価欄が高さ44 DIP以上で横にはみ出さず、Automation IDが一意である（NFR-RV-01、FR-RV-01）。⑨設問文は回答欄の先頭に原文で出る（FR-RS-04）。既存のResults系UI試験が引き続き成功する。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
 | AC-052 | 対応要求: FR-CD-01〜03。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）、合成workbook。操作: リポジトリルートで`dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~DefaultCriterionDescriptionTests"`。期待結果（exit code 0）: ①`DefaultCriterionDescriptions.For`が§11.20の2本文と完全一致し、未対応の種類は`ArgumentOutOfRangeException`（FR-CD-01）。②新規の採点定義の最初の評価項目と、Knowledge Coverの評価項目の「追加」・評価方法の追加で作る評価項目がKnowledge Cover本文、Prompt 分析（Custom）の評価方法への追加・その評価方法の最初の評価項目がPrompt 分析本文である（FR-CD-01）。③評価方法の種類を変えても既存の説明は不変で、その後の追加だけ変更後の種類の本文になり、利用者が編集した説明は評価項目の追加で上書きされない（FR-CD-02）。④入力画面の提案設問は、学生のPrompt列がPrompt 分析本文、それ以外がKnowledge Cover本文で、検証エラーが0件である（FR-CD-01、FR-CD-03）。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
+| AC-053 | 対応要求: FR-RT-01〜02、FR-CR-01〜04、NFR-CR-01。事前条件: リポジトリのsource、Avalonia headless、合成run結果と、`JobUsageTracker`へfakeの観測値を与えて作ったコスト記録（実CLI・実AI・実資格情報・実課金API・`sample/`は使わない）。操作: リポジトリルートで`dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultsRunMetricsTests|FullyQualifiedName~JobUsageTrackerTests|FullyQualifiedName~JobCostBackendTests|FullyQualifiedName~ResultsOutputViewTests|FullyQualifiedName~ResponsiveLayoutTests|FullyQualifiedName~MainWindowSettingsTests"`。期待結果（exit code 0）: ①時間の書式が0秒→`00:00:00`、129.8秒→`00:02:09`、3599.999秒→`00:59:59`、3600秒→`01:00:00`、360000秒→`100:00:00`、記録なし・終了時刻なし・負の差→`—（未計測）`と完全一致（FR-RT-02）。②AIクレジットの書式が0→`0.0000`、49999→`<0.0001`、50000→`0.0001`、12345678901→`12.3457`、1234567890000000→`1,234,567.8900`と完全一致し、型はstring（FR-CR-01）。③`ResultsRunMetrics`の本文がFR-CR-02の5分岐（記録なし・AI送信なし・未取得・一部取得・観測完了）で`総実行時間 {時間} · AIクレジット {クレジット}`と完全一致し、未読込で空・非表示、ToolTipとAccessible NameがFR-CR-04の注記を含み、別の実行結果の読込で更新される（FR-RT-01、FR-CR-02、FR-CR-04）。④コスト要約2行目・コスト詳細・ジョブログ表示のAIクレジットがFR-CR-03の文字列と一致し、旧文言`課金単位未確認`を含まない。通貨記号・`円`・`USD`・`ドル`を含まない（FR-CR-03、FR-CR-04）。⑤JSONLの各行がAIクレジットの項目を持たず、nano-AI unitsの記録値が変わらない（NFR-CR-01）。⑥1024×720・1180×800 DIPのメインwindow（`MainWindowSettingsTests`）と結果の内容領域950 DIP幅で最長例`総実行時間 100:00:00 · AIクレジット 1,234,567.8900（一部取得）`を含め、`ResultsRunMetrics`が省略記号なしに全文見える（FR-RT-01）。既存のResults・コスト系UI試験が引き続き成功する。証跡: テスト結果（.trx）。実account・実請求額との照合は§18外とする。 |
+
 ## 19. Test requirements
 
-以下の番号は追跡ID `TR-01`〜`TR-47`に対応する。既存番号を維持し、中断・再開導線の37、ジョブコスト表示の38、起動時の自動Copilotログインの39、結果画面の設問文表示の40、実行中の速報値表示の41、利用できる全modelの選択の42、結果Excelの解説文書の43、実行準備部品の集約の44、通常評価の設問タブの45、結果画面での学生の回答と評価内容の表示の46、評価項目の説明の初期値の47を末尾へ追加する。T01時点の未実装・試験NOT_RUNは履歴であり、現在の実装・局所検証は[traceability](../dev/docs/traceability.md)のVERIFIED_SCOPEDに限定する。過去の試験結果と現在の局所検証は同追跡表で区別し、異なる対象集合を合算して全体合格にしない。
+以下の番号は追跡ID `TR-01`〜`TR-48`に対応する。既存番号を維持し、中断・再開導線の37、ジョブコスト表示の38、起動時の自動Copilotログインの39、結果画面の設問文表示の40、実行中の速報値表示の41、利用できる全modelの選択の42、結果Excelの解説文書の43、実行準備部品の集約の44、通常評価の設問タブの45、結果画面での学生の回答と評価内容の表示の46、評価項目の説明の初期値の47、結果画面の総実行時間とAIクレジットの48を末尾へ追加する。T01時点の未実装・試験NOT_RUNは履歴であり、現在の実装・局所検証は[traceability](../dev/docs/traceability.md)のVERIFIED_SCOPEDに限定する。過去の試験結果と現在の局所検証は同追跡表で区別し、異なる対象集合を合算して全体合格にしない。
 
 **0.8.4での記録済み結果:** T35の対象文書試験は4/4成功・敵対的レビュー済み（`artifacts/test/ui-settings/t35/t35-reviewed.trx`、指摘0）。T36の文書・画像contract全体は別scopeで、独自の`artifacts/test/ui-settings/t36/t36-current.trx`が21/21成功・REVIEWED。T37は`artifacts/test/ui-settings/t37/t37.trx`の9/9（実ZIP＋MSIX静的契約）、T38は`artifacts/test/ui-settings/t38/t38.trx`の114/114とP06実EXE 7/7・P07 `PASS_DEVELOPMENT`。T39の自動回帰は`artifacts/test/ui-settings/t39/reviewed/`の2026-09-07の2 TRXでCore 190＋App 1702＝1892/1892、skip 0。初回1失敗→fixture修正→126/126・レビュー指摘0→全体再実行成功の履歴を保持する。MSIX実物は`artifacts/package/mechanism/StudyReportEvaluator-win-x64.unsigned.test.evidence.json`の`PASS_MECHANISM`（256 entries、0.8.4.0）で、install／公開の成功ではない。
 
@@ -1234,7 +1258,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 
 37. 中断後の再開準備、partial picker取消時の状態不変、開始前の項目別再開検証、入力・modelの明示適用、window close時の有限中断待機をdeterministicに確認する。
 
-38. ジョブ使用量の集計・表示・JSONLログのdeterministic test。取得成功／一部欠落／全欠落、明示0と未取得、最後の呼び出しのみ、イベント重複・順序逆転・final複数通知、再試行と3 operation（類似度はAIを呼ばない）、取消・cleanup失敗、項目別の取得元、モデル内訳と総量の不一致、下方訂正、overflow／負数を確認する。JSONLは一時directoryだけを使い、回答・Prompt・path・credentialのcanary非記録、容量上限・保存失敗時の観測値保持、終端記録の整合を検証する。実AI・実課金照合・AIクレジット換算は含めない（AC-039）。
+38. ジョブ使用量の集計・表示・JSONLログのdeterministic test。取得成功／一部欠落／全欠落、明示0と未取得、最後の呼び出しのみ、イベント重複・順序逆転・final複数通知、再試行と3 operation（類似度はAIを呼ばない）、取消・cleanup失敗、項目別の取得元、モデル内訳と総量の不一致、下方訂正、overflow／負数を確認する。JSONLは一時directoryだけを使い、回答・Prompt・path・credentialのcanary非記録、容量上限・保存失敗時の観測値保持、終端記録の整合を検証する。実AI・実課金照合・通貨換算は含めない（AC-039）。AIクレジットの換算・書式はTR-48で検証する。
 
 39. 起動時の自動Copilotログインのdeterministic test。既存資格情報あり（login process起動0）、資格情報なし（自動login1回・完了後の再確認・以後の再実行なし）、`CliUnavailable`／`RuntimeFailed`／`Cancelled`でのlogin非開始、利用者取消後の非再試行、dispose後・手動確認中の非実行、確認失敗の封じ込め、環境変数の解釈（未設定・空・`0`・`false`・大文字小文字・空白）、window表示（Opened）で1回だけ開始されること、AI送信0件、状態文・ToStringへのcanary非混入をfake境界で検証する。実CLI・実ブラウザー・実資格情報は使わない（AC-040）。
 
@@ -1251,6 +1275,8 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 
 47. 評価項目の説明の初期値のdeterministic test。評価方法の種類別の本文の完全一致、新規定義・評価項目の追加・評価方法の追加・入力画面の提案設問での初期値、種類変更と利用者編集で既存の説明が変わらないこと、検証エラー0件を検証する。実CLI・実AI・実資格情報は使わない（AC-052、FR-CD-01〜03）。
 
+48. 結果画面の総実行時間とAIクレジットのdeterministic test。時間の書式（0秒・秒未満切捨て・時の繰上り・100時間以上・未計測の3条件）、AIクレジットの換算・丸め・3桁区切り・`<0.0001`・0、`ResultsRunMetrics`の5分岐とToolTip・Accessible Name・未読込時の非表示・再読込での更新、コスト要約・詳細・ジョブログ表示の文言、JSONL schemaの不変、1024×720・1180×800での全文表示をfakeの観測値で検証する。実CLI・実AI・実資格情報・実課金APIは使わない（AC-053、FR-RT-01〜02、FR-CR-01〜04、NFR-CR-01）。
+
 ## 20. 外部仕様出典
 
 本要求の実装時は、固定するversionの一次資料を再確認する。
@@ -1261,6 +1287,8 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 - GitHub Copilot SDK: [Bundled CLI](https://github.com/github/copilot-sdk/blob/main/docs/setup/bundled-cli.md)
 - GitHub Copilot CLI: [Authenticating GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli)
 - GitHub Copilot SDK: [Session persistence](https://github.com/github/copilot-sdk/blob/main/docs/features/session-persistence.md)
+- GitHub Copilot SDK: [Usage and billing metrics](https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/usage-and-billing)（固定版[v1.0.11](https://github.com/github/copilot-sdk/blob/v1.0.11/docs/features/usage-and-billing.md)、確認日2026-10-01、§11.21）
+- GitHub Copilot: [Usage-based billing for individuals](https://docs.github.com/en/copilot/concepts/billing-and-usage/individuals/billing)（AIクレジットの定義、確認日2026-10-01、§11.21）
 - Avalonia: [File dialogs](https://github.com/AvaloniaUI/avalonia-docs/blob/main/docs/services/file-dialogs.md)
 - Microsoft: [.NET application publishing overview](https://learn.microsoft.com/dotnet/core/deploying/)
 - Microsoft: [Single-file deployment overview](https://learn.microsoft.com/dotnet/core/deploying/single-file/overview)
@@ -1299,7 +1327,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | OS-only実測 | fresh Windows 11 x64標準userでのexact EXE CH-01〜06（AC-029／034、TR-33） |
 | Platform release matrix | 既存protected CI/release workflow + candidate-bound v2 matrix／metadata evidence（AC-028／034、TR-29／33） |
 | User/developer documentation | docs + dev/docs + screenshot tests |
-| 実行コスト表示・ジョブログ | App `Usage`の集計と`Logging`のJSONL writer、Execution／Resultsが共有するコストView（AC-039、TR-38）。JobUsageTracker／SdkUsageAdapter／UsageProvenance／JobCostBackend／JobCostView testsで局所検証済み（VERIFIED_SCOPED）。実AI・実課金照合・AIクレジット換算・native確認は未実施 |
+| 実行コスト表示・ジョブログ | App `Usage`の集計と`Logging`のJSONL writer、Execution／Resultsが共有するコストView（AC-039、TR-38）。JobUsageTracker／SdkUsageAdapter／UsageProvenance／JobCostBackend／JobCostView testsで局所検証済み（VERIFIED_SCOPED）。実AI・実課金照合・native確認は未実施（AIクレジットの表示時換算は2026-10-01に§11.21・TR-48で追加） |
 | 実行中の速報値表示 | `DurableEvaluationScheduler`／`DurableQuantificationOrchestrator`の`LivePreviewUpdate`通知、`LiveQuantificationPreviewViewModel`、`ExecutionView`の速報値領域（AC-042、TR-41、FR-LP-01〜09／SEC-LP-01〜02／NFR-LP-01）。LivePreview試験で局所検証。実AI・native表示は未実施 |
 | 起動時の自動Copilotログイン | `ExecutionViewModel.RunStartupAuthenticationAsync`と`App.AttachStartupAuthentication`（AC-040、TR-39、FR-AL-01〜08／SEC-AL-01〜03）。CopilotLoginCommandTestsの起動時自動ログイン試験で局所検証。実CLI・実ブラウザー・実資格情報での確認は未実施（本人操作が必要） |
 | 結果画面の設問文表示 | `ResultsOutputViewModel`（設問別得点・基準の設問文）と`ResultsOutputView`（AC-041、TR-40、FR-RS-01〜06。一覧は設問別得点を表示しない5列）。ResultsQuestionTextTestsと既存Results系UI試験で局所検証 |
@@ -1308,7 +1336,10 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | 実行準備部品の集約・step状態文 | `InputView`＋`ExecutionPreparationPanel`（左列の移設先）、`MainWindow`のExecutionViewModel結線、`MainWindowViewModel`のstep状態文（AC-046、TR-44、FR-PREP-01〜07／FR-STEP-01〜03）。PreparationOnInputTests・MainWindowTests・ExecutionViewTestsで局所検証 |
 | 通常評価の設問タブ | `EvaluatorSettingsView`の`QuestionSelector`（ListBox、AC-048、TR-45、FR-QT-01〜05）。EvaluatorSettingsViewTests・CompactWorkflowLayoutTests・MainWindowSettingsTestsで局所検証 |
 | 結果画面の学生の回答と評価内容 | `ResultsAnswerSource`（入力identity確認つきの1行読込）、`ResultsOutputViewModel`（詳細表示時の読込・行単位の記憶・古い読込の破棄）、`ResultsCriterionViewModel`（回答・理由・引用・根拠の場所・説明の文言）、`ResultsOutputView`の回答欄・評価欄（AC-051、TR-46、FR-RV-01〜06／SEC-RV-01／NFR-RV-01）。ResultsAnswerReviewTestsと既存Results系UI試験で局所検証 |
-| 評価項目の説明の初期値 | `DefaultCriterionDescriptions`（Core）、`QuantificationDesignViewModel`の評価項目・評価方法の追加、`InputViewModel`の提案設問（AC-052、TR-47、FR-CD-01〜03）。DefaultCriterionDescriptionTestsで局所検証 |## 22. Approval record
+| 評価項目の説明の初期値 | `DefaultCriterionDescriptions`（Core）、`QuantificationDesignViewModel`の評価項目・評価方法の追加、`InputViewModel`の提案設問（AC-052、TR-47、FR-CD-01〜03）。DefaultCriterionDescriptionTestsで局所検証 |
+| 結果画面の総実行時間とAIクレジット | `RunMetricsFormatter`（Usage、時間・AIクレジットの書式）、`JobUsageTracker`のコスト要約・詳細、`JobCostLogReader.Render`、`ResultsOutputViewModel.RunMetricsText`と`ResultsOutputView`の`ResultsRunMetrics`（AC-053、TR-48、FR-RT-01〜02／FR-CR-01〜04／NFR-CR-01）。ResultsRunMetricsTests・JobUsageTrackerTests・既存Results系UI試験で局所検証。実請求額との照合は未実施 |
+
+## 22. Approval record
 
 | 項目 | 内容 |
 |---|---|
@@ -1342,14 +1373,20 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | Results answer review source | 2026-10-01: 機能変更・追加。依頼原文「添付の実行後の画面での評価状況で表示される文字や情報を以下にしてください。設問に対して、学生の回答と、その回答をどう評価したのか?これは作成するExcelで作成されている情報です。…自分の設定の確認をするという目的で表示させたいです。」。追加: §11.19（FR-RV-01〜06、SEC-RV-01、NFR-RV-01）、AC-051、TR-46、§21の追跡行、§23のA-RV-01〜05。変更: FR-RS-04（設問文の表示位置を回答欄の先頭へ）、§11.11の境界・例外、§11の結果の記述、§14（結果画面の1行再読込）、A-RS-01（回答本文を表示しない仮定を覆した）。削除した要求IDはない。採点・出力workbook・checkpoint・設定・AI送信の契約は変更しない。不明点は利用者不在のため§23のA-RVを採用した。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Criterion description defaults source | 2026-10-01の要求所有者依頼「[2.定量化設計]の画面の[通常評価]の中の、画面右側の[評価項目]の説明の初期値を、[評価方法]に対応して以下としてください。」（Knowledge Cover／Prompt 分析の各本文）。機能変更。追加: §11.20（FR-CD-01〜03）、AC-052、TR-47、§21の追跡行、§23のA-CD-01〜03。変更: 評価項目の説明の従来の初期値（「評価する知識ポイントまたは観点を記述してください。」、入力画面の提案設問の「回答内で説明・関係・適用を確認する知識ポイント」「必要な視点を引き出す具体性、論理性、実行可能性」）を§11.20の本文へ置換した。削除した要求IDはない。評価項目の名前・重み・range、AI Prompt、採点・出力・checkpoint・保存の契約は変更しない。不明点は利用者不在のため§23のA-CDを採用した。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Results list question score removal source | 2026-10-01: 機能削除・変更。依頼原文「[4.結果・出力]画面の、[設問別得点]は、削除してください。プレビューで表示するには情報量が多すぎるためです。」と、「4 結果・出力」の一覧の画面写真。追加: FR-RS-06（一覧は5列だけで設問別得点を表示しない）、§23のA-RS-04。変更: FR-RS-01（表示先を詳細だけに）、FR-RS-02（一覧の省略表示の記述を削除）、§11.11の例、§11の結果の記述、AC-041（操作のfilterと④⑥）、TR-40、§21の追跡行、A-RS-03（前提の一覧表示が無くなったため適用外と記録）。削除した要求IDはない（一覧の「設問別得点」列はFR-RS-01の表示先の一部だったため、IDを削除せず表示先を変更した）。`QuestionEarned`の計算、詳細の設問別得点、出力workbook、checkpoint、override、設定、AI送信の契約は変更しない。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Run metrics source | 2026-10-01: 機能追加・変更。依頼原文「実行結果の画面に以下の情報を付与してください。定量化のジョブの総実行時間(HH:MM:SS)/AI Credit (これは金額のコストに関わるので大変重要)」と「4 結果・出力」の画面写真。追加: §11.21（FR-RT-01〜02、FR-CR-01〜04、NFR-CR-01）、AC-053、TR-48、§21の追跡行、§23のA-RT-01〜02・A-CR-01〜03。変更: §11.9の単位の規定（旧「換算根拠を確認できるまでAIクレジットの数値を表示しない」を、SDK資料で換算根拠を確認したため§11.21の表示時換算へ置換）、§11の結果の記述、§17.1、AC-039、TR-38、§21のコスト行。削除した要求IDはない。JSONLログschema・Excel出力・checkpoint・設定・AI送信の契約は変更しない。不明点は利用者不在のため§23のA-RT・A-CRを採用した。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Meaning | repository要求baselineの承認記録。実装完了・試験成功・release存在・tag／push／draft／公開操作の承認、組織の法務・教育・security承認または電子署名を意味しない |
 
 ## 23. 仮定・未解決事項
 
-本節は2026-09-30の起動時自動login依頼（A-AL）、結果画面の設問文表示依頼（A-RS）、実行中の速報値表示依頼（A-LP）、利用できる全modelの選択依頼（A-MS）、結果Excelの解説文書依頼（A-XD）、通常評価の設問タブ依頼（A-QT）、2026-10-01の結果画面での学生の回答と評価内容の表示依頼（A-RV）、評価項目の説明の初期値依頼（A-CD）、結果一覧の設問別得点の削除依頼（A-RS-04）で選んだ仮定を記録する。TBD、BLOCKED、競合はない。
+本節は2026-09-30の起動時自動login依頼（A-AL）、結果画面の設問文表示依頼（A-RS）、実行中の速報値表示依頼（A-LP）、利用できる全modelの選択依頼（A-MS）、結果Excelの解説文書依頼（A-XD）、通常評価の設問タブ依頼（A-QT）、2026-10-01の結果画面での学生の回答と評価内容の表示依頼（A-RV）、評価項目の説明の初期値依頼（A-CD）、結果一覧の設問別得点の削除依頼（A-RS-04）、結果画面の総実行時間とAIクレジットの表示依頼（A-RT、A-CR）で選んだ仮定を記録する。TBD、BLOCKED、競合はない。
 
 | ID | 種別 | 内容 |
 |---|---|---|
+| A-CR-01 | [ASSUMPTION] | AIクレジット＝nano-AI units ÷ 1,000,000,000とする。根拠: 固定SDK `1.0.11`とGitHub Docsの「Usage and billing metrics」が`totalNanoAiu`を「AI credit cost, in nano-AI units」と定義し`÷ 1e9`で換算する例を示し、SDKの`workflow.ts`が`NANO_AIU_PER_AIU = 1_000_000_000`でAIクレジット上限をnano-AI unitsへ変換している（確認日2026-10-01）。同文書は「課金上の換算はGitHubの課金文書を正とし、通貨のような値を出す前に確認すること」と注意しているため、通貨へは換算せず、請求確定額でない旨を常に添える（FR-CR-04）。影響: 表示値はSDKが報告した観測値の換算で、未報告の消費・プラン内の無料枠・請求の丸めを反映しない。覆す条件: GitHubの課金文書が異なる換算を定めた場合、または固定SDKの更新で単位が変わった場合（換算定数1か所の変更で対応する）。 |
+| A-CR-02 | [ASSUMPTION] | 表示は小数4桁（0.0001 AIクレジット単位）とする。根拠: 1 AIクレジットは0.01米ドル（GitHub Docs、確認日2026-10-01）で、小数4桁は1回の小さな評価でも0と区別でき、画面の1行に収まる。正の値が丸めで0になる場合は`<0.0001`とし、無料と誤認させない。覆す条件: 桁数・丸め方の指定があった場合。 |
+| A-CR-03 | [ASSUMPTION] | 依頼の「AI Credit」は、結果を作った同じジョブで観測できたAI使用量（再試行・失敗・未保存行を含む、§11.9）のAIクレジット換算とし、アカウント全体の当月利用量・残量・請求額は表示しない。根拠: アプリは課金APIへ問い合わせない境界（§11.9、§14）を持ち、追加の通信・権限を要しない。覆す条件: アカウント単位の利用量表示が求められた場合（課金APIの権限・privacy設計が別途必要）。 |
+| A-RT-01 | [ASSUMPTION] | 「定量化のジョブの総実行時間」は、§11.9のジョブ（開始・再開の1操作）の開始から終了までの壁時計時間とし、最終workbook確定とcleanupを含める。再開した実行では中断前のジョブの時間を加算しない。根拠: AIクレジットと同じ集計範囲にすると、時間とコストを同じジョブについて比較できる。checkpointは中断前の各ジョブの所要時間を保存していない。影響: `ResultsRunIdentity`の開始・終了の差と一致しないことがある。覆す条件: 中断前を含む累計時間を求められた場合。 |
+| A-RT-02 | [ASSUMPTION] | 表示位置は「4 結果」の見出し行の件数要約の右とし、「3 実行」の画面には総実行時間を追加しない（AIクレジットはコスト要約の既存行で両画面に出る）。根拠: 依頼は「実行結果の画面」を対象とし、画面写真で空いている見出し行なら既存の配置・44 DIP契約を変えずに常時見える。覆す条件: 実行画面での経過時間表示が求められた場合。 |
 | A-MO-01 | [ASSUMPTION] | 添付のContext SizeはSDKの入力prompt枠（token budget）として表示する。根拠: 固定SDKはdefault/long-contextの2tierを指定でき、billing metadataにtier別prompt枠があるが拡張の総contextは公開されない。影響: 272K/1MはSDKがその値を返す場合だけ現れ、全modelで同じ2択を保証しない。覆す条件: tier別総contextの公式metadataが提供された場合。 |
 | A-MO-02 | [ASSUMPTION] | 未編集の思考レベルは既存の希望low、contextはdefaultを維持する。明示選択はmodel別に保存する。根拠: 既存のコスト・一貫性方針を保ち、model切替で非対応設定を漏らさない。影響: SDKのDefault表示と初期のlow選択は異なる場合がある。覆す条件: 初期値をSDK defaultへ合わせる依頼。 |
 | A-MO-03 | [ASSUMPTION] | context metadataの実験的SDK型は固定1.0.11に限定し、該当accessだけGHCP001を抑止する。根拠: 同versionで型とJSON契約を確認済み。影響: SDK更新時にmetadata・serialization回帰を再検証する。覆す条件: stable APIの提供。実accountの全model権限・請求額・Windows native本人loginの確認は外部前提で、本変更はfakeによるAC-049〜050の検証であり公開gateの解除ではない。 |

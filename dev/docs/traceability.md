@@ -186,6 +186,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | AC-050 | 同一runの全session・retryのeffort/tier統一、選択tier容量検査、実行中分離、checkpointのtier不一致拒否と明示復旧、Run/override出力のtier継承 | Copilot + Workflow + Workbook | EphemeralEvaluationRunnerTests／AuxiliaryEvaluationRunnerTests／CheckpointStoreTests／ResumeAdmissionEvaluatorTests／ResumeWorkflowTests／ResultsOutputViewTests／ResultExcelDescriptionTests | VERIFIED_SCOPED |
 | AC-051 | 結果画面の詳細で、学生の回答（入力identity確認つきの選択行1行の再読込）と、AIの点・理由・引用・根拠の場所・評価項目の説明を表示。失敗文言・再試行・古い読込の破棄・非保存・採点不変 | UI + App workbook adapter | ResultsAnswerReviewTests、および既存ResultsQuestionTextTests／ResultsOutputViewTests／ResponsiveLayoutTests／PrimaryJourneyAccessibilityTests | VERIFIED_SCOPED |
 | AC-052 | 評価項目の説明の初期値を評価方法の種類（Knowledge Cover／Prompt 分析）で決める。追加・評価方法追加・新規定義・入力画面の提案設問、種類変更・編集済みの説明の不変 | UI + Core | DefaultCriterionDescriptionTests | VERIFIED_SCOPED |
+| AC-053 | 結果画面の見出し行に今回ジョブの総実行時間（`HH:MM:SS`）とAIクレジット（nano-AI units ÷ 1,000,000,000、小数4桁）。記録なし・AI送信なし・未取得・一部取得の区別、コスト要約・詳細・ジョブログ表示の換算値、通貨非表示、JSONL schema不変、1024×720での全文表示 | App Usage + UI | ResultsRunMetricsTests、JobUsageTrackerTests、MainWindowSettingsTests（1024×720・1180×800の実shell）、および既存ResultsOutputViewTests／ResponsiveLayoutTests／JobCostBackendTests | VERIFIED_SCOPED |
 ## Test requirement mapping
 
 | TR | Requirement | Required evidence owner | Status |
@@ -237,6 +238,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | TR-45 | 通常評価の設問タブの表示・双方向選択・空状態・寸法・keyboard（AC-048） | EvaluatorSettingsViewTests／CompactWorkflowLayoutTests／MainWindowSettingsTests | VERIFIED_SCOPED |
 | TR-46 | 結果画面の学生の回答と評価内容: 回答の書式・空欄・改行、詳細表示時だけの1行読込と行単位の記憶、読込前後のidentity確認、不一致・例外の文言と再試行、古い読込の破棄、理由・引用・根拠の場所・説明の全分岐、採点・override・出力の不変、canary非漏洩、合成`.xlsx`の実読込とbytes・更新日時の不変、1024×720の2欄配置（AC-051） | ResultsAnswerReviewTests。fake identity境界・fake行source・一時directoryの合成workbookのみ | VERIFIED_SCOPED |
 | TR-47 | 評価項目の説明の初期値: 種類別本文の完全一致、評価項目・評価方法の追加、新規定義、入力画面の提案設問、種類変更と編集済みの説明の不変（AC-052） | DefaultCriterionDescriptionTests | VERIFIED_SCOPED |
+| TR-48 | 結果画面の総実行時間とAIクレジット: 時間の書式（秒未満切捨て・100時間以上・未計測）、AIクレジットの換算・丸め・3桁区切り・`<0.0001`、見出しの5分岐とToolTip・Accessible Name・未読込時の非表示・再読込、コスト要約・詳細・ジョブログ表示、JSONLのcredit項目なし（AC-053） | ResultsRunMetricsTests、JobUsageTrackerTests。fakeの観測値と一時directoryのみ。実課金APIは使わない | VERIFIED_SCOPED |
 
 ## Mandatory safety surfaces
 

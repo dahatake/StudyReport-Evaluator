@@ -79,14 +79,19 @@
           RowDefinitions="Auto,*,Auto" RowSpacing="8"
           KeyboardNavigation.TabNavigation="Continue">
       <Grid RowDefinitions="24,20,20,44" ColumnDefinitions="*,*" RowSpacing="4" ColumnSpacing="12">
-        <Grid Grid.ColumnSpan="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <Grid Grid.ColumnSpan="2" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
           <TextBlock Text="前回の実行結果" FontSize="18" FontWeight="SemiBold" IsVisible="{Binding IsLoaded}"
                      AutomationProperties.AutomationId="ResultsRunHeading" />
           <TextBlock Text="結果・出力" FontSize="18" FontWeight="SemiBold" IsVisible="{Binding !IsLoaded}" />
           <TextBlock Grid.Column="1" Text="{Binding RunSummaryText}" VerticalAlignment="Center"
                      TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding RunSummaryText}"
                      AutomationProperties.AutomationId="ResultsRunSummary" />
-          <TextBlock Grid.Column="2" Text="部分結果" IsVisible="{Binding IsPartial}" FontWeight="SemiBold"
+          <TextBlock Grid.Column="2" Text="{Binding RunMetricsText}" IsVisible="{Binding IsLoaded}"
+                     VerticalAlignment="Center" FontWeight="SemiBold"
+                     TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding RunMetricsToolTip}"
+                     AutomationProperties.AutomationId="ResultsRunMetrics"
+                     AutomationProperties.Name="{Binding RunMetricsToolTip}" />
+          <TextBlock Grid.Column="3" Text="部分結果" IsVisible="{Binding IsPartial}" FontWeight="SemiBold"
                      AutomationProperties.AutomationId="ResultsPartialStatus" />
         </Grid>
         <TextBlock Grid.Row="1" Text="{Binding RunIdentityText}" IsVisible="{Binding IsLoaded}"

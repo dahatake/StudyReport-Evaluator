@@ -86,6 +86,15 @@ public sealed class MainWindowSettingsTests
             AssertNormalBody(fixture.Window);
             AssertOnlyCurrentEditor(fixture);
             AssertMainControlsInside(view);
+            if (view is ResultsOutputView)
+            {
+                // AC-053: the loaded run's duration/credit heading is fully visible in the real shell.
+                TextBlock metrics = ById<TextBlock>(view, "ResultsRunMetrics");
+                Assert.Equal(fixture.Results.RunMetricsText, metrics.Text);
+                ResponsiveLayoutTests.AssertImportantTextFullyVisible(metrics, Avalonia.Media.TextWrapping.NoWrap, expectEllipsis: true);
+                Assert.DoesNotContain(metrics.TextLayout.TextLines, line => line.HasCollapsed);
+            }
+
             Button previous = Required<Button>(fixture.Window, "PreviousStepButton");
             Button next = Required<Button>(fixture.Window, "NextStepButton");
             Assert.Equal(fixture.Shell.PreviousButtonText, previous.Content);

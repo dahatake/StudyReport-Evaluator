@@ -346,16 +346,20 @@ internal static class JobCostLogReader
         };
         string Metric(decimal? value, UsageMetric metric) => value is null ? "—（未取得）"
             : value.Value.ToString("0.############################", CultureInfo.InvariantCulture)
-                + (entry.HasInvalidValues || entry.Attempt is { Source: UsageSource.Events or UsageSource.LastCall }
-                    || entry.MetricObservations?.GetValueOrDefault(metric)?.IsPartial != false
-                    ? "（部分取得）" : "（観測完了）");
+                + (IsPartial(metric) ? "（部分取得）" : "（観測完了）");
+        bool IsPartial(UsageMetric metric) =>
+            entry.HasInvalidValues || entry.Attempt is { Source: UsageSource.Events or UsageSource.LastCall }
+            || entry.MetricObservations?.GetValueOrDefault(metric)?.IsPartial != false;
+        string credits = entry.Metrics.TotalNanoAiu is { } nanoAiu && nanoAiu >= 0m
+            ? $"{RunMetricsFormatter.FormatAiCredits(nanoAiu)}（SDK報告値から換算・{(IsPartial(UsageMetric.TotalNanoAiu) ? "部分取得" : "観測完了")}）"
+            : "—（未取得）";
         return $"{entry.Timestamp:HH:mm:ss} UTC {label}：入力 {Metric(entry.Metrics.InputTokens, UsageMetric.InputTokens)}／出力 {Metric(entry.Metrics.OutputTokens, UsageMetric.OutputTokens)}"
             + $"／推論 {Metric(entry.Metrics.ReasoningTokens, UsageMetric.ReasoningTokens)}"
             + $"／キャッシュ読み取り {Metric(entry.Metrics.CacheReadTokens, UsageMetric.CacheReadTokens)}"
             + $"／キャッシュ書き込み {Metric(entry.Metrics.CacheWriteTokens, UsageMetric.CacheWriteTokens)}"
             + $"／nano-AI units（SDK報告値） {Metric(entry.Metrics.TotalNanoAiu, UsageMetric.TotalNanoAiu)}"
             + $"／プレミアムリクエスト消費量 {Metric(entry.Metrics.PremiumRequests, UsageMetric.PremiumRequests)}"
-            + "／AIクレジット —（課金単位未確認・換算なし）"
+            + $"／AIクレジット {credits}"
             + (entry.Attempt?.HasDownwardCorrection == true ? "／観測値の下方訂正あり" : string.Empty)
             + (entry.ModelCostMismatchCount > 0
                 ? $"／モデル内訳と総量の不一致 {entry.ModelCostMismatchCount} 試行" : string.Empty);

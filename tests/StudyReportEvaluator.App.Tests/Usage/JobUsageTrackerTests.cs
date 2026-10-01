@@ -50,12 +50,14 @@ public sealed class JobUsageTrackerTests
         Assert.Equal(0.000000000001m, metrics.GetProperty("TotalNanoAiu").GetDecimal());
         Assert.Equal(0.5m, metrics.GetProperty("PremiumRequests").GetDecimal());
         Assert.Contains("観測 1/2", tracker.Snapshot.SummaryText, StringComparison.Ordinal);
-        Assert.Contains("AIクレジット —（課金単位未確認）", tracker.Snapshot.SummaryText, StringComparison.Ordinal);
+        Assert.Contains("AIクレジット <0.0001（SDK報告値から換算・観測 1/2 試行・部分取得）", tracker.Snapshot.SummaryText, StringComparison.Ordinal);
+        Assert.DoesNotContain("課金単位未確認", tracker.Snapshot.SummaryText, StringComparison.Ordinal);
         Assert.Contains("nano-AI units（SDK報告値） 0.000000000001（部分取得）", tracker.Snapshot.LogText, StringComparison.Ordinal);
         Assert.Contains("プレミアムリクエスト消費量 0.5（部分取得）", tracker.Snapshot.LogText, StringComparison.Ordinal);
         Assert.Contains("推論 —（未取得）", tracker.Snapshot.LogText, StringComparison.Ordinal);
         Assert.Contains("キャッシュ読み取り —（未取得）", tracker.Snapshot.LogText, StringComparison.Ordinal);
-        Assert.Contains("換算なし", tracker.Snapshot.LogText, StringComparison.Ordinal);
+        Assert.Contains("／AIクレジット <0.0001（SDK報告値から換算・部分取得）", tracker.Snapshot.LogText, StringComparison.Ordinal);
+        Assert.DoesNotContain("課金単位未確認", tracker.Snapshot.LogText, StringComparison.Ordinal);
         Assert.Equal("CurrentInvocation", final.RootElement.GetProperty("AggregationScope").GetString());
         Assert.Equal("SdkReportedNanoAiuAndPremiumRequests_NoCreditOrCurrencyConversion_v1",
             final.RootElement.GetProperty("UnitPolicy").GetString());

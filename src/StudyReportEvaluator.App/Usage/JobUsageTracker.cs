@@ -230,8 +230,11 @@ public sealed class JobUsageTracker : IAsyncDisposable
                 ? "一部取得（観測できた値のみ）" : "観測完了";
         string Metric(decimal? value, int index) => value is null ? "—（未取得）"
             : $"{Number(value)}（観測 {counts[index]}/{count} 試行{(observations[(UsageMetric)index].IsPartial ? "・部分取得" : "・観測完了")}）";
+        string Credits() => total.TotalNanoAiu is not { } nanoAiu ? "—（未取得）"
+            : $"{RunMetricsFormatter.FormatAiCredits(nanoAiu)}（SDK報告値から換算・観測 {counts[(int)UsageMetric.TotalNanoAiu]}/{count} 試行"
+                + $"{(observations[UsageMetric.TotalNanoAiu].IsPartial ? "・部分取得" : "・観測完了")}）";
         string summary = $"入力 {Metric(total.InputTokens, 0)}／出力 {Metric(total.OutputTokens, 1)}\n"
-            + $"AIクレジット —（課金単位未確認）\n{(_finished ? "終了" : "実行中")}・{status}";
+            + $"AIクレジット {Credits()}\n{(_finished ? "終了" : "実行中")}・{status}";
         var details = new StringBuilder()
             .AppendLine("GitHubから取得できた使用量です。請求確定額・アカウント全体の利用量ではありません。")
             .AppendLine("今回のジョブのみ。再試行・失敗・未保存行を含む観測値。未報告の消費は含みません。")
@@ -244,6 +247,7 @@ public sealed class JobUsageTracker : IAsyncDisposable
             .AppendLine($"キャッシュ読み取り {Metric(total.CacheReadTokens, 3)}")
             .AppendLine($"キャッシュ書き込み {Metric(total.CacheWriteTokens, 4)}")
             .AppendLine($"nano-AI units（SDK報告値） {Metric(total.TotalNanoAiu, 5)}")
+            .AppendLine($"AIクレジット（nano-AI units ÷ 1,000,000,000。SDK報告値からの換算で請求確定額ではありません） {Credits()}")
             .AppendLine($"プレミアムリクエスト消費量 {Metric(total.PremiumRequests, 6)}")
             .AppendLine("非nullable項目の0は欠落と区別できないため未取得。最終RPCの取得項目はイベント累計を置換。")
             .AppendLine("最後の呼び出しのみの値・イベント補完値は部分取得。推論・キャッシュは入力/出力へ加算しません。");
