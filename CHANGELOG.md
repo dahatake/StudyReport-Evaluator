@@ -63,6 +63,7 @@ StudyReport Evaluatorの利用者に影響する変更をこのファイルへ�
 - 通常評価で、モデル（実測ではclaude-sonnet-5）が結果toolの引数からアプリが指定したevaluator IDを省略すると、schema不正として再試行し、再試行でも省略されると`AI_OUTPUT_INVALID`になっていた問題を修正。evaluator IDはアプリが保持している値なので、省略された場合はアプリが補います。返された値が異なる場合は従来どおりschema不正です。reasoning effort `medium`では省略が増えることを実測しています（同じPromptで`medium` 10/30、未指定 2/30）。
 - 結果画面から「検証して出力」で別名workbookを出力すると、`Quantification_References`のmodelが実際のrunのmodelではなく`auto`と記録され、References／Run sheetのreasoning effortが「未指定」になっていた問題を修正。runで選択したmodelとrun開始時に解決したreasoning effortを記録します。
 - 起動時のログイン状態確認が同梱CLIを短時間起動する仕様に対し、single-file公開検証が旧仕様の「子processは一切起動しない」を前提として失敗していた問題を修正。自動ブラウザー認証を明示的に抑止し、状態確認processの終了後に子processが残らないことを検証します。
+- single-file公開検証で、アプリ終了直後にウイルス対策の走査や状態確認processが一時的にfileを保持していると、検証用traceの削除やEXEの移動が失敗し、Release候補作成が不定期に止まっていた問題を修正。起動時の自動ブラウザー認証を抑止し、状態確認processの終了と一時的なfile保持の解消を時間上限付きで待ちます。一般利用者向けの配布物は変わりません。
 
 ## [0.8.1] - 2026-09-04
 

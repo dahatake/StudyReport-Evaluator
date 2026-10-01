@@ -1004,6 +1004,7 @@ function Set-SingleFileProbeEnvironment {
     $StartInfo.Environment['DOTNET_HOST_TRACE'] = '1'
     $StartInfo.Environment['DOTNET_HOST_TRACE_VERBOSITY'] = '4'
     $StartInfo.Environment['DOTNET_HOST_TRACEFILE'] = Join-Path $ProbeDirectory 'host-trace.log'
+    $StartInfo.Environment['STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN'] = '0'
 }
 
 function Get-SingleFileExtractionDirectory {
@@ -1064,6 +1065,57 @@ function Assert-NoStartupChildProcesses {
     }
 }
 
+function Wait-NoStartupChildProcesses {
+    param(
+        [Parameter(Mandatory)]
+        [int] $ProcessId,
+
+        [int] $TimeoutSeconds = 30
+    )
+
+    # The startup login-status check briefly runs the bundled CLI; only a child that outlives it fails.
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ($true) {
+        try {
+            Assert-NoStartupChildProcesses -ProcessId $ProcessId
+            return
+        }
+        catch {
+            if ([DateTimeOffset]::UtcNow -ge $deadline) {
+                throw
+            }
+
+            Start-Sleep -Milliseconds 100
+        }
+    }
+}
+
+function Invoke-TransientFileOperation {
+    param(
+        [Parameter(Mandatory)]
+        [scriptblock] $Operation,
+
+        [int] $TimeoutSeconds = 30
+    )
+
+    # Antivirus scans or an exiting child can briefly hold owned probe files after the app ends.
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ($true) {
+        try {
+            & $Operation
+            return
+        }
+        catch {
+            $transient = $_.Exception -is [System.IO.IOException] -or $_.Exception -is [System.UnauthorizedAccessException]
+            if (-not $transient -or [DateTimeOffset]::UtcNow -ge $deadline) {
+                throw
+            }
+
+            Start-Sleep -Milliseconds 250
+        }
+    }
+}
+
 function Assert-ApplicationLaunch {
     param(
         [Parameter(Mandatory)]
@@ -1108,7 +1160,7 @@ function Assert-ApplicationLaunch {
         }
 
         if (-not [string]::IsNullOrWhiteSpace($SingleFileProbeDirectory)) {
-            Assert-NoStartupChildProcesses -ProcessId $process.Id
+            Wait-NoStartupChildProcesses -ProcessId $process.Id
             # No nonzero window handle requirement on headless CI; this proves liveness, not UI readiness.
             Write-Verbose 'Single-file startup liveness checked with an isolated environment; not GUI or clean-host evidence.'
         }
@@ -1217,11 +1269,11 @@ function Assert-SingleFileApplicationLaunch {
         $tracePath = Join-Path $ProbeDirectory 'host-trace.log'
         if (Test-Path -LiteralPath $tracePath -PathType Leaf) {
             # A nonrecursive removal also removes a file link itself, never its target.
-            Remove-Item -LiteralPath $tracePath -Force
+            Invoke-TransientFileOperation { Remove-Item -LiteralPath $tracePath -Force -ErrorAction Stop }
         }
 
         Assert-OwnedDirectoryPath -Root $RepositoryRoot -Path $ProbeDirectory -IncludeChildren
-        Remove-Item -LiteralPath $ProbeDirectory -Recurse -Force
+        Invoke-TransientFileOperation { Remove-Item -LiteralPath $ProbeDirectory -Recurse -Force -ErrorAction Stop }
     }
 }
 

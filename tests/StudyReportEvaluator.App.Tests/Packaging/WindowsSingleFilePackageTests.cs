@@ -610,8 +610,27 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
             DeletePlainDirectory(CacheDirectory);
             string destination = Path.Combine(Root, "移動した package");
             Assert.False(Directory.Exists(destination));
-            Directory.Move(PackageDirectory, destination);
+            MoveDirectoryWithTransientRetry(PackageDirectory, destination);
             PackageDirectory = destination;
+        }
+
+        private static void MoveDirectoryWithTransientRetry(string source, string destination)
+        {
+            // Antivirus scans can briefly hold a just-exited EXE; an atomic rename is retried within a bound.
+            DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+            while (true)
+            {
+                try
+                {
+                    Directory.Move(source, destination);
+                    return;
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                    && DateTimeOffset.UtcNow < deadline && Directory.Exists(source) && !Directory.Exists(destination))
+                {
+                    Thread.Sleep(250);
+                }
+            }
         }
 
         internal void TruncateOwnedExecutable()
