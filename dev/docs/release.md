@@ -229,6 +229,7 @@ gh release list --repo dahatake/StudyReport-Evaluator --limit 3
 | `CHANGELOG.md does not contain a dated...` | 節の見出しがない・日付形式が違う | 手順1を修正し、新しいcommit／tagで再実行 |
 | `Release vX.Y.Z already exists; this workflow never replaces a release.` | 前回のdraftまたは公開Releaseが残っている | 公開済みなら差し替えず新しい版にする。誤ったdraftなら、内容を確認後にGitHub.comまたは`gh release delete vX.Y.Z`でdraftを削除して再実行。**tagは別途扱う**（削除・移動は共有状況を確認） |
 | Release candidateのtest／package失敗 | コードまたは環境 | ログ（`release-test-results-*`のtrx）で原因を修正し、新しいcommitとtagで再実行。**candidate成果物を手で差し替えない** |
+| `Release builds require .NET SDK 10.0.400 exactly` | 専用install先へ固定SDKを導入できない、またはPATH先頭のSDKが別patch | `Set up .NET`の`DOTNET_INSTALL_DIR`と導入logを確認する。C02/P07証跡はSDK `10.0.400`へ束縛され、runner既定の新しい`10.0.4xx`（`latestPatch`）で作った証跡は`C03_C02_VALIDATION`になる |
 | Publishが`The candidate run must have succeeded for the exact tagged commit.` | 誤った`candidate_run_id`、失敗run、tag移動後のrun | 対象tagで成功したRelease candidateのrun IDを指定 |
 | candidate control artifactが見つからない | 30日の保持期限切れ | Release candidateを再実行（新draftが必要ならdraft削除後） |
 | `The draft must carry exactly EXE/ZIP assets...` | assetの追加・削除・MSIX混入 | draftを手で編集せず、正しいdraftを作り直す |

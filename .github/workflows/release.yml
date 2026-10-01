@@ -38,10 +38,22 @@ jobs:
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v6
+        env:
+          # Release evidence binds the exact SDK; isolate it from newer preinstalled 10.0.4xx patches
+          # that global.json's latestPatch would otherwise select on the hosted runner.
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}\dotnet-sdk-10.0.400
         with:
           dotnet-version: 10.0.400
           cache: true
           cache-dependency-path: "**/packages.lock.json"
+
+      - name: Verify the exact release .NET SDK
+        shell: pwsh
+        run: |
+          $sdkVersion = ((& dotnet --version) | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $sdkVersion -cne '10.0.400') {
+              throw "Release builds require .NET SDK 10.0.400 exactly; resolved '$sdkVersion'."
+          }
 
       - name: Verify release identity and privacy boundary
         shell: pwsh
