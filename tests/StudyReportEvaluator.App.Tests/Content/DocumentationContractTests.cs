@@ -867,8 +867,7 @@ public sealed class DocumentationContractTests
 
         AssertContainsAll(Read("images/README.md"), "一時directoryへ描画", "2回生成の一致", "finally",
             "生成時の製品版: `0.8.6`候補（UNRELEASED）", "その時点ではPNGを再生成していません");
-        AssertContainsAll(Read("CHANGELOG.md"), "## [Unreleased]", "ソース候補`0.8.6`", "**未公開**");
-        Assert.DoesNotContain("## [0.8.6]", Read("CHANGELOG.md"), StringComparison.Ordinal);
+        AssertContainsAll(Read("CHANGELOG.md"), "## [Unreleased]", "## [0.8.6] - 2026-10-01");
         AssertContainsAll(
             Read("docs/getting-started.md"),
             "確認のためだけにPowerShell等を導入する必要はありません",

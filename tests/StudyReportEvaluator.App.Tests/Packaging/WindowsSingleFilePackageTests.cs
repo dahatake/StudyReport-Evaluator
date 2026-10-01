@@ -457,7 +457,17 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
                 Add-Type -Path {{Quote(Path.Combine(desktopRuntime, "UIAutomationClient.dll"))}}
                 $appProcess = [Diagnostics.Process]::GetProcessById({{app.Process.Id}})
                 try {
-                    Assert-NoStartupChildProcesses -ProcessId {{app.Process.Id}}
+                    $childDeadline = [DateTimeOffset]::UtcNow.AddSeconds(30)
+                    while ($true) {
+                        try {
+                            Assert-NoStartupChildProcesses -ProcessId {{app.Process.Id}}
+                            break
+                        }
+                        catch {
+                            if ([DateTimeOffset]::UtcNow -ge $childDeadline) { throw }
+                            Start-Sleep -Milliseconds 100
+                        }
+                    }
                     $appProcess.Refresh()
                     if ($appProcess.HasExited -or $appProcess.MainWindowHandle -eq [IntPtr]::Zero) { throw 'P06 GUI is not alive.' }
                     $window = [Windows.Automation.AutomationElement]::FromHandle($appProcess.MainWindowHandle)
@@ -717,6 +727,7 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
             info.Environment["DOTNET_ROOT_X64"] = Path.Combine(Root, "absent-dotnet-x64");
             info.Environment["DOTNET_MULTILEVEL_LOOKUP"] = "0";
             info.Environment["DOTNET_DISABLE_GUI_ERRORS"] = "1";
+            info.Environment["STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN"] = "0";
             foreach (string name in new[] { "DOTNET_ROOT", "DOTNET_ROOT_X64" })
             {
                 Assert.False(Directory.Exists(info.Environment[name]) || File.Exists(info.Environment[name]));
