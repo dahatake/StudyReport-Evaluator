@@ -2,20 +2,20 @@
 
 StudyReport Evaluatorは、標準`.xlsx`の回答をGitHub Copilotで定量化し、入力を変更せず別の`.xlsx`へ結果を作成するWindowsデスクトップアプリです。
 
-現在の公開版は`0.8.1`です。[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases)で取得できる配布物は、`v0.8.1`の`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`です。
+現在の公開版は`0.8.6`です。[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6)で取得できる配布物は、`v0.8.6`の`StudyReportEvaluator-win-x64.exe`、`StudyReportEvaluator-win-x64.exe.sha256`、`StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`の4件です。単一EXEが主導線で、ZIPは代替経路として維持します。旧`v0.8.1`は前回公開版です。
 
-今後の主導線は単一EXEの`StudyReportEvaluator-win-x64.exe`と対応するSHA-256 sidecarで、ZIPは代替として維持します。ただし、**現在は作業ツリーの`0.8.6`未公開候補**です。単一EXEはまだ公開されておらず、**clean-host試験と本人loginは`NOT_RUN`**です。
+`v0.8.6`は公開済みですが、repository ownerの明示判断によりfresh Windows 11 x64のclean-host試験CH-01〜06と本人loginを実施しないまま公開しました。追加native UI確認FAIL、Narrator／本人walkthrough／隔離利用者設定保存の未実施、T39 BLOCKED、CH-01〜06 `NOT_RUN`は維持します。
 
 > [!WARNING]
 > 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません
 
-**対象版の注意:** 4ステップの簡素化、全設問へのコンパクト一覧・ページ切替、設定5カテゴリ、明示保存・適用の説明は**UNRELEASED（未リリース）の`0.8.6`候補**向けです。公開`0.8.1`にはこれらの新UI・設定保存を追加していません。要求文書は**v4.6**で、製品版とは別です。
+**対象版の注意:** 4ステップの簡素化、全設問へのコンパクト一覧・ページ切替、設定5カテゴリ、明示保存・適用の説明は公開`v0.8.6`向けです。旧`v0.8.1`にはこれらの新UI・設定保存を追加していません。要求文書は**v4.6**で、製品版とは別です。
 
-操作説明の画像は**8枚（01〜08）**で、synthetic／fake状態です。実認証・実結果出力・設定保存・native表示の成功証拠ではありません。製品`0.8.4`の時点で生成したPNGを維持しており、版表記の更新は新たなUI検証を意味しません。既存の検証履歴と未完了の確認範囲は[はじめに](getting-started.md#未公開候補の検証範囲)を参照してください。
+操作説明の画像は**8枚（01〜08）**で、synthetic／fake状態です。実認証・実結果出力・設定保存・native表示の成功証拠ではありません。製品`0.8.4`の時点で生成したPNGを維持しており、版表記の更新は新たなUI検証を意味しません。既存の検証履歴と未完了の確認範囲は[はじめに](getting-started.md#v086の検証範囲)を参照してください。
 
 ## 読者別ガイド
 
-利用開始と詳細設定の手順を分けています。公開版と候補版を区別し、配布・起動条件は製品READMEの「公開状況・SHA-256確認・起動」も参照してください。文書・版の変更を配布物へ取り込む場合は、最終EXE／ZIPとsidecarを再生成・再検証し、変更後のexact EXEでclean-host公開条件を満たす必要があります。
+利用開始と詳細設定の手順を分けています。公開`v0.8.6`と旧`v0.8.1`を区別し、配布・起動条件は製品READMEの「公開状況・SHA-256確認・起動」も参照してください。文書・版の変更を配布物へ取り込む場合は、最終EXE／ZIPとsidecarを再生成・再検証し、変更後のexact EXEでclean-host公開条件を満たす必要があります。
 
 | 読者 | ガイド | 内容 |
 |---|---|---|
@@ -34,20 +34,20 @@ StudyReport Evaluatorは、標準`.xlsx`の回答をGitHub Copilotで定量化�
 ## 対応範囲
 
 - **OS:** Windows 11 x64
-- **配布:** .NET 10 self-contained。公開ZIP／候補EXEともunsignedで、各形式にSHA-256 sidecar
+- **配布:** .NET 10 self-contained。公開EXE／ZIPともunsignedで、各形式にSHA-256 sidecar
 - **入力:** 標準Office Open XML `.xlsx` 1file
 - **出力:** 入力を保持した別の標準`.xlsx`
-- **設定（未公開候補）:** 共通設定＋任意の採点定義1件を、利用者別`setting.txt`へ明示保存。起動時は共通値を読み込み、採点定義はExcel読込後の明示操作で適用
+- **設定（v0.8.6）:** 共通設定＋任意の採点定義1件を、利用者別`setting.txt`へ明示保存。起動時は共通値を読み込み、採点定義はExcel読込後の明示操作で適用
 - **AI runtime:** 配布物へ同梱したGitHub Copilot CLI。PATH上の別CLIへfallbackしません
 - **GUI起動:** .NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI（`gh`）、別Copilot CLI、Microsoft Excel／Office／LibreOffice、IDEの追加導入を要求しない設計
 
-候補EXEの目標は、標準userがofflineで**取得済みEXEをダブルクリック → 入力画面**へ進む1起動gestureです。download、任意の手動hash比較、SmartScreen等の警告への操作、本人loginは含めません。手動hash比較は任意・推奨で、sidecarは起動の前提ではありません。
+単一EXEの目標は、標準userがofflineで**取得済みEXEをダブルクリック → 入力画面**へ進む1起動gestureです。download、任意の手動hash比較、SmartScreen等の警告への操作、本人loginは含めません。手動hash比較は任意・推奨で、sidecarは起動の前提ではありません。
 
 SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行拒否があり得ます。無警告・無条件の起動を保証せず、拒否時に保護機能を回避しません。
 
 development MSIXは検証専用で、一般配布しません。
 
-**「GitHubにログイン」は未公開`0.8.6`候補のみ**です。明示操作で検証済み同梱native CLIのconsole／ブラウザーへ本人認証を委譲します。**公開`v0.8.1`にはこのbuttonがなく、従来の同梱CLIで本人login**を行います。どちらも完了後は既存の「Copilot 状態を確認」で再確認します。
+**「GitHubにログイン」は公開`v0.8.6`の機能です。**明示操作で検証済み同梱native CLIのconsole／ブラウザーへ本人認証を委譲します。旧`v0.8.1`にはこのbuttonがなく、従来の同梱CLIで本人loginを行います。どちらも完了後は既存の「Copilot 状態を確認」で再確認します。
 
 AI処理には、本人loginに加え、利用可能なGitHub Copilot account／model、network接続、組織policy上の許可が別途必要です。GUI起動や状態確認からlogin・AI評価を自動開始しません。アプリの認証処理はPAT、password、client secret、token、device codeを入力・収集・保存・log出力しません。未認証でもアプリ起動、workbook読込、mapping、設計編集は利用できますが、新しいAI処理は開始できません。
 

@@ -13,7 +13,7 @@ AIが作る値は確認対象です。最終的な評点と利用判断は、授
 - GitHub Copilotで参照回答、通常評価、固有評価、類似度を求める
 - 参照回答・回答行の完了ごとに`.partial.xlsx`へ保存し、中断後に再開する
 - 完成版を自動作成し、必要なら評価項目の修正値（override）を別名workbookへ出力する
-- 未公開候補では、共通設定と任意の採点定義1件を明示保存して再利用する
+- 公開`v0.8.6`では、共通設定と任意の採点定義1件を明示保存して再利用する
 
 ## Architecture
 
@@ -30,58 +30,61 @@ Component図、認証から出力までのmessage flow、変更時に同期す�
 | 項目 | 対応内容 |
 |---|---|
 | OS / architecture | Windows 11 x64 |
-| 配布 | .NET 10 self-contained。公開`v0.8.1`はunsigned ZIP、未公開`0.8.6`候補ではunsigned単一EXEを追加。各形式にSHA-256 sidecar |
+| 配布 | .NET 10 self-contained。公開`v0.8.6`はunsigned単一EXEを主導線とし、unsigned ZIPも提供。各形式にSHA-256 sidecar |
 | 入力 | 標準Office Open XML `.xlsx` 1file |
 | AI runtime | 配布物へ同梱したGitHub Copilot CLI。PATH上の別CLIへfallbackしません |
-| AI login | GitHub Copilotのlogin。候補版は起動時にこのPCの既存GitHubログインを自動確認し、なければブラウザー認証を自動で開始します。GUI起動とは別条件です |
+| AI login | GitHub Copilotのlogin。公開`v0.8.6`は起動時にこのPCの既存GitHubログインを自動確認し、なければブラウザー認証を自動で開始します。GUI起動とは別条件です |
 | Spreadsheet runtime | Microsoft Excel、Office、LibreOfficeはアプリ実行に不要 |
 
 `.xls`、`.xlsb`、CSV、PDF、`.xlsm`等のmacro-enabled file、password／rights-protected／暗号化workbook、安全境界に違反するpackageは対象外です。
 
 ## 公開状況・SHA-256確認・起動
 
-現在の公開版は`0.8.1`です。[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases)で現在取得できる配布物は、`v0.8.1`の`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`です。**この公開版には単一EXE配布も「GitHubにログイン」buttonもありません。**
+現在の公開版は`0.8.6`です。[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6)で取得できる配布物は、`v0.8.6`の`StudyReportEvaluator-win-x64.exe`、`StudyReportEvaluator-win-x64.exe.sha256`、`StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`の4件です。単一EXEが主導線で、ZIPは代替経路として維持します。旧`v0.8.1`は前回公開版です。
 
 > [!IMPORTANT]
-> **製品候補は`0.8.6`（UNRELEASED・未公開）です。** 以下の新しい画面配置・設定保存・login buttonは候補版向けで、公開`0.8.1`の機能ではありません。版の更新は最終配布物の検証や公開の完了を意味しません。**追加ソフト未導入のOS-only環境でのclean-host試験と本人loginは未実施**です。
+> `v0.8.6`は公開済みですが、repository ownerの明示判断により、fresh Windows 11 x64でのclean-host試験CH-01〜06と本人loginを実施しないまま公開しました。追加native UI確認FAIL、Narrator／本人walkthrough／隔離利用者設定保存の未実施、T39 BLOCKED、CH-01〜06 `NOT_RUN`、未署名／SmartScreen非保証の状態は変わりません。
 
-### 単一EXEから起動する（未公開候補・今後の主導線）
+### 単一EXEから起動する（v0.8.6の主導線）
 
-候補版の配布名は`StudyReportEvaluator-win-x64.exe`と`StudyReportEvaluator-win-x64.exe.sha256`です。公開条件を満たす最終成果物の公開後に主導線となります。未公開のdownload URLは案内しません。
+1. [`StudyReportEvaluator-win-x64.exe`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe)をdownloadします。
+2. 任意・推奨のhash確認を行う場合は、同じreleaseの[`StudyReportEvaluator-win-x64.exe.sha256`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe.sha256)も取得し、下記の方法で照合します。
+3. `StudyReportEvaluator-win-x64.exe`をダブルクリックします。
+4. 入力画面が表示されたら、[はじめに](docs/getting-started.md)の「1. 入力」へ進みます。
 
-目標とする起動操作は、**取得済みの`StudyReportEvaluator-win-x64.exe`をダブルクリック → 入力画面**です。ダブルクリックを1起動gestureと数え、download、任意の手動hash比較、Windowsの警告への操作、本人loginは含めません。
+**ダブルクリックを1起動gestureと数えます。** download、任意の手動hash比較、Windowsの警告への操作、本人loginはこの1操作に含めません。
 
 - 標準userがofflineでGUI、Excel読込、mapping、採点設計を利用する設計です。ただし、**clean-hostでの実証は未完了**です。
 - GUI起動に.NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI（`gh`）、別Copilot CLI、Microsoft Excel／Office／LibreOffice、IDEの導入を要求しないself-contained設計です。
 - 手動展開、setup script、terminalへのcommand入力、管理者昇格、repository、隣接DLL／manifest、既存CLI cache・認証情報、sidecarをGUI起動の前提にしません。
-- GUI表示後、候補版は既存のGitHubログインを自動確認し、利用できるログインがなければloginを1回だけ自動開始します（AI評価は自動開始しません）。AIのnetwork・account・model・組織policy上の許可は別条件です。
+- GUI表示後、公開`v0.8.6`は既存のGitHubログインを自動確認し、利用できるログインがなければloginを1回だけ自動開始します（AI評価は自動開始しません）。AIのnetwork・account・model・組織policy上の許可は別条件です。
 
-### 現在の公開版を起動する（v0.8.1 ZIP・今後も代替として維持）
+### ZIPを起動する（v0.8.6の代替経路）
 
-1. 上記GitHub Releasesの`v0.8.1`から`StudyReportEvaluator-win-x64.zip`をdownloadします。
-2. 任意・推奨のhash確認を行う場合は、同じreleaseの`StudyReportEvaluator-win-x64.zip.sha256`も取得し、下記の方法で照合します。
+1. [`StudyReportEvaluator-win-x64.zip`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip)をdownloadします。
+2. 任意・推奨のhash確認を行う場合は、同じreleaseの[`StudyReportEvaluator-win-x64.zip.sha256`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip.sha256)も取得し、下記の方法で照合します。
 3. ZIPを新しいdirectoryへ展開します。
 4. `StudyReportEvaluator-win-x64\StudyReportEvaluator.App.exe`を起動します。
 
-単一EXEが公開された後も、ZIPとsidecarの名前および展開後の起動方法は代替経路として維持します。公開済み`v0.8.1`の配布物を候補版の内容へ差し替えることはありません。
+旧`v0.8.1`の配布物は履歴として残りますが、現在の案内は`v0.8.6`の4 assetを対象にします。
 
 ### SHA-256の確認（利用者の手動比較は任意・推奨）
 
 EXE／ZIPそれぞれのsidecar公開と、CI・公開判定での最終配布bytesとのhash完全一致確認は必須です。一方、**利用者の手動hash比較は任意の推奨で、sidecarは起動に必要なfileではありません。**
 
-確認する場合は、配布fileのSHA-256が、同じrelease／候補のsidecarの先頭64文字と完全一致することを確かめます。不一致なら実行せず、正式配布元からの再取得を確認してください。同じ配布元のhash一致だけでは、発行者の真正性やSmartScreen reputationは保証されません。
+確認する場合は、配布fileのSHA-256が、同じreleaseのsidecarの先頭64文字と完全一致することを確かめます。不一致なら実行せず、正式配布元からの再取得を確認してください。同じ配布元のhash一致だけでは、発行者の真正性やSmartScreen reputationは保証されません。
 
 確認方法は[はじめに](docs/getting-started.md)を参照してください。既存のPowerShell 7やWindows 11標準の`certutil`を利用でき、確認のために追加ソフトを導入する必要はありません。
 
 ### Windowsの警告・実行拒否
 
-公開ZIPと候補EXEはunsignedです。SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行拒否があり得ます。code signing済み、installer形式、SmartScreen reputation確立済み、すべての端末で無警告・無条件に1操作で起動できるとは表示しません。
+公開EXEとZIPはunsignedです。SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行拒否があり得ます。code signing済み、installer形式、SmartScreen reputation確立済み、すべての端末で無警告・無条件に1操作で起動できるとは表示しません。
 
 入手元を確認できない場合やhashが不一致の場合は実行しないでください。保護機能が実行を拒否した場合は停止し、所属組織の管理者に確認してください。保護機能の無効化、MOTW除去、証明書の自動trust、execution policy変更、UAC回避は案内しません。
 
 ### 単一EXEの標準展開と残存cache
 
-候補EXEの内容は.NET標準hostが、通常は標準userの一時領域`%TEMP%/.net/<app>/<bundle-id>/`へ展開します。展開先の書込権限と空き容量が必要です。cacheは終了後も残り、再利用され得ます。**1ファイル配布は「ディスク上も1ファイル」「痕跡なし」ではありません。** 独自の展開・cache管理UIや自動掃除は追加しません。
+単一EXEの内容は.NET標準hostが、通常は標準userの一時領域`%TEMP%/.net/<app>/<bundle-id>/`へ展開します。展開先の書込権限と空き容量が必要です。cacheは終了後も残り、再利用され得ます。**1ファイル配布は「ディスク上も1ファイル」「痕跡なし」ではありません。** 独自の展開・cache管理UIや自動掃除は追加しません。
 
 cacheはアプリ配置用で、入力／final／partial、利用者別設定、CLI credential storeとは別です。明示出力先が未指定の場合だけ、入力fileに隣接する`result`を使い、抽出cacheを結果保存先にはしません。配布・展開・起動のために利用者workbookを移動・削除しません。結果の扱いは[出力と再開](#出力と再開)を参照してください。
 
@@ -135,7 +138,7 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\publish-windows.ps1
 
 ## 5分クイックスタート
 
-> **対象版:** 以下は**`0.8.6`（UNRELEASED・未公開）候補**の操作です。公開`0.8.1`で追加UIや設定保存を前提にしないでください。画像は合成データ・fake結果による説明用で、実認証・実保存・clean-host動作の証拠ではありません。生成時の製品版と来歴は[画像一覧](images/README.md)を参照してください。
+> **対象版:** 以下は公開`v0.8.6`の操作です。旧公開`v0.8.1`で追加UIや設定保存を前提にしないでください。画像は合成データ・fake結果による説明用で、実認証・実保存・clean-host動作の証拠ではありません。生成時の製品版と来歴は[画像一覧](images/README.md)を参照してください。
 
 主画面は**入力 → 採点設計 → 実行 → 結果・出力**の4ステップです。詳細編集は同じウィンドウの**設定**へ移っています。設定は第5ステップではなく、**共通／入力詳細／通常評価／固有評価／読込Prompt**の5カテゴリです。
 
@@ -271,7 +274,7 @@ final/partialには入力全体、Prompt、Reference、AI結果が含まれ得�
 
 ## Promptファイルから起動する
 
-任意の高度な起動方法です。通常のGUI起動にcommand入力は不要です。未公開候補の`StudyReportEvaluator-win-x64.exe`と、公開`v0.8.1` ZIPの`StudyReportEvaluator.App.exe`は、次の起動引数を扱います。
+任意の高度な起動方法です。通常のGUI起動にcommand入力は不要です。公開`v0.8.6`の`StudyReportEvaluator-win-x64.exe`と、同じ`v0.8.6` ZIPの`StudyReportEvaluator.App.exe`は、次の起動引数を扱います。
 
 - `--input`は0または1回
 - `--prompt`は0回以上、指定順を維持
@@ -288,13 +291,13 @@ final/partialには入力全体、Prompt、Reference、AI結果が含まれ得�
 - installer、code signing、notarizationを提供しません。
 - development MSIXは非公開の開発用検証だけで、一般利用者向けinstallerではありません。
 - 自動更新・差分更新、online bootstrap、独自cache管理／自動掃除、常駐service、file associationは追加しません。更新時は正式に公開された配布物を利用者が取得します。
-- 保存済みfinal workbookのアプリへの再importと、複数definition profileの管理・切替は提供しません。候補版の採点定義1件の明示保存・適用とは別です。
+- 保存済みfinal workbookのアプリへの再importと、複数definition profileの管理・切替は提供しません。公開`v0.8.6`の採点定義1件の明示保存・適用とは別です。
 - AI品質、教育的妥当性、公平性、法的適合性、組織policy適合性、不正行為を保証・判定しません。
 - 未実測の処理時間、token数、費用を保証しません。
 
 ## ガイド
 
-公開版と未公開候補を区別し、各ガイドの対象版を確認してください。
+公開`v0.8.6`と旧`v0.8.1`の記述を区別し、各ガイドの対象版を確認してください。
 
 - [はじめに](docs/getting-started.md)
 - [設定の保存と適用](docs/settings.md)

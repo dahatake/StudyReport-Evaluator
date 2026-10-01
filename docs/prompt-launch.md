@@ -6,12 +6,12 @@ StudyReport Evaluatorは、入力workbookと複数の評価Promptを起動時に
 
 ## 対象版と確認範囲
 
-- **未公開候補`0.8.6`（UNRELEASED・単一EXE）**: 配布名は`StudyReportEvaluator-win-x64.exe`です。以下の候補版の例は取得済みのEXEを使うもので、公開済みとは扱わず、未公開のdownload URLも案内しません。
-- **現在の公開版`v0.8.1`（ZIP）**: `StudyReportEvaluator-win-x64.zip`を展開した`StudyReportEvaluator.App.exe`を使います。この起動名と引数は従来どおり維持します。
+- **公開`v0.8.6`（単一EXE）**: 配布名は`StudyReportEvaluator-win-x64.exe`です。通常はGitHub Releaseの`v0.8.6`から取得し、必要に応じて`StudyReportEvaluator-win-x64.exe.sha256`でSHA-256を照合します。clean-host試験CH-01〜06と本人loginは公開前に実施していません。
+- **公開`v0.8.6`（ZIP代替経路）**: `StudyReportEvaluator-win-x64.zip`を展開した`StudyReportEvaluator.App.exe`も使えます。この起動名と引数は従来どおり維持します。旧`v0.8.1`は前回公開版です。
 
-以下の画面操作は、特記しない限り候補版の新UIです。Imported Promptsの本文・適用先は**設定 → 読込Prompt**、モデル・並列度・指定出力先の編集は**設定 → 共通**にあります。公開版の旧操作は後述の「公開 v0.8.1（ZIP）の旧画面」に分けています。
+以下の画面操作は、特記しない限り候補版の新UIです。Imported Promptsの本文・適用先は**設定 → 読込Prompt**、モデル・並列度・指定出力先の編集は**設定 → 共通**にあります。旧`v0.8.1`の操作は後述の「旧 v0.8.1（ZIP）の旧画面」に分けています。
 
-> **既存P06の確認範囲（製品`0.8.4`の検証履歴）:** 開発host上の実GUIで日本語pathの入力workbookと複数Promptの指定順維持を確認済みで、P06全7件PASS・review未解決指摘0です。この履歴を版更新後の最終成果物の検証結果へ流用しません。追加ソフト未導入のfresh OS（clean-host）での試験と利用者本人のloginは`NOT_RUN`であり、その成功や候補EXEの公開完了を示しません。
+> **既存P06の確認範囲（製品`0.8.4`の検証履歴）:** 開発host上の実GUIで日本語pathの入力workbookと複数Promptの指定順維持を確認済みで、P06全7件PASS・review未解決指摘0です。この履歴を版更新後の最終成果物の検証結果へ流用しません。追加ソフト未導入のfresh OS（clean-host）での試験と利用者本人のloginは`NOT_RUN`であり、その成功や`v0.8.6`公開後もclean-host成功を示しません。
 
 ## 2種類のPrompt
 
@@ -22,13 +22,13 @@ StudyReport Evaluatorは、入力workbookと複数の評価Promptを起動時に
 
 ## 起動option
 
-未公開`0.8.6`候補の単一EXE:
+公開`v0.8.6`の単一EXE:
 
 ```text
 StudyReportEvaluator-win-x64.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prompt "<txt-path>" ...]
 ```
 
-公開`v0.8.1`のZIPを展開したEXE（従来の起動方法）:
+公開`v0.8.6`のZIPを展開したEXE（代替経路）:
 
 ```text
 StudyReportEvaluator.App.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prompt "<txt-path>" ...]
@@ -64,13 +64,13 @@ StudyReportEvaluator.App.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prom
 
 既にPowerShell 7がある場合の任意の例です。通常のGUI起動のためにPowerShellを導入したり、terminalへcommandを入力したりする必要はありません。
 
-未公開`0.8.6`候補の単一EXE:
+公開`v0.8.6`の単一EXE:
 
 ```powershell
 & "C:\配布 アプリ\StudyReportEvaluator-win-x64.exe" --input "C:\授業 データ\回答.xlsx" --prompt "C:\授業 データ\評価 Prompt\内容 評価.txt" --prompt "C:\授業 データ\評価 Prompt\学生 Prompt.txt"
 ```
 
-公開`v0.8.1`のZIPを展開したEXE:
+公開`v0.8.6`のZIPを展開したEXE:
 
 ```powershell
 & "C:\配布 アプリ\StudyReportEvaluator-win-x64\StudyReportEvaluator.App.exe" --input "C:\授業 データ\回答.xlsx" --prompt "C:\授業 データ\評価 Prompt\内容 評価.txt" --prompt "C:\授業 データ\評価 Prompt\学生 Prompt.txt"
@@ -80,7 +80,7 @@ StudyReportEvaluator.App.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prom
 
 ## GitHub Copilotへ貼る起動依頼例
 
-`<...>`を実在pathへ置き換え、引用符を残します。アプリには取得済みの未公開`0.8.6`候補の単一EXE、または公開`v0.8.1`のZIPを展開したEXEのどちらか1つを指定します。
+`<...>`を実在pathへ置き換え、引用符を残します。アプリには公開`v0.8.6`の単一EXE、または同じ`v0.8.6`のZIPを展開したEXEのどちらか1つを指定します。
 
 ```text
 ローカルのStudyReport Evaluatorを、次の入力と評価Promptを事前入力して起動してください。
@@ -197,14 +197,14 @@ command lineにresume optionはありません。通常どおり`--input`と必�
 
 checkpointのinput、definition、modelが一致しない場合、またはruntimeの互換条件を満たさない場合は再開を拒否します。アプリidentityを`アプリ名/バージョン`として解釈できる場合は、**アプリ名とmajor版の一致**を求め、minor／patchの差だけでは拒否しません。解釈できないidentityは文字列の完全一致が必要です。**SDK informational version、CLI version、CLI SHA-256は完全一致**を求めます。partialを編集、rename、copyして一致を回避しないでください。
 
-## 公開 v0.8.1（ZIP）の旧画面
+## 旧 v0.8.1（ZIP）の旧画面
 
-この節だけは公開`v0.8.1`の旧配置です。上記の候補版の設定画面と混同しないでください。
+この節だけは旧`v0.8.1`の旧配置です。上記の候補版の設定画面と混同しないでください。
 
 - Imported Promptsは**Design画面内**で確認し、対象を選んで**Promptを適用**します。選択だけでの適用やfilenameによる自動割当はしません。
 - モデル・並列度・出力directoryは**Execution画面の編集欄**で指定します。
 - checkpoint再開は旧Execution画面の**既存checkpointから再開**で`.partial.xlsx`を指定します。新しいresume引数はありません。
-- このガイドで説明する設定画面と`setting.txt`への共通設定・採点定義1件の保存は、公開`v0.8.1`の機能ではありません。起動引数の順序、Promptの明示適用、no-auto-runの契約は従来どおりです。
+- このガイドで説明する設定画面と`setting.txt`への共通設定・採点定義1件の保存は、旧`v0.8.1`の機能ではありません。起動引数の順序、Promptの明示適用、no-auto-runの契約は従来どおりです。
 
 ## privacy
 

@@ -387,33 +387,37 @@ public sealed class DocumentationContractTests
             readme,
             "Windows 11 x64",
             ".NET 10 self-contained",
-            "公開`v0.8.1`はunsigned ZIP",
+            "公開`v0.8.6`はunsigned単一EXEを主導線とし、unsigned ZIPも提供",
             "StudyReportEvaluator-win-x64.zip",
             "StudyReportEvaluator-win-x64.zip.sha256",
             "StudyReportEvaluator-win-x64.exe",
             "StudyReportEvaluator-win-x64.exe.sha256",
-            "現在の公開版は`0.8.1`です",
-            "https://github.com/dahatake/StudyReport-Evaluator/releases",
-            "追加ソフト未導入のOS-only環境でのclean-host試験と本人loginは未実施",
+            "現在の公開版は`0.8.6`です",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6",
+            "fresh Windows 11 x64でのclean-host試験CH-01〜06と本人loginを実施しないまま公開",
             "macOS、Linux、Windows Arm64は初版対応対象外",
             "installer、code signing、notarizationを提供しません");
 
-        // A versioned direct link goes stale on the next release and once returned 404 to users.
-        Assert.DoesNotContain("/releases/download/", readme, StringComparison.OrdinalIgnoreCase);
+        AssertContainsAll(
+            readme,
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe.sha256",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip.sha256");
         AssertContainsAll(
             userIndex,
             "Windows 11 x64",
-            "公開ZIP／候補EXEともunsigned",
-            "現在の公開版は`0.8.1`です",
-            "単一EXEはまだ公開されておらず",
-            "clean-host試験と本人loginは`NOT_RUN`",
+            "公開EXE／ZIPともunsigned",
+            "現在の公開版は`0.8.6`です",
+            "`v0.8.6`の`StudyReportEvaluator-win-x64.exe`",
+            "CH-01〜06 `NOT_RUN`は維持します",
             "development MSIXは検証専用で、一般配布しません",
             "macOS、Linux、Windows Arm64");
         AssertContainsAll(
             Read("docs/getting-started.md"),
-            "現在の公開版は`v0.8.1`です",
-            "https://github.com/dahatake/StudyReport-Evaluator/releases",
-            "fresh Windowsのclean-host試験CH-01〜06と本人loginは`NOT_RUN`",
+            "現在の公開版は`v0.8.6`です",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6",
+            "clean-host試験CH-01〜06と本人loginを実施しないまま公開",
             "development MSIXは非公開の開発検証専用");
         AssertContainsAll(
             publishScript,
@@ -512,7 +516,7 @@ public sealed class DocumentationContractTests
         string guide = Read("docs/prompt-launch.md");
         AssertContainsAll(
             readme,
-            "未公開候補の`StudyReportEvaluator-win-x64.exe`と、公開`v0.8.1` ZIPの`StudyReportEvaluator.App.exe`",
+            "公開`v0.8.6`の`StudyReportEvaluator-win-x64.exe`と、同じ`v0.8.6` ZIPの`StudyReportEvaluator.App.exe`",
             "[Promptファイルから起動](docs/prompt-launch.md)",
             "`--input`は0または1回",
             "`--prompt`は0回以上",
@@ -842,37 +846,39 @@ public sealed class DocumentationContractTests
     }
 
     [Fact]
-    public void Unreleased_ui_and_screenshots_are_explicitly_distinguished_from_the_public_release()
+    public void Published_0_8_6_ui_and_screenshots_are_explicitly_distinguished_from_historical_0_8_1()
     {
-        // Literal current candidate expectations are deliberate: synchronized in F02,
-        // not by reading a version back from the documents being checked. Public 0.8.1 is separate.
+        // Literal current public release expectations are deliberate: synchronized after publication,
+        // not by reading a version back from the documents being checked. Public 0.8.6 is current; 0.8.1 is historical.
         Assert.Contains("<VersionPrefix>0.8.6</VersionPrefix>", Read("Directory.Build.props"), StringComparison.Ordinal);
         foreach ((string path, string candidate, string published) in new[]
                  {
-                     ("README.md", "製品候補は`0.8.6`（UNRELEASED・未公開）", "現在の公開版は`0.8.1`です"),
-                     ("docs/README.md", "UNRELEASED（未リリース）の`0.8.6`候補", "現在の公開版は`0.8.1`です"),
-                     ("docs/getting-started.md", "現在のソース候補`0.8.6`（UNRELEASED・未公開）", "現在の公開版は`v0.8.1`です"),
-                     ("docs/settings.md", "現在のソース候補`0.8.6`", "公開`v0.8.1`はZIP配布で、本頁の設定保存・適用機能はありません"),
-                     ("docs/features.md", "UNRELEASED（未リリース）の`0.8.6`候補", "現在の公開版`v0.8.1`（ZIP）"),
-                     ("docs/custom-evaluator-guide.md", "UNRELEASED（未リリース）の`0.8.6`候補", "現在の公開版`v0.8.1`（ZIP）"),
-                     ("docs/prompt-launch.md", "未公開候補`0.8.6`（UNRELEASED・単一EXE）", "現在の公開版`v0.8.1`（ZIP）"),
-                     ("docs/privacy-and-data-handling.md", "現在のソースの`0.8.6`候補", "公開`v0.8.1`はZIP配布"),
-                     ("docs/troubleshooting.md", "UNRELEASED（未公開）の`0.8.6`候補", "公開`v0.8.1`はZIP配布"),
-                     ("docs/result-excel-description.md", "UNRELEASED（未リリース）の`0.8.6`候補", "現在の公開版は`0.8.1`です"),
-                     ("images/README.md", "UNRELEASED（未リリース）の`0.8.6`候補", "公開`0.8.1`の画面を示すものではありません"),
+                     ("README.md", "現在の公開版は`0.8.6`です", "fresh Windows 11 x64でのclean-host試験CH-01〜06と本人loginを実施しないまま公開"),
+                     ("docs/README.md", "現在の公開版は`0.8.6`です", "CH-01〜06 `NOT_RUN`は維持します"),
+                     ("docs/getting-started.md", "現在の公開版は`v0.8.6`です", "clean-host試験CH-01〜06と本人loginを実施しないまま公開"),
+                     ("docs/settings.md", "公開`v0.8.6`", "旧`v0.8.1`はZIP配布で、本頁の設定保存・適用機能はありません"),
+                     ("docs/features.md", "公開`v0.8.6`", "旧`v0.8.1`（ZIP）の機能・画面配置とは区別"),
+                     ("docs/custom-evaluator-guide.md", "公開`v0.8.6`", "旧`v0.8.1`（ZIP）の旧Design画面とは配置が異なります"),
+                     ("docs/prompt-launch.md", "公開`v0.8.6`（単一EXE）", "公開`v0.8.6`（ZIP代替経路）"),
+                     ("docs/privacy-and-data-handling.md", "公開`v0.8.6`向け", "旧`v0.8.1`はZIP配布"),
+                     ("docs/troubleshooting.md", "公開`v0.8.6`向け", "旧`v0.8.1`はZIP配布"),
+                     ("docs/result-excel-description.md", "公開`v0.8.6`の出力", "clean-host試験CH-01〜06と本人loginは公開前に実施していません"),
+                     ("images/README.md", "公開`v0.8.6`のUI説明用", "旧`0.8.1`の画面を示すものではありません"),
                  })
         {
-            AssertContainsAll(Read(path), "UNRELEASED", candidate, published);
+            string content = Read(path);
+            AssertContainsAll(content, candidate, published);
+            Assert.DoesNotContain("UNRELEASED", content, StringComparison.Ordinal);
         }
 
         AssertContainsAll(Read("images/README.md"), "一時directoryへ描画", "2回生成の一致", "finally",
-            "生成時の製品版: `0.8.6`候補（UNRELEASED）", "その時点ではPNGを再生成していません");
+            "生成時の製品版: `0.8.6`", "その時点ではPNGを再生成していません");
         AssertContainsAll(Read("CHANGELOG.md"), "## [Unreleased]", "## [0.8.6] - 2026-10-01");
         AssertContainsAll(
             Read("docs/getting-started.md"),
             "確認のためだけにPowerShell等を導入する必要はありません",
             "certutil",
-            "fresh Windowsのclean-host試験CH-01〜06と本人loginは`NOT_RUN`");
+            "clean-host試験CH-01〜06と本人loginを実施しないまま公開");
     }
 
     [Fact]
@@ -886,7 +892,7 @@ public sealed class DocumentationContractTests
             "すべての端末で無警告・無条件に1操作で起動できるとは表示しません",
             "1ファイル配布は「ディスク上も1ファイル」「痕跡なし」ではありません",
             "保存済みfinal workbookのアプリへの再importと、複数definition profileの管理・切替は提供しません",
-            "候補版の採点定義1件の明示保存・適用とは別です",
+            "公開`v0.8.6`の採点定義1件の明示保存・適用とは別です",
             "[MIT License](LICENSE)");
         AssertDoesNotContainAny(
             readme,
@@ -1132,8 +1138,8 @@ public sealed class DocumentationContractTests
             "T01時点の未実装・試験NOT_RUNは履歴",
             "T01〜T35はREVIEWED",
             "T35の対象文書試験は4/4成功・敵対的レビュー済み",
-            "製品`0.8.6`は未公開候補",
-            "公開済みは`v0.8.1` ZIPのまま");
+            "製品0.8.6は2026-10-01に公開済み",
+            "前回公開版は`v0.8.1` ZIP");
         // T35's four historical results are not T36's expanded document/image gate.
         // Check the evidence boundary without requiring T36 to remain pending forever.
         foreach (string content in new[] { requirements, traceability, ledger, prompts })

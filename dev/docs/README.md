@@ -2,9 +2,9 @@
 
 対象読者は開発者、アーキテクト、QA、リリース担当です。利用者向け文書は[`docs/`](../../docs/README.md)を参照してください。
 
-現在のソース候補は**`0.8.6`（UNRELEASED・未公開）**、要求版はv4.6、公開済みは`v0.8.1`のunsigned ZIP／sidecarです。T01〜T38とF01はREVIEWED、T39は追加native FAILと本人確認等の外部前提によりBLOCKEDです。利用者不在時の自律続行指示によりF01／F02を進めますが、G4・全タスクDONE・公開PASSを付与しません。
+現在の公開版は**`0.8.6`**、要求版はv4.6、前回公開版は`v0.8.1`のunsigned ZIP／sidecarです。`v0.8.6`の公開assetはunsigned EXE／EXE sidecar／ZIP／ZIP sidecarの4件です。T01〜T38とF01はREVIEWED、T39は追加native FAILと本人確認等の外部前提によりBLOCKEDです。repository ownerの明示判断でclean-host試験CH-01〜06を実施せず、protected `publish-release.yml` workflowではなくdraft解除で公開しましたが、G4・全タスクDONE・clean-host PASSを付与しません。
 
-F02の最終版再検証は本同期時点では親担当で未完了です。以後は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄を参照してください。[実装状態](implementation-status.md)は、0.8.4のT36文書contract・T37実ZIP・T38実EXE・T39自動回帰／MSIX機構確認と、追加native FAIL／Narrator・本人walkthrough・隔離利用者保存の未実施を分けています。旧証跡を0.8.6最終artifactの成功へ流用しません。
+Release candidate run 36860591724は成功し、`v0.8.6`は2026-10-01に公開済みです。[実装状態](implementation-status.md)は、0.8.4のT36文書contract・T37実ZIP・T38実EXE・T39自動回帰／MSIX機構確認と、追加native FAIL／Narrator・本人walkthrough・隔離利用者保存の未実施を分けています。旧証跡を0.8.6最終artifactの成功へ流用しません。
 
 ## 現行正本
 
@@ -19,7 +19,7 @@ F02の最終版再検証は本同期時点では親担当で未完了です。�
 | [Excel / formula契約](excel-contract.md) | 開発、Excel監査、QA | sheet、formula、blank、preflight、atomic commit |
 | [Traceability](traceability.md) | QA、リリース | AC / TR / implementation / test / gate対応 |
 | [README claim台帳](readme-claim-ledger.md) | QA、リリース | 行ごとの検証範囲、未実施条件と公開claimの制限 |
-| [要求定義書](../../docs/requirements-definition.md) | 要求所有者、QA | v4.6規範baseline。製品0.8.6・公開0.8.1と独立 |
+| [要求定義書](../../docs/requirements-definition.md) | 要求所有者、QA | v4.6規範baseline。製品0.8.6・前回公開0.8.1と独立 |
 | [ADR-0012](adr/0012-point-allocation-similarity-resume-portability.md) | アーキテクト | 配点、AI operation、formula、checkpoint、Prompt起動 |
 | [ADR-0013](adr/0013-windows-only-public-release.md) | アーキテクト、リリース | 現行platform/release scope decision |
 | [ADR-0014](adr/0014-product-versioning.md) | アーキテクト、リリース | 製品SemVer、単一正本、tag/release identity |
@@ -27,7 +27,7 @@ F02の最終版再検証は本同期時点では親担当で未完了です。�
 | [ADR-0016](adr/0016-windows-one-action-startup.md) | アーキテクト、リリース、QA | App限定Windows単一EXE、login導線、matrix v2、clean-host公開境界 |
 | [ADR-0018](adr/0018-job-cost-observability.md) | アーキテクト、QA | ジョブ単位のAI使用量観測、JSONLログ、単位・換算の境界 |
 | [Windows単一EXEの方式適合](preflight/windows-singlefile-feasibility.md) | 開発、QA、リリース | 固定.NET／SDK／CLIでの開発host適合結果と未実施clean-host境界 |
-| [Screenshot manifest](../../images/README.md) | UI開発、QA、利用者支援 | 8枚の合成説明画像。T28の生成履歴は`0.8.4`・1440×1050・2回hash一致。現在のソース`0.8.6`での再生成やnative／実保存の証拠ではない |
+| [Screenshot manifest](../../images/README.md) | UI開発、QA、利用者支援 | 8枚の合成説明画像。T28の生成履歴は`0.8.4`・1440×1050・2回hash一致。`0.8.6`公開後のnative／実保存の証拠ではない |
 
 ## 履歴文書
 
@@ -112,7 +112,7 @@ historical fileへ追加した先頭bannerはpost-gate navigation metadataです
 
 | Item | Pinned value | Source |
 |---|---:|---|
-| Product version | `0.8.6` candidate（UNRELEASED・未公開） | [`Directory.Build.props`](../../Directory.Build.props)、[版管理手順](version-management.md) |
+| Product version | `0.8.6` published | [`Directory.Build.props`](../../Directory.Build.props)、[版管理手順](version-management.md) |
 | .NET SDK | 10.0.400、latestPatch | [`global.json`](../../global.json) |
 | Target framework | `net10.0` | [`Directory.Build.props`](../../Directory.Build.props) |
 | Avalonia | 12.1.1 | [`Directory.Packages.props`](../../Directory.Packages.props) |

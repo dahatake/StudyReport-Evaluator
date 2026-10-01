@@ -2,11 +2,11 @@
 
 回答やPrompt本文、`setting.txt`の実内容をerror report、issue、chatへ貼らず、表示されたcode、field、件数、file形式だけで切り分けてください。設定には見出し由来の質問文や貼付内容、機密なpathが含まれ得ます。
 
-> **対象版・確認範囲（2026-09-07）:** 公開`v0.8.1`はZIP配布で、単一EXE、「GitHubにログイン」button、本頁の設定保存・適用機能はありません。本頁の単一EXE、login button、`setting.txt`の説明は、**UNRELEASED（未公開）の`0.8.6`候補**向けです。
+> **対象版・確認範囲:** 本頁の単一EXE、login button、`setting.txt`の説明は、公開`v0.8.6`向けです。旧`v0.8.1`はZIP配布で、単一EXE、「GitHubにログイン」button、本頁の設定保存・適用機能はありません。
 >
-> 版更新前の製品`0.8.4`では、P06の実EXE試験は開発hostで**7件すべてPASS・独立レビュー指摘0**です。この履歴を版更新後の最終成果物の検証結果へ流用しません。一方、**clean-host（MOTW／Windows保護の実測を含む）と本人loginは`NOT_RUN`**です。今後のEXE主配布は、最終成果物のCH-01〜06のPASSと公開判定待ちであり、まだ公開済みではありません。同梱文書や製品版の変更でEXEのbytesが変われば、再package・当該EXEの再検証が必要です。
+> 版更新前の製品`0.8.4`では、P06の実EXE試験は開発hostで**7件すべてPASS・独立レビュー指摘0**です。この履歴を版更新後の最終成果物の検証結果へ流用しません。一方、**clean-host（MOTW／Windows保護の実測を含む）と本人loginは`NOT_RUN`**です。`v0.8.6`は公開済みですが、最終成果物のCH-01〜06を実施しないままrepository ownerの明示判断で公開されました。同梱文書や製品版の変更でEXEのbytesが変われば、再package・当該EXEの再検証が必要です。
 >
-> 一時保存先の実設定fileとfake AI境界を使うdeterministic E2Eの成功は、native WindowsのUI／DPI／Narrator確認・本人walkthroughやrelease完了の証拠ではありません。追加native確認は**NOT COMPLETE（FAIL）**で、Space／Narrator、本人walkthrough、隔離利用者環境のnative保存は`NOT_RUN`です。UIAの行特定段階の失敗をアプリ不具合と断定せず、P06の実測と追加probeの到達範囲は[検証範囲](getting-started.md#未公開候補の検証範囲)で区別してください。
+> 一時保存先の実設定fileとfake AI境界を使うdeterministic E2Eの成功は、native WindowsのUI／DPI／Narrator確認・本人walkthroughやrelease完了の証拠ではありません。追加native確認は**NOT COMPLETE（FAIL）**で、Space／Narrator、本人walkthrough、隔離利用者環境のnative保存は`NOT_RUN`です。UIAの行特定段階の失敗をアプリ不具合と断定せず、P06の実測と追加probeの到達範囲は[検証範囲](getting-started.md#v086の検証範囲)で区別してください。
 
 以下は症状を切り分けるための確認事項です。列挙した症状すべてを、再現済みの製品不具合として扱うものではありません。
 
@@ -23,9 +23,9 @@
 
 `nano-AI units`とpremium request消費量はSDK報告値です。AIクレジットは`nano-AI units`を1,000,000,000で割った表示時の換算値で、請求確定額ではありません。アプリは円・ドル・アカウント残量へ換算しません。結果画面の`AIクレジット —（未取得）`はSDKから値を観測できなかった状態、`—（コスト記録なし）`はその結果にコスト記録が付属していない状態、`（一部取得）`は一部の試行の値が部分取得の状態で、いずれも0を意味しません。入力／出力tokenと重複し得る推論／cache内訳を合計tokenとして加算しないでください。記録対象、保存先、保持期間は[データとprivacy](privacy-and-data-handling.md#ジョブコストログ)を確認してください。
 
-## 単一EXEを起動できない（未公開候補）
+## 単一EXEを起動できない（v0.8.6）
 
-候補`StudyReportEvaluator-win-x64.exe`は.NET標準hostが、通常は標準userの一時領域`%TEMP%/.net/<app>/<bundle-id>/`へ内容を展開してからGUIを起動します。**EXEの配置先と抽出先は別**で、EXEを置いたdirectoryがread-onlyであることと、抽出先へ書き込めないことを区別します。
+公開`v0.8.6`の`StudyReportEvaluator-win-x64.exe`は.NET標準hostが、通常は標準userの一時領域`%TEMP%/.net/<app>/<bundle-id>/`へ内容を展開してからGUIを起動します。**EXEの配置先と抽出先は別**で、EXEを置いたdirectoryがread-onlyであることと、抽出先へ書き込めないことを区別します。
 
 | 状況 | 対処 |
 |---|---|
@@ -39,7 +39,7 @@
 
 ## ZIPを起動できない
 
-公開`v0.8.1`では`StudyReportEvaluator-win-x64.zip`を使います。単一EXEの公開後もZIPは代替経路として維持します。
+公開`v0.8.6`では単一EXEが主導線ですが、`StudyReportEvaluator-win-x64.zip`も代替経路として維持します。旧`v0.8.1`のZIPは前回公開版です。
 
 | 状況 | 対処 |
 |---|---|
@@ -108,7 +108,7 @@ native pickerが開かない場合はfull pathを直接入力できます。pick
 
 step移動ができても、技術検証がinvalidな状態ではrunを開始できません。
 
-## 設定を保存・読み込めない（未公開候補）
+## 設定を保存・読み込めない（v0.8.6）
 
 設定は現在の利用者のLocalApplicationData配下、Windowsでは通常`%LOCALAPPDATA%\StudyReportEvaluator\setting.txt`にある**UTF-8 JSON・設定schema整数1**です。実際の場所は**設定 → 共通 → 保存定義**で確認できます。EXE／ZIPの配置先、入力、結果、抽出cache、CLI credential storeとは別で、新しい環境変数・API key・`.env`は不要です。
 
@@ -162,7 +162,7 @@ Windowsのフォルダーの**ReadOnly属性だけでは書込拒否を保証し
 - `OUTPUT_DIRECTORY_INVALID`等では指定path・権限・作成可能性を確認し、修正してください。利用不可でも別pathへfallbackしません。設定の復元だけでは出力directoryを作りません。
 - 実行中の編集は次回用です。現在runのimmutable snapshot・予約済みfinal／partial pathを変更せず、再開時のcheckpoint内pathも別の出力指定で置き換えません。
 
-含有情報と平文保存の注意は[データとprivacy](privacy-and-data-handling.md#settingtxtの保存と機密性未公開候補)を確認してください。詳細な操作は[設定ガイド](settings.md)を参照してください。
+含有情報と平文保存の注意は[データとprivacy](privacy-and-data-handling.md#settingtxtの保存と機密性v086)を確認してください。詳細な操作は[設定ガイド](settings.md)を参照してください。
 
 ## Copilotを利用できない
 
@@ -180,13 +180,13 @@ CLIはEXE／ZIPの配布物へ同梱され、manifestでpath、RID、SDK／CLI v
 
 **設定 → 共通 → 診断**の認証状態・runtime情報は読取専用の表示で、保存対象外です。希望model IDが未指定の初回は、従来どおり確認成功後に初期選択を表示しますが、それだけで希望IDを保存しません。候補版では保存済み`cachedModels`がある場合（空配列を含む）だけ、起動時に一覧を表示用に復元して認証・一覧を自動再確認します。キャッシュなしの旧設定・初回起動は明示確認またはloginを待ちます。再確認失敗ではキャッシュを保持しても実行用の認証・model選択は解除され、一覧が見えても評価できません。設定の明示再読込・保存では認証確認やloginを始めません。
 
-CLI欠落・不一致時は処理を止め、利用中と**同じ製品版の正式配布物を再取得**してください。ZIP版はpackage全体を新しいdirectoryへ展開します。.NET標準抽出は書換え済みcacheの完全性を保証せず、再取得したEXEでも同じcacheを再利用し得ます。不一致が続く場合は、提供元が同じ製品版・runtime identityのZIPを提供していれば新しいdirectoryへ全体を展開し、なければ提供元へ確認してください。未公開候補の代わりに公開`v0.8.1`を使ってcheckpoint互換を推測しないでください。
+CLI欠落・不一致時は処理を止め、利用中と**同じ製品版の正式配布物を再取得**してください。ZIP版はpackage全体を新しいdirectoryへ展開します。.NET標準抽出は書換え済みcacheの完全性を保証せず、再取得したEXEでも同じcacheを再利用し得ます。不一致が続く場合は、提供元が同じ製品版・runtime identityのZIPを提供していれば新しいdirectoryへ全体を展開し、なければ提供元へ確認してください。公開`v0.8.6`の代わりに旧公開`v0.8.1`を使ってcheckpoint互換を推測しないでください。
 
 PATH上の別CLIのinstall／追加、他版CLIのcopy、manifest変更やhash検証緩和で回避しないでください。
 
 ### 本人loginと完了後の再確認
 
-**「GitHubにログイン」「ログインを取り消す」は未公開`0.8.6`候補のみ**です。公開`v0.8.1`にはこのbuttonがなく、従来どおり同梱CLIで本人loginを行い、既存の状態確認buttonを使います。buttonがないことだけを不具合と判断しないでください。
+**「GitHubにログイン」「ログインを取り消す」は公開`v0.8.6`のbuttonです。**旧公開`v0.8.1`にはこのbuttonがなく、従来どおり同梱CLIで本人loginを行い、既存の状態確認buttonを使います。buttonがないことだけを不具合と判断しないでください。
 
 1. 候補版は起動直後にこのPCで利用中のGitHubアカウントのログイン（環境変数`COPILOT_GITHUB_TOKEN`／`GH_TOKEN`／`GITHUB_TOKEN`、OSの資格情報ストア、GitHub CLI `gh`の順に同梱CLIが解決）を自動確認します。手動で再確認するにはExecution画面で**Copilot 状態を確認**を選びます。
 2. 利用できるログインがない場合、候補版は検証済みの同梱native CLIだけを直接起動し、ブラウザー認証を1回だけ自動で開始します。CLIのconsole／ブラウザーの案内に従って本人のGitHub accountで対話認証を完了します。取消・失敗後は自動では再試行しないので、必要なら**GitHubにログイン**を選びます。ブラウザーを開きたくない環境では環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`を`0`または`false`にします。
@@ -197,7 +197,7 @@ PATH上の別CLIのinstall／追加、他版CLIのcopy、manifest変更やhash�
 
 ### loginの失敗・取消・終了処理
 
-次は未公開候補のlogin専用処理です。評価runの`CLEANUP_FAILED`や、final完成後の`PARTIAL_CLEANUP_FAILED`とは区別します。
+次は公開`v0.8.6`のlogin専用処理です。評価runの`CLEANUP_FAILED`や、final完成後の`PARTIAL_CLEANUP_FAILED`とは区別します。
 
 | 状況 | 対処 |
 |---|---|
@@ -270,4 +270,3 @@ PATH上の別CLIのinstall／追加、他版CLIのcopy、manifest変更やhash�
 ## outputを扱うとき
 
 final/partialは入力全体、Prompt、Reference、AI resultを含み得ます。issueへ添付せず、必要な場合は機密本文を含まないcode・件数・basenameだけを共有してください。詳しくは[データとprivacy](privacy-and-data-handling.md)を参照してください。
-

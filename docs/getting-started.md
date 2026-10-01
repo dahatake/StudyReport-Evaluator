@@ -2,20 +2,20 @@
 
 このガイドでは、Windows 11 x64でStudyReport Evaluatorを起動し、標準`.xlsx`から最初の結果workbookを作る手順を説明します。
 
-現在の公開版は`v0.8.1`です。[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases)で取得できる`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`はこの旧公開版です。**公開`v0.8.1`には単一EXE配布も「GitHubにログイン」buttonもありません。**
+現在の公開版は`v0.8.6`です。[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6)で取得できる`StudyReportEvaluator-win-x64.exe`、`StudyReportEvaluator-win-x64.exe.sha256`、`StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`の4件が公開assetです。単一EXEが主導線で、ZIPは代替経路として維持します。旧`v0.8.1`は前回公開版です。
 
 > [!WARNING]
 > 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません
 
 > [!IMPORTANT]
-> 単一EXE、login button、以下の簡素化UI・設定保存は、現在のソース候補**`0.8.6`（UNRELEASED・未公開）**向けです。新EXEのdownload linkはまだ公開されていません。**fresh Windowsのclean-host試験CH-01〜06と本人loginは`NOT_RUN`**であり、追加ソフト未導入のOS-only環境での動作を実証済みとはしていません。公開`v0.8.1`の操作と区別してください。既存の検証状況と画像の対象版は本ガイド末尾を参照してください。
+> 単一EXE、login button、以下の簡素化UI・設定保存は公開`v0.8.6`向けです。`v0.8.6`はrepository ownerの明示判断により、**fresh Windowsのclean-host試験CH-01〜06と本人loginを実施しないまま公開**しました。追加ソフト未導入のOS-only環境での動作、Narrator／本人walkthrough／隔離利用者設定保存、T39の完了を実証済みとはしていません。旧`v0.8.1`の操作と区別してください。既存の検証状況と画像の対象版は本ガイド末尾を参照してください。
 
 ## 準備
 
 必要なもの:
 
 - Windows 11 x64の標準user環境
-- 下記の対象版に合った配布物（今後の主導線は単一EXE、現在の公開版はZIP）
+- 下記の対象版に合った配布物（主導線は単一EXE、ZIPは代替経路）
 - 評価対象の標準`.xlsx`
 - AI処理を行う場合だけ、利用可能なGitHub Copilot account、本人の対話login、network接続、利用可能model、組織policy上の利用許可
 
@@ -23,33 +23,33 @@ GUI起動に.NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI�
 
 development MSIXは非公開の開発検証専用であり、一般利用者向けの入手・起動手順には含めません。
 
-## 単一EXEから起動する（未公開候補・今後の主導線）
+## 単一EXEから起動する（v0.8.6の主導線）
 
-今後の主配布名は`StudyReportEvaluator-win-x64.exe`と`StudyReportEvaluator-win-x64.exe.sha256`です。公開条件を満たす最終成果物の公開後に一般利用者の主導線となります。現時点では、開発者から対象の未公開候補を受領した場合の手順として読んでください。
-
-1. 取得済みの`StudyReportEvaluator-win-x64.exe`をダブルクリックします。
-2. 入力画面が表示されたら、本ガイドの「1. 入力」へ進みます。
+1. [`StudyReportEvaluator-win-x64.exe`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe)をdownloadします。
+2. 任意・推奨のhash確認を行う場合は、同じreleaseの[`StudyReportEvaluator-win-x64.exe.sha256`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe.sha256)も取得し、下記の方法で照合します。
+3. `StudyReportEvaluator-win-x64.exe`をダブルクリックします。
+4. 入力画面が表示されたら、本ガイドの「1. 入力」へ進みます。
 
 **ダブルクリックを1起動gestureと数えます。** download、任意の手動hash比較、Windowsの警告への操作、本人loginはこの1操作に含めません。警告・拒否や追加操作を隠して、無条件に1操作で起動できるとは表示しません。
 
 標準userがofflineでGUI、Excel読込、mapping、採点設計を利用できることを要求しています。ただし、**fresh OS-only環境での実証は未完了**です。手動展開、setup script、terminalへのcommand入力、管理者昇格、repository、隣接DLL／manifest、既存CLI cache・認証情報、sidecarをGUI起動の前提にしません。起動時にloginやAI評価は自動開始しません。
 
-未公開のdownload URLを推測したり、repository内の`artifacts`を一般配布先として扱ったりしないでください。
+repository内の`artifacts`を一般配布先として扱わず、公開`v0.8.6`のGitHub Release assetを利用してください。
 
-## ZIPを起動する（現在の公開v0.8.1・代替経路）
+## ZIPを起動する（v0.8.6の代替経路）
 
-1. 上記GitHub Releasesの`v0.8.1`から`StudyReportEvaluator-win-x64.zip`をdownloadします。
-2. 任意・推奨のhash確認を行う場合は、同じreleaseの`StudyReportEvaluator-win-x64.zip.sha256`も取得し、下記の方法で照合します。
+1. [`StudyReportEvaluator-win-x64.zip`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip)をdownloadします。
+2. 任意・推奨のhash確認を行う場合は、同じreleaseの[`StudyReportEvaluator-win-x64.zip.sha256`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip.sha256)も取得し、下記の方法で照合します。
 3. ZIPを新しいdirectoryへ展開します。
 4. `StudyReportEvaluator-win-x64\StudyReportEvaluator.App.exe`を起動します。
 
-単一EXEが公開された後も、ZIPとsidecarの名前および展開後の起動方法は代替経路として維持します。**既存の公開`v0.8.1`の内容が候補版へ置き換わるわけではなく、login buttonも追加されません。**
+旧`v0.8.1`の配布物は履歴として残りますが、現在の案内は`v0.8.6`の4 assetを対象にします。
 
 ## SHA-256を確認する（手動比較は任意・推奨）
 
 EXE／ZIPそれぞれのsidecar公開と、CI・公開判定での最終配布bytesとのSHA-256完全一致確認は必須です。一方、**利用者の手動hash比較は任意の推奨であり、sidecarはアプリ起動の依存fileではありません。** 確認のためだけにPowerShell等を導入する必要はありません。
 
-確認する場合は、取得したEXEまたはZIPのSHA-256を、同じrelease／候補・同じ形式のsidecarの先頭64文字と照合してください。不一致なら実行せず、正式配布元からの再取得を確認します。同じ配布元のhash一致だけでは、発行者の真正性やSmartScreen reputationは保証されません。
+確認する場合は、取得したEXEまたはZIPのSHA-256を、同じrelease・同じ形式のsidecarの先頭64文字と照合してください。不一致なら実行せず、正式配布元からの再取得を確認します。同じ配布元のhash一致だけでは、発行者の真正性やSmartScreen reputationは保証されません。
 
 PowerShell 7が既にある場合の、公開ZIPのSHA-256確認例（任意）:
 
@@ -61,13 +61,13 @@ Windows 11標準の`certutil`の`-hashfile`機能でも、取得した配布file
 
 ## Windowsの警告・実行拒否
 
-公開ZIPと候補EXEはunsignedです。SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行拒否があり得ます。code signing済み、installer形式、SmartScreen reputation確立済み、すべての端末で無警告とは表示しません。
+公開EXEとZIPはunsignedです。SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行拒否があり得ます。code signing済み、installer形式、SmartScreen reputation確立済み、すべての端末で無警告とは表示しません。
 
 入手元を確認できない場合やhashが不一致の場合は実行しないでください。保護機能が実行を拒否した場合は停止し、所属組織の管理者に確認してください。保護機能の無効化、MOTW除去、証明書の自動trust、execution policy変更、UAC回避は案内しません。
 
 ## 単一EXEの標準展開と残存cache
 
-候補EXEの内容は.NET標準hostが、通常は標準userの一時領域`%TEMP%/.net/<app>/<bundle-id>/`へ展開します。展開先の書込権限と空き容量が必要です。cacheは終了後も残り、再利用され得ます。**1ファイル配布は「ディスク上も1ファイル」「痕跡なし」ではありません。** 独自のcache管理UIや自動掃除はありません。
+単一EXEの内容は.NET標準hostが、通常は標準userの一時領域`%TEMP%/.net/<app>/<bundle-id>/`へ展開します。展開先の書込権限と空き容量が必要です。cacheは終了後も残り、再利用され得ます。**1ファイル配布は「ディスク上も1ファイル」「痕跡なし」ではありません。** 独自のcache管理UIや自動掃除はありません。
 
 cacheはアプリ配置用で、入力workbook、final／partial、利用者別設定、CLI credential storeとは別です。**新規runの明示出力先が未指定（`null`）の場合だけ、入力fileに隣接する`result`**を使います。保存した明示出力先は再起動・入力変更後も保持し、EXE配置先や抽出cacheを既定先にしません。配布・展開・起動のために利用者workbookを移動・削除しません。アプリは抽出cacheの再帰削除やCLI credentialの削除も行いません。
 
@@ -159,7 +159,7 @@ $$
 
 実行画面の**モデル・並列度・実効出力先は確認用**です。編集は**変更 → 設定の共通**で行います。**定量化を開始／cancel**は実行画面に残っています。認証確認・login開始／取消、新規／再開の準備は入力画面の**実行の準備を開く**から行います（入力値は保持されます）。
 
-### GitHubにログイン（未公開0.8.6候補のみ）
+### GitHubにログイン（v0.8.6）
 
 1. 起動直後に、アプリが**このPCで利用中のGitHubアカウントのログインを自動確認**します（同梱CLIが環境変数`COPILOT_GITHUB_TOKEN`／`GH_TOKEN`／`GITHUB_TOKEN`、OSの資格情報ストア、GitHub CLI `gh`のログインの順に探します）。既に利用できるログインがあれば、操作は不要です。
 2. 利用できるログインがない場合は、検証済みの同梱native CLIの認証用ブラウザーを**1回だけ自動で開きます**。手動では**GitHubにログイン**を選んでも同じ処理を開始できます。確認だけを手動で繰り返すには**Copilot 状態を確認**を選びます。
@@ -172,7 +172,7 @@ $$
 
 起動時の自動確認・自動login以外では、起動引数、Prompt適用、画面遷移、状態確認からloginを暗黙に開始せず、AI評価は一切自動開始しません。自動loginを取消・失敗した後は、同じ起動中に自動では再試行しません。login後の自動再確認では希望modelが利用可能な場合に実効選択へ反映しますが、別modelへfallbackしません。AI評価は**定量化を開始**を選ぶまで行いません。GUI表示やlogin完了だけではAI利用可能とは判断せず、network、account、列挙されたmodel、組織policy上の許可を別途確認してください。
 
-### loginの取消・失敗（未公開0.8.6候補のみ）
+### loginの取消・失敗（v0.8.6）
 
 **ログインを取り消す**またはアプリ終了で終了・解放するのは、アプリが開始・所有した**当該login CLI processだけ**です。ブラウザー、他のCLI、保存済みcredentialには触れず、logout、credentialの削除・失効も行いません。
 
@@ -182,7 +182,7 @@ loginの二重開始と評価中の開始はできません。取消・失敗後
 
 ### 同梱CLIで手動loginする（旧公開v0.8.1のみ）
 
-**この手動操作は、login buttonがない旧公開`v0.8.1`のZIP向けです。** 未公開候補の通常のGUI起動・login buttonの利用手順ではありません。
+**この手動操作は、login buttonがない旧公開`v0.8.1`のZIP向けです。** 公開`v0.8.6`の通常のGUI起動・login buttonの利用手順ではありません。
 
 1. 展開済みZIP内の`StudyReportEvaluator-win-x64\runtimes\win-x64\native\copilot.exe`を指定して、同梱CLIの対話loginを本人が行います。認証はCLI／ブラウザー上で完了してください。
 2. アプリへ戻り、既存の**Copilot 状態を確認**を選びます。
@@ -305,7 +305,7 @@ final/partialには入力全体、Prompt、参照回答、AI結果が含まれ�
 
 問題がある場合は[トラブルシューティング](troubleshooting.md)を参照してください。
 
-## 未公開候補の検証範囲
+## v0.8.6の検証範囲
 
 以下は2026-09-07、版更新前の**製品`0.8.4`で得た検証履歴**です。**T01〜T38は対象範囲でREVIEWED**です。文書・実成果物・full required gateの実績を、版更新後の`0.8.6`の最終成果物や未完了のnative確認のPASSへ読み替えません。
 
@@ -326,11 +326,10 @@ final/partialには入力全体、Prompt、参照回答、AI結果が含まれ�
 
 ## 対象版
 
-単一EXEとlogin button、4ステップ＋設定5カテゴリ、ページ切替、設定保存・明示適用の説明は現在のソース候補向けです。[画像一覧](../images/README.md)の**8枚（01〜08）**は説明用synthetic／fake状態です。02はSettingsの入力詳細、03はDesign概要、04はSettingsのCustom編集、05は認証未確認、06はfake結果、07は未保存override、08はstore未構成の合成Common画面です。生成時の製品版は`0.8.4`で、版更新に伴うPNGの再生成はしていません。画像を実認証・実保存・native確認の証拠や、`0.8.6`の新たなUI検証結果に読み替えません。
+単一EXEとlogin button、4ステップ＋設定5カテゴリ、ページ切替、設定保存・明示適用の説明は公開`v0.8.6`向けです。[画像一覧](../images/README.md)の**8枚（01〜08）**は説明用synthetic／fake状態です。02はSettingsの入力詳細、03はDesign概要、04はSettingsのCustom編集、05は認証未確認、06はfake結果、07は未保存override、08はstore未構成の合成Common画面です。生成時の製品版は`0.8.4`で、版更新に伴うPNGの再生成はしていません。画像を実認証・実保存・native確認の証拠や、`0.8.6`の新たなUI検証結果に読み替えません。
 
-公開`v0.8.1`にこれらのUI・設定保存を追加したわけではありません。**要求文書v4.6、製品候補`0.8.6`、公開版`v0.8.1`は別**です。
+旧公開`v0.8.1`にこれらのUI・設定保存を追加したわけではありません。**要求文書v4.6、公開`v0.8.6`、旧公開`v0.8.1`は別**です。
 
 本ガイドは配布物へ同梱するsourceです。同梱文書や製品版を変更すると最終EXE／ZIPのbytesとSHA-256も変わるため、**公開判定は対象版の最終成果物・sidecarと、その成果物に対応する検証に基づきます。** 過去のPASSでこの条件やclean-host条件を省略しません。
 
-**対象版: 現在のソース候補`0.8.6`（UNRELEASED・未公開）。現在の公開版は`v0.8.1`のZIPです。**
-
+**対象版: 公開`v0.8.6`。旧`v0.8.1`は前回公開版のZIPです。**

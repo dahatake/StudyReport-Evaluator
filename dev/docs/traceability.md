@@ -11,7 +11,7 @@
 | Previous validation | delivery変更前 Release build warning/error 0、full 670/670 PASS（Core 190 / App 480）。現在の0.8.0 delivery evidenceへ流用しない |
 | Recorded focused validation | 2026-09-05: InputViewTests 21、WorkbookMetadataReaderTests 11、ColumnMappingSuggesterTests 14、計46/46 PASS。DocumentationContractTests 14/14 PASS |
 | Audited full required validation | 2026-09-05、source `20c8121`のbaseline: Core 190 + App deterministic 524 + sample構造 1 + Windows ZIP 3 = 718/718 PASS（App計528、failed 0、skipped 0）。opt-inの未実行経路を含む |
-| Current status | UI／設定保存・復元差分と記録済み文書／実EXEの限定範囲はVERIFIED_SCOPED。T01〜T38はREVIEWED、T39は追加native FAIL・本人確認等の外部前提によりBLOCKED。製品は`0.8.6`未公開候補（UNRELEASED）、F01はREVIEWED、公開済みは`v0.8.1` ZIP。F02最終再検証は本同期時点では親担当で未完了、以後は実行記録の最新F02欄を参照。T36〜T39の記録済み成功は0.8.4に限定し、CH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITE、公開gateは未達。`20c8121`のv4.4／`0.8.3` baselineとR03／V01は別の履歴。 |
+| Current status | UI／設定保存・復元差分と記録済み文書／実EXEの限定範囲はVERIFIED_SCOPED。T01〜T38はREVIEWED、T39は追加native FAIL・本人確認等の外部前提によりBLOCKED。製品`0.8.6`は2026-10-01に公開済み、F01はREVIEWED、前回公開版は`v0.8.1` ZIP。公開はrepository ownerの明示判断でclean-host試験CH-01〜06を実施せず、protected `publish-release.yml` workflowではなくdraft解除で行った。T36〜T39の記録済み成功は0.8.4に限定し、CH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITEのまま。`20c8121`のv4.4／`0.8.3` baselineとR03／V01は別の履歴。 |
 
 この表の`PLANNED`は未実装をPASSと称しない。task完了後にproduction symbol、direct test、gate identityへ更新する。旧v3 traceabilityはGit履歴とADR-0011に保持する。
 
@@ -287,5 +287,5 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 7. development MSIXのpackage/unpack/hash/policy/cleanupが`PASS_MECHANISM`で、install/launchはrequiredでなく未実行、release assetと一般利用者手順から除外されている。
 8. macOS、Linux、Windows Arm64、production-signed MSIX、未実測artifactを対応済みと表示していない。
 9. optional live Copilot／spreadsheet recalculationをrequired evidenceへ算入しない。
-10. docsとscreenshotsがcurrent UI、公開`v0.8.1` ZIPと未公開`0.8.6`候補の境界、実在assetへ同期する。0.8.4のT28画像生成／T36文書contractの記録を保持し、F02最終版の再検証結果は実行記録の最新欄で確認する。
-11. 公開済みpublic releaseは`v0.8.1` ZIPのままであり、新しい単一EXEはCH-01..06とprotected publish完了まで未公開を維持する。
+10. docsとscreenshotsが公開`v0.8.6` UI、旧公開`v0.8.1` ZIPとの境界、実在assetへ同期する。0.8.4のT28画像生成／T36文書contractの記録を保持し、CH-01..06とprotected publish workflowの未実施を成功へ読み替えない。
+11. 公開済みpublic releaseは`v0.8.6`であり、単一EXEを含む4 assetを公開済み。ただしCH-01..06とprotected publish workflowは未実施のまま維持する。

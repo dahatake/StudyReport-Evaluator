@@ -1,5 +1,10 @@
 # Current implementation status
 
+## 2026-10-01 — v0.8.6公開状態
+
+- **公開状態**: StudyReport Evaluator `v0.8.6`は2026-10-01 21:42 JSTにGitHub Releasesへ公開済み。release candidate run 36860591724は成功し、公開assetは`StudyReportEvaluator-win-x64.exe`、`.exe.sha256`、`.zip`、`.zip.sha256`の4件。
+- **維持するgap**: repository ownerの明示判断により、fresh Windows 11 x64のclean-host試験CH-01〜06と本人loginは公開前に実施していない。追加native UI確認FAIL、Narrator／本人walkthrough／隔離利用者設定保存の未実施、T39 BLOCKED、CH-01〜06 `NOT_RUN`、未署名／SmartScreen非保証は解除しない。
+- **公開操作**: protected `publish-release.yml` workflowではなく、draft Releaseを`gh release edit --draft=false`で公開した。
 ## 2026-09-27 — 要求定義との突合で見つかった残差の解消
 
 - **結果画面からの別名出力**: `ResultsOutputBoundary`が`Quantification_References`のmodelを固定`auto`と書き、References／Run sheetのreasoning effortを未記録（「未指定」）にしていた。§7.1／§7.2／§9.2どおり、`ExecutionRunContext`へrunのreasoning effortを持たせ、runのmodelとeffortを記録するよう修正した（自動finalizationの`DurableRunFinalizer`はcheckpoint値を使っており正しかった）。`Production_output_boundary_writes_valid_separate_workbook_and_preserves_exact_input_identity`でD2／H2とRun sheetの`ReasoningEffort`を検証する。
@@ -81,9 +86,9 @@ AC-038／TR-37: 共通admission、再開元picker、開始前の項目別検証�
 
 `TestResults/resume-focused/resume-verified.trx` は12/12 PASS（再開関連10、料金記録のビルド接続回帰2）、`resume-durable.trx` は既存再開回帰5/5 PASS。Debug build成功。VERIFIED_SCOPEDであり、本人／native／別process／OS shutdown／exact配布物の受入は未実施。
 
-## 2026-09-07 — F02文書同期時点の現在状態
+## 2026-09-07 — F02文書同期時点の履歴状態
 
-現在の製品は**`0.8.6`未公開候補（UNRELEASED）**、要求はv4.6、公開済みは`v0.8.1`のunsigned ZIP／sidecarである。親担当が`Directory.Build.props`をPATCHし、F01のUnreleased追記はREVIEWED。以下は[親担当の実行記録](archive/work/20260907-ui-settings-execution-record.md)と後続引継ぎに基づく既存結果の同期で、この文書編集では端末・build・test・package・native操作を実行していない。
+この節は2026-09-07時点の履歴である。当時の製品は`0.8.6`候補、要求はv4.6、当時の公開版は`v0.8.1`のunsigned ZIP／sidecarであった。現在は`v0.8.6`公開済みだが、clean-host試験CH-01〜06と本人loginは公開前に実施していない。親担当が`Directory.Build.props`をPATCHし、F01のUnreleased追記はREVIEWED。以下は[親担当の実行記録](archive/work/20260907-ui-settings-execution-record.md)と後続引継ぎに基づく既存結果の同期で、この文書編集では端末・build・test・package・native操作を実行していない。
 
 | 項目 | 状態・適用限界 |
 |---|---|
