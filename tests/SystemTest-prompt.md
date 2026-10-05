@@ -1572,7 +1572,7 @@ T01の未実装・NOT_RUNは履歴で、現在はMainWindow／SettingsView、既
 - 設定は4ステップ外の独立内容で、5カテゴリと共通内のDesign定義情報を扱う。対象を保ち1操作で開き、値・対象ID・ページ・カテゴリ・入力途中のtextを保持して元位置へ戻る。
 - 同じ入力／定義の往復は新規／再開、partial、進捗、直前runを初期化しない。入力／定義変更時だけ再開指定を再確認または解除し理由を示す。新規／再開・partialは設定fileへ保存しない。
 - 保存希望modelあり／なし／欠落、明示確認失敗、auto欠落を別caseにする。希望IDは明示確認の候補にある場合だけ実効選択とし、不在は未選択でno fallback。確認失敗だけで保存希望を消さない。希望なし初回の従来選択とauto検証を分離する。
-- 遷移、Prompt適用、設定読込／保存／適用、login完了から認証確認／login／runのcall countは0。明示開始だけが検証済み有効値でrequestを作る。
+- 遷移、Prompt適用、設定読込／保存／適用から認証確認／login／runのcall countは0。login完了時は認証状態・model一覧の再確認だけが自動で1回行われ、login再開始／runのcall countは0（要求定義書§11.3の6、§11.8）。明示開始だけが検証済み有効値でrequestを作る。
 
 現在run／前回結果oracle:
 - 実行中の前工程・設定編集は次回用で、現在request／immutable snapshot／予約pathを変更しない。保存定義の一括適用は禁止する。
