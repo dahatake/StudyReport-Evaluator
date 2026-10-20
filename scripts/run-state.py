@@ -24,9 +24,10 @@ import argparse
 import datetime as dt
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ebaklib as h  # noqa: E402
@@ -36,6 +37,7 @@ DEFAULT_OPTIONS = {
     "max_hours": "24", "approval_policy": "安全範囲は推奨どおり", "parallel_workers": "auto",
     "scope": "承認済みすべて", "git_push": "しない", "deploy": "しない", "external_write": "しない",
     "paid_services": "使わない", "external_exposure": "公開しない",
+    "system_test": "必要最小限",
 }
 HISTORY_HEADER = (
     "# 実行履歴\n\n"
@@ -104,6 +106,41 @@ def counts(queue: dict) -> Dict[str, int]:
     return c
 
 
+def require_own_worktree(root: Path, cfg: dict, args) -> Optional[int]:
+    """Each run must live in its own git worktree so that several runs in one VS Code never share a tree.
+
+    A run started in the primary checkout is refused; a dedicated worktree (branch run/<id>) is created and its
+    path printed so the job can be started there. Returns an exit code to stop, or None to continue.
+    """
+    if (cfg.get("run") or {}).get("require_worktree", True) is False or os.environ.get("EABK_ALLOW_PRIMARY") == "1":
+        return None
+    if getattr(args, "allow_primary", False) or not (root / ".git").is_dir():
+        return None
+    rid = h.new_run_id()
+    path = root.parent / f"{root.name}-run-{rid}"
+    rc, out = h.git(["worktree", "add", "-b", f"run/{rid}", str(path), "HEAD"], root)
+    if rc != 0:
+        print(f"ERROR run-state: 専用 worktree を作れませんでした: {out.strip()[:200]}")
+        return 4
+    # start the run inside the new worktree right away: no second VS Code window and no re-sent request
+    cmd = [sys.executable, str(path / "scripts" / "run-state.py"), "start"]
+    if getattr(args, "options_file", None):
+        cmd += ["--options-file", str(Path(args.options_file).resolve())]
+    elif getattr(args, "options", None):
+        cmd += ["--options", args.options]
+    proc = subprocess.run(cmd, cwd=str(path), capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if proc.returncode != 0 or not (path / "scripts" / "run-state.py").exists():
+        print(f"WORKTREE-REQUIRED {path}")
+        print((proc.stdout + proc.stderr).strip()[:400])
+        print("worktree では run を始められませんでした。その worktree を開き（または cd して）、同じ依頼で `/build` をやり直してください。")
+        return 4
+    print(f"WORKTREE {path}")
+    print("run は専用 worktree で始めました。以後の `python scripts/...`・git・作業役への依頼は、すべてこのパスを cwd にして行います"
+          "（VS Code を別に開く必要はありません）。成功すると main へ取り込まれます。")
+    print(proc.stdout.strip())
+    return 0
+
+
 def cmd_start(args) -> int:
     root, cfg = ctx(args)
     rid = h.current_run(root, cfg)
@@ -112,6 +149,9 @@ def cmd_start(args) -> int:
         if meta.get("status") == "active":
             print(f"RESUME {rid}")
             return cmd_status(args)
+    wt_rc = require_own_worktree(root, cfg, args)
+    if wt_rc is not None:
+        return wt_rc
     text = ""
     if args.options_file:
         text = h.read_text(Path(args.options_file))
@@ -163,7 +203,7 @@ def cmd_start(args) -> int:
     models = cfg.get("models") or {}
     if not any(v for k, v in models.items() if not k.startswith("_") and isinstance(v, str)):
         print("HINT models: 全役割が空（既定のモデル）です。実測では conductor・implementer の選択が所要時間と Token を最も左右しました。"
-              "較正の手順は users-guide/04-customization.md 4.2 を参照してください")
+              "較正の手順は EABK-docs/04-customization.md 4.2 を参照してください")
     return 0
 
 
@@ -521,6 +561,7 @@ def main(argv=None) -> int:
     s.add_argument("--options")
     s.add_argument("--new", action="store_true")
     s.add_argument("--no-branch", action="store_true", help="main 上でも統合ブランチを作らない")
+    s.add_argument("--allow-primary", action="store_true", help="主の作業ツリーでの開始を許す（run ごとの worktree 必須を外す。通常は使わない）")
     s.add_argument("--tail", type=int, default=8)
     st = sub.add_parser("status")
     st.add_argument("--tail", type=int, default=8)
