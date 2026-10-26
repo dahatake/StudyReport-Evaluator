@@ -109,6 +109,24 @@ run の実行中は、hook G-7 がこの表を強制します。値のある役�
 | `external_deploy_verbs` | 同じく、名前にこの動詞（`deploy`・`provision`・`publish`・`release`）を含むものを「デプロイ・公開」とみなし、`deploy` の値で判定します |
 | `external_tool_allow` | 外部のシステムの変更とみなさないツール名の正規表現（例: `"^mcp_myindex_update_index$"`）。名前に動詞を含むが、ローカルにしか作用しないツールを許可するときに使います |
 
+## 4.3b 時間・依存の共有・クレジットの設定（`limits` / `worktree_share` / `credits`）
+
+```json
+"limits": { "max_hours_default": 2.5, "max_hours_cap": 3, "reserve_minutes": 30 },
+"worktree_share": { "enabled": true, "dirs": ["node_modules"] },
+"credits": { "default_multiplier": 1, "model_multipliers": { "claude-sonnet-5.5": 1, "gpt-6.1-sol": 3 } }
+```
+
+| キー | 意味 |
+|---|---|
+| `limits.max_hours_default` | run_options に `max_hours` がないときの時間（時間単位） |
+| `limits.max_hours_cap` | `max_hours` の上限。これを超える指定は切り詰めます。夜間に長く回すときは、この値（と run_options の `max_hours`）を引き上げます（例: `8`）。既定は 3 時間 |
+| `limits.reserve_minutes` | 工程 6（最終）のために残す時間。残りがこれを切る（または 85% を超える）と、新しい項目を始めません |
+| `worktree_share.enabled` / `dirs` | 作業用 worktree の依存ディレクトリ（`node_modules` など）を、導入済みの主の作業ツリーの実体へのリンク（Windows は junction）にして、worktree ごとの `npm ci` をなくします。`package.json` と `package-lock.json` が共有元と同じときだけ共有します。共有元がなければ、`integrate.py prepare` が `NOTE:` を出すので、主の作業ツリーで 1 回だけ導入してください。`false` で無効にできます |
+| `credits.model_multipliers` | `run-state.py finish` が `--credits` なしのとき、作業役（task）の呼び出しをモデルの倍率で数えた「推定」を run-history の AI クレジット欄に記録します。進行役自身の呼び出しは含みません。作業役ごとの所要時間は `work/runs/<run-id>/subagents.jsonl` に記録されます |
+
+hook は、読み取り専用・記録だけのツール（`view`・`grep`・`sql`・`report_intent` など）を、設定やリポジトリを読まずに即座に許可します。
+
 ## 4.4 MCP Server・plugin・拡張機能を使う
 
 利用者が GitHub Copilot に設定した MCP Server・plugin・拡張機能のツールと skill は、追加の設定なしで、conductor とすべての作業役が使えます。例は Work IQ（社内のメール・会議・チャット・ドキュメント）、Microsoft Learn、Azure MCP Server、Copilot Studio・Microsoft 365 Agents Toolkit の plugin です。
@@ -155,7 +173,7 @@ run の実行中は、hook G-7 がこの表を強制します。値のある役�
 
 `.github/workflows/ebak-data-layer.yml`（ebak-data-layer）は、プルリクエスト、main への push、手動実行（workflow_dispatch）、週 1 回の定期実行（schedule）で `python scripts/verify.py --docs-only` を実行し、データ層を検査します。
 
-- 不合格のとき、`python scripts/rdfix.py --apply` で自動修復して再検査します。自動修復で要求定義書は変更しない設計です（`docs/requirements-definition.md` は修復後に元へ戻します）。合格した場合だけ修復を commit します。同一リポジトリのプルリクエストでは当該 PR のブランチへ、main への push と定期実行では修復用ブランチ `eabk/data-layer-fix` へ push して PR を作成します（既にあれば追加しません）。
+- 不合格のとき、共通の入口 `python scripts/rdfix.py --full --apply` で自動修復して再検査します（インストーラ・手動実行と同じ入口。独自の書き換え手順は持ちません。終了コード 0/1/2 は [05](05-scripts-reference.md)）。インストーラは既定で導入後に同じ入口を 1 回呼び、`--no-repair` で検査と計画だけ（書き込まない）、`--skip-verify` で検査も修復もしません。自動修復で要求定義書は変更しない設計です（`docs/requirements-definition.md` は修復後に元へ戻します）。合格した場合だけ修復を commit します。同一リポジトリのプルリクエストでは当該 PR のブランチへ、main への push と定期実行では修復用ブランチ `eabk/data-layer-fix` へ push して PR を作成します（既にあれば追加しません）。
 - 修復後も直らないときは、ラベル `eabk-data-layer` つきで、失敗の要約と実行へのリンクを含む Issue を作成します。同じ内容の未解決 Issue があれば、コメントを追加します。
 - 権限は contents・pull-requests・issues の write だけです。fork からのプルリクエストでは検査だけを行い、書き込みはしません。bot の修復 commit では再修復しません。
 - 無効化するには、このファイルを削除するか、GitHub の Actions 画面でこのワークフローを Disable します。インストール時に入れたくない場合は `--no-ci` を指定します。
@@ -169,7 +187,7 @@ run の実行中は、hook G-7 がこの表を強制します。値のある役�
 
 **検査を同時に動かします。**
 - `verify.commands` で、連続する工程に `"parallel": true` を付けると同時に実行します（例: lint・型検査・単体テスト）。build のように前の工程が必要なものには付けません。
-- System Test は、`ledger.py run --jobs N|auto`（または設定の `system_test.jobs`）で同時に実行します。既定は 1 です（ポートや DB を共有するケースがあるため）。ケースに `"serial": true` を付けると、並列の実行が終わってから単独で動きます。canary は常に先に単独で動きます。
+- System Test は、`ledger.py run --jobs N|auto`（または設定の `system_test.jobs`）で同時に実行します。既定は `auto`（CPU 数 ÷ 4、2〜6）です。ケースに `"serial": true` を付ける、または command が `system_test.serial_patterns`（既定は `default_port`）の文字列を含むと、並列の実行が終わってから単独で動きます。同じ command のケースは 1 回だけ実行し、結果を共有します。さらに、同じ pytest ファイルを指す command（`python -m pytest <file>[::node] [-k 式] [-q]` の形）が 2 つ以上あるときは、1 つの pytest プロセスにまとめて実行し（`-k` は pytest と同じ文法で JUnit の結果から各ケースに振り分けます）、失敗したケースとどのテストにも当たらなかったケースだけを単独で再実行します（判定とログは従来どおり）。実測（GUI を含む 45 ケース）で 320 秒 → 281 秒でした。止めるには `ledger.py run --no-batch` か `system_test.batch_pytest: false`。canary・serial のケースはまとめません。GUI のサーバー起動をテストごとに行う fixture（function scope）を module scope にすると、さらに短くなります（テストの状態の分離を確認してから）。canary は常に先に単独で動きます。
 
 **Azure は、既定では使いません。** 次の条件が揃ったときだけ、利用者が選びます（実行時のオプションとしては実装していません）。
 1. 手元のマシンが小さい（コア数が 8 未満、またはメモリが 32 GB 未満）。

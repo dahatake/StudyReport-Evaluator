@@ -14,8 +14,17 @@
 | `[G-6] ログ・証跡・実行結果などの一時ファイルは /work/runs/<run-id>/ に書きます` | テストレポートなどをリポジトリ直下に出力しようとした | テストツールの出力先を `work/` の下に設定します（例: Playwright の `outputDir`） |
 | `[G-7] scripts/ebak.config.json の models で <役割> のモデルは <モデル> です` | run の実行中に、conductor が `models` に値のある作業役を、`task` の `model` 引数なし、または違うモデルで呼んだ | 想定どおりの動作です。conductor が指定のモデルで呼び直します。harness の `task` が `model` を受け付けず、呼び直しても拒否が続く場合は、`gates.enforce_models` を `false` にし、agent の frontmatter の `model:` で固定します（[4.2](04-customization.md#42-モデルの割り当てmodels)） |
 | `[G-4] 終了前の検証が失敗しています` | 作業役の verify が失敗した | 作業役が自動で修正します。3 回で直らなければ `GATE G-4` 付きで conductor に返され、その項目は統合されません |
+| 作業役の書き込みが `[G-5] 作業ディレクトリ外への書き込みは禁止` で拒否され、別の run が `blocked` で終わった | subagent の `sessionId` は親ではなく agentId です（`subagentStart` は `sessionId`=親・`agentId`・`parentAgentId` を持つ）。旧 gate は agentId を「未所有の新しい run」の持ち主と見なして横取りし、束縛後は sibling run を判定できなかった | 配布元の最新 gate.py に更新します（`subagentStart` の親子記録 `work/.ebak/active-agents.json` に一致する agentId だけを親 session とみなし、他 session 所有の run への書き込みは G-5 で拒否します。記録のない id・`subagentStop` 後の id・入れ子（親が agentId）の 2 段目は許可されません）。既に G-5 で finished になった run は再開・done 化せず、必要なら新しい run で依頼し直します。再送で書き込みを通そうとせず、`gate.log` の `START`/`DENY` を確認します |
+| 並列 run で、rd-author に依頼したのに `[G-1] 要求定義書を編集できるのは rd-author だけです` が出る | 同時実行の run があると、`subagentStart` の記録（`work/.ebak/active-agents.json`）が別の run の `work/.ebak/` に書かれ、対象 run には rd-author が見えなかった | 最新 gate.py に更新します（記録に `session` を付け、同じセッションが起動した作業役は、別の run の記録でも有効と見なします。他セッションの記録・`session` のない記録は有効になりません）。ゲートの変更・迂回はしません |
+| 並列 run で、自分の run なのに `[G-5]`・`[G-1]` が出る。別の run の `gate.log` に自分の書き込みの DENY が残る | 同時に別の session が最初の tool 呼び出しをすると、まだ持ち主のいない新しい run を先に取り込み（R-2）、本来の持ち主が自分の run に束縛されなくなっていた（`meta.json` の `session_id` が別の session になる） | 最新の gate.py・run-state.py に更新します。`run-state.py start` を実行した session を hook が記録し、start が `session_id` に保存するため、取り違えは起きません（claim は start コマンドの識別子と結びつき、start は自分の識別子と一致する claim だけを消費します。追記・消費・`session_id` の記録は `work/.ebak/start-claims.lock` の排他で行います。所有者なし run の救済は、候補が 1 つ・session が特定でき・他 session の未消費 claim がないときだけです）。既に取り違えた run は、`session_id` を持ち主に直さず新しい run で依頼し直します |
+| 主の作業ツリーで run を置いたとき、run と無関係な別の chat の編集が `[G-5]` で拒否される | 旧 gate は、持ち主以外の session にも run のゲートを掛けていた | 最新の gate.py に更新します。持ち主と異なる session（識別子あり）には run のゲート（編集範囲・hook の変更禁止・main への commit 禁止・deploy・external_write）を掛けません。G-1〜G-3・G-6・force push の禁止は常に残ります（[6.1.1](06-quality-gates.md#611-主ツリーで-run-を置いたときの別-sessionfr-1076)）。持ち主の chat と所有者なし run は従来どおりゲートが掛かります |
+| `/build template` の表示中でない chat の tool が `TEMPLATE` で拒否される／他の chat の発話で制限が早く外れる | 旧 gate は template 状態を 1 ファイルで共有していた | 最新の gate.py に更新します。状態は session ごと（`work/.ebak/template-request-<session>.json`）で、自分の session の次の発話でだけ消えます |
+| `[G-5] start-claim を記録できませんでした`／`start-claim・meta の排他を 10 秒以内に得られず、run を始めませんでした` | 別の start・hook が `work/.ebak/start-claims.lock` を保持している | claim・meta は書かれていません。少し待ってもう一度実行します。保持していたプロセスが異常終了していても、ロックは OS が解放する（ロックファイルの残留で止まらない）ので、次の呼び出しがそのまま進みます。work/.ebak/start-claims.lock の中身は保持者の PID（診断用）で、手で消す必要はありません |
+| run の worktree への `git -C <worktree> commit`・`cd <worktree>; git commit` が `実行中は main に直接 commit・merge しません` で拒否される | 旧 gate は hook の cwd のブランチだけで判定していた | 最新の gate.py に更新します。`git -C <path>`・`cd <path>` が指す tree のブランチで判定します（main に実際に commit される場合は従来どおり拒否します） |
 | hook がまったく動かない | Session Target が Copilot 以外、hook が無効、Python がない | Session Target で Copilot harness を選びます。`/hooks`（VS Code）や `copilot` の設定で hook が有効かを確認します。`python --version` を確認します。`work/.ebak/gate.log` が作成されるかどうかで判断できます |
 | GitHub Copilot app で hook の失敗の警告が出る（Windows で `DriveNotFoundException` など） | ローカル サンドボックスの中で PowerShell や Python を起動できなかった。Python がサンドボックスから読めない場所にある | 一時的なものは、`/restart-session` でセッションを再起動すると直ることがあります。続く場合は、プロジェクトのサンドボックス設定の **追加の読み取り専用** に Python のインストール先を追加します。ゲートが効かない間も、verify が統合の時点で同じ規則を検査します |
+
+Windows の core.autocrlf で CRLF になったファイルは、`tools/install.py` が CRLF/LF を正規化して比較するため、改行だけの差では `KEEP-LOCAL` になりません。本物のローカル変更（内容の差）は従来どおり `KEEP-LOCAL` のまま保持されます（`--force` は使いません）。
 
 原因の切り分けのために hook を一時的に止めたい場合は、`scripts/ebak.config.json` の `gates.enabled` を `false` にします（verify の検査は残ります）。終わったら必ず元に戻してください。
 
@@ -28,9 +37,14 @@
 | GitHub Copilot app を閉じたり PC がスリープしたりして止まった | ローカルのセッションは PC の上で動いている | アプリを起動し直し、同じセッションで「続けて」と送ります。長い run の間は、PC のスリープを無効にします。PC を離れたい場合はクラウド サンドボックスを検討します（[README](../README.md#github-copilot-app-で実行する)） |
 | 終わらない（同じ失敗を繰り返している） | `python scripts/run-state.py status` と `progress.md` で、どの項目が何回失敗しているかを確認します。`max_hours` の 85% に達すると、自動的に最終工程に進みます。急ぐ場合は、その項目を `python scripts/run-state.py queue set <ID> --status blocked` にします |
 | 「完了条件を満たしていません」で差し戻され続ける | `python scripts/run-state.py complete-check` が出力する理由を確認します。工程 6 を終えて `run-state.py stage 6 --done` を実行し、`run-report.md` を作成する必要があります。差し戻しは 40 回、または時間予算の 125% で止まります |
+| 孤児プロセス（node・ブラウザーなど）が残って重い | `python scripts/watch.py scan` で確認し、`python scripts/watch.py reap`（必要なら `--under <PATH>`）で回収します。詳細は [watch.py](05-scripts-reference.md#watchpy) |
+| 項目が 60 分を超えて `doing` のまま（`STUCK`） | `python scripts/watch.py stuck` で確認します。conductor は結果を返させるか `integrate.py abandon <item>` で todo に戻します |
 | `clean-work.py` が run を `KEEP` する | 全件完了、main 統合、統合後 verify、清掃前版 report、または所有証拠のいずれかが未達です。表示された保持理由を直してください。失敗・中止・未達 run は自動期限なく保持されます |
 | `clean-work.py` が非 0 で止まる | dirty、パス衝突、Windows のファイルロック、Git 登録の変化などで候補の削除に失敗しました。`run-report.md` の候補別結果を確認し、利用中のファイルを閉じるなど原因を除いて同じコマンドを再実行します。削除済み候補は成功済みとして扱われ、残存候補だけが再検査されます |
 | 前の run が残っていて、新しい依頼が RESUME になる | 前の run を終わらせるか、`work/current-run.txt` を削除してから依頼します |
+| `LAND-WAIT`（取り込みが待たされる） | 主の作業ツリーが base（main）をチェックアウト中で、その未コミットの変更が取り込む変更と同じファイルに重なっている。変更を commit か退避すると、同じ `run-state.py land` で取り込めます |
+| `LAND-CONFLICT`（競合したファイルの一覧つき） | 自動同期（base の取り込み直し）で解消できないファイルがある。run の worktree で `git merge main` して競合を解消し、`verify.py --quick` が通ってから `run-state.py land` を再実行します（`tests/system/ledger.json` だけの競合は自動で解消されます） |
+| `gate.log` に `UNBOUND-RUN` | hook が、どの run にもセッションを束縛できなかった（セッション ID があり、所有者のない run が見つからない）。run の worktree を cwd にしてコマンドを実行しているかと、`work/runs/<run-id>/meta.json` の `session_id` を確認します |
 
 ## 7.3 verify が失敗する
 
@@ -42,7 +56,7 @@
 | 工程 4 の後に CHK-10/11 が出る | AC が追加・変更されたのに、System Test が追従していません。conductor が test-designer に作業を割り当てます |
 | CHK-19 で、テストデータや資料の中の ID が検出される | `checks.id_scan_exclude` にそのパスを追加します |
 | CHK-08 でカタログのパスが見つからない | パスはリポジトリのルートからの相対パスで、`src/a.ts, src/b.ts` のようにカンマ区切りで書きます。ファイルの名前を変えた・削除した場合は `python scripts/rdfix.py --apply` が参照を直します |
-| マージの後にカタログ・ID 台帳・台帳・実行履歴が食い違う（CHK-07・CHK-01・CHK-11・CHK-23） | `python scripts/rdfix.py` で修正の計画を確認し、`python scripts/rdfix.py --apply` で直します。`MANUAL` の行は、表示された担当の役割が直します（[6.3](06-quality-gates.md#63-データ層の不整合の自動修正rdfix)） |
+| マージの後にカタログ・ID 台帳・台帳・実行履歴が食い違う（CHK-07・CHK-01・CHK-11・CHK-23） | `python scripts/rdfix.py --full` で確認し、`python scripts/rdfix.py --full --apply` で直します（終了コード 0 = 合格・修復済み、1 = 手動対応が残る、2 = 実行しなかった・取り消した。インストール時にも既定で実行され、`--no-repair` で止められます。同時に 2 つ適用すると後からのものが最大 30 秒待ち、超えると exit 2。要求定義書は変更しません）。`MANUAL` の行は、表示された担当の役割が直します（[6.3](06-quality-gates.md#63-データ層の不整合の自動修正rdfix)） |
 | CI でだけ失敗する | CI にアプリのツールチェーンがない可能性があります。`.github/workflows/ebak-verify.yml` にセットアップのステップを追加します |
 
 ## 7.4 Windows 固有の問題

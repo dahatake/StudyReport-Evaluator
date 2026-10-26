@@ -1,10 +1,18 @@
 import { t, lang, setLang, onLang, applyI18n } from './i18n.js';
 import { store } from './store.js';
-import { el, esc, colorOf, typeLabel, toast, businessIcon } from './ui.js';
+import { el, esc, colorOf, typeLabel, toast, businessIcon, statePanel, icon } from './ui.js';
 import { initDrawer } from './drawer.js';
 import { installXref } from './xref.js';
 import { decorate, mountStructure, mountConsistency, mountMaintenance } from './insights.js';
-import { dimToggle, dimState, registerDim, hasDimHandler, runDim } from './dim.js';
+import { dimToggle, dimState, registerDim, hasDimHandler, runDim, headerDimToggle, publishDim, onHeaderDim } from './dim.js';
+import { cameraCommands } from './camera3d.js';
+
+// FR-1066: the header's display-mode switch is always there; each screen publishes what it supports (publishDim).
+const headerDimHost = document.getElementById('headerDim');
+const drawHeaderDim = () => headerDimHost.replaceChildren(headerDimToggle());
+onHeaderDim(drawHeaderDim);
+onLang(drawHeaderDim);
+publishDim({ dims: ['2d'], current: '2d', selected: '2d' });
 
 // FR-1041: the top navigation, organised by "what data can be viewed" (9 items, MECE).
 // Old screen ids (map2d / map3d / placement) stay as aliases and move to the item that now holds them (AC-226).
@@ -13,6 +21,7 @@ const ROUTES = {
   implstatus: { icon: 'progress', load: () => import('./implstatus.js') },
   map2d: { navKey: 'map', icon: 'map2d', dim: '2d', load: () => import('./map2d.js') },
   map3d: { navKey: 'map', icon: 'map3d', dim: '3d', load: () => import('./map3d.js') },
+  maprpg: { navKey: 'map', icon: 'map2d', dim: 'rpg', load: () => import('./maprpg.js') },
   diagrams: { icon: 'diagrams', load: () => import('./diagrams.js') },
   placement: { navKey: 'diagrams', alias: 'diagrams', load: () => import('./diagrams.js') },
   entities: { icon: 'entities', load: () => import('./entities.js') },
@@ -25,20 +34,21 @@ const ROUTES = {
 };
 // nav items in display order: key → route it opens (the map opens in the dimension chosen last)
 const NAV = ['dashboard', 'implstatus', 'map', 'diagrams', 'entities', 'integrations', 'source', 'tables', 'maintenance'];
-const navTarget = (k) => (k === 'map' ? (dimState.map === '3d' ? 'map3d' : 'map2d') : k);
+const MAP_ROUTE = { '2d': 'map2d', '3d': 'map3d', rpg: 'maprpg' };
+const navTarget = (k) => (k === 'map' ? MAP_ROUTE[dimState.map] || 'map2d' : k);
 const navKeyOf = (route) => ROUTES[route]?.navKey || route;
 const view = document.getElementById('view');
 const nav = document.getElementById('nav');
 const navDesc = document.getElementById('navDesc');
-let current = null, token = 0, fingerprint = null;
+let current = null, token = 0, fingerprint = null, modelError = null;
 
 const personaBar = document.getElementById('personaBar');
-for (const [name, icon] of [['Product Manager', '🎯'], ['Architect', '🏗️'], ['Software Engineer', '💻']]) {
+for (const [name, glyph] of [['Product Manager', 'goal'], ['Architect', 'structure'], ['Software Engineer', 'source']]) {
   personaBar.append(el('button', { class: 'chip persona', 'aria-label': `${name} view`, onclick: () => {
     if (name === 'Architect') location.hash = '#/map2d';
     else if (name === 'Software Engineer') location.hash = '#/tables';
     else location.hash = '#/dashboard';
-  } }, el('span', { class: 'biz-icon', role: 'img', 'aria-hidden': 'true' }, icon), name));
+  } }, el('span', { class: 'biz-icon', 'aria-hidden': 'true' }, icon(glyph, { size: 16 })), name, el('span', { class: 'sr-only' }, ' view')));
 }
 
 const routeName = () => { const r = (location.hash.replace(/^#\/?/, '') || 'dashboard').split('?')[0]; return ROUTES[r] ? r : 'dashboard'; };
@@ -71,6 +81,11 @@ function renderNav() {
 
 // Old URLs move to the item that holds the view now, keeping the kind / dimension / ?select / ?q (FR-1041 AC-226).
 function legacyRedirect(name) {
+  if (ROUTES[name]?.dim && !ROUTES[name].mount) {     // #/map2d?dim=rpg (and 2d / 3d) opens the map in that dimension, keeping the rest of the query
+    const p = new URLSearchParams(location.hash.split('?')[1] || '');
+    const target = MAP_ROUTE[p.get('dim')];
+    if (target && target !== name) { p.delete('dim'); const s = p.toString(); location.replace('#/' + target + (s ? '?' + s : '')); return true; }
+  }
   if (name !== 'placement') return false;
   const p = new URLSearchParams(location.hash.split('?')[1] || '');
   const out = new URLSearchParams();
@@ -81,23 +96,57 @@ function legacyRedirect(name) {
   return true;
 }
 
+// 全ナビ項目の画面で、更新できない（エラー）・データが無い（空）を同じ構造の状態表示で出す（FR-1048 AC-267）。入力済みの内容（検索ボックスなど）は触らない。
+function problemPanel() {
+  if (modelError) {
+    return statePanel({ state: 'error', heading: t('state.stale.h'), description: `${t('state.stale.d')} (${(modelError && modelError.message) || modelError})`,
+      action: el('button', { type: 'button', class: 'btn', onclick: () => loadModel(true).then(() => { modelError = null; route(); }).catch((e) => { modelError = e; route(); }) }, icon('stale', { size: 16 }), t('state.retry')) });
+  }
+  if (store.model && store.nodes.size === 0) {
+    return statePanel({ state: 'empty', heading: t('state.empty.h'), description: t('state.empty.d'),
+      action: el('button', { type: 'button', class: 'btn ghost', onclick: () => document.getElementById('repoBtn').click() }, icon('folder', { size: 16 }), t('state.empty.a')) });
+  }
+  // 検索ボックスの語に一致する項目が 0 件のときも「空」として同じ構造で示す（入力は消さない）
+  const typed = (document.getElementById('q')?.value || '').trim();
+  if (store.model && typed && !/^[>＞]/.test(typed) && store.search(typed, 1).total === 0) {
+    return statePanel({ state: 'empty', heading: t('state.nohit.h'), description: t('state.nohit.d'),
+      action: el('button', { type: 'button', class: 'btn ghost', onclick: () => { const qb = document.getElementById('q'); qb.value = ''; route(); qb.focus(); } }, icon('search', { size: 16 }), t('state.nohit.a')) });
+  }
+  return null;
+}
+async function checkModel() {
+  if (!store.model) return;
+  try {
+    const r = await fetch('/api/model', { cache: 'no-store' });
+    r.body?.cancel?.();
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (modelError) { modelError = null; route(); }
+  } catch (e) { modelError = e; route(); }
+}
+window.addEventListener('focus', checkModel);
+
 async function route() {
   const name = routeName();
   if (legacyRedirect(name)) return;
   document.documentElement.dataset.route = name;
   document.documentElement.classList.toggle('snapshot', isSnapshotLink());
   if (ROUTES[name].dim) dimState.map = ROUTES[name].dim;
+  // default for screens without a display mode: only 2D (the screens that have one publish their own below)
+  publishDim({ dims: ['2d'], current: '2d', selected: '2d' });
   renderNav();
   if (!store.model) return;
   const my = ++token;
-  current?.destroy?.();
-  current = null;
+  const problem = problemPanel();
+  if (problem) { current?.destroy?.(); current = null; view.replaceChildren(problem); return; }
   const host = el('div', { class: 'fill' });
-  view.replaceChildren(host);
-  host.append(el('div', { class: 'sr-only', role: 'status' }, t('loading'))); // never leave the view empty while the module loads
+  // 画面の部品を読み込む間は、前の画面を残す（描画の空白を作らない）。最初の描画で view が空のときだけ読み込み中の表示を置く
+  if (!view.firstChild) { view.replaceChildren(host); host.append(el('div', { class: 'sr-only', role: 'status' }, t('loading'))); }
   try {
     const mod = ROUTES[name].mount ? { mount: ROUTES[name].mount } : await ROUTES[name].load();
     if (my !== token) return;
+    current?.destroy?.();
+    current = null;
+    view.replaceChildren(host);
     host.querySelector(':scope > [role=status].sr-only')?.remove();
     current = mod.mount(host);
     if (ROUTES[name].dim) mountMapDim(host, name, current);
@@ -109,19 +158,26 @@ async function route() {
     }
   } catch (e) {
     console.error(e);
+    if (my !== token) return;
+    view.replaceChildren(host);
     host.replaceChildren(el('div', { class: 'page' }, el('div', { class: 'warnbox' }, String((e && e.message) || e))));
   }
 }
 
-// The map is one item: 2D (map2d) and 3D (map3d) are two displays of it, switched here (FR-1040).
+// The map is one item: 2D (map2d), 3D (map3d) and RPG-style (maprpg) are three displays of it, switched here (FR-1040, FR-1053).
 // Selection, filter and the search box live in the store / shared view state, so they survive the switch (AC-221).
+const MAP_DIMS = ['2d', '3d', 'rpg'];
 function mountMapDim(host, name, inner) {
   const go = (d) => {
     const q = location.hash.includes('?') ? '?' + location.hash.split('?')[1] : '';
-    location.hash = '#/' + (d === '3d' ? 'map3d' : 'map2d') + q;
+    location.hash = '#/' + (MAP_ROUTE[d] || 'map2d') + q;
   };
-  host.append(el('div', { class: 'dim-float' }, dimToggle({ current: ROUTES[name].dim, onPick: go })));
-  const off = registerDim((d) => go(d || (ROUTES[name].dim === '2d' ? '3d' : '2d')));
+  const cur = ROUTES[name].dim;
+  publishDim({ dims: MAP_DIMS, current: cur, selected: cur });
+  host.append(el('div', { class: 'dim-float' }, dimToggle({ current: cur, onPick: go, dims: MAP_DIMS })));
+  const off = registerDim((d) => go(MAP_DIMS.includes(d) ? d : cur === '2d' ? '3d' : '2d'));
+  const v = window.eabkView;      // every map display reports which dimension it is
+  if (v?.getState && !v.__dim) { const g = v.getState; v.getState = () => ({ dim: cur, ...g() }); v.__dim = true; }
   const orig = inner?.destroy;
   if (inner) inner.destroy = () => { off(); orig?.call(inner); };
 }
@@ -131,7 +187,7 @@ async function loadModel(quiet) {
   const model = await res.json();
   store.load(model);
   document.title = `EABK Studio · ${model.meta.name}`;
-  document.getElementById('repoBtn').textContent = '📁 ' + model.meta.name;
+  document.getElementById('repoBtn').replaceChildren(icon('folder', { size: 16 }), ' ' + model.meta.name);
   document.getElementById('repoBtn').title = model.meta.repo;
   const modelTime = document.getElementById('modelTime');
   modelTime.dateTime = model.meta.generatedAt;
@@ -154,7 +210,12 @@ function hl(text, toks) {
 // FR-1041 AC-226: every nav item (and the 2D / 3D switch) is reachable from the command box.
 function navCommands() {
   const list = NAV.map((k) => ({ cmd: true, id: 'cmd:nav:' + k, label: t('cmd.goto') + t('nav.' + k), key: t('nav.' + k), run: () => { location.hash = '#/' + navTarget(k); } }));
-  if (hasDimHandler()) list.push({ cmd: true, id: 'cmd:dim', label: t('cmd.dim'), key: '2D 3D', run: () => runDim() });
+  for (const c of window.eabkTheme.choices) list.push({ cmd: true, id: 'cmd:theme:' + c, label: t('theme.cmd') + t('theme.' + c), key: t('theme.keys') + ' ' + t('theme.' + c), run: () => window.eabkTheme.set(c) });
+  if (hasDimHandler()) {
+    list.push({ cmd: true, id: 'cmd:dim', label: t('cmd.dim'), key: '2D 3D', run: () => runDim() });
+    if (ROUTES[routeName()]?.dim) list.push({ cmd: true, id: 'cmd:dim:rpg', label: t('cmd.dim.rpg'), key: 'RPG', run: () => runDim('rpg') });
+  }
+  list.push(...cameraCommands());   // FR-1070 AC-384: 3D のカメラのプリセットをコマンド検索から選ぶ
   return list;
 }
 // FR-1033 AC-197: command box. ">" followed by text lists commands; Enter runs one.
@@ -218,42 +279,63 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---------------------------------------------------------------- chrome
+// テーマ（FR-1047 AC-259/260）: ライト・ダーク・システム。名前だけを保存・復元する（AC-260）。切替は再読込なしで入力・選択・絞り込み・配置を保つ。
+const themeLive = document.getElementById('themeLive');
+function renderTheme(announce) {
+  const cur = window.eabkTheme.get();
+  document.querySelectorAll('[data-testid="theme-toggle"] [data-theme-choice]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeChoice === cur)));
+  document.querySelector('[data-testid="theme-toggle"]').setAttribute('aria-label', t('theme.group'));
+  if (announce) themeLive.textContent = t('theme.announce.' + cur);
+}
+document.querySelectorAll('[data-testid="theme-toggle"] [data-theme-choice]').forEach((b) => b.addEventListener('click', () => window.eabkTheme.set(b.dataset.themeChoice)));
+window.eabkTheme.onChange(() => renderTheme(true));
+renderTheme(false);
 document.getElementById('lang').addEventListener('click', () => setLang(lang() === 'ja' ? 'en' : 'ja'));
 function renderLangBtn() { document.getElementById('lang').innerHTML = lang() === 'ja' ? '<b>JA</b> | EN' : 'JA | <b>EN</b>'; }
-onLang(() => { renderLangBtn(); renderNav(); if (!box.hidden) renderResults(); });
-async function chooseRepository(cur) {
-  const modal = el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true' },
-    el('form', { class: 'card', onsubmit: (e) => e.preventDefault() },
-      el('h3', {}, t('repo.prompt')),
-      el('input', { type: 'text', value: cur, autofocus: true }),
-      el('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '12px' } },
-        el('button', { type: 'button', class: 'btn ghost', onclick: () => modal.remove() }, 'Cancel'),
-        el('button', { type: 'submit', class: 'btn', onclick: () => modal.dispatchEvent(new CustomEvent('chosen', { detail: modal.querySelector('input').value })) }, 'OK'))));
-  document.body.append(modal);
-  return await new Promise((resolve) => {
-    modal.addEventListener('chosen', (e) => { const value = e.detail.trim(); modal.remove(); resolve(value); });
-  });
+onLang(() => { renderLangBtn(); renderNav(); renderTheme(false); if (!box.hidden) renderResults(); });
+// FR-010 AC-332..336: the header button opens the OS folder dialog (served by POST /api/repo/pick); no path-typing modal.
+const HDR = { 'Content-Type': 'application/json', 'X-EABK-Studio': '1' };
+function renderRepoBtnLabel() {
+  const b = document.getElementById('repoBtn');
+  b.setAttribute('aria-label', t('repo.change'));
+  b.title = store.model?.meta.repo || t('repo.change');
 }
-document.getElementById('repoBtn').addEventListener('click', async () => {
+onLang(renderRepoBtnLabel);
+async function pickAndSwitch() {
   const cur = store.model?.meta.repo || '';
-  await switchRepository(cur, await chooseRepository(cur));
-});
-// NFR-OPS-003 AC-028: on failure keep the current model, show cause + Retry / Back.
-async function switchRepository(cur, path) {
-  if (!path || path === cur) return;
-  const res = await fetch('/api/repo', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-EABK-Studio': '1' }, body: JSON.stringify({ path }) });
-  if (!res.ok) {
-    const j = await res.json().catch(() => ({}));
-    toast(j.error === 'no-data-layer' ? t('repo.nodata') : t('repo.bad'), [
-      { label: t('repo.retry'), run: async () => switchRepository(cur, await chooseRepository(path)) },
+  let res;
+  try { res = await fetch('/api/repo/pick', { method: 'POST', headers: HDR, body: '{}' }); } catch { res = null; }
+  if (!res || !res.ok) {
+    toast(res && res.status === 501 ? t('repo.nopicker') : t('repo.bad'), [
+      { label: t('repo.retry'), run: () => pickAndSwitch() },
       { label: t('repo.back'), run: () => {} },
     ]);
     return;
   }
-  store.clear();
-  await loadModel();
+  const { path } = await res.json().catch(() => ({}));
+  await switchRepository(cur, path);
 }
-window.addEventListener('hashchange', route);
+document.getElementById('repoBtn').addEventListener('click', () => { pickAndSwitch(); });
+// NFR-OPS-003 AC-028: on failure keep the current model, show cause + Retry / Back.
+async function switchRepository(cur, path) {
+  if (!path || path === cur) return; // cancelled: change nothing, show nothing
+  const res = await fetch('/api/repo', { method: 'POST', headers: HDR, body: JSON.stringify({ path }) });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    toast(j.error === 'no-data-layer' ? t('repo.nodata') : t('repo.bad'), [
+      { label: t('repo.retry'), run: () => pickAndSwitch() },
+      { label: t('repo.back'), run: () => {} },
+    ]);
+    return;
+  }
+  // AC-333: nothing of the previous repository may remain (selection, focus, filter, search, drawer, deep-link query).
+  store.clear();
+  store.setImplFilter(null);
+  q.value = ''; box.hidden = true; box.replaceChildren(); hits = []; lastResult = null;
+  const next = '#/' + routeName();
+  if (location.hash !== next) history.replaceState(null, '', next);
+  await loadModel();
+}window.addEventListener('hashchange', route);
 
 setInterval(async () => {
   if (document.hidden || !store.model || routeName() === 'maintenance') return;
@@ -268,8 +350,12 @@ new ResizeObserver(() => document.documentElement.style.setProperty('--hh', head
 applyI18n(document);
 renderLangBtn();
 renderNav();
-view.replaceChildren(el('div', { class: 'splash' }, el('div', { class: 'spin' }), t('loading')));
+view.replaceChildren(statePanel({ state: 'loading', heading: t('loading'), description: t('state.loading.d') }));
 initDrawer(document.getElementById('drawer'));
 installXref();
-for (const k of ['dashboard', 'implstatus', 'diagrams', 'map2d']) ROUTES[k].load().catch(() => {}); // warm the module cache (the 2D map is the default map target)
-loadModel().catch((e) => { view.replaceChildren(el('div', { class: 'page' }, el('div', { class: 'warnbox' }, 'Failed to load: ' + e.message))); });
+for (const k of ['dashboard', 'implstatus', 'diagrams', 'map2d', 'map3d']) ROUTES[k].load().catch(() => {}); // warm the module cache (the 2D map is the default map target; the 3D map is one mode switch away — no empty view while its module loads)
+function showLoadError(e) {
+  view.replaceChildren(statePanel({ state: 'error', heading: t('state.error.h'), description: `${t('state.error.d')} (${(e && e.message) || e})`,
+    action: el('button', { type: 'button', class: 'btn', onclick: () => { view.replaceChildren(statePanel({ state: 'loading', heading: t('loading'), description: t('state.loading.d') })); loadModel().catch(showLoadError); } }, t('state.retry')) }));
+}
+loadModel().catch(showLoadError);

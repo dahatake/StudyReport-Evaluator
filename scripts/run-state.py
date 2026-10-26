@@ -2,7 +2,7 @@
 """run-state.py - run state under /work/runs/<run-id>/ for the conductor (plan §7.5, §7.6, §8.3).
 
 Usage:
-  python scripts/run-state.py start [--options-file F | --options "max_hours: 24\\n..."] [--new]
+  python scripts/run-state.py start [--options-file F | --options "max_hours: 2.5\\n..."] [--new]
   python scripts/run-state.py status                       # resume summary (read this first in a new context)
   python scripts/run-state.py stage N [--done]             # 0 init,1 RD,2 audit,3 plan,4 ST design,5 impl,6 final
   python scripts/run-state.py progress "text"              # append one entry (<= 3 lines) to progress.md
@@ -16,16 +16,21 @@ Usage:
   python scripts/run-state.py lane confirm [--flags ...]   # 工程 3 の後に queue の数で再判定。full なら fast に戻さない
   python scripts/run-state.py lane show
   python scripts/run-state.py human answers|resume|instruction [--note "..."]   # count one human prompt (KPI)
+  python scripts/run-state.py land [--wait SEC]            # 全件完了の run を、共通ロックの下で main へ 1 本ずつ取り込む（0 取り込み済み・1 失敗・2 競合・3 主が未整備）
   python scripts/run-state.py finish [--result "..."] [--credits "..."]   # append docs/run-history.md, close the run
 """
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
+import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -34,7 +39,7 @@ import ebaklib as h  # noqa: E402
 
 STAGES = {0: "初期化", 1: "要求定義", 2: "独立監査", 3: "計画", 4: "System Test の設計", 5: "実装ループ", 6: "最終"}
 DEFAULT_OPTIONS = {
-    "max_hours": "24", "approval_policy": "安全範囲は推奨どおり", "parallel_workers": "auto",
+    "max_hours": "2.5", "approval_policy": "安全範囲は推奨どおり", "parallel_workers": "auto",
     "scope": "承認済みすべて", "git_push": "しない", "deploy": "しない", "external_write": "しない",
     "paid_services": "使わない", "external_exposure": "公開しない",
     "system_test": "必要最小限",
@@ -106,6 +111,55 @@ def counts(queue: dict) -> Dict[str, int]:
     return c
 
 
+def take_start_claim(root: Path, cfg: dict, locked: bool = False, ident: Optional[str] = None) -> Optional[str]:
+    """Session id the hook recorded for THIS `start` (FR-1074 AC-405/406; see gate.record_start_claim).
+
+    The claim is matched by the identifier of the start command (hash of its arguments; a child start inherits the
+    parent's through EABK_START_IDENT). A claim of another start is never taken (no oldest-first). Only when the hook
+    could not determine an identifier (claim without ident) and that claim is the only unexpired one is it used.
+    Reading and consuming happen under an exclusive lock; if the lock cannot be taken in PARAM-053 seconds the start
+    fails without writing anything."""
+    ident = ident or start_ident()
+    files = []
+    for f in (h.start_claims_file(root, cfg), h.work_dir(root, cfg) / ".ebak" / "start-claims.json"):
+        if f not in files:
+            files.append(f)
+    for f in files:
+        if not f.exists():
+            continue
+        try:
+            with (contextlib.nullcontext() if locked else h.FileLock(f.with_name("start-claims.lock"), h.CLAIM_LOCK_WAIT_SEC)):
+                now = time.time()
+                claims = [c for c in (h.read_json(f, default=[]) or [])
+                          if now - c.get("t", 0) < h.CLAIM_TTL_SEC and c.get("session")]
+                mine = [c for c in claims if c.get("ident") and c.get("ident") == ident]
+                pick = None
+                if mine:
+                    if len({c["session"] for c in mine}) == 1:
+                        pick = min(mine, key=lambda c: c.get("t", 0))
+                elif len(claims) == 1 and not claims[0].get("ident"):
+                    pick = claims[0]  # identifier unavailable on the hook side and no other start can be meant
+                if pick is None:
+                    continue
+                claims.remove(pick)
+                h.write_json(f, claims)
+                return str(pick["session"])
+        except h.LockBusy as e:
+            raise SystemExit(f"ERROR run-state: start-claim の排他を得られず、run を始めませんでした（claim・meta は書いていません）: {e}")
+    return None
+
+
+def start_ident() -> str:
+    """Identifier of this start command: inherited from the parent start (env), else from its own arguments."""
+    env = os.environ.get("EABK_START_IDENT")
+    if env:
+        return env
+    argv = sys.argv[1:]
+    if "start" in argv:
+        argv = argv[argv.index("start") + 1:]
+    return h.start_ident_from_text(" ".join(argv))
+
+
 def require_own_worktree(root: Path, cfg: dict, args) -> Optional[int]:
     """Each run must live in its own git worktree so that several runs in one VS Code never share a tree.
 
@@ -116,19 +170,36 @@ def require_own_worktree(root: Path, cfg: dict, args) -> Optional[int]:
         return None
     if getattr(args, "allow_primary", False) or not (root / ".git").is_dir():
         return None
-    rid = h.new_run_id()
-    path = root.parent / f"{root.name}-run-{rid}"
-    rc, out = h.git(["worktree", "add", "-b", f"run/{rid}", str(path), "HEAD"], root)
-    if rc != 0:
-        print(f"ERROR run-state: 専用 worktree を作れませんでした: {out.strip()[:200]}")
+    # The branch ref is created atomically by git, so concurrent starts (several chats in one minute) never share an ID:
+    # the loser moves on to the next free minute-stamped ID.
+    stamp = dt.datetime.now()
+    for _ in range(60):
+        rid = stamp.strftime("%Y%m%d%H%M")
+        path = root.parent / f"{root.name}-run-{rid}"
+        taken = path.exists() or h.ref_exists(root, f"refs/heads/run/{rid}")
+        if not taken:
+            rc, out = h.git(["worktree", "add", "-b", f"run/{rid}", str(path), "HEAD"], root)
+            if rc == 0:
+                break
+            taken = path.exists() or h.ref_exists(root, f"refs/heads/run/{rid}")
+            if not taken:
+                print(f"ERROR run-state: 専用 worktree を作れませんでした: {out.strip()[:200]}")
+                return 4
+        stamp += dt.timedelta(minutes=1)
+    else:
+        print("ERROR run-state: 空いている run ID が見つかりませんでした")
         return 4
     # start the run inside the new worktree right away: no second VS Code window and no re-sent request
-    cmd = [sys.executable, str(path / "scripts" / "run-state.py"), "start"]
+    cmd = [sys.executable, str(path / "scripts" / "run-state.py"), "start", "--run-id", rid]
+    sid = getattr(args, "session_id", None) or take_start_claim(root, cfg)
+    if sid:
+        cmd += ["--session-id", sid]
     if getattr(args, "options_file", None):
         cmd += ["--options-file", str(Path(args.options_file).resolve())]
     elif getattr(args, "options", None):
         cmd += ["--options", args.options]
-    proc = subprocess.run(cmd, cwd=str(path), capture_output=True, text=True, encoding="utf-8", errors="replace")
+    env = dict(os.environ, EABK_START_IDENT=start_ident())  # the child start inherits the parent's identifier
+    proc = subprocess.run(cmd, cwd=str(path), capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
     if proc.returncode != 0 or not (path / "scripts" / "run-state.py").exists():
         print(f"WORKTREE-REQUIRED {path}")
         print((proc.stdout + proc.stderr).strip()[:400])
@@ -138,6 +209,269 @@ def require_own_worktree(root: Path, cfg: dict, args) -> Optional[int]:
     print("run は専用 worktree で始めました。以後の `python scripts/...`・git・作業役への依頼は、すべてこのパスを cwd にして行います"
           "（VS Code を別に開く必要はありません）。成功すると main へ取り込まれます。")
     print(proc.stdout.strip())
+    return 0
+
+
+def primary_tree(root: Path) -> Path:
+    rc, out = h.git(["worktree", "list", "--porcelain"], root)
+    for line in out.splitlines():
+        if line.startswith("worktree "):
+            return Path(line.split(" ", 1)[1].strip())
+    return root
+
+
+def other_active_runs(root: Path) -> int:
+    """Active runs in other worktrees of this repository (they share the machine's CPU and memory)."""
+    n = 0
+    here = os.path.normcase(str(root.resolve()))
+    rc, out = h.git(["worktree", "list", "--porcelain"], root)
+    for line in out.splitlines():
+        if not line.startswith("worktree "):
+            continue
+        p = Path(line.split(" ", 1)[1].strip())
+        if os.path.normcase(str(p.resolve())) == here or not p.exists():
+            continue
+        try:
+            cfg = h.load_config(p)
+            rid = h.current_run(p, cfg)
+            if rid and h.load_meta(p, cfg, rid).get("status") == "active":
+                n += 1
+        except Exception:
+            continue
+    return n
+
+
+class LandLock:
+    """Repository-wide lock (in the git common dir) so that only one run at a time changes the base branch."""
+
+    def __init__(self, root: Path, wait: float, verify_timeout: int = 1800):
+        self.stale = max(3600, 2 * (verify_timeout + 120) + 600)
+        rc, out = h.git(["rev-parse", "--git-common-dir"], root)
+        d = Path(out.strip()) if rc == 0 and out.strip() else root / ".git"
+        self.path = (d if d.is_absolute() else root / d) / "ebak-land.lock"
+        self.wait = wait
+
+    def __enter__(self):
+        deadline = time.time() + self.wait
+        while True:
+            try:
+                if self.path.exists() and (h.lock_orphaned(self.path)
+                                           or time.time() - self.path.stat().st_mtime > self.stale):
+                    self.path.unlink()
+            except OSError:
+                pass
+            try:
+                fd = os.open(str(self.path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, str(os.getpid()).encode())
+                os.close(fd)
+                return self
+            except FileExistsError:
+                if time.time() >= deadline:
+                    raise SystemExit("LAND-BUSY 別の run が main に取り込み中です（待ち時間切れ。もう一度 land を実行します）")
+                time.sleep(2)
+
+    def __exit__(self, *exc):
+        try:
+            self.path.unlink()
+        except OSError:
+            pass
+
+
+def land_tmp_path(primary: Path) -> Path:
+    rc, out = h.git(["rev-parse", "--git-common-dir"], primary)
+    d = Path(out.strip()) if rc == 0 and out.strip() else primary / ".git"
+    return (d if d.is_absolute() else primary / d) / "ebak-land-wt"
+
+
+def remove_land_tmp(primary: Path, tmp: Path) -> None:
+    if tmp.exists():
+        h.git(["worktree", "remove", "--force", str(tmp)], primary)
+    if tmp.exists():
+        shutil.rmtree(str(tmp), ignore_errors=True)
+    h.git(["worktree", "prune"], primary)
+
+
+def _ts_of(rec) -> str:
+    return str((rec or {}).get("last_run_at") or "") if isinstance(rec, dict) else ""
+
+
+def _merge3(anc, ours, theirs):
+    """3-way pick for one value. Returns (value, present)."""
+    if ours == theirs:
+        return ours, ours is not None
+    if anc == ours:
+        return theirs, theirs is not None
+    if anc == theirs:
+        return ours, ours is not None
+    if ours is None:
+        return theirs, True
+    if theirs is None:
+        return ours, True
+    return (theirs, True) if _ts_of(theirs) > _ts_of(ours) else (ours, True)
+
+
+def merge_ledgers(anc: dict, ours: dict, theirs: dict) -> dict:
+    """Three-way merge of tests/system/ledger.json: cases by id, ac_digests by key (ours = run, theirs = base)."""
+    def by_id(d):
+        return {c.get("id"): c for c in (d.get("cases") or []) if isinstance(c, dict)}
+    a, o, t = by_id(anc), by_id(ours), by_id(theirs)
+    order = list(t) + [i for i in o if i not in t]
+    cases = []
+    for i in order:
+        v, ok = _merge3(a.get(i), o.get(i), t.get(i))
+        if ok:
+            cases.append(v)
+    out = dict(theirs)
+    for k in set(anc) | set(ours) | set(theirs):
+        if k in ("cases", "ac_digests"):
+            continue
+        v, ok = _merge3(anc.get(k), ours.get(k), theirs.get(k))
+        if ok:
+            out[k] = v
+        else:
+            out.pop(k, None)
+    ad_a, ad_o, ad_t = (x.get("ac_digests") or {} for x in (anc, ours, theirs))
+    digests = {}
+    for k in list(ad_t) + [k for k in ad_o if k not in ad_t]:
+        v, ok = _merge3(ad_a.get(k), ad_o.get(k), ad_t.get(k))
+        if ok:
+            digests[k] = v
+    out["cases"] = cases
+    out["ac_digests"] = digests
+    return out
+
+
+def sync_with_base(root: Path, cfg: dict, branch: str, base: str):
+    """Merge the base branch into the run worktree; auto-resolve only tests/system/ledger.json. Returns (ok, conflicts)."""
+    import json
+    if h.current_branch(root) != branch:
+        return False, []
+    rc, dirty = h.git(["status", "--porcelain", "--untracked-files=no"], root)
+    if rc != 0 or dirty.strip():
+        return False, []
+    rc, out = h.git(["merge", "--no-ff", "--no-edit", base], root)
+    if rc == 0:
+        return True, []
+    rc, names = h.git(["diff", "--name-only", "--diff-filter=U"], root)
+    files = [n.strip() for n in names.splitlines() if n.strip()]
+    ledger = h.mf(cfg, "ledger").replace("\\", "/")
+    if not files or any(f != ledger for f in files):
+        h.git(["merge", "--abort"], root)
+        return False, files
+    def stage(n):
+        rc, txt = h.git(["show", f":{n}:{ledger}"], root)
+        return json.loads(txt) if rc == 0 and txt.strip() else None
+    try:
+        anc, ours, theirs = stage(1) or {}, stage(2), stage(3)
+        if ours is None or theirs is None:
+            raise ValueError("ledger side missing")
+        h.save_ledger(root, cfg, merge_ledgers(anc, ours, theirs))
+        h.git(["add", "--", ledger], root)
+        rc, out = h.git(["commit", "--no-edit"], root)
+        if rc != 0:
+            raise ValueError(out)
+    except Exception:
+        h.git(["merge", "--abort"], root)
+        return False, files
+    return True, []
+
+
+def landed(root: Path, branch: str, base: str) -> bool:
+    rc, _ = h.git(["merge-base", "--is-ancestor", branch, base], root)
+    return rc == 0
+
+
+def cmd_land(args) -> int:
+    """Merge this run's integration branch into the base branch in the primary tree, one run at a time."""
+    root, cfg = ctx(args)
+    rid = h.current_run(root, cfg)
+    if not rid:
+        runs = sorted(p.name for p in (h.work_dir(root, cfg) / "runs").glob("*") if (p / "meta.json").exists())
+        rid = runs[-1] if runs else None
+    if not rid:
+        raise SystemExit("ERROR run-state: 取り込む run がありません")
+    meta = h.load_meta(root, cfg, rid)
+    branch = meta.get("integration_branch") or h.current_branch(root)
+    base = cfg.get("base_branch", "main")
+    if meta.get("status") != "finished" or meta.get("result") != "全件完了":
+        print(f"LAND-SKIP {rid}: 結果が「全件完了」ではない（status={meta.get('status')} result={meta.get('result')}）ので取り込みません")
+        return 1
+    primary = primary_tree(root)
+    if os.path.normcase(str(primary.resolve())) == os.path.normcase(str(root.resolve())):
+        print("LAND-SKIP: この作業ツリーが主の作業ツリーです（run は専用 worktree で動かします）")
+        return 1
+    if landed(primary, branch, base):
+        print(f"LANDED {rid}: すでに {base} に取り込み済みです")
+        return 0
+    deadline = time.time() + args.wait
+    vtimeout = int(cfg["verify"].get("timeout_sec", 1800))
+    with LandLock(primary, args.wait, vtimeout):
+        syncs = 0
+        while True:
+            rc, old = h.git(["rev-parse", base], primary)
+            old = old.strip()
+            if rc != 0 or not old:
+                print(f"ERROR run-state: {base} を解決できません: {old[:200]}")
+                return 1
+            tmp = land_tmp_path(primary)
+            remove_land_tmp(primary, tmp)
+            try:
+                rc, out = h.git(["worktree", "add", "--detach", str(tmp), old], primary)
+                if rc != 0:
+                    print(f"ERROR run-state: 取り込み用の一時 worktree を作れません: {out.strip()[:300]}")
+                    return 1
+                rc, out = h.git(["merge", "--no-ff", "-m", f"Merge {branch} ({rid})", branch], tmp)
+                if rc != 0:
+                    h.git(["merge", "--abort"], tmp)
+                    remove_land_tmp(primary, tmp)
+                    if syncs < 3:
+                        syncs += 1
+                        ok, files = sync_with_base(root, cfg, branch, base)
+                        if ok:
+                            continue
+                    else:
+                        files = []
+                    print(f"LAND-CONFLICT {rid}: {out.strip()[:300]}\n"
+                          + (f"競合したファイル: {', '.join(files)}\n" if files else "")
+                          + f"run の worktree で `git merge {base}` を行って競合を解消し、verify の後にもう一度 land を実行します")
+                    return 2
+                vrc, vout = h.run([sys.executable, str(tmp / "scripts" / "verify.py"), "--quick"], cwd=tmp,
+                                  timeout=vtimeout + 120)
+                if vrc != 0:
+                    print(f"LAND-VERIFY-FAIL {rid}: 統合後の verify が失敗したので取り込みません\n" + "\n".join(vout.splitlines()[-12:]))
+                    return 1
+                rc, new = h.git(["rev-parse", "HEAD"], tmp)
+                new = new.strip()
+                restart = False
+                while True:
+                    if h.current_branch(primary) == base:
+                        rc, out = h.git(["merge", "--ff-only", new], primary)
+                    else:
+                        rc, out = h.git(["update-ref", f"refs/heads/{base}", new, old], primary)
+                        if rc != 0:
+                            restart = True  # CAS failed: someone else moved the base branch
+                            break
+                    if rc == 0:
+                        break
+                    rc2, now = h.git(["rev-parse", base], primary)
+                    if now.strip() != old:
+                        restart = True
+                        break
+                    if time.time() >= deadline:
+                        print(f"LAND-WAIT {rid}: 主の作業ツリーの未コミットの変更が重なっていて {base} を進められません"
+                              f"（{out.strip()[:200]}）。その変更を commit か退避したあと、もう一度 `run-state.py land` を実行します")
+                        return 3
+                    time.sleep(5)
+                if restart:
+                    continue
+                rc, sha = h.git(["rev-parse", "--short", new], primary)
+                sha = sha.strip()
+                break
+            finally:
+                remove_land_tmp(primary, tmp)
+    meta["landed_commit"] = sha
+    h.save_meta(root, cfg, rid, meta)
+    print(f"LANDED {rid}: {base} @ {sha}")
     return 0
 
 
@@ -158,17 +492,32 @@ def cmd_start(args) -> int:
     elif args.options:
         text = args.options.replace("\\n", "\n")
     opts = dict(DEFAULT_OPTIONS)
+    opts["max_hours"] = f"{h.time_limits(cfg)[0]:g}"
     opts.update(h.parse_options_text(text))
+    opts["max_hours"] = f"{h.effective_max_hours(opts, cfg):g}"
     pw = str(opts.get("parallel_workers", "auto")).strip()
     auto_note = ""
     if pw.lower() in ("auto", "自動", ""):
-        opts["parallel_workers"] = str(h.auto_workers())
-        auto_note = f"parallel_workers: auto -> {opts['parallel_workers']}（CPU {os.cpu_count()} コア・メモリ {h.total_memory_gb():.0f} GB から算出）"
-    rid = h.new_run_id()
+        others = other_active_runs(root)
+        opts["parallel_workers"] = str(max(1, h.auto_workers() // (others + 1)))
+        auto_note = (f"parallel_workers: auto -> {opts['parallel_workers']}（CPU {os.cpu_count()} コア・メモリ {h.total_memory_gb():.0f} GB から算出"
+                     f"{f'。同時に動いている別の run {others} 件と分け合う' if others else ''}）")
+    try:
+        # FR-1074 AC-405: consuming the claim and recording the owner in meta happen under one exclusive lock
+        with h.start_claims_lock(root, cfg):
+            return _start_create(args, root, cfg, opts, auto_note)
+    except h.LockBusy as e:
+        print(f"ERROR run-state: start-claim・meta の排他を {h.CLAIM_LOCK_WAIT_SEC} 秒以内に得られず、run を始めませんでした"
+              f"（claim・meta は書いていません）: {e}")
+        return 5
+
+
+def _start_create(args, root: Path, cfg: dict, opts: dict, auto_note: str) -> int:
+    rid = args.run_id or h.new_run_id()
     rdir = h.run_dir(root, cfg, rid)
     n = 1
     while rdir.exists():
-        rid = f"{h.new_run_id()}-{n}"
+        rid = f"{args.run_id or h.new_run_id()}-{n}"
         rdir = h.run_dir(root, cfg, rid)
         n += 1
     for sub in ("evidence", "audit", "logs"):
@@ -186,7 +535,8 @@ def cmd_start(args) -> int:
         "run_id": rid, "status": "active", "started_at": h.now_iso(), "finished_at": None,
         "head_at_start": h.head_commit(root), "branch_at_start": start_branch,
         "integration_branch": branch, "options": opts, "stage": 0,
-        "stages_done": [], "ledger_strict": False, "session_id": None, "toolkit": h.TOOLKIT_VERSION,
+        "stages_done": [], "ledger_strict": False, "session_id": getattr(args, "session_id", None) or take_start_claim(root, cfg, locked=True),
+        "toolkit": h.TOOLKIT_VERSION,
         "human_interventions": [{"at": h.now_iso(), "kind": "request", "note": ""}],
     }
     h.save_meta(root, cfg, rid, meta)
@@ -221,6 +571,26 @@ def heal_integration_branch(root: Path, cfg: dict, rid: str, meta: dict) -> str:
     return f"WARN 統合ブランチ {old} が見つからないため、現在のブランチ {cur} を統合ブランチとして記録し直しました"
 
 
+def watch_warning(q: dict) -> str:
+    """FR-1065 AC-363: read-only WATCH: line (over-limit doing items, suspicious processes). Never raises."""
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("watch_mod", Path(__file__).resolve().parent / "watch.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        stuck = mod.stuck_items(q, dt.datetime.now().astimezone())
+    except Exception:  # noqa: BLE001
+        return ""
+    try:
+        orphans = sum(1 for r in mod._evaluate(None) if r[1])
+    except Exception:  # noqa: BLE001
+        orphans = 0
+    if not stuck and not orphans:
+        return ""
+    ids = ",".join(f"{i}({m}分)" for i, m in stuck) or "-"
+    return f"WATCH: 時間超過の項目={ids} 疑わしい（孤児）プロセス={orphans}（watch.py stuck / reap）"
+
+
 def cmd_status(args) -> int:
     root, cfg = ctx(args)
     rid = h.current_run(root, cfg)
@@ -231,7 +601,7 @@ def cmd_status(args) -> int:
     heal = heal_integration_branch(root, cfg, rid, meta) if meta.get("status") == "active" else ""
     q = h.load_queue(root, cfg, rid)
     c = counts(q)
-    mh = float(meta.get("options", {}).get("max_hours", 24) or 24)
+    mh = h.effective_max_hours(meta.get("options"), cfg)
     el = elapsed_hours(meta)
     print(f"run: {rid} status={meta.get('status')} stage={meta.get('stage')}({STAGES.get(meta.get('stage'), '?')}) done={meta.get('stages_done')}")
     print(f"time: {el:.1f}h / {mh:g}h ({el / mh * 100:.0f}%)  branch={h.current_branch(root)} HEAD={h.head_commit(root)}")
@@ -240,6 +610,9 @@ def cmd_status(args) -> int:
     if heal:
         print(heal)
     print(f"queue: todo={c['todo']} doing={c['doing']} done={c['done']} blocked={c['blocked']}")
+    watch_line = watch_warning(q)
+    if watch_line:
+        print(watch_line)
     for it in q.get("items", []):
         if it.get("status") in ("doing", "todo"):
             print(f"  {it['id']} {it.get('status')} req={','.join(it.get('requirement_ids', []))} deps={','.join(it.get('depends_on', [])) or '-'} attempts={it.get('attempts', 0)} branch={it.get('branch') or '-'}")
@@ -404,11 +777,12 @@ def cmd_time(args) -> int:
     root, cfg = ctx(args)
     rid = need_run(root, cfg)
     meta = h.load_meta(root, cfg, rid)
-    mh = float(meta.get("options", {}).get("max_hours", 24) or 24)
+    mh = h.effective_max_hours(meta.get("options"), cfg)
     el = elapsed_hours(meta)
     pct = el / mh * 100
-    print(f"elapsed={el:.2f}h max_hours={mh:g} used={pct:.0f}%{' -> 新しい項目を始めず工程 6 へ' if pct >= 85 else ''}")
-    return 3 if pct >= 85 else 0
+    stop = pct >= 85 or mh - el <= h.time_limits(cfg)[2]  # 工程 6 のための残り時間
+    print(f"elapsed={el:.2f}h max_hours={mh:g} used={pct:.0f}%{' -> 新しい項目を始めず工程 6 へ' if stop else ''}")
+    return 3 if stop else 0
 
 
 def completion(root, cfg, rid) -> List[str]:
@@ -508,6 +882,38 @@ def cmd_human(args) -> int:
     return 0
 
 
+def credit_estimate(root: Path, cfg: dict, rid: str) -> str:
+    """Estimated AI credits when --credits is not given: the sum of the model multipliers (config credits.model_multipliers,
+    default credits.default_multiplier) over the `task` calls logged by hook G-7 (models.jsonl). Estimate only: the main
+    session's own calls are not visible to hooks."""
+    mp = h.run_dir(root, cfg, rid) / "models.jsonl"
+    if not mp.exists():
+        return ""
+    conf = cfg.get("credits") or {}
+    mult = {k: v for k, v in (conf.get("model_multipliers") or {}).items() if not k.startswith("_")}
+    try:
+        default = float(conf.get("default_multiplier", 1))
+    except (TypeError, ValueError):
+        default = 1.0
+    total, calls = 0.0, {}
+    for line in h.read_text(mp).splitlines():
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        model = str(rec.get("model") or "(既定)")
+        try:
+            m = float(mult.get(model, default))
+        except (TypeError, ValueError):
+            m = default
+        total += m
+        calls[model] = calls.get(model, 0) + 1
+    if not calls:
+        return ""
+    detail = ", ".join(f"{k}×{v}" for k, v in sorted(calls.items(), key=lambda kv: -kv[1]))
+    return f"推定 {total:g}（作業役 {sum(calls.values())} 回: {detail}）"
+
+
 def cmd_finish(args) -> int:
     root, cfg = ctx(args)
     rid = need_run(root, cfg)
@@ -529,6 +935,7 @@ def cmd_finish(args) -> int:
     verified, _ = h.load_script("kpi").verified_requirements(root, cfg, impl)
     human = meta.get("human_interventions")
     human_n = str(len(human)) if isinstance(human, list) else "未記録"
+    credits = args.credits or credit_estimate(root, cfg, rid) or "未取得"
     result = args.result or ("全件完了" if not blocked else "blocked あり")
     meta.update({"status": "finished", "finished_at": h.now_iso(), "result": result})
     h.save_meta(root, cfg, rid, meta)
@@ -538,7 +945,7 @@ def cmd_finish(args) -> int:
         print(f"run-history: {rid} は既に記録されています")
     else:
         row = (f"| {rid} | {meta['started_at'][:16]} | {meta['finished_at'][:16]} | {h.head_commit(root)} | {result} | "
-               f"{', '.join(impl) or '-'} | {len(blocked)} | {ac_rate} | {el:.1f}h | {first_gate} | {args.credits or '未取得'} | "
+               f"{', '.join(impl) or '-'} | {len(blocked)} | {ac_rate} | {el:.1f}h | {first_gate} | {credits} | "
                f"{human_n} | {len(verified)}/{len(impl)} |")
         if not text.endswith("\n"):
             text += "\n"
@@ -560,6 +967,8 @@ def main(argv=None) -> int:
     s.add_argument("--options-file")
     s.add_argument("--options")
     s.add_argument("--new", action="store_true")
+    s.add_argument("--run-id", default=None, help="run ID を指定する（専用 worktree の名前と揃える。通常は使わない）")
+    s.add_argument("--session-id", default=None, help="run の持ち主の session ID（hook が記録した値を worktree 側の start に渡す。通常は使わない）")
     s.add_argument("--no-branch", action="store_true", help="main 上でも統合ブランチを作らない")
     s.add_argument("--allow-primary", action="store_true", help="主の作業ツリーでの開始を許す（run ごとの worktree 必須を外す。通常は使わない）")
     s.add_argument("--tail", type=int, default=8)
@@ -593,6 +1002,8 @@ def main(argv=None) -> int:
     qs.add_parser("show")
     sub.add_parser("time")
     sub.add_parser("complete-check")
+    la = sub.add_parser("land", help="全件完了した run を、共通ロックの下で main へ取り込む")
+    la.add_argument("--wait", type=float, default=1800, help="ロックと主の作業ツリーを待つ秒数")
     ln = sub.add_parser("lane")
     ls = ln.add_subparsers(dest="lcmd", required=True)
     for name in ("decide", "confirm"):
@@ -609,7 +1020,7 @@ def main(argv=None) -> int:
     f.add_argument("--force", action="store_true")
     args = ap.parse_args(argv)
     return {"start": cmd_start, "status": cmd_status, "stage": cmd_stage, "progress": cmd_progress,
-            "queue": cmd_queue, "time": cmd_time, "complete-check": cmd_complete_check,
+            "queue": cmd_queue, "time": cmd_time,             "complete-check": cmd_complete_check, "land": cmd_land,
             "lane": cmd_lane, "human": cmd_human, "finish": cmd_finish}[args.cmd](args)
 
 

@@ -10,7 +10,7 @@ import json
 import hashlib
 import re
 from collections import Counter, OrderedDict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 STUDIO_VERSION = "1.0.0"
@@ -37,10 +37,24 @@ RANGE_RE = re.compile(
     r"(?<![A-Za-z0-9\-])((?:FR|NFR-[A-Z0-9]+)-)(\d{3,})\s*[〜~～]\s*(?:(?:FR|NFR-[A-Z0-9]+)-)?(\d{3,})")
 LIST_RE = re.compile(
     r"(?<![A-Za-z0-9\-])((?:FR|NFR-[A-Z0-9]+)-)(\d{3,})((?:\s*[・,、，]\s*\d{3,}(?![0-9\-]))+)")
-KEYS = ("決定状態", "出自", "優先度", "上位", "出典", "対象エンティティ", "関係する状態", "参照パラメータ", "関連する既存資産")
-KEY_RE = re.compile(r"(?:(?<=^)|(?<=[\s　]))(" + "|".join(KEYS) + r")\s*[:：]")
+def _load_field_roles() -> "OrderedDict[str, str]":
+    """欄名 -> 役割。メタデータ定義（scripts/metadata.json, FR-1058）から読む。欄名の一覧をここに重ねて持たない。"""
+    for p in (Path(__file__).resolve().parent.parent / "scripts" / "metadata.json",):
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            roles = OrderedDict((f["name"], f["role"]) for f in data.get("requirement_fields", []) if f.get("role"))
+            if roles:
+                return roles
+        except (OSError, ValueError, KeyError):
+            continue
+    return OrderedDict()  # 定義が見つからないときは構造化欄を読まない（本文は表示される）
+
+
+FIELD_ROLES = _load_field_roles()
+KEYS = tuple(FIELD_ROLES)
+KEY_RE = re.compile(r"(?:(?<=^)|(?<=[\s　]))(" + "|".join(map(re.escape, KEYS or ("\0",))) + r")\s*[:：]")
 TOP_KEY_RE = re.compile(
-    r"^[-*]\s+(要求|" + "|".join(KEYS) + r"|受入基準(?:\s+(?:AC-(?:\d{3,}|[A-Z][A-Z0-9_-]*)))?)\s*[:：]\s*(.*)$")
+    r"^[-*]\s+(要求|" + "|".join(map(re.escape, KEYS)) + r"|受入基準(?:\s+(?:AC-(?:\d{3,}|[A-Z][A-Z0-9_-]*)))?)\s*[:：]\s*(.*)$")
 AC_BULLET_RE = re.compile(r"^[-*]\s+(?:受入基準\s*)?\**(AC-(?:\d{3,}|[A-Z][A-Z0-9_-]*))\**\s*[:：]\s*(.*)$")
 SUB_RE = re.compile(r"^\s{2,}[-*]\s+(検証レベル|BLOCKED)\s*[:：]\s*(.*)$")
 NONE_WORDS = {"", "なし", "無し", "-", "—", "–", "n/a", "N/A", "未実装", "未設定", "tbd", "TBD"}
@@ -459,27 +473,30 @@ def apply_kv(r: dict, text: str) -> None:
         end = marks[k + 1].start() if k + 1 < len(marks) else len(text)
         key, val = m.group(1), text[m.end():end].strip(" 　")
         val = strip_md(val)
-        if key == "決定状態":
+        role = FIELD_ROLES.get(key)
+        if role == "status":
             r["status"] = val
-        elif key == "出自":
+        elif role == "origin":
             r["origin"] = val
-        elif key == "優先度":
+        elif role == "priority":
             mm = re.match(r"(MUST|SHOULD|MAY|COULD|WON'T)", val, re.I)
             r["priority"] = mm.group(1).upper() if mm else val.split("（")[0]
             r["priorityNote"] = val
-        elif key == "上位":
+        elif role == "goal":
             gm = re.search(r"G-\d{3,}", val)
             r["goal"] = gm.group(0) if gm else val
-        elif key == "出典":
+        elif role == "sources":
             r["sources"] = val
-        elif key == "対象エンティティ":
+        elif role == "entities":
             r["entities"] = [e for e in split_items(val, ",、，;；・/／") if e not in NONE_WORDS]
-        elif key == "関係する状態":
+        elif role == "states":
             r["states"] = [] if val in NONE_WORDS else [val]
-        elif key == "参照パラメータ":
+        elif role == "params":
             r["params"] = re.findall(r"PARAM-\d{3,}", val)
-        elif key == "関連する既存資産":
+        elif role == "assets":
             r["assets"] = "" if val in NONE_WORDS else val
+        elif role in ("area", "updated", "version"):
+            r[role] = val
 
 
 # --------------------------------------------------------------------------- states
@@ -557,13 +574,45 @@ def classify_impl_state(has_impl: bool, has_system_ac: bool, case_statuses: list
     return IMPL_STATES[1] if has_system_ac else IMPL_STATES[4]
 
 
+def _parse_ts(value):
+    """FR-1061 AC-342: ISO 8601 text -> aware datetime (naive = UTC); anything else -> None."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        d = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+def gantt_span(cases: list) -> tuple:
+    """FR-1061 AC-338: start = min(history[].at); end = max(last_run_at, history[].at). Returns (start, end) as the
+    original ISO strings, or (None, None) when no value can be interpreted."""
+    pts, ends = [], []
+    for c in cases:
+        for h in c.get("history") or []:
+            d = _parse_ts(h)
+            if d:
+                pts.append((d, h.strip()))
+        d = _parse_ts(c.get("last_run_at"))
+        if d:
+            ends.append((d, c["last_run_at"].strip()))
+    ends = pts + ends
+    pts = pts or ends
+    if not pts:
+        return None, None
+    return min(pts, key=lambda x: x[0])[1], max(ends, key=lambda x: x[0])[1]
+
+
 def build_impl_status(model: dict, root: Path) -> dict:
     """Per-requirement implementation state + counts. Read-only; uses only the data layer."""
     feats = {f["req"]: f for f in model["catalog"]["features"]}
     cases_by_req: dict = {}
+    case_objs_by_req: dict = {}
     for c in model["cases"]:
         for rid in c.get("requirement_ids") or []:
             cases_by_req.setdefault(rid, []).append(c.get("status") or "not_run")
+            case_objs_by_req.setdefault(rid, []).append(c)
     items, excluded = [], 0
     for r in model["reqs"]:
         if r["statusKind"] != "approved":
@@ -585,9 +634,10 @@ def build_impl_status(model: dict, root: Path) -> dict:
         for s in statuses:
             breakdown[s] = breakdown.get(s, 0) + 1
         stalled = bool(r["blocked"]) or any(a.get("blocked") for a in r["acs"])
+        start, end = gantt_span(case_objs_by_req.get(r["id"], []))
         items.append({"id": r["id"], "title": r["title"], "state": classify_impl_state(has_impl, has_sys, statuses),
                       "cases": breakdown, "blocked": stalled, "goal": r["goal"] or "-",
-                      "priority": r["priority"] or "-"})
+                      "priority": r["priority"] or "-", "start": start, "end": end})
     return {"states": list(IMPL_STATES), "items": items, "excluded": excluded}
 
 
@@ -735,6 +785,8 @@ def parse_integration_catalog(root: Path, files: dict, model: dict) -> None:
         it["dataClass"], it["pii"], it["status"] = f.get("データ分類", ""), f.get("個人情報", ""), f.get("状態", "")
         it["authz"], it["responsibility"] = f.get("認証認可", ""), f.get("責任分界", "")
         it["reqs"] = list(dict.fromkeys(REQ_ID_RE.findall(f.get("関連する要求", ""))))
+        # FR-1050 AC-278: every ID written in 「関連する要求」 (FR / NFR / AC / INT …) so the UI can link it or show it as unresolved.
+        it["refs"] = list(dict.fromkeys(re.findall(r"(?<![A-Za-z0-9\-])((?:G|FR|NFR-[A-Z0-9]+|AC|Q|PARAM|SRC|INT|E2E|IT)-\d{3,})(?![0-9])", f.get("関連する要求", ""))))
         vps = []
         for label, keys in INT_VIEWPOINTS:
             states = [viewpoint_state(f.get(k, "")) for k in keys]
@@ -752,6 +804,117 @@ def parse_integration_catalog(root: Path, files: dict, model: dict) -> None:
     model["integrationCatalog"] = items
 
 
+# FR-1062 AC-343 AC-344: 種類 → 区分 → 領域 → 項目 の階層を、元データから 1 か所で導出する。
+# 領域の割り当て表は持たない（要求の領域の欄・既存の節の見出しを直接読み、build_model のたびに作り直す）。
+UNCLASSIFIED = "未分類"
+HIER_KINDS = ("目的", "要求", "受入基準", "試験ケース", "カタログ", "エンティティ", "質問", "出典", "パラメータ", "監査指摘",
+              "外部連携", "users-guide", "scripts")
+HIER_SKIP_DIRS = {"__pycache__", ".git", "node_modules", "images"}
+
+
+def _section_area(section: str) -> str:
+    """表の節（見出しの並び）から既存の分類名を決める: 「領域: <名>」があればその名、なければ最も内側の見出し。"""
+    parts = [p.strip() for p in (section or "").split(" / ") if p.strip()]
+    for p in reversed(parts):
+        m = re.match(r"^領域\s*[:：]\s*(.+)$", p)
+        if m:
+            return m.group(1).strip()
+    return parts[-1] if parts else UNCLASSIFIED
+
+
+def _first_heading(path: Path) -> str:
+    try:
+        for ln in read_text(path).splitlines():
+            m = HEADING_RE.match(ln)
+            if m:
+                return strip_md(m.group(2)) or UNCLASSIFIED
+    except OSError:
+        pass
+    return UNCLASSIFIED
+
+
+def derive_hierarchy(model: dict, root: Path, docs: list[dict], cat_doc: dict | None) -> dict:
+    items: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add(kind: str, division: str, area: str, iid: str, **kw) -> None:
+        iid = (iid or "").strip()
+        if not iid or (kind, iid) in seen:
+            return
+        seen.add((kind, iid))
+        items.append({"kind": kind, "division": division or UNCLASSIFIED, "area": (area or "").strip() or UNCLASSIFIED,
+                      "id": iid, **{k: v for k, v in kw.items() if v not in (None, "")}})
+
+    req_area: dict[str, str] = {}
+    for r in model["reqs"]:
+        a = (r.get("area") or "").strip()
+        req_area[r["id"]] = a or UNCLASSIFIED
+        add("要求", "機能" if r["id"].startswith("FR-") else "非機能", a, r["id"], title=r.get("title"))
+        for ac in r.get("acs", []):
+            add("受入基準", ac.get("level") or UNCLASSIFIED, a, ac["id"], title=(ac.get("text") or "")[:80])
+    sect: dict[str, str] = {}
+    for d in docs:
+        for t in d["tables"]:
+            for row in t["rows"]:
+                c0 = strip_md(row["cells"][0]) if row["cells"] else ""
+                if c0:
+                    sect.setdefault(c0, _section_area(t["section"]))
+    for kind, key in (("目的", "goals"), ("質問", "questions"), ("出典", "sources"), ("パラメータ", "params"), ("監査指摘", "audits")):
+        for x in model[key]:
+            add(kind, kind, sect.get(x["id"], UNCLASSIFIED), x["id"], title=x.get("title") or x.get("question") or x.get("name") or x.get("summary"))
+    for c in model["cases"]:
+        rids = c.get("requirement_ids") or []
+        area = next((req_area[q] for q in rids if q in req_area and req_area[q] != UNCLASSIFIED), UNCLASSIFIED)
+        add("試験ケース", c.get("layer") or UNCLASSIFIED, area, c.get("id") or "", title=c.get("title"))
+    for it in model.get("integrationCatalog", []):
+        add("外部連携", "連携カタログ", UNCLASSIFIED, it["id"], title=it.get("name"))
+    for e in model.get("entities", {}).get("entities", []):
+        add("エンティティ", "エンティティ", UNCLASSIFIED, e.get("name") or "")
+    for sm in model["stateMachines"]:
+        add("エンティティ", "状態遷移", UNCLASSIFIED, sm["entity"])
+    if cat_doc:
+        for t in cat_doc["tables"]:
+            k = t["key"]
+            if "要求ID" in k and "実装ファイル" in k:
+                div = "機能"
+            elif "テーブル名" in k:
+                div = "テーブル"
+            elif "部品名" in k:
+                div = "共通部品"
+            elif "定義ファイル" in k:
+                div = "API・イベント"
+            else:
+                div = _section_area(t["section"]) if t["section"] else "その他"
+            sec = t["section"] and any(re.match(r"^領域\s*[:：]", p.strip()) for p in t["section"].split(" / "))
+            for row in t["rows"]:
+                c0 = strip_md(row["cells"][0]) if row["cells"] else ""
+                area = _section_area(t["section"]) if sec else (req_area.get(c0) if div == "機能" else None)
+                if not area:
+                    area = _section_area(t["section"]) if t["section"] and div != "機能" else UNCLASSIFIED
+                add("カタログ", div, area, c0)
+    for sub, kind in (("users-guide", "users-guide"), ("scripts", "scripts")):
+        base = root / sub
+        if not base.is_dir():
+            continue
+        exts = {".md"} if sub == "users-guide" else {".py", ".sh", ".ps1", ".json"}
+        for p in sorted(base.rglob("*")):
+            rel = p.relative_to(root).as_posix()
+            if not p.is_file() or p.suffix.lower() not in exts or set(p.relative_to(base).parts[:-1]) & HIER_SKIP_DIRS:
+                continue
+            parts = p.relative_to(base).parts
+            div = (parts[0] if len(parts) > 1 else sub)
+            area = _first_heading(p) if sub == "users-guide" else (parts[0] if len(parts) > 1 else UNCLASSIFIED)
+            add(kind, div, area, rel)
+    order = {k: i for i, k in enumerate(HIER_KINDS)}
+    counts: OrderedDict[tuple, int] = OrderedDict()
+    for it in items:
+        key = (it["kind"], it["division"], it["area"])
+        counts[key] = counts.get(key, 0) + 1
+    tiers = [{"path": list(k), "count": n} for k, n in
+             sorted(counts.items(), key=lambda kv: (order.get(kv[0][0], 99), kv[0][1] != "機能", kv[0][1], kv[0][2] == UNCLASSIFIED, kv[0][2]))]
+    return {"items": items, "tiers": tiers, "unclassified": UNCLASSIFIED, "kinds": list(HIER_KINDS)}
+
+
 def build_model(root: Path) -> dict:
     root = Path(root).resolve()
     files = load_config(root)
@@ -761,6 +924,7 @@ def build_model(root: Path) -> dict:
                  "generatedAt": generated_at(root), "files": {}, "fingerprint": fingerprint(root)},
         "goals": [], "reqs": [], "params": [], "terms": [], "stateMachines": [], "personas": [],         "integrations": [], "integrationCatalog": [],
         "questions": [], "decisions": [], "audits": [], "sources": [], "scenarios": [], "catalog": {"features": [], "apis": [], "tables": [], "parts": []},
+        "hierarchy": {"items": [], "tiers": [], "unclassified": UNCLASSIFIED, "kinds": list(HIER_KINDS)},
         "cases": [], "caseDigests": {}, "runs": [], "registry": [], "registryRecords": [],
         "analysis": {"structure": {"layers": [], "differences": []}, "runtime": {}, "history": []},
         "graph": {"nodes": [], "edges": []}, "warnings": warnings,
@@ -959,6 +1123,7 @@ def build_model(root: Path) -> dict:
             for c in data.get("cases", []):
                 case = {k: c.get(k) for k in ("id", "requirement_ids", "ac_ids", "title", "layer", "command",
                                               "canary", "status", "last_commit", "last_run_at", "evidence")}
+                case["history"] = [h.get("at") for h in (c.get("history") or []) if isinstance(h, dict)] if isinstance(c.get("history"), list) else []
                 encoded_id = json.dumps(c.get("id"), ensure_ascii=False)
                 match = re.search(r'"id"\s*:\s*' + re.escape(encoded_id), ledger_text[search_from:])
                 if match:
@@ -1005,6 +1170,7 @@ def build_model(root: Path) -> dict:
     model["implStatus"] = build_impl_status(model, root)
     build_management_analysis(model, docs, cat_doc, files, warnings)
     build_graph(model, reqs, parts)
+    model["hierarchy"] = derive_hierarchy(model, root, docs, cat_doc)
     return model
 
 

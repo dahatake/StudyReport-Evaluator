@@ -18,13 +18,19 @@ What it does (idempotent):
   * merges scripts/ebak.config.json (adds new keys, keeps your values);
   * adds /work/ to .gitignore, union-merge rules to .gitattributes, and a marked block to AGENTS.md
     and .github/copilot-instructions.md;
-  * records versions and hashes in .github/ebak-toolkit.json.
+  * records versions and hashes in .github/ebak-toolkit.json;
+  * after an install / update, calls the data-layer common entry point once: `scripts/rdfix.py --full --apply`
+    (check -> repair -> re-check; the requirements definition and docs/integrations.md are never changed; repairs are
+    not committed). `--no-repair` runs `rdfix.py --full` (check + plan only, writes nothing); `--skip-verify` neither
+    checks nor repairs; --dry-run / --check / --uninstall / --purge never repair. The installer's exit code does
+    not depend on the data-layer result.
 """
 from __future__ import annotations
 
 import argparse
 import datetime as dt
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -41,11 +47,13 @@ MANAGED = [
     ".github/agents/implementer.agent.md",
     ".github/agents/reviewer.agent.md",
     ".github/skills/requirement-definition/SKILL.md",
+    ".github/skills/requirement-definition/original.md",
     ".github/skills/requirement-definition/integration-checklist.md",
     ".github/skills/requirement-definition/integration-requirements.md",
     ".github/skills/implement-fr/SKILL.md",
     ".github/skills/implement-fr/ui-design.md",
     ".github/skills/implement-fr/original-rd.md",
+    ".github/skills/implement-fr/original-fr.md",
     ".github/skills/system-test-increment/SKILL.md",
     ".github/skills/rd-audit/SKILL.md",
     ".github/skills/adopt-existing/SKILL.md",
@@ -57,7 +65,9 @@ MANAGED = [
     "scripts/ebaklib.py",
     "scripts/rdcheck.py",
     "scripts/rdfix.py",
-    "scripts/entities.py",    "scripts/verify.py",
+    "scripts/entities.py",
+    "scripts/metadata.json",
+    "scripts/verify.py",
     "scripts/verify.ps1",
     "scripts/verify.sh",
     "scripts/next-id.py",
@@ -69,6 +79,7 @@ MANAGED = [
     "scripts/next-impl.py",
     "scripts/build-request.py",
     "scripts/integrate.py",
+    "scripts/watch.py",
     "scripts/kpi.py",
     "scripts/import-speckit.py",
     "scripts/adopt.py",
@@ -104,6 +115,7 @@ MANAGED = [
     "EABK-Studio/web/js/diagrams.js",
     "EABK-Studio/web/js/drawer.js",
     "EABK-Studio/web/js/entities.js",
+    "EABK-Studio/web/js/hier.js",
     "EABK-Studio/web/js/i18n.js",
     "EABK-Studio/web/js/implstatus.js",
     "EABK-Studio/web/js/insights.js",
@@ -215,7 +227,8 @@ INSTRUCTIONS_BLOCK = """## Enterprise App Build Kit（要求定義書・カタ�
 - System Test の台帳 `tests/system/ledger.json` は `python scripts/ledger.py` でだけ更新します。
 - 一時ファイル（ログ・証跡・実行結果・作業メモ）は `/work` に置きます（git の管理対象外。14 日で削除）。"""
 GITIGNORE_LINES = ["/work/"]
-GITATTR_LINES = ["docs/id-registry.md merge=union", "docs/run-history.md merge=union"]
+GITATTR_LINES = ["docs/id-registry.md merge=union", "docs/run-history.md merge=union",
+                 "scripts/*.sh text eol=lf", "EABK-Studio/*.sh text eol=lf"]
 GITIGNORE_HEADER = "# Enterprise App Build Kit: temporary run files (kept 14 days)"
 GITATTR_HEADER = "# Enterprise App Build Kit: append-only records"
 # Management data paths (defaults of scripts/ebaklib.py DEFAULT_CONFIG["files"]); --purge also honours the target's config.
@@ -231,8 +244,35 @@ DEFAULT_FILES = {
 }
 
 
+def preflight() -> None:
+    """Warn (never fail) about missing tools that the installed scripts, agents and hooks rely on."""
+    if not shutil.which("git"):
+        print("警告: git が PATH にありません。run の worktree・統合・hook が動きません。")
+    if not shutil.which("python"):
+        print("警告: `python` コマンドが PATH にありません（`python3` / `py` のみ）。手順書・agent・verify.commands は `python scripts/...` と書かれています。"
+              "Windows は python.org か `winget install Python.Python.3.12` で導入（PATH に追加）、macOS・Linux は `python` を `python3` の別名にします"
+              "（例: python-is-python3、または venv を有効化）。")
+    if importlib.util.find_spec("pytest") is None:
+        print("注意: pytest が未導入です。既定の verify.commands（toolkit-unit）が失敗します。`python -m pip install pytest` を実行するか、"
+              "scripts/ebak.config.json の verify.commands を書き換えます。")
+
+
 def sha(path: Path) -> str:
+    """Content hash that ignores CRLF vs LF in text files: a Windows checkout (core.autocrlf) turns the same toolkit
+    file into CRLF, which must not look like a local modification (binary files, with NUL bytes, are hashed as is)."""
+    data = path.read_bytes()
+    if b"\0" not in data:
+        data = data.replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
+
+
+def sha_raw(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def is_recorded(path: Path, recorded) -> bool:
+    """True when `path` still has the content the manifest recorded (older manifests hold raw byte hashes)."""
+    return bool(recorded) and recorded in (sha(path), sha_raw(path))
 
 
 def toolkit_version(source: Path) -> str:
@@ -293,10 +333,11 @@ class Installer:
                 self.note("SAME", rel)
                 continue
             old = self.manifest.get("files", {}).get(rel)
-            if old == cur or self.force:
-                if old != cur and not self.dry:
+            unmodified = is_recorded(dest, old)
+            if unmodified or self.force:
+                if not unmodified and not self.dry:
                     shutil.copy2(dest, dest.with_name(dest.name + f".ebak-backup-{self.stamp}"))
-                self.note("UPDATE" if old == cur else "OVERWRITE", rel)
+                self.note("UPDATE" if unmodified else "OVERWRITE", rel)
                 self.write_bytes(rel, src.read_bytes())
             else:
                 self.note("KEEP-LOCAL", rel)
@@ -308,7 +349,7 @@ class Installer:
             old = self.manifest.get("files", {}).get(rel)
             if not p.exists() or old is None:
                 continue
-            if sha(p) == old:
+            if is_recorded(p, old):
                 self.note("REMOVE", rel)
                 if not self.dry:
                     p.unlink()
@@ -439,7 +480,7 @@ class Installer:
             p = self.target / rel
             if not p.is_file():
                 continue
-            if self.force or (h is not None and sha(p) == h):
+            if self.force or (h is not None and is_recorded(p, h)):
                 self.remove_path(rel)
             else:
                 self.note("KEEP-LOCAL", rel)
@@ -534,14 +575,18 @@ class Installer:
                               "（管理データと設定は残します。すべて削除するには --purge）")
 
 
-def run_verify(target: Path) -> int:
+def run_data_layer(target: Path, apply: bool) -> int:
+    """FR-1044/FR-1045: the only data-layer step of the installer. It calls the common entry point once
+    (`rdfix.py --full [--apply]`); the check, the repair and the pass/fail all come from it (no second verify)."""
+    cmd = [sys.executable, str(target / "scripts" / "rdfix.py"), "--full"] + (["--apply"] if apply else [])
     try:
-        proc = subprocess.run([sys.executable, str(target / "scripts" / "verify.py"), "--docs-only"],
-                              cwd=str(target), capture_output=True, text=True, encoding="utf-8", errors="replace")
+        proc = subprocess.run(cmd, cwd=str(target), capture_output=True, text=True, encoding="utf-8", errors="replace")
     except OSError as exc:
-        print(f"WARN verify を実行できません: {exc}")
-        return 1
-    print((proc.stdout or "").strip())
+        print(f"WARN データ層の確認・修復を実行できません: {exc}")
+        return 2
+    for part in (proc.stdout, proc.stderr):
+        if (part or "").strip():
+            print(part.strip())
     return proc.returncode
 
 
@@ -562,7 +607,9 @@ def main(argv=None) -> int:
     ap.add_argument("--uninstall", action="store_true", help="変更していない toolkit のファイルと AGENTS.md などのブロックを削除する（管理データと設定は残す）")
     ap.add_argument("--purge", action="store_true", help="--uninstall に加えて、管理データ（docs・台帳）・設定・/work・.gitignore と .gitattributes の追記・バックアップも削除する")
     ap.add_argument("--allow-non-git", action="store_true")
-    ap.add_argument("--skip-verify", action="store_true")
+    ap.add_argument("--skip-verify", action="store_true", help="導入後のデータ層の検査も修復も行わない")
+    ap.add_argument("--no-repair", action="store_true",
+                    help="導入後のデータ層の自動修復をせず、検査と修復の計画だけを表示する（書き込まない）")
     args = ap.parse_args(argv)
 
     if sys.version_info < (3, 9):
@@ -627,9 +674,20 @@ def main(argv=None) -> int:
         return 0
     if dry:
         return 0
+    preflight()
     if not args.skip_verify:
-        print("\n--- verify --docs-only ---")
-        run_verify(target)
+        apply = not args.no_repair
+        print("\n--- データ層の確認" + ("と自動修復" if apply else "（修復の計画のみ・書き込みません）")
+              + ": python scripts/rdfix.py --full" + (" --apply" if apply else "") + " ---")
+        rc = run_data_layer(target, apply)
+        label = "再検査" if apply else "検査"
+        verdict = "合格 (PASS)" if rc == 0 else ("不合格 (FAIL)" if rc == 1 else "判定できません（修復は取り消された、または実行されませんでした）")
+        print(f"データ層の{label}の合否: {verdict}")
+        if rc != 0 or not apply:
+            print("データ層の確認: `python scripts/rdfix.py --full`、自動修復: `python scripts/rdfix.py --full --apply`"
+                  "（導入した toolkit のファイルはそのまま残ります。修復は commit していません。要求定義書は変更しません）")
+        if rc == 2:
+            print("取り消しの理由は上の表示を確認します。インストーラの終了コードはデータ層の結果で変わりません")
     print("\n次の手順（README.md の「インストール」「Quickstart」）:")
     print("  1. 変更を確認して commit します: git add -A && git commit -m \"Add Enterprise App Build Kit\"")
     print("  2. scripts/ebak.config.json の verify.commands に、ビルド・静的検査・テストのコマンドを登録します（初回の実行で implementer が登録することもできます）")
