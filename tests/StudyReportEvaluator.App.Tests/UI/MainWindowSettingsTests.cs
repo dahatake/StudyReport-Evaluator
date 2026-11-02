@@ -119,7 +119,10 @@ public sealed class MainWindowSettingsTests
             Assert.False(previous.IsEffectivelyVisible);
             Assert.False(next.IsEffectivelyVisible);
             Assert.True(Required<TextBlock>(fixture.Window, "SettingsNavigationHint").IsEffectivelyVisible);
-            foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
+            // FR-002: 設定のカテゴリは共通だけ（旧カテゴリのボタンは存在しない）。
+            Assert.Single(settings.GetVisualDescendants().OfType<Button>(), button =>
+                (AutomationProperties.GetAutomationId(button) ?? string.Empty).StartsWith("SettingsCategory", StringComparison.Ordinal));
+            foreach (SettingsCategory category in new[] { SettingsCategory.Common })
             {
                 Button categoryButton = ById<Button>(settings, "SettingsCategory" + category);
                 Assert.Same(fixture.Shell.Settings.SelectCategoryCommand, categoryButton.Command);
@@ -164,21 +167,20 @@ public sealed class MainWindowSettingsTests
     }
 
     [AvaloniaTheory]
-    [InlineData(WorkflowStep.Input, SettingsCategory.Mapping)]
-    [InlineData(WorkflowStep.Design, SettingsCategory.Evaluation)]
-    [InlineData(WorkflowStep.Execution, SettingsCategory.Common)]
-    [InlineData(WorkflowStep.Results, SettingsCategory.Common)]
-    public async Task Settings_close_restores_the_actual_invoker_from_each_workflow_view(
-        WorkflowStep step, SettingsCategory expectedCategory)
+    [InlineData(WorkflowStep.Input)]
+    [InlineData(WorkflowStep.Design)]
+    [InlineData(WorkflowStep.Execution)]
+    [InlineData(WorkflowStep.Results)]
+    public async Task Settings_close_restores_the_actual_invoker_from_each_workflow_view(WorkflowStep step)
     {
+        // FR-002: 設定は共通だけ。入力・採点設計・結果の呼び出し元は歯車、実行は専用ボタン。
+        SettingsCategory expectedCategory = SettingsCategory.Common;
         using ShellFixture fixture = await ShellFixture.CreateAsync();
         fixture.Show();
         NavigateInitially(fixture, step);
         Control originalView = CurrentView(fixture.Window);
         Button invoker = originalView switch
         {
-            InputView input => Required<Button>(input, "MappingDetailsButton"),
-            QuantificationDesignView design => Required<Button>(design, "OpenEvaluatorSettingsButton"),
             ExecutionView execution => Required<Button>(execution, "ChangeExecutionSettingsButton"),
             _ => Required<Button>(fixture.Window, "SettingsOpenButton"),
         };
@@ -189,19 +191,12 @@ public sealed class MainWindowSettingsTests
         Assert.Equal(expectedCategory, fixture.Shell.Settings.SelectedCategory);
         Assert.Equal(step, fixture.Shell.CurrentStep);
         AssertOnlyCurrentEditor(fixture);
-        Assert.Same(ById<Control>(settings, expectedCategory switch
-        {
-            SettingsCategory.Mapping => "MappingSettingsQuestions",
-            SettingsCategory.Evaluation => "EvaluatorSettingsQuestions",
-            _ => "ExecutionModel",
-        }), fixture.Window.FocusManager?.GetFocusedElement());
+        Assert.Same(ById<Control>(settings, "ExecutionModel"), fixture.Window.FocusManager?.GetFocusedElement());
 
-        // A category change and the fifth (already-open Settings) entry must not
-        // replace the original invoking control with the gear or a category button.
-        Activate(ById<Button>(settings, "SettingsCategorySpecial"));
+        // The already-open Settings entry must not replace the original invoking control.
         Activate(Required<Button>(fixture.Window, "SettingsOpenButton"));
         Assert.Same(settings, CurrentView(fixture.Window));
-        Assert.Equal(SettingsCategory.Special, fixture.Shell.Settings.SelectedCategory);
+        Assert.Equal(SettingsCategory.Common, fixture.Shell.Settings.SelectedCategory);
         Activate(Required<Button>(settings, "SettingsRequestClose"));
 
         Assert.False(fixture.Shell.IsSettingsOpen);
@@ -238,6 +233,14 @@ public sealed class MainWindowSettingsTests
         Assert.True(DataValidationErrors.GetHasErrors(points));
         Assert.Equal(originalPoints, fixture.Design.BasePoints);
 
+        EvaluatorDesignItemViewModel evaluator = fixture.Design.SelectedQuestion!.SelectedEvaluator!;
+        TextBox weight = ById<TextBox>(design, $"DesignEvaluator-{evaluator.Id}-Weight");
+        decimal originalWeight = evaluator.Weight;
+        BindingExpressionBase weightBinding = Assert.IsAssignableFrom<BindingExpressionBase>(
+            BindingOperations.GetBindingExpressionBase(weight, TextBox.TextProperty));
+        Edit(weight, "-");
+        Assert.True(DataValidationErrors.GetHasErrors(weight));
+
         Activate(Required<Button>(fixture.Window, "SettingsOpenButton"));
         SettingsView settings = Assert.IsType<SettingsView>(CurrentView(fixture.Window));
         TextBox rounding = ById<TextBox>(settings, "DesignRoundingDigits");
@@ -246,19 +249,11 @@ public sealed class MainWindowSettingsTests
             BindingOperations.GetBindingExpressionBase(rounding, TextBox.TextProperty));
         Edit(rounding, "未確定の桁数");
         Assert.True(DataValidationErrors.GetHasErrors(rounding));
-        Activate(ById<Button>(settings, "SettingsCategoryEvaluation"));
-        Control evaluation = Assert.IsAssignableFrom<Control>(Required<ContentControl>(settings, "CurrentSettingsContent").Content);
-        EvaluatorDesignItemViewModel evaluator = fixture.Design.SelectedQuestion!.SelectedEvaluator!;
-        TextBox weight = ById<TextBox>(settings, $"DesignEvaluator-{evaluator.Id}-Weight");
-        decimal originalWeight = evaluator.Weight;
-        BindingExpressionBase weightBinding = Assert.IsAssignableFrom<BindingExpressionBase>(
-            BindingOperations.GetBindingExpressionBase(weight, TextBox.TextProperty));
-        Edit(weight, "-");
-        Assert.True(DataValidationErrors.GetHasErrors(weight));
         Activate(Required<Button>(settings, "SettingsRequestClose"));
 
         Assert.Same(design, CurrentView(fixture.Window));
         AssertPending(points, "未確定の配点", pointsBinding);
+        AssertPending(weight, "-", weightBinding);
         fixture.Shell.NavigateCommand.Execute(WorkflowStep.Input);
         Render();
         Assert.Same(input, CurrentView(fixture.Window));
@@ -267,13 +262,12 @@ public sealed class MainWindowSettingsTests
         Render();
         Assert.Same(design, CurrentView(fixture.Window));
         AssertPending(points, "未確定の配点", pointsBinding);
+        Assert.Same(weight, ById<TextBox>(design, $"DesignEvaluator-{evaluator.Id}-Weight"));
+        AssertPending(weight, "-", weightBinding);
 
         Activate(Required<Button>(fixture.Window, "SettingsOpenButton"));
         Assert.Same(settings, CurrentView(fixture.Window));
-        Assert.Equal(SettingsCategory.Evaluation, fixture.Shell.Settings.SelectedCategory);
-        Assert.Same(evaluation, Required<ContentControl>(settings, "CurrentSettingsContent").Content);
-        AssertPending(weight, "-", weightBinding);
-        Activate(ById<Button>(settings, "SettingsCategoryCommon"));
+        Assert.Equal(SettingsCategory.Common, fixture.Shell.Settings.SelectedCategory);
         Assert.Same(rounding, ById<TextBox>(settings, "DesignRoundingDigits"));
         AssertPending(rounding, "未確定の桁数", roundingBinding);
         Assert.Equal(originalRow, fixture.Input.FirstDataRow);
@@ -593,7 +587,7 @@ public sealed class MainWindowSettingsTests
         using ShellFixture fixture = await ShellFixture.CreateAsync();
         fixture.Show();
         InputView input = Assert.IsType<InputView>(CurrentView(fixture.Window));
-        Button invoker = Required<Button>(input, "MappingDetailsButton");
+        Button invoker = Required<Button>(fixture.Window, "SettingsOpenButton"); // FR-002: 入力詳細ボタンは廃止
         Activate(invoker);
         SettingsView settings = Assert.IsType<SettingsView>(CurrentView(fixture.Window));
         invoker.IsEnabled = false;

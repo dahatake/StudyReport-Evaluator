@@ -92,7 +92,7 @@ public sealed class CopilotLoginCommandTests
             shell.OpenSettings(category);
             Assert.Same(shell.Settings, shell.CurrentEditorViewModel);
             Assert.Same(viewModel, shell.Settings.Execution);
-            Assert.Equal(category, shell.Settings.SelectedCategory);
+            Assert.Equal(SettingsCategory.Common, shell.Settings.SelectedCategory); // FR-002: 削除済みカテゴリは共通へ寄せる
             Assert.Equal(WorkflowStep.Execution, shell.CurrentStep);
             shell.Settings.RequestCloseCommand.Execute(null);
             Assert.False(shell.IsSettingsOpen);
@@ -159,7 +159,7 @@ public sealed class CopilotLoginCommandTests
             shell.OpenSettings(SettingsCategory.Common);
             RenderUi();
             SettingsView settings = Assert.IsType<SettingsView>(CurrentView(window));
-            foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
+            foreach (SettingsCategory category in new[] { SettingsCategory.Common }) // FR-002: 設定のカテゴリは共通だけ
             {
                 Activate(window, ById<Button>(settings, "SettingsCategory" + category));
                 Assert.Equal(category, shell.Settings.SelectedCategory);

@@ -437,16 +437,20 @@ public sealed class QuantificationDesignViewTests
             Assert.Contains(view.GetVisualDescendants(), control => control is VirtualizingStackPanel);
             // Fluent also materializes a hidden PART_EditableTextBox for ComboBox.
             // Count actual editable surfaces, not that template part or read-only details.
+            // FR-001: 統合した通常評価エディター（EvaluatorSettingsView）は別に数える。ここでは
+            // 設問一覧・採点設計の上部が持つ編集欄だけを数える。
             Assert.Equal(
                 ["BasePointsTextBox", "SelectedQuestionPointsTextBox", "SimilarityPenaltyWeightTextBox", "SpecialPointsTextBox"],
                 view.GetVisualDescendants().OfType<TextBox>()
-                    .Where(textBox => textBox.IsEffectivelyVisible && !textBox.IsReadOnly)
+                    .Where(textBox => textBox.IsEffectivelyVisible && !textBox.IsReadOnly
+                        && !textBox.GetVisualAncestors().OfType<EvaluatorSettingsView>().Any())
                     .Select(textBox => Assert.IsType<string>(textBox.Name)).OrderBy(name => name, StringComparer.Ordinal).ToArray());
             Assert.True(Required<TextBox>(view, "AllocationSummaryText").IsReadOnly);
             TextBox errorDetail = Assert.IsType<TextBox>(
                 Assert.IsType<Flyout>(Required<Button>(view, "ErrorDetailsButton").Flyout).Content);
             Assert.True(errorDetail.IsReadOnly);
-            Assert.DoesNotContain(view.GetVisualDescendants().OfType<Control>(), control =>
+            // 設問一覧のページは入れ子の編集欄を描画しない（編集は統合エディターの 1 組だけ）。
+            Assert.DoesNotContain(list.GetVisualDescendants().OfType<Control>(), control =>
                 (AutomationProperties.GetAutomationId(control) ?? string.Empty).StartsWith("DesignEvaluator-", StringComparison.Ordinal)
                 || (AutomationProperties.GetAutomationId(control) ?? string.Empty).StartsWith("DesignCriterion-", StringComparison.Ordinal));
             Assert.Equal(2d, window.RenderScaling);
@@ -662,8 +666,9 @@ public sealed class QuantificationDesignViewTests
     }
 
     [AvaloniaFact]
-    public async Task Loaded_input_A_and_design_B_mapping_link_opens_B_and_returns_to_input_B()
+    public async Task Loaded_input_A_and_design_B_have_no_mapping_link_and_keep_independent_selections()
     {
+        // FR-002: 設問の詳細（入力詳細）への導線は廃止。選択は入力と採点設計で独立したまま。
         using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
         InputViewModel input = new();
         await input.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
@@ -680,19 +685,10 @@ public sealed class QuantificationDesignViewTests
         {
             window.Show();
             Render();
-            Button link = Required<Button>(view, "OpenQuestionSettingsButton");
-            Assert.Same(shell.OpenSettingsCommand, link.Command);
-            Activate(link);
-            Assert.True(shell.IsSettingsOpen);
-            Assert.Equal(SettingsCategory.Mapping, shell.Settings.SelectedCategory);
-            Assert.Same(inputB, input.SelectedQuestion);
+            Assert.Null(view.FindControl<Button>("OpenQuestionSettingsButton"));
+            Assert.False(shell.IsSettingsOpen);
+            Assert.Same(inputA, input.SelectedQuestion);
             Assert.Same(designB, shell.DesignViewModel.SelectedQuestion);
-            MappingSettingsView mapping = new(shell.Settings.Input);
-            window.Content = mapping;
-            Render();
-            Assert.Same(inputB, Required<ComboBox>(mapping, "QuestionSelector").SelectedItem);
-            Assert.Equal(designB.QuestionText, Required<TextBox>(mapping, "QuestionTextEditor").Text);
-            Assert.True(Required<TextBox>(mapping, "QuestionTextEditor").IsReadOnly);
 
             shell.NavigateCommand.Execute(WorkflowStep.Input);
             InputView mainInput = new(input);
@@ -700,10 +696,11 @@ public sealed class QuantificationDesignViewTests
             Render();
             Assert.False(shell.IsSettingsOpen);
             Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
-            Assert.Same(inputB, input.SelectedQuestion);
-            Assert.Same(inputB, Required<ComboBox>(mainInput, "QuestionSelector").SelectedItem);
-            Assert.Same(inputB, Required<TextBox>(mainInput, "QuestionTextEditor").DataContext);
-            Assert.Equal(inputB.QuestionText, Required<TextBox>(mainInput, "QuestionTextEditor").Text);
+            Assert.Same(inputA, input.SelectedQuestion);
+            Assert.Same(designB, shell.DesignViewModel.SelectedQuestion);
+            Assert.Same(inputA, Required<ComboBox>(mainInput, "QuestionSelector").SelectedItem);
+            Assert.Same(inputA, Required<TextBox>(mainInput, "QuestionTextEditor").DataContext);
+            Assert.Equal(inputA.QuestionText, Required<TextBox>(mainInput, "QuestionTextEditor").Text);
             Assert.False(Required<TextBox>(mainInput, "QuestionTextEditor").IsReadOnly);
         }
         finally
@@ -830,24 +827,10 @@ public sealed class QuantificationDesignViewTests
                 Assert.Equal(question.DisplayName, AutomationProperties.GetName(name));
             }
 
-            Button open = Required<Button>(view, "OpenQuestionSettingsButton");
-            Activate(open);
-            Assert.Equal(SettingsCategory.Mapping, shell.Settings.SelectedCategory);
+            // FR-002: 設問名の全文確認用の入力詳細への導線は廃止。全文は Automation 名で確認済み（上）。
+            Assert.Null(view.FindControl<Button>("OpenQuestionSettingsButton"));
+            Assert.False(shell.IsSettingsOpen);
             Assert.Same(viewModel.Questions[0], viewModel.SelectedQuestion);
-            // T22 owns cross-VM selection sync; verify the new mapping view's full
-            // text surface, not another Input/Design synchronization implementation.
-            MappingSettingsView settings = new(input);
-            window.Content = settings;
-            Render();
-            TextBox fullName = Required<TextBox>(settings, "QuestionNameEditor");
-            Assert.NotNull(viewModel.SelectedQuestion);
-            Assert.Equal(viewModel.SelectedQuestion.DisplayName, fullName.Text);
-            Assert.True(fullName.Focus(NavigationMethod.Tab));
-            Press(window, Key.End, RawInputModifiers.Control);
-            Assert.Equal(fullName.Text!.Length, fullName.CaretIndex);
-            shell.CloseSettings();
-            window.Content = view;
-            Render();
             AssertMeasuredPage(view, viewModel);
         }
         finally
@@ -857,7 +840,7 @@ public sealed class QuantificationDesignViewTests
     }
 
     [AvaloniaFact]
-    public void Paged_questions_and_direct_settings_links_preserve_the_same_prompt_target()
+    public void Paged_questions_and_integrated_evaluator_editor_preserve_the_same_prompt_target()
     {
         ImportedPrompt source = new() { Path = "t19.txt", DisplayName = "t19.txt", Content = "原文\n{回答} {評価項目}" };
         QuantificationDesignViewModel viewModel = new(null, ["A", "B"], [source]);
@@ -888,31 +871,27 @@ public sealed class QuantificationDesignViewTests
 
             AssertMeasuredPage(view, viewModel);
             QuantificationDefinition draft = viewModel.Draft;
-            foreach ((string name, SettingsCategory category) in new[]
+            // FR-001/FR-002: 設定へのリンク（通常評価・固有評価・読込Prompt）は廃止。
+            foreach (string removed in new[]
             {
-                ("OpenEvaluatorSettingsButton", SettingsCategory.Evaluation),
-                ("OpenSpecialSettingsButton", SettingsCategory.Special),
-                ("OpenImportedPromptsButton", SettingsCategory.ImportedPrompts),
+                "OpenQuestionSettingsButton", "OpenEvaluatorSettingsButton", "OpenSpecialSettingsButton", "OpenImportedPromptsButton",
             })
             {
-                Button link = Required<Button>(view, name);
-                Assert.Same(shell.OpenSettingsCommand, link.Command);
-                Assert.Equal(category, Assert.IsType<SettingsCategory>(link.CommandParameter));
-                Activate(link);
-                Assert.True(shell.IsSettingsOpen);
-                Assert.Equal(category, shell.Settings.SelectedCategory);
-                Assert.Same(first, viewModel.SelectedQuestion);
-                Assert.Same(custom, first.SelectedEvaluator);
-                Assert.Same(special, first.SelectedSpecialEvaluation);
-                Assert.Equal(ImportedPromptTarget.CustomEvaluator, viewModel.SelectedPromptTarget);
-                Assert.Same(draft, viewModel.Draft);
-                shell.CloseSettings();
+                Assert.Null(view.FindControl<Button>(removed));
             }
 
-            Assert.Equal("読込Prompt (1)", Required<Button>(view, "OpenImportedPromptsButton").Content);
-            Assert.Contains(custom.DisplayName, Required<TextBlock>(view, "EvaluatorSummaryText").Text!, StringComparison.Ordinal);
-            Assert.Contains(custom.Criteria[0].DisplayName, Required<TextBlock>(view, "EvaluatorSummaryText").Text!, StringComparison.Ordinal);
-            Assert.Contains(special.DisplayName, Required<TextBlock>(view, "SpecialSummaryText").Text!, StringComparison.Ordinal);
+            Assert.False(shell.IsSettingsOpen);
+            Assert.Same(first, viewModel.SelectedQuestion);
+            Assert.Same(custom, first.SelectedEvaluator);
+            Assert.Same(special, first.SelectedSpecialEvaluation);
+            Assert.Equal(ImportedPromptTarget.CustomEvaluator, viewModel.SelectedPromptTarget);
+            Assert.Same(draft, viewModel.Draft);
+
+            // 統合した通常評価エディターは、同じ設問・評価方法・観点を同じ画面に表示する。
+            EvaluatorSettingsView embedded = Assert.Single(view.GetVisualDescendants().OfType<EvaluatorSettingsView>());
+            Assert.Same(viewModel, embedded.DataContext);
+            Assert.Equal(custom.DisplayName, Assert.Single(embedded.GetVisualDescendants().OfType<TextBox>(),
+                box => AutomationProperties.GetAutomationId(box) == $"DesignEvaluator-{custom.Id}-Name").Text);
             ImportedPromptSettingsView prompts = new(viewModel);
             window.Content = prompts;
             Render();
@@ -934,7 +913,7 @@ public sealed class QuantificationDesignViewTests
             window.Content = view;
             Render();
             ListBoxItem selectedCard = Assert.Single(
-                view.GetVisualDescendants().OfType<ListBoxItem>(),
+                Required<ListBox>(view, "QuestionEditorList").GetVisualDescendants().OfType<ListBoxItem>(),
                 item => ReferenceEquals(item.DataContext, second));
             Assert.True(selectedCard.IsSelected);
             Assert.Equal(new Thickness(3d), selectedCard.BorderThickness);
@@ -1007,15 +986,13 @@ public sealed class QuantificationDesignViewTests
             Assert.Null(view.FindControl<Border>("EthicsWarningBanner"));
             Assert.Null(view.FindControl<TextBox>("DefinitionNameTextBox"));
             Assert.Null(view.FindControl<ListBox>("ImportedPromptList"));
+            // FR-002: 設定へのリンクは廃止（通常評価エディターは同じ画面に統合）。
             foreach (string name in new[]
             {
                 "OpenQuestionSettingsButton", "OpenEvaluatorSettingsButton", "OpenSpecialSettingsButton", "OpenImportedPromptsButton",
             })
             {
-                Button link = Required<Button>(view, name);
-                Assert.Null(link.Command);
-                Assert.False(link.IsEnabled);
-                Assert.False(link.IsEffectivelyEnabled);
+                Assert.Null(view.FindControl<Button>(name));
             }
 
             basePoints.SetCurrentValue(TextBox.TextProperty, "55");
@@ -1115,12 +1092,14 @@ public sealed class QuantificationDesignViewTests
             ComboBox errors = Required<ComboBox>(view, "ValidationErrorSelector");
             Assert.Same(design.ValidationErrors, errors.ItemsSource);
             Assert.InRange(errors.MaxDropDownHeight, 44d, 220d);
-            foreach ((string id, string field, SettingsCategory category) in new[]
+            // FR-001/FR-002: 通常評価の問題は同じ画面の統合エディターに移動し、設定は開かない。
+            // それ以外（固有評価・共通）は、残る唯一の設定カテゴリ（共通）を開く。
+            foreach ((string id, string field, bool opensSettings) in new[]
             {
-                (custom.Id, "CustomPromptTemplate", SettingsCategory.Evaluation),
-                (criterion.Id, "Weight", SettingsCategory.Evaluation),
-                (special.Id, "PromptTemplate", SettingsCategory.Special),
-                (design.Draft.Id, "RoundingDigits", SettingsCategory.Common),
+                (custom.Id, "CustomPromptTemplate", false),
+                (criterion.Id, "Weight", false),
+                (special.Id, "PromptTemplate", true),
+                (design.Draft.Id, "RoundingDigits", true),
             })
             {
                 design.SelectedQuestion = other;
@@ -1141,8 +1120,8 @@ public sealed class QuantificationDesignViewTests
                 details.Hide();
                 Render();
                 Activate(Required<Button>(view, "GoToProblemButton"));
-                Assert.Equal(category, shell.Settings.SelectedCategory);
-                Assert.True(shell.IsSettingsOpen);
+                Assert.Equal(opensSettings, shell.IsSettingsOpen);
+                Assert.Equal(SettingsCategory.Common, shell.Settings.SelectedCategory);
                 if (id != design.Draft.Id)
                 {
                     Assert.Same(question, design.SelectedQuestion);
@@ -1160,7 +1139,10 @@ public sealed class QuantificationDesignViewTests
                 }
 
                 Assert.Same(draft, design.Draft);
-                shell.CloseSettings();
+                if (shell.IsSettingsOpen)
+                {
+                    shell.CloseSettings();
+                }
             }
 
             other.Points = -1m;

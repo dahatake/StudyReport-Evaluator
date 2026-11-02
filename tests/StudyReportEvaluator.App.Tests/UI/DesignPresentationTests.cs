@@ -1203,9 +1203,11 @@ public sealed class DesignPresentationTests
         // This finite fixture fits four actual 48-DIP rows. T09 controls PageSize
         // explicitly below; T19 separately checks measured resize growth. Do not
         // depend on a production MaxHeight or disable its capacity calculation.
+        // FR-001: 左ペイン（設問一覧）の下に統合した通常評価エディターの高さが加わるため、
+        // 4 行が収まる有限の高さに調整した。T09 は PageSize を明示して制御し、T19 が測定を別に確認する。
         return (view, list, new Window
         {
-            Width = 1260, Height = 450, WindowDecorations = WindowDecorations.None, Content = view,
+            Width = 1260, Height = 550, WindowDecorations = WindowDecorations.None, Content = view,
         });
     }
 

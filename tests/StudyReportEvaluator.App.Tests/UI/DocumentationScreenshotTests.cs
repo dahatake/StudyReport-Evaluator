@@ -48,9 +48,9 @@ public sealed class DocumentationScreenshotTests
     private static readonly string[] ScreenshotFileNames =
     [
         "01-input-workbook.png",       // Input: synthetic workbook, 100 rows / 2 questions.
-        "02-input-mapping.png",        // Settings / Mapping: question 2, primary C, supporting D.
-        "03-design-knowledge.png",     // Design: question 1, Knowledge summary (not its Prompt editor).
-        "04-design-custom-prompt.png", // Settings / Evaluation / Prompt: actual Custom editor + preview.
+        "02-input-mapping.png",        // Input: question 2, primary C, supporting D（入力詳細は廃止）。
+        "03-design-knowledge.png",     // Design: question 1, Knowledge evaluator in the integrated editor.
+        "04-design-custom-prompt.png", // Design: integrated evaluator editor / Prompt tab: actual Custom editor + preview.
         "05-execution-auto.png",       // Execution: NotChecked, login not started, effort unselected.
         "06-results-review.png",       // Results list: completed FAKE run/finalization, no overrides.
         "07-output-export.png",        // Results detail: raw 8 -> override 9, separate UNSAVED candidate.
@@ -310,32 +310,24 @@ public sealed class DocumentationScreenshotTests
             }
 
             Required<ComboBox>(inputView, "QuestionSelector").SelectedItem = input.Questions[1];
-            Activate(Required<Button>(inputView, "MappingDetailsButton"));
-            SettingsView settingsView = CurrentView<SettingsView>(window);
-            Assert.Equal(SettingsCategory.Mapping, viewModel.Settings.SelectedCategory);
-            Assert.Equal(WorkflowStep.Input, viewModel.CurrentStep);
-            MappingSettingsView mappingView = CurrentSettingsView<MappingSettingsView>(settingsView);
-            Assert.Same(input, mappingView.DataContext);
-            Assert.Equal(QuestionIds[1], input.SelectedQuestion?.Id);
-            Assert.Equal(QuestionIds[1], viewModel.DesignViewModel.SelectedQuestion?.Id);
-            ListBox supportingColumns = Required<ListBox>(mappingView, "SupportingColumnList");
-            supportingColumns.SelectedItem = input.Questions[1].SupportingColumns.Single(column => column.ColumnName == "D");
-            Required<ComboBox>(mappingView, "CandidateSelector").SelectedItem =
-                input.MappingSuggestions.Single(candidate => candidate.ColumnName == "C");
+            // FR-002: 入力詳細は廃止。主回答列は入力画面で選び、補助列（D）は同じ VM の操作で設定する。
+            Assert.Null(inputView.FindControl<Button>("MappingDetailsButton"));
             Render();
-            Assert.True(Required<TextBox>(mappingView, "QuestionTextEditor").IsReadOnly);
+            Assert.Equal(WorkflowStep.Input, viewModel.CurrentStep);
+            Assert.Equal(QuestionIds[1], input.SelectedQuestion?.Id);
+            Required<ComboBox>(inputView, "PrimaryColumnComboBox").SelectedItem = "C";
+            input.Questions[1].SetSupportingColumn("D", true);
+            Render();
             Assert.Equal("C", input.SelectedQuestion?.PrimarySourceColumn);
             Assert.Equal("D", input.SelectedQuestion?.SupportingSummary);
-            Assert.True(Required<CheckBox>(mappingView, "IncludeSupportingColumnCheckBox").IsChecked);
-            AssertContainedInViewport(Required<TextBox>(mappingView, "QuestionNameEditor"), window);
-            AssertContainedInViewport(Required<TextBox>(mappingView, "CandidateOverview"), window);
+            AssertContainedInViewport(Required<ComboBox>(inputView, "PrimaryColumnComboBox"), window);
+            AssertContainedInViewport(Required<TextBox>(inputView, "QuestionTextEditor"), window);
+            SettingsView settingsView;
             if (!executionOnly)
             {
-                Capture(window, imageDirectory, ScreenshotFileNames[1], Required<Button>(settingsView, "SettingsRequestClose"));
+                Capture(window, imageDirectory, ScreenshotFileNames[1], Required<Button>(inputView, "PickFileButton"));
             }
 
-            Activate(Required<Button>(settingsView, "SettingsRequestClose"));
-            Assert.Same(inputView, CurrentView<InputView>(window));
             Activate(Required<Button>(window, "NextStepButton"));
             Assert.Equal(WorkflowStep.Design, viewModel.CurrentStep);
             QuantificationDesignViewModel design = viewModel.DesignViewModel;
@@ -360,12 +352,13 @@ public sealed class DocumentationScreenshotTests
             Render();
             Assert.Same(knowledgeQuestion, design.SelectedQuestion);
             Assert.True(knowledgeEvaluator.IsKnowledge);
-            TextBlock knowledgeSummary = Required<TextBlock>(designView, "EvaluatorSummaryText");
-            Assert.Contains("Knowledge", knowledgeSummary.Text, StringComparison.Ordinal);
-            AssertContainedInViewport(knowledgeSummary, window);
-            // Prompt editors moved to Settings; do not search for an off-tree editor.
+            // FR-001: 統合した通常評価エディターが同じ画面にある（Knowledge は読取専用）。
+            TextBox knowledgeName = ById<TextBox>(designView, $"DesignEvaluator-{knowledgeEvaluator.Id}-Name");
+            AssertContainedInViewport(knowledgeName, window);
+            // Knowledge has no editable Prompt; its preview must not be an editable control.
             Assert.DoesNotContain(designView.GetVisualDescendants().OfType<TextBox>(), control =>
-                AutomationProperties.GetAutomationId(control) == knowledgeEvaluator.KnowledgePromptPreviewAutomationId);
+                AutomationProperties.GetAutomationId(control) == knowledgeEvaluator.KnowledgePromptPreviewAutomationId
+                && !control.IsReadOnly);
             Assert.Equal(
                 2,
                 designView.GetVisualDescendants().OfType<Border>().Count(border =>
@@ -382,21 +375,20 @@ public sealed class DocumentationScreenshotTests
             }
             if (!executionOnly)
             {
-                Capture(window, imageDirectory, ScreenshotFileNames[2], Required<Button>(designView, "OpenEvaluatorSettingsButton"));
+                Capture(window, imageDirectory, ScreenshotFileNames[2], Required<Button>(designView, "ValidateDesignButton"));
             }
 
             QuestionDesignItemViewModel customQuestion = design.Questions[1];
             EvaluatorDesignItemViewModel customEvaluator = customQuestion.Evaluators[0];
             questionCards.SelectedItem = customQuestion;
             customQuestion.SelectedEvaluator = customEvaluator;
-            Activate(Required<Button>(designView, "OpenEvaluatorSettingsButton"));
-            settingsView = CurrentView<SettingsView>(window);
-            Assert.Equal(SettingsCategory.Evaluation, viewModel.Settings.SelectedCategory);
+            Render();
+            // FR-001: Prompt の編集は同じ画面の統合エディター（設定の通常評価カテゴリは廃止）。
+            Assert.False(viewModel.IsSettingsOpen);
             Assert.Equal(WorkflowStep.Design, viewModel.CurrentStep);
-            EvaluatorSettingsView evaluatorView = CurrentSettingsView<EvaluatorSettingsView>(settingsView);
-            Assert.Same(design, evaluatorView.DataContext);
             Assert.Equal(QuestionIds[1], design.SelectedQuestion?.Id);
-            Assert.Equal(QuestionIds[1], input.SelectedQuestion?.Id);
+            EvaluatorSettingsView evaluatorView = Assert.Single(designView.GetVisualDescendants().OfType<EvaluatorSettingsView>());
+            Assert.Same(design, evaluatorView.DataContext);
             TabControl promptTabs = Required<TabControl>(evaluatorView, "EditorTabs");
             promptTabs.SelectedItem = ById<TabItem>(evaluatorView, "EvaluatorSettingsPromptTab");
             Render();
@@ -411,11 +403,9 @@ public sealed class DocumentationScreenshotTests
             AssertContainedInViewport(customPreview, window);
             if (!executionOnly)
             {
-                Capture(window, imageDirectory, ScreenshotFileNames[3], Required<Button>(settingsView, "SettingsRequestClose"));
+                Capture(window, imageDirectory, ScreenshotFileNames[3], Required<Button>(designView, "ValidateDesignButton"));
             }
 
-            Activate(Required<Button>(settingsView, "SettingsRequestClose"));
-            Assert.Same(designView, CurrentView<QuantificationDesignView>(window));
             Activate(Required<Button>(window, "NextStepButton"));
             Assert.Equal(WorkflowStep.Execution, viewModel.CurrentStep);
             execution.MaxConcurrency = 2;

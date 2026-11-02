@@ -189,7 +189,7 @@
       <Grid x:Name="SelectedQuestionEditor" Grid.Column="1"
             DataContext="{Binding SelectedQuestion, DataType={x:Type viewModels:InputViewModel}}"
             x:DataType="viewModels:InputQuestionMappingViewModel" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="4">
-        <Grid RowDefinitions="Auto,44" RowSpacing="4" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+        <Grid RowDefinitions="Auto,44" RowSpacing="4" ColumnDefinitions="Auto,*" ColumnSpacing="8">
           <TextBlock Grid.Column="1" Text="主回答列" Classes="label" />
           <CheckBox x:Name="QuestionEnabledCheckBox" Grid.Row="1" Content="有効" IsChecked="{Binding Enabled, Mode=TwoWay}"
                     IsEnabled="{Binding ., Converter={x:Static converters:ObjectConverters.IsNotNull}, FallbackValue=False}"
@@ -201,10 +201,6 @@
                     TabIndex="13" AutomationProperties.AutomationId="{Binding PrimaryAutomationId, FallbackValue=InputQuestionPrimary}"
                     AutomationProperties.Name="この質問の主回答列"
                     ToolTip.Tip="主回答列を変更すると、読込済みの質問行の見出しが設問文に反映されます。" />
-          <Button x:Name="MappingDetailsButton" Grid.Row="1" Grid.Column="2" Content="入力詳細…" Click="HandleMappingDetailsClick"
-                  TabIndex="14" AutomationProperties.AutomationId="{Binding Id, StringFormat='InputQuestion-{0}-Details', FallbackValue=InputMappingDetails}"
-                  AutomationProperties.Name="選択した設問の入力詳細を設定で開く"
-                  ToolTip.Tip="設問名・補助列・列候補・追加・複製・並替え・削除は入力詳細で編集します。" />
         </Grid>
         <Grid Grid.Row="1" ColumnDefinitions="Auto,*" ColumnSpacing="8">
           <TextBlock Text="設問文（必須）" Classes="label" />
