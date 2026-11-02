@@ -20,7 +20,7 @@ G-11は、後続のdeterministic fixture factoryが生成する入力を5つのJ
 
 | Spec | 目的 | Case数 |
 |---|---|---:|
-| `tests/fixtures/specs/workbook-clean.json` | 1/2/10問、typed value、styles有無、sparse row、name collision、preservation、local formula分類、FR-006 exact boundaries | 17 |
+| `tests/fixtures/specs/workbook-clean.json` | 1/2/10問、typed value、styles有無、sparse row、name collision、preservation、local formula分類、§4.2 exact boundaries | 17 |
 | `tests/fixtures/specs/workbook-hostile.json` | file/package/resource/relationship/execution/namespace/reserved-nameの単一原因negative | 34 |
 | `tests/fixtures/specs/unicode.json` | NFKC、line ending、Unicode whitespace、scalar、3-shingle multiset、状態優先 | 15 |
 | `tests/fixtures/specs/formula.json` | untrusted string 30件、closed AST 7件、生成式validator 13件 | 50 |
@@ -101,6 +101,6 @@ G-11の完了はJSON仕様と本計画のparse、整合、敵対的reviewまで�
 - 5 JSONをPowerShell 7 / `System.Text.Json`相当のstrict parse経路で読み取り、152 case IDの全file横断一意性を確認した。
 - JA/ENのbase ReportDefinition 2件は`eng/schemas/report-definition-v1.schema.json`へ適合した。
 - Unicode 13 text caseはcase-sensitive ordinal shingle辞書で正規化・包含・coverage・multiset Jaccardの分子/分母を再計算し、全期待値と一致した。
-- 初回reviewで確認した圧縮率exact値、FR-006 positive boundary、cached formula表示、LF/CR whitespace正規化、未定義classification、empty instruction error codeを修正した。
+- 初回reviewで確認した圧縮率exact値、§4.2 positive boundary、cached formula表示、LF/CR whitespace正規化、未定義classification、empty instruction error codeを修正した。
 - 修正後の独立敵対的reviewは、resource boundary 11対、WH-008、UC-006、全明示fraction、formula 8,191/8,192境界、validation code、case数、single-cause、synthetic/PII policyを再確認し、残存するevidence-backed defect 0件と判定した。
 - このPASSはfixture**仕様**に限定し、binary、production code、Office、ICU、cross-OSの実証を含まない。

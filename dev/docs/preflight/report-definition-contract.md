@@ -8,7 +8,7 @@
 | 状態 | **G-10完了（production実装はGATE-0待ち）** |
 | Schema | `eng/schemas/report-definition-v1.schema.json` |
 | Positive vectors | `eng/schemas/examples/report-definition.synthetic-ja.json`; `eng/schemas/examples/report-definition.synthetic-en.json` |
-| 要求 | FR-030〜039、FR-048/049/052/053、ADR-0005、ADR-0009 |
+| 要求 | §5〜039、§7.1/049/052/053、ADR-0005、ADR-0009 |
 | データ | 合成構造だけ。実在学生回答、reason/evidence実例、承認者、tokenなし |
 | 記録日 | 2026-08-31 |
 
@@ -45,7 +45,7 @@ JSON Schema合格だけでrun可能にしない。次を順に検査する。
 7. BCP 47 parserで`target_language`を検証する。language availabilityや回答言語を自動推測せず、evidenceを翻訳しない。
 8. score/anchor/question weight/item weightはfiniteで、minimum <= maximum、anchor scoreはrange内、required weight集合の合計は正とする。`rounding_digits`はintegerかつG-16で実証したengine共通range内とし、暗黙defaultを補わない。
 9. `aggregate_formula`はADR-0004のclosed structured ASTで受け、function arity、許可token、型、DAGを検査してからformula textへserializeし、8,192文字未満を検証する。`setting-ref`は`adopted-score-range`、`item-weight-range`、`question-subtotal-range`、`question-weight-range`、`rounding-digits`だけを許し、range/scalar型と参照可能性を検査する。ReportDefinitionからraw formula textを受けず、設定文字列をExcelへ直接書かない。
-10. Prompt placeholderはFR-031のclosed setだけを許し、再帰展開しない。
+10. Prompt placeholderは§5のclosed setだけを許し、再帰展開しない。
 11. reason/evidence instruction、display name、condition、Prompt等の文字列はuntrusted textとして保持し、code/markup/URI/pathとして解釈しない。
 12. `reason_source_quote_rejection_threshold_scalars`はinclusiveな拒否閾値として扱い、その長さ以上のexact contiguous source一致をreason中に検出したら拒否する。`reason_max_scalars`以下でなければ設定を拒否し、大小関係を暗黙補正しない。
 13. operational policy、OAuth identity、local launcher identity、承認者fieldをReportDefinitionへ追加しない。

@@ -7,14 +7,14 @@
 |---|---|
 | 状態 | **承認済み・G-04完了・要求v1.2へG-RB反映済み（ADR-0009 launcher訂正、G-16 ROUND sentinel訂正を含む）** |
 | 対象決定 | DEC-05、DEC-06、DEC-21 |
-| 要求 | FR-071〜075、FR-080〜086、第15節、AC-002、AC-005 |
+| 要求 | §7.5〜075、§8.5〜086、第15節、AC-002、AC-005 |
 | 決定 | `ROUND` だけを関数 allowlistへ追加し、既存5軸を維持する。類似度 metric/数値閾値に製品既定を持たず、署名済み校正 recordで選択する |
 | 承認根拠 | ADR-0001 の承認証跡（実装前 decision gate は既定案） |
 | 記録日 | 2026-08-31 |
 
 ## 解消する矛盾
 
-FR-081 は丸めを `Evaluation_Config` 参照にする一方、FR-085 の関数 allowlist に丸め関数がない。このままでは「丸めを設定可能」と「allowlist 外関数禁止」を同時に満たせない。また、第15節の `REVIEW_STATUS` と Excel の `教員判断` token、`VALIDATION_STATUS=RECALC_REQUIRED` から `VALID` への遷移、FR-072 の高/中/低が使う metric と境界包含規則が未定義である。
+§8.5 は丸めを `Evaluation_Config` 参照にする一方、§8.5 の関数 allowlist に丸め関数がない。このままでは「丸めを設定可能」と「allowlist 外関数禁止」を同時に満たせない。また、第15節の `REVIEW_STATUS` と Excel の `教員判断` token、`VALIDATION_STATUS=RECALC_REQUIRED` から `VALID` への遷移、§7.5 の高/中/低が使う metric と境界包含規則が未定義である。
 
 本ADRの変更案はG-RBが要求v1.2へ反映した。ただしstrict GATE-0を満たすまでL-10〜L-14とproduction Formula Builderを開始しない。
 
@@ -88,7 +88,7 @@ formula serializer は logical setting ID から実 cell addressへの1つの ve
 | `REJECT` | `REJECTED` | explicit actionとtimestampが記録される。採用点は空欄 |
 | `ESCALATE` | `ESCALATED` | explicit action、timestamp、理由/commentが記録される。採用点は空欄 |
 
-FR-083 の `教員判断` 列の token 一覧へ `ESCALATE` を追加する。これは新しい状態軸ではなく、第15節に既存の `REVIEW_STATUS=ESCALATED` へ到達する入力 token の明確化である。
+§8.5 の `教員判断` 列の token 一覧へ `ESCALATE` を追加する。これは新しい状態軸ではなく、第15節に既存の `REVIEW_STATUS=ESCALATED` へ到達する入力 token の明確化である。
 
 `ACCEPT_AI`/`OVERRIDE` の前提を満たさない操作は status を成功側へ変更せず、利用者へ理由を返す。`REVIEW_STATUS` が `ACCEPTED`/`OVERRIDDEN` でも、Excel の採用点は `AI_STATUS=SUCCESS` かつ `VALIDATION_STATUS=VALID` が同時成立しなければ必ず空欄とする。
 
@@ -177,14 +177,14 @@ weighted aggregateの構造は、全体を`IFERROR`で囲み、`COUNT(score_rang
 
 署名済み calibration record が選べる metric ID は初版では次のいずれか1つだけとする。
 
-- `QUESTION_SHINGLE_COVERAGE` — FR-070 の $C(q,p)$
-- `MULTISET_JACCARD` — FR-070 の $J(q,p)$
+- `QUESTION_SHINGLE_COVERAGE` — §7.5 の $C(q,p)$
+- `MULTISET_JACCARD` — §7.5 の $J(q,p)$
 
 複合 metric、最大/平均、AI推定 metric、完全包含を数値化した metric は初版 schemaで受け付けない。追加には metric specification、known-answer、教育評価承認、schema/version変更が必要である。
 
 `完全包含` は threshold formulaが計算する値ではない。L-08 の正規化後に L-09 が Unicode scalar配列を比較し、正規化した学習者Prompt $p$ が正規化した設問文 $q$ の全scalar列を連続部分列として含む場合だけ Boolean literal `TRUE` を出力する。空/片空/3 scalar未満は状態判定が先であり、完全包含を `TRUE` にしない。$C=1$ や $J=1$ を完全包含の代用にしない。
 
-O-05 はこの Booleanを各行の app-owned literal cell `{QID}.完全包含` へ、$C$ を `{QID}.設問包含率`、$J$ を `{QID}.MultisetJaccard` へ書く。L-13 は logical column IDから検証済みaddressを受け取り、完全包含をinline計算しない。FR-071 の出力列一覧へ `{QID}.完全包含` を明記する変更は G-RB が行う。
+O-05 はこの Booleanを各行の app-owned literal cell `{QID}.完全包含` へ、$C$ を `{QID}.設問包含率`、$J$ を `{QID}.MultisetJaccard` へ書く。L-13 は logical column IDから検証済みaddressを受け取り、完全包含をinline計算しない。§7.5 の出力列一覧へ `{QID}.完全包含` を明記する変更は G-RB が行う。
 
 ### Calibration record と境界
 
@@ -217,7 +217,7 @@ O-05 はこの Booleanを各行の app-owned literal cell `{QID}.完全包含` �
 5. `完全包含=TRUE` → `完全包含`
 6. signed record が選択した列の metric valueを上記境界で比較 → `高類似` / `中類似` / `低類似`
 
-`SIMILARITY_STATUS=COMPUTED` 以外が step 4以降へ到達しないよう検査する。`UNCONFIGURED` は `閾値未校正` とする。署名recordが無効なときは完全包含も強い区分として表示せず、常に `閾値未校正` とする。これは FR-073 の「record欠落/不正時は区分が閾値未校正」に従う。
+`SIMILARITY_STATUS=COMPUTED` 以外が step 4以降へ到達しないよう検査する。`UNCONFIGURED` は `閾値未校正` とする。署名recordが無効なときは完全包含も強い区分として表示せず、常に `閾値未校正` とする。これは §7.5 の「record欠落/不正時は区分が閾値未校正」に従う。
 
 serializer はこの順序を nested `IF` の外側から内側へそのまま表現し、全体を `IFERROR(...,"閾値未校正")` で囲む。step 4 は `ISNUMBER(high)`、`ISNUMBER(medium)`、$0\le medium\le high\le1$、既知metric ID、および選択対象 metric cell の `ISNUMBER` を内側の比較より先にguardする。metric ID は nested `IF` で `QUESTION_SHINGLE_COVERAGE` なら $C$ cell、`MULTISET_JACCARD` なら $J$ cellを選び、未知値を数値比較へ渡さない。これにより `INVALID + 完全包含=TRUE` は必ず `閾値未校正`、非数値 metric は error値ではなく `閾値未校正` になる。
 
@@ -226,7 +226,7 @@ serializer はこの順序を nested `IF` の外側から内側へそのまま�
 - adopted score、subtotal、total、pass、weight、review transition の formula AST は similarity status、完全包含、$C$、$J$、区分、thresholdを参照できない。
 - similarity formula は score/statusを変更せず、review queue の表示候補だけに使う。
 - generated formula graph に similarity node から採点nodeへのedgeが1本でもあれば output validationを失敗させる。
-- UI、Excel、README に FR-075 の注意文を表示する。高類似を不正、AI利用、減点の証拠と表現しない。
+- UI、Excel、README に §7.5 の注意文を表示する。高類似を不正、AI利用、減点の証拠と表現しない。
 
 教員がExcelで式を手動変更する自由は維持するが、その式を app-generated formula として保証しない。再検証時は AST、DAG、参照、非接続を再検査し、循環や similarity→score参照を検出した workbookを検証済み結果と表示しない。手動変更を黙って元へ戻さない。
 
@@ -236,7 +236,7 @@ graph edge は「formula cellから、そのformulaが直接参照するcell/ran
 
 G-RB は少なくとも次を正本へ反映する。
 
-1. FR-085 の関数 allowlistへ `ROUND` だけを追加し、第2引数を Config参照に限定する。
+1. §8.5 の関数 allowlistへ `ROUND` だけを追加し、第2引数を Config参照に限定する。
 2. `教員判断` tokenへ `ESCALATE` を追加し、本 ADR の `REVIEW_STATUS` mappingとtransitionを採用する。
 3. `VALIDATION_STATUS=RECALC_REQUIRED` は、検証済み formulaの採用Office再計算・保存・再open検証後だけ `VALID` または具体的errorへ遷移する。
 4. similarity active metricに製品既定を設けず、署名校正 recordの closed metric IDで $C$ または $J$ を1つ選ぶ。

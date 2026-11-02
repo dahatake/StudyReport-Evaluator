@@ -68,18 +68,18 @@
     {"id":"FA-007","expected":"reject-semantic-type","ast":{"kind":"binary","operator":"/","left":{"kind":"empty"},"right":{"kind":"boolean","value":true}}}
   ],
   "generated_formula_validation_cases": [
-    {"id":"FV-001","construction":"allowlisted AST serialized to 8191 characters","expected":"accept","requirement_refs":["FR-085","ADR-0004"]},
-    {"id":"FV-002","construction":"allowlisted AST serialized to 8192 characters","expected":"reject","requirement_refs":["FR-085","ADR-0004"]},
-    {"id":"FV-003","formula":"[external.xlsx]Sheet1!A1","expected":"reject-external-reference","requirement_refs":["FR-088"]},
-    {"id":"FV-004","formula":"DDE(server,topic)","expected":"reject-dde","requirement_refs":["FR-088"]},
-    {"id":"FV-005","formula":"HYPERLINK(\"https://invalid.example\",\"x\")","expected":"reject-forbidden-function","requirement_refs":["FR-085","FR-088"]},
-    {"id":"FV-006","formula":"WEBSERVICE(\"https://invalid.example\")","expected":"reject-forbidden-function","requirement_refs":["FR-085","FR-088"]},
-    {"id":"FV-007","formula":"INDIRECT(\"A1\")","expected":"reject-forbidden-function","requirement_refs":["FR-085"]},
+    {"id":"FV-001","construction":"allowlisted AST serialized to 8191 characters","expected":"accept","requirement_refs":["§8.5","ADR-0004"]},
+    {"id":"FV-002","construction":"allowlisted AST serialized to 8192 characters","expected":"reject","requirement_refs":["§8.5","ADR-0004"]},
+    {"id":"FV-003","formula":"[external.xlsx]Sheet1!A1","expected":"reject-external-reference","requirement_refs":["§8.5"]},
+    {"id":"FV-004","formula":"DDE(server,topic)","expected":"reject-dde","requirement_refs":["§8.5"]},
+    {"id":"FV-005","formula":"HYPERLINK(\"https://invalid.example\",\"x\")","expected":"reject-forbidden-function","requirement_refs":["§8.5"]},
+    {"id":"FV-006","formula":"WEBSERVICE(\"https://invalid.example\")","expected":"reject-forbidden-function","requirement_refs":["§8.5"]},
+    {"id":"FV-007","formula":"INDIRECT(\"A1\")","expected":"reject-forbidden-function","requirement_refs":["§8.5"]},
     {"id":"FV-008","formula":"Sheet1:Sheet3!A1","expected":"reject-3d-reference","requirement_refs":["ADR-0004"]},
     {"id":"FV-009","formula":"SUM(A:A)","expected":"reject-whole-column-reference","requirement_refs":["ADR-0004"]},
     {"id":"FV-010","formula":"Original!A1","expected":"reject-source-sheet-reference","requirement_refs":["ADR-0004"]},
     {"id":"FV-011","formula":"ApprovedName","expected":"reject-defined-name","requirement_refs":["ADR-0004"]},
-    {"id":"FV-012","graph_mutation":"add an edge from an adopted-score node to a similarity node","expected":"reject-similarity-to-scoring-connection","requirement_refs":["FR-074","ADR-0004"]},
-    {"id":"FV-013","graph_mutation":"add a self-edge to an app-owned formula node","expected":"reject-cycle","requirement_refs":["FR-085","ADR-0004"]}
+    {"id":"FV-012","graph_mutation":"add an edge from an adopted-score node to a similarity node","expected":"reject-similarity-to-scoring-connection","requirement_refs":["§7.5","ADR-0004"]},
+    {"id":"FV-013","graph_mutation":"add a self-edge to an app-owned formula node","expected":"reject-cycle","requirement_refs":["§8.5","ADR-0004"]}
   ]
 }
