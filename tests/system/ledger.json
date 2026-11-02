@@ -17,10 +17,10 @@
       "layer": "e2e",
       "command": "dotnet test tests/system/ui --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
-      "status": "not_run",
-      "last_commit": null,
-      "last_run_at": null,
-      "evidence": null,
+      "status": "pass",
+      "last_commit": "400dfb2",
+      "last_run_at": "2026-11-02T14:46:14+09:00",
+      "evidence": "work/runs/202611021118/logs/system-test/E2E-001-202611021445.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
@@ -48,10 +48,10 @@
       "layer": "e2e",
       "command": "dotnet test tests/system/ui --filter \"FullyQualifiedName~FR002_AC055\"",
       "canary": false,
-      "status": "not_run",
-      "last_commit": null,
-      "last_run_at": null,
-      "evidence": null,
+      "status": "pass",
+      "last_commit": "400dfb2",
+      "last_run_at": "2026-11-02T14:46:14+09:00",
+      "evidence": "work/runs/202611021118/logs/system-test/E2E-002-202611021446.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
