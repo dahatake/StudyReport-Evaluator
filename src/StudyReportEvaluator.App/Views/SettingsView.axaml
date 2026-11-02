@@ -253,29 +253,13 @@
   <!-- At 950 x 450: categories 44 + gaps 16 + body 346 + footer 44.
        Warning, workflow navigation, and focus restoration belong to T23's host. -->
   <Grid RowDefinitions="44,*,44" RowSpacing="8" KeyboardNavigation.TabNavigation="Local">
-    <Grid x:Name="SettingsCategoryBar" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="4"
+    <Grid x:Name="SettingsCategoryBar" ColumnDefinitions="*" ColumnSpacing="4"
           TabIndex="0" KeyboardNavigation.TabNavigation="Local"
           AutomationProperties.AutomationId="SettingsCategories">
       <Button Classes="settings-category" Content="共通" Command="{Binding SelectCategoryCommand}"
               CommandParameter="{x:Static viewModels:SettingsCategory.Common}" TabIndex="0"
               AutomationProperties.AutomationId="SettingsCategoryCommon" AutomationProperties.Name="共通設定"
               ToolTip.Tip="共通の実行設定、定義情報、保存定義、診断を表示します。" />
-      <Button Grid.Column="1" Classes="settings-category" Content="入力詳細" Command="{Binding SelectCategoryCommand}"
-              CommandParameter="{x:Static viewModels:SettingsCategory.Mapping}" TabIndex="1"
-              AutomationProperties.AutomationId="SettingsCategoryMapping" AutomationProperties.Name="入力詳細の設定"
-              ToolTip.Tip="Inputの設問と列mappingの詳細を編集します。" />
-      <Button Grid.Column="2" Classes="settings-category" Content="通常評価" Command="{Binding SelectCategoryCommand}"
-              CommandParameter="{x:Static viewModels:SettingsCategory.Evaluation}" TabIndex="2"
-              AutomationProperties.AutomationId="SettingsCategoryEvaluation" AutomationProperties.Name="通常評価の設定"
-              ToolTip.Tip="Designの評価方法・評価項目・Promptを編集します。" />
-      <Button Grid.Column="3" Classes="settings-category" Content="固有評価" Command="{Binding SelectCategoryCommand}"
-              CommandParameter="{x:Static viewModels:SettingsCategory.Special}" TabIndex="3"
-              AutomationProperties.AutomationId="SettingsCategorySpecial" AutomationProperties.Name="固有評価の設定"
-              ToolTip.Tip="Designの固有項目・対象列・Promptを編集します。" />
-      <Button Grid.Column="4" Classes="settings-category" Content="読込Prompt" Command="{Binding SelectCategoryCommand}"
-              CommandParameter="{x:Static viewModels:SettingsCategory.ImportedPrompts}" TabIndex="4"
-              AutomationProperties.AutomationId="SettingsCategoryImportedPrompts" AutomationProperties.Name="読込Promptの設定"
-              ToolTip.Tip="入力前でもPromptの原文を閲覧できます。適用は入力と対象を確認した後の明示操作です。" />
     </Grid>
 
     <Grid Grid.Row="1" TabIndex="1" KeyboardNavigation.TabNavigation="Local">

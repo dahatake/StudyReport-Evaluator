@@ -66,7 +66,10 @@ public sealed class CompactWorkflowLayoutTests(ITestOutputHelper output)
 
         Activate(settingsOpen, Key.Space);
         SettingsView settings = Assert.IsType<SettingsView>(CurrentView(window));
-        foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
+        // FR-002: 設定のカテゴリは共通だけ。旧カテゴリの確認（設問選択・読込Prompt 一覧）は採点設計画面の統合エディターに移った。
+        Assert.Single(settings.GetVisualDescendants().OfType<Button>(), button =>
+            (AutomationProperties.GetAutomationId(button) ?? string.Empty).StartsWith("SettingsCategory", StringComparison.Ordinal));
+        foreach (SettingsCategory category in new[] { SettingsCategory.Common })
         {
             if (fixture.Shell.Settings.SelectedCategory != category)
             {
@@ -78,32 +81,6 @@ public sealed class CompactWorkflowLayoutTests(ITestOutputHelper output)
             Control categoryView = Assert.IsAssignableFrom<Control>(Required<ContentControl>(settings, "CurrentSettingsContent").Content);
             Assert.Contains(Assert.IsAssignableFrom<Control>(window.FocusManager?.GetFocusedElement()).GetVisualAncestors(),
                 ancestor => ReferenceEquals(ancestor, categoryView));
-
-            if (category is SettingsCategory.Mapping or SettingsCategory.Evaluation or SettingsCategory.Special)
-            {
-                string selectorId = category switch
-                {
-                    SettingsCategory.Mapping => "MappingSettingsQuestions",
-                    SettingsCategory.Evaluation => "EvaluatorSettingsQuestions",
-                    _ => "SpecialSettingsQuestions",
-                };
-                if (category == SettingsCategory.Evaluation)
-                {
-                    SelectLastTab(window, ById<ListBox>(settings, selectorId));
-                }
-                else
-                {
-                    SelectLastComboItem(window, ById<ComboBox>(settings, selectorId));
-                }
-            }
-            else if (category == SettingsCategory.ImportedPrompts)
-            {
-                ListBox list = ById<ListBox>(settings, "ImportedPrompts");
-                SelectLastItem(window, list);
-                Assert.Same(fixture.Shell.DesignViewModel.ImportedPrompts[^1], fixture.Shell.DesignViewModel.SelectedImportedPrompt);
-                AssertScrollEndReachable(ListScroll(list), Assert.IsType<ListBoxItem>(list.ContainerFromIndex(list.Items.Count - 1)),
-                    requireOverflow: true);
-            }
 
             // Cover Common edit/stored-definition/runtime and Basic/Prompt pages,
             // not just each category's default tab or its outer ScrollViewer flags.
@@ -121,7 +98,7 @@ public sealed class CompactWorkflowLayoutTests(ITestOutputHelper output)
                 TextBox[] longEditors = settings.GetVisualDescendants().OfType<TextBox>().Where(editor =>
                     editor.IsEffectivelyVisible && (editor.Text?.Contains(LongJapaneseName, StringComparison.Ordinal) == true
                     || editor.Text == Path.GetDirectoryName(LongPath))).ToArray();
-                if ((page == 0 && category != SettingsCategory.Common) || (category == SettingsCategory.Common && page < 2))
+                if (category == SettingsCategory.Common && page < 2)
                 {
                     Assert.NotEmpty(longEditors);
                 }
@@ -191,7 +168,7 @@ public sealed class CompactWorkflowLayoutTests(ITestOutputHelper output)
         SettingsView settings = Assert.IsType<SettingsView>(CurrentView(window));
         Rect[] settingsFixedRegions = AssertSettingsFixedRegions(settings);
         Assert.True(body.Extent.Height > body.Viewport.Height, "The narrow shell must exercise actual body overflow.");
-        foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
+        foreach (SettingsCategory category in new[] { SettingsCategory.Common }) // FR-002: 設定のカテゴリは共通だけ
         {
             Activate(ById<Button>(settings, "SettingsCategory" + category));
             Assert.Equal(category, fixture.Shell.Settings.SelectedCategory);
@@ -249,7 +226,7 @@ public sealed class CompactWorkflowLayoutTests(ITestOutputHelper output)
         try
         {
             Rect[] fixedRegions = AssertSettingsFixedRegions(view);
-            foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
+            foreach (SettingsCategory category in new[] { SettingsCategory.Common }) // FR-002: 設定のカテゴリは共通だけ
             {
                 Activate(ById<Button>(view, "SettingsCategory" + category));
                 Assert.Equal(category, fixture.Shell.Settings.SelectedCategory);
@@ -348,8 +325,10 @@ public sealed class CompactWorkflowLayoutTests(ITestOutputHelper output)
     }
 
     [AvaloniaFact]
-    public async Task Deleting_the_last_page_through_mapping_settings_repairs_main_pages_and_empty_state()
+    public async Task Deleting_the_last_page_through_input_commands_repairs_main_pages_and_empty_state()
     {
+        // FR-002: 入力詳細（設問の削除・追加）は設定にない。同じ VM のコマンドで、メインの
+        // ページ・空状態が修復されることを確かめる。
         using WorkflowLayoutFixture fixture = await WorkflowLayoutFixture.CreateAsync();
         MainWindow window = fixture.Window;
         window.Width = 1024;
@@ -361,31 +340,26 @@ public sealed class CompactWorkflowLayoutTests(ITestOutputHelper output)
         GoToLastPage(view, "NextPageButton", input.Questions.Count);
         SelectLastItem(window, Required<ListBox>(view, "InputQuestionList"));
         InputQuestionMappingViewModel neighbor = input.Questions[^2];
-        Activate(Required<Button>(view, "MappingDetailsButton"));
-        SettingsView settings = Assert.IsType<SettingsView>(CurrentView(window));
-        MappingSettingsView mapping = Assert.Single(settings.GetVisualDescendants().OfType<MappingSettingsView>());
-        Activate(Required<Button>(mapping, "DeleteQuestionButton"));
+        input.SelectedQuestion!.DeleteCommand.Execute(null);
+        Render();
         Assert.Same(neighbor, input.SelectedQuestion);
-        Activate(Required<Button>(settings, "SettingsRequestClose"));
         var repaired = AssertCurrentPage(view);
         Assert.Equal((input.Questions.Count - 1) / input.PageSize, repaired.Index);
         AssertNormalBody(window);
         RecordLayout(output, "last-page-delete", window);
 
-        Activate(Required<Button>(view, "MappingDetailsButton"));
-        // Each real Delete button rebinds to the previous surviving ID, including across page boundaries.
+        // Each real Delete rebinds to the previous surviving ID, including across page boundaries.
         int remaining = input.Questions.Count;
         while (remaining > 0)
         {
             string removedId = input.SelectedQuestion!.Id;
-            Activate(Required<Button>(mapping, "DeleteQuestionButton"));
+            input.SelectedQuestion.DeleteCommand.Execute(null);
+            Render();
             Assert.Equal(--remaining, input.Questions.Count);
             Assert.DoesNotContain(input.Questions, question => question.Id == removedId);
             Assert.Same(remaining == 0 ? null : input.Questions[^1], input.SelectedQuestion);
         }
 
-        AssertFullyInside(Required<TextBlock>(mapping, "NoQuestionMessage"), mapping);
-        Activate(Required<Button>(settings, "SettingsRequestClose"));
         Assert.Equal((0, input.PageSize, 0), AssertCurrentPage(view));
         Assert.Equal("設問はありません（0 件）", Required<TextBlock>(view, "QuestionPageSummary").Text);
         Assert.False(Required<Button>(view, "PreviousPageButton").IsEffectivelyEnabled);
@@ -400,9 +374,8 @@ public sealed class CompactWorkflowLayoutTests(ITestOutputHelper output)
         RecordLayout(output, "empty-design", window);
 
         Activate(Required<Button>(window, "PreviousStepButton"));
-        Activate(Required<Button>(view, "MappingDetailsButton"));
-        Activate(Required<Button>(mapping, "AddQuestionButton"));
-        Activate(Required<Button>(settings, "SettingsRequestClose"));
+        input.AddQuestionCommand.Execute(null);
+        Render();
         Assert.Same(Assert.Single(input.Questions), input.SelectedQuestion);
         Assert.Equal((0, input.PageSize, 1), AssertCurrentPage(view));
         AssertNormalBody(window);

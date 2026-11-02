@@ -135,8 +135,6 @@ public sealed partial class InputView : UserControl
 
     private void HandlePreparationToggleClick(object? sender, RoutedEventArgs e) =>
         SetPreparationOpen(!IsPreparationOpen);
-    /// <summary>Standalone hosts can open Mapping settings using this view's current selection.</summary>
-    public event EventHandler? SettingsRequested;
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -334,21 +332,6 @@ public sealed partial class InputView : UserControl
         finally
         {
             updatingPageSize = false;
-        }
-    }
-
-    private void HandleMappingDetailsClick(object? sender, RoutedEventArgs e)
-    {
-        MainWindowViewModel? shell = this.GetVisualAncestors().OfType<Window>()
-            .Select(window => window.DataContext).OfType<MainWindowViewModel>().FirstOrDefault();
-        if (shell is not null && ReferenceEquals(shell.InputViewModel, DataContext))
-        {
-            // Settings.Input is this same VM: SelectedQuestion already carries the stable ID.
-            shell.OpenSettings(SettingsCategory.Mapping);
-        }
-        else
-        {
-            SettingsRequested?.Invoke(this, EventArgs.Empty);
         }
     }
 

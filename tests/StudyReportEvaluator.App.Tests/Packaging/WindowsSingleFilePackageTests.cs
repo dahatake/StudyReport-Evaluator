@@ -524,37 +524,22 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
                         ([Windows.Automation.InvokePattern]$design.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)).Invoke()
                         Assert-GuiStillLive
                         $designStepName = (Find-Control 'WorkflowStepDesign').Current.Name
-                        $openPrompts = Find-Control 'DesignOpenImportedPrompts'
-                        if ($openPrompts.Current.ControlType -ne [Windows.Automation.ControlType]::Button -or
-                            $openPrompts.Current.Name -cne '同じ設問を対象に読込Promptの設定を開く' -or
-                            -not $openPrompts.Current.IsEnabled) {
-                            throw 'Design did not expose the labelled, enabled imported-Prompt settings button.'
+                        # FR-001/FR-002: 通常評価の編集は採点設計の統合エディターにあり、設定は共通だけ。
+                        [void](Find-Control 'EvaluatorSettingsView')
+                        $goneCondition = [Windows.Automation.PropertyCondition]::new(
+                            [Windows.Automation.AutomationElement]::AutomationIdProperty, 'DesignOpenImportedPrompts')
+                        if ($null -ne $window.FindFirst([Windows.Automation.TreeScope]::Descendants, $goneCondition)) {
+                            throw 'Design still exposes the removed imported-Prompt settings button.'
                         }
-                        ([Windows.Automation.InvokePattern]$openPrompts.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)).Invoke()
+                        $openSettings = Find-Control 'SettingsOpen'
+                        ([Windows.Automation.InvokePattern]$openSettings.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)).Invoke()
                         Assert-GuiStillLive
                         $settings = Find-Control 'SettingsView'
-                        $promptSettings = Find-Control 'ImportedPromptSettingsView' $settings
-                        $list = Find-Control 'ImportedPrompts' $promptSettings
-                        $condition = [Windows.Automation.PropertyCondition]::new(
-                            [Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::ListItem)
-                        $items = @($list.FindAll([Windows.Automation.TreeScope]::Descendants, $condition))
-                        if ($items.Count -ne 2) { throw 'Settings did not expose exactly two imported Prompt items.' }
-                        $names = @({{Quote(FirstPromptName)}}, {{Quote(SecondPromptName)}})
-                        $contents = @({{Quote(FirstPrompt)}}, {{Quote(SecondPrompt)}})
-                        $textCondition = [Windows.Automation.PropertyCondition]::new(
-                            [Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Text)
-                        for ($index = 0; $index -lt 2; $index++) {
-                            $text = $items[$index].FindFirst([Windows.Automation.TreeScope]::Descendants, $textCondition)
-                            if ($null -eq $text -or $text.Current.Name -cne $names[$index]) {
-                                throw "Actual Settings Prompt order mismatch at index $index."
-                            }
-                            ([Windows.Automation.SelectionItemPattern]$items[$index].GetCurrentPattern(
-                                [Windows.Automation.SelectionItemPattern]::Pattern)).Select()
-                            Assert-GuiStillLive
-                            $preview = Find-Control 'ImportedPromptPreview' $promptSettings
-                            if ((Read-Value $preview) -cne $contents[$index]) {
-                                throw "Actual Settings Prompt preview mismatch at index $index (content not logged)."
-                            }
+                        [void](Find-Control 'SettingsCategoryCommon' $settings)
+                        $removedCondition = [Windows.Automation.PropertyCondition]::new(
+                            [Windows.Automation.AutomationElement]::AutomationIdProperty, 'ImportedPromptSettingsView')
+                        if ($null -ne $settings.FindFirst([Windows.Automation.TreeScope]::Descendants, $removedCondition)) {
+                            throw 'Settings still exposes the removed imported-Prompt category.'
                         }
                         $back = Find-Control 'SettingsRequestClose' $settings
                         if ($back.Current.Name -cne '設定から元のステップへ戻る' -or -not $back.Current.IsEnabled) {

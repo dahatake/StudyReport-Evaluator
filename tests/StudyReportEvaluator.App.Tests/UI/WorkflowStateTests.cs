@@ -38,10 +38,12 @@ public sealed class WorkflowStateTests
         [new("model-test", 64_000, 128_000), new("auto", null, null)];
 
     [AvaloniaTheory]
-    [InlineData(SettingsCategory.Mapping)]
-    [InlineData(SettingsCategory.Evaluation)]
-    public async Task Shell_round_trip_saves_the_latest_mapping_or_evaluator_edit(SettingsCategory lastEditor)
+    [InlineData(WorkflowStep.Input)]
+    [InlineData(WorkflowStep.Design)]
+    public async Task Shell_round_trip_saves_the_latest_input_or_design_edit(WorkflowStep lastEditor)
     {
+        // FR-001/FR-002: 通常評価の編集は採点設計画面に統合され、設定は共通だけになった。
+        // 最後に編集した面（入力 or 採点設計の統合エディター）の値が、設定の保存と実行へ届く。
         using WorkflowFixture fixture = await WorkflowFixture.CreateAsync();
         QuantificationDefinition original = fixture.Input.DefinitionDraft;
         string originalHash = Canonical.ComputeSha256(original);
@@ -59,46 +61,38 @@ public sealed class WorkflowStateTests
         CriterionDesignItemViewModel criterion = evaluator.SelectedCriterion!;
         ImportedPromptViewModel[] prompts = fixture.Design.ImportedPrompts.ToArray();
 
-        Activate(Required<Button>(designView, "OpenEvaluatorSettingsButton"));
-        SettingsView settings = Current<SettingsView>(fixture);
-        Edit(ById<TextBox>(settings, $"DesignEvaluator-{evaluator.Id}-Name"), "T24 evaluator");
-        Edit(ById<TextBox>(settings, $"DesignEvaluator-{evaluator.Id}-Weight"), "2.5");
-        Edit(ById<TextBox>(settings, $"DesignCriterion-{criterion.Id}-Description"), "中間の観点");
-        Open(fixture, SettingsCategory.Mapping);
-        MappingSettingsView mappingView = Assert.IsType<MappingSettingsView>(CategoryContent(settings));
-        Edit(Required<TextBox>(mappingView, "QuestionNameEditor"), "中間の設問名");
-        Required<ListBox>(mappingView, "SupportingColumnList").SetCurrentValue(
-            ListBox.SelectedItemProperty, mapping.SupportingColumns.Single(column => column.ColumnName == "B"));
-        Render();
-        CheckBox support = Required<CheckBox>(mappingView, "IncludeSupportingColumnCheckBox");
-        Assert.True(support.IsEffectivelyEnabled);
-        support.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
-        Render();
-        Assert.Contains("B", fixture.Input.DefinitionDraft.Questions[0].SupportingSourceColumns);
+        Edit(ById<TextBox>(designView, $"DesignEvaluator-{evaluator.Id}-Name"), "T24 evaluator");
+        Edit(ById<TextBox>(designView, $"DesignEvaluator-{evaluator.Id}-Weight"), "2.5");
+        Edit(ById<TextBox>(designView, $"DesignCriterion-{criterion.Id}-Description"), "中間の観点");
 
-        Open(fixture, SettingsCategory.Common);
+        SettingsView settings = Open(fixture);
         Edit(ById<TextBox>(settings, "DesignDefinitionName"), "T24 保存定義");
         Edit(ById<TextBox>(settings, "DesignRevision"), "t24");
         Select(ById<ComboBox>(settings, "ExecutionConcurrency"), 2);
         string outputDirectory = Path.Combine(fixture.Workbook.Directory, "明示出力先");
         Edit(ById<TextBox>(settings, "ExecutionOutputDirectory"), outputDirectory);
-        Open(fixture, SettingsCategory.Special);
-        Assert.IsType<SpecialEvaluationSettingsView>(CategoryContent(settings));
-        Open(fixture, SettingsCategory.ImportedPrompts);
-        Assert.IsType<ImportedPromptSettingsView>(CategoryContent(settings));
+        Assert.IsType<TabControl>(CategoryContent(settings));
         Assert.Equal(prompts, fixture.Design.ImportedPrompts);
 
         // Save directly from either final editing surface, not after a manual SynchronizeDrafts call.
-        foreach (SettingsCategory category in lastEditor == SettingsCategory.Mapping
-            ? new[] { SettingsCategory.Evaluation, SettingsCategory.Mapping }
-            : new[] { SettingsCategory.Mapping, SettingsCategory.Evaluation })
+        string finalQuestionText = "T24 手動の設問文";
+        string finalDescription = "中間の観点";
+        if (lastEditor == WorkflowStep.Input)
         {
-            Open(fixture, category);
-            Edit(category == SettingsCategory.Mapping
-                ? Required<TextBox>(Assert.IsType<MappingSettingsView>(CategoryContent(settings)), "QuestionNameEditor")
-                : ById<TextBox>(settings, $"DesignCriterion-{criterion.Id}-Description"),
-                category == SettingsCategory.Mapping ? "最終の設問名" : "最新の評価説明");
+            Close(fixture);
+            Go(fixture, WorkflowStep.Input);
+            finalQuestionText = "最終の設問文";
+            Edit(Required<TextBox>(inputView, "QuestionTextEditor"), finalQuestionText);
         }
+        else
+        {
+            Close(fixture);
+            Go(fixture, WorkflowStep.Design);
+            finalDescription = "最新の評価説明";
+            Edit(ById<TextBox>(designView, $"DesignCriterion-{criterion.Id}-Description"), finalDescription);
+        }
+
+        Open(fixture);
 
         QuantificationDefinition expected = original with
         {
@@ -107,21 +101,18 @@ public sealed class WorkflowStateTests
             BasePoints = 62.5m,
             Questions = [originalQuestion with
             {
-                DisplayName = "最終の設問名",
-                QuestionText = "T24 手動の設問文",
+                QuestionText = finalQuestionText,
                 Points = 37.5m,
-                SupportingSourceColumns = originalQuestion.SupportingSourceColumns.Contains("B")
-                    ? originalQuestion.SupportingSourceColumns : originalQuestion.SupportingSourceColumns.Add("B"),
                 Evaluators = [originalEvaluator with
                 {
                     DisplayName = "T24 evaluator",
                     Weight = 2.5m,
-                    Criteria = [originalEvaluator.Criteria[0] with { Description = "最新の評価説明" }],
+                    Criteria = [originalEvaluator.Criteria[0] with { Description = finalDescription }],
                 }],
             }],
         };
-        Assert.Equal(WorkflowStep.Design, fixture.Shell.CurrentStep);
-        Assert.Equal(lastEditor, fixture.Shell.Settings.SelectedCategory);
+        Assert.Equal(lastEditor, fixture.Shell.CurrentStep);
+        Assert.Equal(SettingsCategory.Common, fixture.Shell.Settings.SelectedCategory);
         Assert.False(File.Exists(fixture.Store.FilePath));
         AssertPassive(fixture);
         ApplicationSettings saved = await SaveAsync(fixture, expected);
@@ -129,6 +120,7 @@ public sealed class WorkflowStateTests
         Assert.Equal(outputDirectory, saved.OutputDirectoryOverride);
         Assert.Null(saved.PreferredModelId);
         Close(fixture);
+        Go(fixture, WorkflowStep.Design);
         Assert.Same(designView, Current<QuantificationDesignView>(fixture));
         Go(fixture, WorkflowStep.Input);
         Assert.Same(inputView, Current<InputView>(fixture));
@@ -168,17 +160,14 @@ public sealed class WorkflowStateTests
         TextBox points = Required<TextBox>(designView, "BasePointsTextBox");
         BindingExpressionBase pointsBinding = Binding(points);
         Edit(points, "未確定");
-        SettingsView settings = Open(fixture, SettingsCategory.Common);
+        string evaluatorId = original.Questions[0].Evaluators[0].Id;
+        TextBox weight = ById<TextBox>(designView, $"DesignEvaluator-{evaluatorId}-Weight");
+        BindingExpressionBase weightBinding = Binding(weight);
+        Edit(weight, "-");
+        SettingsView settings = Open(fixture);
         TextBox rounding = ById<TextBox>(settings, "DesignRoundingDigits");
         BindingExpressionBase roundingBinding = Binding(rounding);
         Edit(rounding, "-");
-        Open(fixture, SettingsCategory.Evaluation);
-        Control evaluation = CategoryContent(settings);
-        string evaluatorId = original.Questions[0].Evaluators[0].Id;
-        TextBox weight = ById<TextBox>(settings, $"DesignEvaluator-{evaluatorId}-Weight");
-        BindingExpressionBase weightBinding = Binding(weight);
-        Edit(weight, "-");
-        Open(fixture, SettingsCategory.Special);
         Close(fixture);
         Go(fixture, WorkflowStep.Input);
         Assert.Same(inputView, Current<InputView>(fixture));
@@ -186,13 +175,11 @@ public sealed class WorkflowStateTests
         Next(fixture);
         Assert.Same(designView, Current<QuantificationDesignView>(fixture));
         AssertPending(points, "未確定", pointsBinding);
+        Assert.Same(weight, ById<TextBox>(designView, $"DesignEvaluator-{evaluatorId}-Weight"));
+        AssertPending(weight, "-", weightBinding);
         Next(fixture);
         Assert.True(fixture.Execution.IsConfigured);
-        Assert.Same(settings, Open(fixture, SettingsCategory.Evaluation));
-        Assert.Same(evaluation, CategoryContent(settings));
-        Assert.Same(weight, ById<TextBox>(settings, $"DesignEvaluator-{evaluatorId}-Weight"));
-        AssertPending(weight, "-", weightBinding);
-        Open(fixture, SettingsCategory.Common);
+        Assert.Same(settings, Open(fixture));
         Assert.Same(rounding, ById<TextBox>(settings, "DesignRoundingDigits"));
         AssertPending(rounding, "-", roundingBinding);
         AssertDefinition(original, fixture.Input.DefinitionDraft);
@@ -207,10 +194,9 @@ public sealed class WorkflowStateTests
         Next(fixture);
         Edit(points, "55.5");
         Edit(Required<TextBox>(designView, "SelectedQuestionPointsTextBox"), "44.5");
-        Open(fixture, SettingsCategory.Common);
-        Edit(rounding, "2");
-        Open(fixture, SettingsCategory.Evaluation);
         Edit(weight, "2.5");
+        Open(fixture);
+        Edit(rounding, "2");
         QuantificationDefinition expected = original with
         {
             FirstDataRow = 3,
@@ -243,7 +229,7 @@ public sealed class WorkflowStateTests
         Next(fixture);
         Assert.False(File.Exists(fixture.Store.FilePath));
         byte[] savedBytes = await AuthenticateAsync(fixture);
-        SettingsView settings = Open(fixture, SettingsCategory.Common);
+        SettingsView settings = Open(fixture);
         Select(ById<ComboBox>(settings, "ExecutionModel"), "auto");
         Select(ById<ComboBox>(settings, "ExecutionConcurrency"), 2);
         string outputDirectory = Path.Combine(fixture.Workbook.Directory, "chosen-output");
@@ -269,8 +255,13 @@ public sealed class WorkflowStateTests
 
         Go(fixture, WorkflowStep.Input);
         Next(fixture);
-        Open(fixture, SettingsCategory.Common);
-        foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>()) Open(fixture, category);
+        Open(fixture);
+        foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
+        {
+            // FR-002: どのカテゴリ値を指定しても設定は共通を開く。
+            fixture.Shell.OpenSettings(category);
+            Assert.Equal(SettingsCategory.Common, fixture.Shell.Settings.SelectedCategory);
+        }
         Close(fixture);
         Go(fixture, WorkflowStep.Input);
         Next(fixture);
@@ -315,7 +306,7 @@ public sealed class WorkflowStateTests
             "Replacement", 1, 5, 3, new X02Header(1, "Different answer"), new X02Header(2, "Rationale"));
         Next(fixture);
         Next(fixture);
-        SettingsView settings = Open(fixture, SettingsCategory.Common);
+        SettingsView settings = Open(fixture);
         string chosenOutput = Path.Combine(fixture.Workbook.Directory, "persisted-output");
         if (explicitOutput) Edit(ById<TextBox>(settings, "ExecutionOutputDirectory"), chosenOutput);
         QuantificationDefinition original = fixture.Input.DefinitionDraft;
@@ -395,10 +386,11 @@ public sealed class WorkflowStateTests
         {
             Assert.False(run.IsCompleted);
             QuantificationRunRequest active = Assert.IsType<QuantificationRunRequest>(fixture.Runner.LastRequest);
-            SettingsView settings = Open(fixture, SettingsCategory.Evaluation);
+            // FR-001: 進行中の実行の間も、次回の定義はそのまま編集できる。ここは実行ステップに留まるため、
+            // 統合エディターの束縛先と同じ設計 VM の観点を直接編集する（画面からの編集は他テストで確認）。
             string criterionId = original.Questions[0].Evaluators[0].Criteria[0].Id;
-            Edit(ById<TextBox>(settings, $"DesignCriterion-{criterionId}-Description"), "次回の評価説明");
-            Open(fixture, SettingsCategory.Common);
+            fixture.Design.Questions[0].Evaluators[0].Criteria.Single(item => item.Id == criterionId).Description = "次回の評価説明";
+            SettingsView settings = Open(fixture);
             Edit(ById<TextBox>(settings, "DesignDefinitionName"), "進行中に編集した次回定義");
             Select(ById<ComboBox>(settings, "ExecutionModel"), "auto");
             Select(ById<ComboBox>(settings, "ExecutionConcurrency"), 3);
@@ -479,7 +471,7 @@ public sealed class WorkflowStateTests
         try
         {
             QuantificationRunRequest active = Assert.IsType<QuantificationRunRequest>(fixture.Runner.LastRequest);
-            SettingsView settings = Open(fixture, SettingsCategory.Common);
+            SettingsView settings = Open(fixture);
             Edit(ById<TextBox>(settings, "DesignDefinitionName"), "停止とは独立した次回draft");
             Select(ById<ComboBox>(settings, "ExecutionConcurrency"), 2);
             QuantificationDefinition next = fixture.Design.Draft;
@@ -571,7 +563,7 @@ public sealed class WorkflowStateTests
         QuantificationDefinition designBefore = fixture.Design.Draft;
         var metadataBefore = fixture.Input.Metadata;
         var snapshotBefore = fixture.Input.Snapshot;
-        SettingsView settings = Open(fixture, SettingsCategory.Common);
+        SettingsView settings = Open(fixture);
         ById<TabControl>(settings, "SettingsCommonTabs").SetCurrentValue(TabControl.SelectedIndexProperty, 1);
         Render();
         TaskCompletionSource<InputWorkbookLoadResult> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -675,10 +667,10 @@ public sealed class WorkflowStateTests
         var values = resultItems.Select(item => (item.AutomationId, item.AiRawScore, item.OverrideText,
             item.EffectiveRaw, item.NormalizedScore, item.EvaluatorScore, item.QuestionScore, item.OverallScore)).ToArray();
         string originalHash = completed.Summary.DefinitionSha256;
-        SettingsView settings = Open(fixture, SettingsCategory.Common);
+        QuantificationDesignView nextDesignView = DesignView(fixture);
+        Edit(ById<TextBox>(nextDesignView, $"DesignEvaluator-{criterion.EvaluatorId}-Maximum"), "20");
+        SettingsView settings = Open(fixture);
         Edit(ById<TextBox>(settings, "DesignDefinitionName"), "過去の結果とは異なる次回定義");
-        Open(fixture, SettingsCategory.Evaluation);
-        Edit(ById<TextBox>(settings, $"DesignEvaluator-{criterion.EvaluatorId}-Maximum"), "20");
         QuantificationDefinition next = fixture.Design.Draft;
         await SaveAsync(fixture, next);
         Assert.NotEqual(originalHash, Canonical.ComputeSha256(next));
@@ -777,14 +769,21 @@ public sealed class WorkflowStateTests
         return Assert.IsType<ExecutionRunContext>(fixture.Execution.LastRunContext);
     }
 
-    private static SettingsView Open(WorkflowFixture fixture, SettingsCategory category)
+    private static SettingsView Open(WorkflowFixture fixture)
     {
         if (!fixture.Shell.IsSettingsOpen) Activate(Required<Button>(fixture.Window, "SettingsOpenButton"));
         SettingsView settings = Current<SettingsView>(fixture);
-        if (fixture.Shell.Settings.SelectedCategory != category)
-            Activate(ById<Button>(settings, "SettingsCategory" + category));
-        Assert.Equal(category, fixture.Shell.Settings.SelectedCategory);
+        // FR-002: 設定のカテゴリは共通だけ。
+        Assert.Equal(SettingsCategory.Common, fixture.Shell.Settings.SelectedCategory);
         return settings;
+    }
+
+    // FR-001: 通常評価の編集は採点設計画面（統合エディター）にある。設定を閉じて採点設計へ移る。
+    private static QuantificationDesignView DesignView(WorkflowFixture fixture)
+    {
+        if (fixture.Shell.IsSettingsOpen) Close(fixture);
+        if (fixture.Shell.CurrentStep != WorkflowStep.Design) Go(fixture, WorkflowStep.Design);
+        return Current<QuantificationDesignView>(fixture);
     }
 
     private static void Close(WorkflowFixture fixture) =>

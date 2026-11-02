@@ -8,8 +8,8 @@
 
 | 要求 ID | 題名 | 決定状態 | 実装ファイル | テスト | 使っている共通部品 |
 |---|---|---|---|---|---|
-| FR-001 | 採点配分と通常評価の統合画面 | 承認済み | 未実装 | 未実装 | - |
-| FR-002 | 設定は共通のみ | 承認済み | 未実装 | 未実装 | - |
+| FR-001 | 採点配分と通常評価の統合画面 | 承認済み | src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml, src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml.cs | tests/system/ui/IntegratedDesignAndSettingsTests.cs | - |
+| FR-002 | 設定は共通のみ | 承認済み | src/StudyReportEvaluator.App/Views/SettingsView.axaml, src/StudyReportEvaluator.App/Views/SettingsView.axaml.cs, src/StudyReportEvaluator.App/ViewModels/MainWindowViewModel.cs | tests/system/ui/IntegratedDesignAndSettingsTests.cs | - |
 | FR-003 | 削除した3タブの機能要求の維持 | 承認待ち | dev/docs/adr/0003-openxml-mutation.md | tests/fixtures/specs/workbook-hostile.json | - |
 
 ## API・イベント
