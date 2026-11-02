@@ -115,7 +115,8 @@ public sealed partial class SettingsView : UserControl
             return;
         }
 
-        SettingsCategory category = owner.SelectedCategory;
+        SettingsCategory category = SettingsCategory.Common; // FR-002: 表示するカテゴリは共通だけ。
+
         if (!categoryViews.TryGetValue(category, out Control? view))
         {
             view = CreateCategory(category, owner);
@@ -146,59 +147,11 @@ public sealed partial class SettingsView : UserControl
 
     private Control CreateCategory(SettingsCategory category, SettingsViewModel settings)
     {
-        Control view = category switch
-        {
-            SettingsCategory.Common => ((IDataTemplate)Resources["CommonSettingsTemplate"]!).Build(settings)
-                ?? throw new InvalidOperationException("The common settings template must produce a control."),
-            SettingsCategory.Mapping => new MappingSettingsView(settings.Input),
-            SettingsCategory.Evaluation => new EvaluatorSettingsView(settings.Design),
-            SettingsCategory.Special => new SpecialEvaluationSettingsView(settings.Design),
-            SettingsCategory.ImportedPrompts => new ImportedPromptSettingsView(settings.Design),
-            _ => throw new ArgumentOutOfRangeException(nameof(category)),
-        };
-
-        if (category == SettingsCategory.Common)
-        {
-            view.DataContext = settings;
-        }
-
-        if (view is UserControl { Content: Grid layout })
-        {
-            // Adapt only these newly-created embedded instances. Never impose the
-            // standalone tests' 450-DIP height on the smaller settings body.
-            layout.Margin = new Thickness(4, 0);
-            layout.RowSpacing = 4;
-        }
-
-        if (view is EvaluatorSettingsView evaluator)
-        {
-            CompactEvaluatorHeader(evaluator);
-        }
-
-        if (view is EvaluatorSettingsView or SpecialEvaluationSettingsView)
-        {
-            // An ancestor style disappears while a cached category is off-tree.
-            // Changing TabStripPlacement rebuilds containers and resets pending text.
-            foreach (TabControl tabs in view.GetLogicalDescendants().OfType<TabControl>())
-            {
-                tabs.TabStripPlacement = Dock.Left;
-            }
-        }
-
-        if (view is ImportedPromptSettingsView prompts)
-        {
-            // Viewing the original prompts is valid before loading an Excel file.
-            // Button.Command still supplies CanApplyImportedPrompt (including the
-            // Knowledge/missing-target guard); IsEnabled adds the Settings gate.
-            prompts.FindControl<Button>("ApplyImportedPromptButton")!.Bind(IsEnabledProperty,
-                new Binding(nameof(SettingsViewModel.CanEditDefinition))
-                {
-                    Source = settings,
-                    Mode = BindingMode.OneWay,
-                    FallbackValue = false,
-                });
-        }
-
+        // FR-002: 設定のカテゴリは「共通」だけ。旧カテゴリ（入力詳細・通常評価・固有評価・読込Prompt）は
+        // UI から削除済みで、どの値が来ても共通設定を表示する（通常評価は 2 採点設計の統合画面にある）。
+        Control view = ((IDataTemplate)Resources["CommonSettingsTemplate"]!).Build(settings)
+            ?? throw new InvalidOperationException("The common settings template must produce a control.");
+        view.DataContext = settings;
         return view;
     }
 
@@ -243,7 +196,7 @@ public sealed partial class SettingsView : UserControl
     private void RefreshAvailability()
     {
         bool inspectable = owner is not null && (owner.CanEditDefinition
-            || owner.SelectedCategory is SettingsCategory.Common or SettingsCategory.ImportedPrompts);
+            || owner.SelectedCategory is SettingsCategory.Common);
         this.FindControl<Grid>("SettingsCategoryBar")!.IsEnabled = owner is not null;
         this.FindControl<ContentControl>("CurrentSettingsContent")!.IsEnabled = inspectable;
         this.FindControl<TextBlock>("SettingsDefinitionAvailability")!.IsVisible = owner is null

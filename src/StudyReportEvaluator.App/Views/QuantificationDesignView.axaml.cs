@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Avalonia.Utilities;
 using Avalonia.VisualTree;
@@ -17,8 +18,6 @@ public sealed partial class QuantificationDesignView : UserControl
 {
     private static readonly string[] NumericEditorNames =
     ["BasePointsTextBox", "SpecialPointsTextBox", "SimilarityPenaltyWeightTextBox", "SelectedQuestionPointsTextBox"];
-    private static readonly string[] SettingsLinkNames =
-    ["OpenQuestionSettingsButton", "OpenEvaluatorSettingsButton", "OpenSpecialSettingsButton", "OpenImportedPromptsButton"];
     // Only this shared editor needs a per-question buffer. Confirmed points stay
     // in the VM; invalid text is never parsed, normalized, or written as a draft.
     private readonly Dictionary<string, string?> pendingQuestionPoints = new(StringComparer.Ordinal);
@@ -40,11 +39,65 @@ public sealed partial class QuantificationDesignView : UserControl
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         InitializeComponent();
+        CompactEmbeddedEvaluatorEditor();
         DataContext = viewModel;
         Loaded += HandleLoaded;
         foreach (TextBox editor in NumericEditors())
         {
             editor.PropertyChanged += HandleNumericEditorChanged;
+        }
+    }
+
+    /// <summary>
+    /// 統合した通常評価の編集部を、有限の領域に収めるため 1 行ヘッダー・左タブにする（FR-001）。
+    /// 選択・保存の束縛と Automation ID は変えない。
+    /// </summary>
+    private void CompactEmbeddedEvaluatorEditor()
+    {
+        if (this.FindControl<EvaluatorSettingsView>("EmbeddedEvaluatorEditor") is not { } view
+            || view.Content is not Grid layout)
+        {
+            return;
+        }
+
+        layout.Margin = new Thickness(0);
+        layout.RowSpacing = 4;
+        if (layout.Children[0] is Grid selectors)
+        {
+            selectors.ColumnSpacing = 8;
+            foreach (Grid field in selectors.Children.OfType<Grid>())
+            {
+                field.RowDefinitions = new RowDefinitions("44");
+                field.ColumnDefinitions = new ColumnDefinitions(field.Children.OfType<Button>().Any()
+                    ? "Auto,*,Auto" : "Auto,*");
+                field.ColumnSpacing = 4;
+                foreach (Control control in field.Children)
+                {
+                    Grid.SetRow(control, 0);
+                    Grid.SetColumnSpan(control, 1);
+                    Grid.SetColumn(control, control is TextBlock ? 0 : control is ComboBox ? 1 : 2);
+                }
+            }
+        }
+
+        foreach (Border pane in view.GetLogicalDescendants().OfType<Border>()
+            .Where(border => border.Classes.Contains("settings-pane")))
+        {
+            pane.Padding = new Thickness(4);
+        }
+
+        foreach (TabControl tabs in view.GetLogicalDescendants().OfType<TabControl>())
+        {
+            tabs.TabStripPlacement = Dock.Left;
+        }
+
+        foreach (TabItem tab in view.GetLogicalDescendants().OfType<TabItem>())
+        {
+            if (tab.Content is Grid page)
+            {
+                page.Margin = new Thickness(0);
+                page.ColumnSpacing = 8;
+            }
         }
     }
 
@@ -144,9 +197,8 @@ public sealed partial class QuantificationDesignView : UserControl
     {
         Grid body = this.FindControl<Grid>("DesignBody")!;
         body.Width = Math.Max(720, e.NewSize.Width - 16);
-        // Root rows/gaps 156 + pane frame 14 + selected rows/gaps 124
-        // + two 40-DIP summaries, a 44-DIP formula row and gaps 8 = 426.
-        body.Height = Math.Max(426, e.NewSize.Height - 16);
+        // Root rows/gaps 104 + 左（設問一覧＋選択設問・計算式）と右（通常評価の統合編集部）の領域 300 = 404。
+        body.Height = Math.Max(404, e.NewSize.Height - 16);
     }
 
     private void HandleQuestionListSizeChanged(object? sender, SizeChangedEventArgs e) => QueuePageSizeUpdate();
@@ -191,15 +243,7 @@ public sealed partial class QuantificationDesignView : UserControl
 
     private void RefreshSettingsLinks()
     {
-        MainWindowViewModel? shell = Shell;
-        foreach (string name in SettingsLinkNames)
-        {
-            if (this.FindControl<Button>(name) is { } link)
-            {
-                link.SetCurrentValue(Button.CommandProperty, shell?.OpenSettingsCommand);
-                link.IsEnabled = shell is not null;
-            }
-        }
+        // FR-001/FR-002: 旧設定カテゴリ（入力詳細・通常評価・固有評価・読込Prompt）への入口は削除済み。
     }
 
     private void RefreshPresentation()
@@ -211,25 +255,7 @@ public sealed partial class QuantificationDesignView : UserControl
             ? FormattableString.Invariant($"配点合計 {total:0.############################} / 100 · 残り {remaining:0.############################}")
             : design?.AllocationSummary ?? string.Empty;
         this.FindControl<TextBox>("AllocationSummaryText")?.SetCurrentValue(TextBox.TextProperty, allocation);
-        QuestionDesignItemViewModel? question = design?.SelectedQuestion;
-        if (question is null)
-        {
-            SetSummary("EvaluatorSummaryText", "設問を選択してください。設問の追加は入力詳細の設定、設問文の編集は入力画面で行います。");
-            SetSummary("SpecialSummaryText", "固有評価の対象となる設問が選択されていません。");
-        }
-        else
-        {
-            EvaluatorDesignItemViewModel[] evaluators = question.Evaluators.Where(item => item.Enabled).ToArray();
-            string methods = string.Join("、", evaluators.Select(item =>
-                $"{item.DisplayName}［{string.Join("、", item.Criteria.Where(criterion => criterion.Enabled).Select(criterion => criterion.DisplayName))}］"));
-            string state = question.Enabled ? string.Empty : "設問は無効・設定を保持。";
-            SetSummary("EvaluatorSummaryText", $"{state}通常評価: 有効 {evaluators.Length} / {question.Evaluators.Count} 方法、"
-                + $"有効項目 {evaluators.Sum(item => item.Criteria.Count(criterion => criterion.Enabled))} 件。{methods}");
-            SpecialEvaluationDesignItemViewModel[] specials = question.SpecialEvaluations.Where(item => item.Enabled).ToArray();
-            SetSummary("SpecialSummaryText", $"{state}固有評価: 有効 {specials.Length} / {question.SpecialEvaluations.Count} 件（0～1・等分平均）。"
-                + string.Join("、", specials.Select(item => $"{item.DisplayName}（主列 {item.PrimarySourceColumn}）")));
-        }
-
+        // 通常評価の要約は統合した編集部（EvaluatorSettingsView）が直接表示する。
         RefreshValidation();
     }
 
@@ -515,7 +541,17 @@ public sealed partial class QuantificationDesignView : UserControl
                 ? SettingsCategory.Mapping : SettingsCategory.Common);
     }
 
-    private void OpenProblemSettings(SettingsCategory category) => Shell?.OpenSettingsCommand.Execute(category);
+    private void OpenProblemSettings(SettingsCategory category)
+    {
+        // 通常評価は同じ画面の統合編集部へ移る。旧カテゴリは削除済みのため、その他は共通設定を指す。
+        if (category == SettingsCategory.Evaluation)
+        {
+            FocusEditor("EvaluatorSettingsEvaluators");
+            return;
+        }
+
+        Shell?.OpenSettingsCommand.Execute(SettingsCategory.Common);
+    }
 
     private void OpenInputProblem(string editorName, string? questionId = null)
     {

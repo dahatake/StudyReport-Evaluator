@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:converters="using:Avalonia.Data.Converters"
     xmlns:viewModels="using:StudyReportEvaluator.App.ViewModels"
+    xmlns:views="using:StudyReportEvaluator.App.Views"
     FontSize="14"
     Background="{DynamicResource AppCanvasBrush}"
     Foreground="{DynamicResource AppTextBrush}"
@@ -76,9 +77,9 @@
                   SizeChanged="HandleBodySizeChanged"
                   AutomationProperties.AutomationId="QuantificationDesignScrollViewer"
                   AutomationProperties.Name="採点設計の本文（狭い表示ではスクロール）">
-      <Grid x:Name="DesignBody" Margin="8" RowDefinitions="44,44,*,44" RowSpacing="8"
+      <Grid x:Name="DesignBody" Margin="8" RowDefinitions="44,*,44" RowSpacing="8"
             KeyboardNavigation.TabNavigation="Local">
-        <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*" ColumnSpacing="8"
+        <Grid ColumnDefinitions="Auto,92,Auto,92,Auto,92,*,Auto" ColumnSpacing="8"
               TabIndex="0" KeyboardNavigation.TabNavigation="Local">
           <TextBlock Text="基礎配点" Classes="label" />
           <TextBox x:Name="BasePointsTextBox" Grid.Column="1" Text="{Binding BasePoints, Mode=TwoWay}" TabIndex="0"
@@ -92,20 +93,16 @@
           <TextBox x:Name="SimilarityPenaltyWeightTextBox" Grid.Column="5" Text="{Binding SimilarityPenaltyWeight, Mode=TwoWay}" TabIndex="2"
                    AutomationProperties.AutomationId="DesignSimilarityPenaltyWeight" AutomationProperties.Name="類似度減点係数（0～1）"
                    ToolTip.Tip="設問配点と類似度に掛ける係数を0～1で入力します。0なら類似度による減点はありません。" />
-        </Grid>
-
-        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8"
-              TabIndex="1" KeyboardNavigation.TabNavigation="Local">
-          <TextBox x:Name="AllocationSummaryText" IsReadOnly="True" TabIndex="0"
+          <TextBox x:Name="AllocationSummaryText" Grid.Column="6" IsReadOnly="True" TabIndex="3"
                    AutomationProperties.AutomationId="DesignAllocationSummary" AutomationProperties.Name="全有効設問を含む配点の正確な合計と過不足・読取専用"
                    ToolTip.Tip="現在の確定値による合計と残りです。表示ページや丸め桁数では省略せず、正確に100かを判定します。全文を選択・コピーできます。" />
-          <Button x:Name="EqualizeQuestionPointsButton" Grid.Column="1" Content="設問配点を均等化"
-                  Command="{Binding EqualizeQuestionPointsCommand}" TabIndex="1"
+          <Button x:Name="EqualizeQuestionPointsButton" Grid.Column="7" Content="設問配点を均等化"
+                  Command="{Binding EqualizeQuestionPointsCommand}" TabIndex="4"
                   AutomationProperties.AutomationId="EqualizeQuestionPoints" AutomationProperties.Name="残り配点を有効な設問へ均等配分"
                   ToolTip.Tip="100から基礎配点と固有配点を引いた残りを、有効な全設問へ均等配分します。この明示操作でだけ手動配点を置き換えます。" />
         </Grid>
 
-        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="12"
+        <Grid Grid.Row="1" ColumnDefinitions="3*,7*" RowDefinitions="*,Auto" ColumnSpacing="12" RowSpacing="8"
               TabIndex="2" KeyboardNavigation.TabNavigation="Local">
           <Border Classes="design-pane" TabIndex="0" KeyboardNavigation.TabNavigation="Local">
             <Grid RowDefinitions="20,*,44" RowSpacing="4" KeyboardNavigation.TabNavigation="Local">
@@ -154,15 +151,15 @@
             </Grid>
           </Border>
 
-          <Border Grid.Column="1" Classes="design-pane" TabIndex="1" KeyboardNavigation.TabNavigation="Local">
+          <Border Grid.Row="1" Classes="design-pane" TabIndex="1" KeyboardNavigation.TabNavigation="Local">
             <!-- Keep these controls alive when pages change or T23 caches the view.
                  No repeated numeric editors, child editors, or secondary draft. -->
-            <Grid RowDefinitions="24,44,*,44" RowSpacing="4" TabIndex="1" KeyboardNavigation.TabNavigation="Local">
+            <Grid RowDefinitions="24,44,44" RowSpacing="4" TabIndex="1" KeyboardNavigation.TabNavigation="Local">
               <TextBlock x:Name="SelectedQuestionName" Text="{Binding SelectedQuestion.DisplayName, TargetNullValue='設問を選択してください', FallbackValue='設問を選択してください'}"
                          Classes="label" TextTrimming="CharacterEllipsis" MaxLines="1"
                          AutomationProperties.AutomationId="DesignSelectedQuestionName" AutomationProperties.Name="{Binding SelectedQuestion.DisplayName}"
                          ToolTip.Tip="{Binding SelectedQuestion.DisplayName}" />
-              <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+              <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
                 <CheckBox x:Name="SelectedQuestionEnabled" Content="有効" IsChecked="{Binding SelectedQuestion.Enabled, Mode=TwoWay}"
                           IsEnabled="{Binding SelectedQuestion, Converter={x:Static converters:ObjectConverters.IsNotNull}, FallbackValue=False}" TabIndex="0"
                           AutomationProperties.AutomationId="{Binding SelectedQuestion.Id, StringFormat='DesignQuestion-{0}-Enabled', FallbackValue=DesignSelectedQuestionEnabled}"
@@ -174,16 +171,10 @@
                          AutomationProperties.AutomationId="{Binding SelectedQuestion.WeightAutomationId, FallbackValue=DesignSelectedQuestionPoints}"
                          AutomationProperties.Name="選択した設問の配点（絶対点）"
                          ToolTip.Tip="選択した設問の絶対配点を0以上で入力します。全有効設問と基礎・固有配点の合計を正確に100にします。" />
-                <Button x:Name="OpenQuestionSettingsButton" Grid.Column="3" Content="設問の詳細"
-                        CommandParameter="{x:Static viewModels:SettingsCategory.Mapping}" IsEnabled="False" TabIndex="2"
-                  AutomationProperties.AutomationId="DesignOpenQuestionSettings" AutomationProperties.Name="選択した設問の名前と本文の確認を入力詳細の設定で開く"
-                  ToolTip.Tip="同じ設問の名前・複製・並替えを入力詳細で編集し、本文は全文を確認できます。本文の編集は入力画面で行います。メインウィンドウで利用できます。" />
               </Grid>
 
-              <Grid Grid.Row="2" RowDefinitions="*,*,44" RowSpacing="4">
-                <TextBlock x:Name="EvaluatorSummaryText" Classes="summary" AutomationProperties.AutomationId="DesignEvaluatorSummary" />
-                <TextBlock x:Name="SpecialSummaryText" Grid.Row="1" Classes="summary" AutomationProperties.AutomationId="DesignSpecialSummary" />
-                <Border x:Name="FormulaGuide" Grid.Row="2" AutomationProperties.AutomationId="DesignFormulaGuide"
+              <Grid Grid.Row="2" RowDefinitions="44" RowSpacing="4">
+                <Border x:Name="FormulaGuide" AutomationProperties.AutomationId="DesignFormulaGuide"
                         AutomationProperties.Name="採点計算式と現在の確定値">
                   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
                     <Grid RowDefinitions="20,20" ColumnDefinitions="*,*,*" ColumnSpacing="4">
@@ -232,28 +223,17 @@
                   </Grid>
                 </Border>
               </Grid>
-
-              <Grid Grid.Row="3" ColumnDefinitions="*,*,Auto" ColumnSpacing="4">
-                <!-- The code-behind supplies the owning shell's existing command;
-                     parameters are enums, not labels. No selection is changed here. -->
-                <Button x:Name="OpenEvaluatorSettingsButton" Content="通常評価" CommandParameter="{x:Static viewModels:SettingsCategory.Evaluation}"
-                        IsEnabled="False" TabIndex="4" HorizontalContentAlignment="Center"
-                        AutomationProperties.AutomationId="DesignOpenEvaluatorSettings" AutomationProperties.Name="選択した設問の通常評価設定を開く"
-                        ToolTip.Tip="同じ設問の評価方法・評価項目・Promptを設定で編集します。メインウィンドウで利用できます。AIは実行しません。" />
-                <Button x:Name="OpenSpecialSettingsButton" Grid.Column="1" Content="固有評価" CommandParameter="{x:Static viewModels:SettingsCategory.Special}"
-                        IsEnabled="False" TabIndex="5" HorizontalContentAlignment="Center"
-                        AutomationProperties.AutomationId="DesignOpenSpecialSettings" AutomationProperties.Name="選択した設問の固有評価設定を開く"
-                        ToolTip.Tip="同じ設問の固有項目・対象列・Promptを設定で編集します。メインウィンドウで利用できます。AIは実行しません。" />
-                <Button x:Name="OpenImportedPromptsButton" Grid.Column="2" Content="{Binding ImportedPrompts.Count, StringFormat='読込Prompt ({0})'}"
-                        CommandParameter="{x:Static viewModels:SettingsCategory.ImportedPrompts}" IsEnabled="False" TabIndex="6" HorizontalContentAlignment="Center"
-                        AutomationProperties.AutomationId="DesignOpenImportedPrompts" AutomationProperties.Name="同じ設問を対象に読込Promptの設定を開く"
-                        ToolTip.Tip="原文と適用先を設定で確認します。メインウィンドウで利用できます。開くだけではPromptを適用せず、AIも実行しません。" />
-              </Grid>
             </Grid>
+          </Border>
+
+          <!-- FR-001: 通常評価の編集（設問タブ・評価方法・評価項目・基本/Prompt）を同じ画面に統合。
+               同じ QuantificationDesignViewModel を共有し、Automation ID は旧画面と同じ。 -->
+          <Border Grid.Column="1" Grid.RowSpan="2" Classes="design-pane" Padding="2" TabIndex="3" KeyboardNavigation.TabNavigation="Local">
+            <views:EvaluatorSettingsView x:Name="EmbeddedEvaluatorEditor" />
           </Border>
         </Grid>
 
-        <Border x:Name="DesignValidationSummary" Grid.Row="3" CornerRadius="8"
+        <Border x:Name="DesignValidationSummary" Grid.Row="2" CornerRadius="8"
                 AutomationProperties.AutomationId="DesignValidationSummary">
           <Grid ColumnDefinitions="*,220,Auto,Auto,Auto" ColumnSpacing="4" TabIndex="3" KeyboardNavigation.TabNavigation="Local">
             <TextBlock x:Name="DesignStatusText" Margin="4,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
