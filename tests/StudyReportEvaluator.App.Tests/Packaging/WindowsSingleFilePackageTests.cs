@@ -924,25 +924,7 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
 
     private static string FindPowerShellCoreExecutable()
     {
-        HashSet<string> candidates = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
-                     .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            candidates.Add(Path.Combine(directory.Trim('"'), "pwsh.exe"));
-        }
-
-        string installed = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "PowerShell");
-        if (Directory.Exists(installed))
-        {
-            foreach (string directory in Directory.EnumerateDirectories(installed)) { candidates.Add(Path.Combine(directory, "pwsh.exe")); }
-        }
-
-        return candidates.Where(File.Exists).Select(path => (Path: path, Info: FileVersionInfo.GetVersionInfo(path)))
-            .Where(candidate => candidate.Info.FileMajorPart >= 7)
-            .OrderByDescending(candidate => new Version(candidate.Info.FileMajorPart, candidate.Info.FileMinorPart,
-                candidate.Info.FileBuildPart, candidate.Info.FilePrivatePart))
-            .Select(candidate => Path.GetFullPath(candidate.Path)).FirstOrDefault()
-            ?? throw new FileNotFoundException("P06 observer requires installed PowerShell Core 7+; no Windows PowerShell fallback.");
+        return PowerShellCoreLocator.Find("P06 observer requires installed PowerShell Core 7+; no Windows PowerShell fallback.");
     }
 
     private static string FindWindowsDesktopRuntime()
