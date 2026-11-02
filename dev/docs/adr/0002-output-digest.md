@@ -7,14 +7,14 @@
 |---|---|
 | 状態 | **承認済み・G-02完了・要求v1.2へG-RB反映済み** |
 | 対象決定 | DEC-02 |
-| 要求 | FR-016、FR-017、FR-035、FR-073、FR-089、AC-001、AC-007 |
+| 要求 | §9.3、§9.2、§5.1、§7.5、§9.2、AC-001、AC-007 |
 | 決定 | canonical manifest digest と署名済み detached completion record |
 | 承認根拠 | ADR-0001 の承認証跡（実装前 decision gate は既定案） |
 | 記録日 | 2026-08-31 |
 
 ## 問題
 
-旧要求正本v1.1のFR-017は「出力SHA-256」を出力workbookの監査sheetへ記録するよう読めた。しかし、確定後の`.xlsx`全体のSHA-256を同じ`.xlsx`内へ書き込むと、その書込み自体でfile bytesとSHA-256が変わる。固定点が得られる保証はなく、単純な再計算では自己参照を解消できない。
+旧要求正本v1.1の§9.2は「出力SHA-256」を出力workbookの監査sheetへ記録するよう読めた。しかし、確定後の`.xlsx`全体のSHA-256を同じ`.xlsx`内へ書き込むと、その書込み自体でfile bytesとSHA-256が変わる。固定点が得られる保証はなく、単純な再計算では自己参照を解消できない。
 
 次の代案にも不足がある。
 
@@ -24,7 +24,7 @@
 
 ## 決定
 
-FR-017 を要求改版し、出力完全性を次の2層で表す。
+§9.2 を要求改版し、出力完全性を次の2層で表す。
 
 1. **workbook 内部**: `Evaluation_Run` に `run_id`、入力 SHA-256、選択元 sheet ID/name、生成 sheet name、および `manifest_digest` を保存する。確定ファイル全体の SHA-256 は保存しない。
 2. **detached completion record**: 確定直前の検証済み workbook 全 bytes の SHA-256、将来の final filename、`run_id`、`manifest_digest`、record metadata を署名対象として、同じ出力ディレクトリへ別ファイルで保存する。
@@ -120,7 +120,7 @@ workbook 内の logical manifest が O-10 後に1 byteでも変われば、compl
 
 ## 要求改版案
 
-G-RB は FR-017 を少なくとも次の意味へ変更する。
+G-RB は §9.2 を少なくとも次の意味へ変更する。
 
 - `Evaluation_Run` には input SHA-256、run ID、生成日時、version、sheet identity、canonical manifest digest を保存する。
 - final output workbook の全 bytes の SHA-256 は、署名済み detached completion record に保存する。
@@ -144,4 +144,4 @@ G-RB は FR-017 を少なくとも次の意味へ変更する。
 
 ## 完了判定
 
-自己参照問題、pairの結合、欠落、取り違え、署名不正、書込み失敗、rename失敗、crash時の完成判定を定義し、要求v1.2のFR-017へ反映した。ADR-0006と後続実測依存を満たすまでO-04/O-10を完成扱いにしない。
+自己参照問題、pairの結合、欠落、取り違え、署名不正、書込み失敗、rename失敗、crash時の完成判定を定義し、要求v1.2の§9.2へ反映した。ADR-0006と後続実測依存を満たすまでO-04/O-10を完成扱いにしない。

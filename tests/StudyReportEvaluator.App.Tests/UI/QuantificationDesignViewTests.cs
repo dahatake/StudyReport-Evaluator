@@ -839,10 +839,9 @@ public sealed class QuantificationDesignViewTests
     }
 
     [AvaloniaFact]
-    public void Paged_questions_and_integrated_evaluator_editor_preserve_the_same_prompt_target()
+    public void Paged_questions_and_integrated_evaluator_editor_preserve_the_same_selection()
     {
-        ImportedPrompt source = new() { Path = "t19.txt", DisplayName = "t19.txt", Content = "原文\n{回答} {評価項目}" };
-        QuantificationDesignViewModel viewModel = new(null, ["A", "B"], [source]);
+        QuantificationDesignViewModel viewModel = new(null, ["A", "B"]);
         QuestionDesignItemViewModel first = Assert.Single(viewModel.Questions);
         first.DisplayName = "設問A";
         QuestionDesignItemViewModel second = viewModel.DuplicateQuestion(first.Id);
@@ -883,7 +882,6 @@ public sealed class QuantificationDesignViewTests
             Assert.Same(first, viewModel.SelectedQuestion);
             Assert.Same(custom, first.SelectedEvaluator);
             Assert.Same(special, first.SelectedSpecialEvaluation);
-            Assert.Equal(ImportedPromptTarget.CustomEvaluator, viewModel.SelectedPromptTarget);
             Assert.Same(draft, viewModel.Draft);
 
             // 統合した通常評価エディターは、同じ設問・評価方法・観点を同じ画面に表示する。

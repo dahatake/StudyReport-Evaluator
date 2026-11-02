@@ -150,7 +150,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | AC-015 | closed resume validation and completed-row skip | W-01/W-02 | mismatch/skip tests | PASS_REQUIRED |
 | AC-016 | 実progress／状態、通常最小1024×720の外側scroll不要・完全包含、ページ切替、長文／狭小／拡大例外、keyboard／ID／virtualization | U-03 + T07〜09/T11/T18〜26 | MainWindowSettingsTests／ResponsiveLayoutTests／CompactWorkflowLayoutTests／PrimaryJourneyAccessibilityTests。TR-17／ST-UC-12のheadless範囲。T39追加nativeは120 DPI部分観測でFAIL、NarratorはNOT_RUN_EXTERNAL_PREREQUISITE | VERIFIED_SCOPED |
 | AC-017 | exact warning text and nonblockingを設定画面でも常時全文維持 | U-04 + T23/T25/T26 | EthicsWarningTests／MainWindowSettingsTests／ResponsiveLayoutTests。TR-17／ST-UC-12の全step・設定のheadless警告／完全包含。native読上げはNOT_RUN | VERIFIED_SCOPED |
-| AC-018 | `--input`, repeated `--prompt`, 設定の読込Promptへ移設、explicit apply、no auto-run | L-01/U-02 + T16/T17/T23/T25 | ImportedPromptSettingsViewTests／SettingsViewTests／SettingsCompositionTests／CopilotLoginCommandTests。TR-18／ST-UC-13。既存LaunchOptionsTestsのparser／startup契約を維持、最終EXE引数回帰は別 | VERIFIED_SCOPED |
+| AC-018 | `--input`, repeated `--prompt`（受理のみ。FR-003で読込Prompt UIは廃止）、no auto-run | L-01/U-02 + T16/T17/T23/T25 | LaunchOptionsTests／SettingsViewTests／SettingsCompositionTests／CopilotLoginCommandTests。TR-18／ST-UC-13。既存LaunchOptionsTestsのparser／startup契約を維持、最終EXE引数回帰は別 | VERIFIED_SCOPED |
 | AC-019 | selected same-row payload and no-content logs | C-05/A-02..04/W-01 | capability/logger/canary tests | PASS_REQUIRED |
 | AC-020 | Windows legacy self-contained ZIP regression | P-01 | packaging/launch smoke | PASS_REQUIRED |
 | AC-021 | unverified platform/installer/signing claim exclusion | P-01..04/D-01..05 | documentation/package contract | PASS_REQUIRED |
@@ -208,7 +208,7 @@ pathは実在するsourceへの参照、メソッド名は各test fileの直接a
 | TR-15 | AI failure/retry/cancel | A-02..04/W-02 | PASS_REQUIRED |
 | TR-16 | selected-row/literal/no-content | C-05/A-02..04/X-03 | PASS_REQUIRED |
 | TR-17 | 4step＋設定の通常非scroll／完全包含・ページ切替、長文／狭小／拡大例外、warning／focus／ID／virtualizationとInput binding同期 | MainWindowSettingsTests／PrimaryJourneyAccessibilityTests／EthicsWarningTests／ResponsiveLayoutTests／CompactWorkflowLayoutTests、T23/T25/T26／ST-UC-12。T26の27ケースは74件の内数。T39追加nativeは部分観測でFAIL、NarratorはNOT_RUN_EXTERNAL_PREREQUISITE | VERIFIED_SCOPED |
-| TR-18 | launch options、設定へ移設したPrompt一覧／明示適用、no auto-run | 既存LaunchOptionsTests + ImportedPromptSettingsViewTests／SettingsViewTests／SettingsCompositionTests／CopilotLoginCommandTests、T16/T17/T23/T25／ST-UC-13。最終package起動は別判定 | VERIFIED_SCOPED |
+| TR-18 | launch options（`--prompt`は受理のみ。読込Prompt UIはFR-003で廃止）、no auto-run | 既存LaunchOptionsTests + SettingsViewTests／SettingsCompositionTests／CopilotLoginCommandTests、T16/T17/T23/T25／ST-UC-13。最終package起動は別判定 | VERIFIED_SCOPED |
 | TR-19 | Windows publish/package/bundled CLI/clean launch | P-01 | PASS_REQUIRED |
 | TR-20 | unsigned ZIP/hash/safe layout/reproducibility | P-01 | PASS_REQUIRED |
 | TR-21 | unsupported platform/installer/signing claim exclusion | P-01/D-01..05 | PASS_REQUIRED |

@@ -656,10 +656,10 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 ### 11.4 主画面と設定の分担
 
 - 固定の「1 入力 / 2 採点設計 / 3 実行 / 4 結果」を維持する。設定は同一ウィンドウ内の独立した内容画面であり、第5ステップ、modal、drawerではない。
-- 主画面は対象、配点、実行の開始判断、結果を扱い、有効値と変更入口を残す。「変更」から同じ対象IDの設定カテゴリへ1操作で移動し、「設定から戻る」で元ステップへ復帰する。同じ入力欄を二重配置しない。
+- 主画面は対象、配点、実行の開始判断、結果を扱い、有効値と変更入口を残す。「変更」から同じ対象IDの設定（共通）の入口へ1操作で移動し、「設定から戻る」で元ステップへ復帰する。同じ入力欄を二重配置しない。
 - 設定は「共通」だけとする（2026-11-02変更、§11.23。旧: 「共通」「入力詳細」「通常評価」「固有評価」「読込Prompt」の5カテゴリ）。共通内の定義名・revision・丸めはDesignの採点定義に属し、独立したカテゴリや実行設定へ移さない。
 - 旧「通常評価」（既存evaluator／criterionのCRUD・range・weight・Knowledge読取・Custom編集、設問タブ〔§11.22〕）は、「2 採点設計」の統合画面（§11.23）で扱う。旧「入力詳細」「固有評価」「読込Prompt」は設定から削除する（§11.23）。結果とoverrideは設定へ移さない。
-- 対象がないカテゴリも位置を保ち、利用できない理由を表示する。カテゴリ変更でworkflowを進めず、前後操作は行先を明示する。各stepの「設定済み」表示（§11.16）と準備完了・処理成功を区別し、結果画面に無効な最終ステップ主ボタンを残さない。
+- 設定は共通だけで、対象がない入口は位置を保ち、利用できない理由を表示する。設定内の表示切替でworkflowを進めず、前後操作は行先を明示する。各stepの「設定済み」表示（§11.16）と準備完了・処理成功を区別し、結果画面に無効な最終ステップ主ボタンを残さない。
 - 既存FluentThemeと必要な静的Fluent System Iconsだけを使い、常時見える日本語ラベルを併記する。素材・revision・LICENSE／NOTICEは採用時に記録し、新UI framework、renderer、NuGet依存、テーマ切替を追加しない。
 
 ### 11.5 通常表示・ページ切替・例外到達
@@ -670,7 +670,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 - 追加・削除・並替え・リサイズ時にページ範囲を補正し、対象が残る限りIDで選択を保持する。削除時だけ隣接対象へ移動する。空一覧を明示し、多数のevaluator／criterionは選択詳細で編集する。複数エラーも件数・対象・次の問題への移動を示し、隠して検証成功にしない。
 - 長文の設問text／Prompt、全文path、dropdown候補には局所スクロールを許容し、keyboardで全文へ到達可能にする。760×600 standaloneと200%表示はreflow・表示行数削減を先に行い、不足時だけ本文の縦スクロールを許容する。固定領域で操作やfocusを覆わず、通常サイズの非スクロール成功へ算入しない。
 - 本文・入力14 DIP、主操作target最小44 DIPを維持する。MinHeightは下限であり実高さの固定値ではない。余白は4／8／12／16を基準に重複を減らし、未測定の固定表示件数を約束しない。
-- Tab／Shift+Tab／Enter／Space、カテゴリ切替後と設定終了時のfocus復帰、日本語Accessible Name、文字／icon／focusのcontrast、色以外の状態表示を検証する。Automation IDは既存の安定IDを可能な限り保ち、対象ID＋操作名等で一意にする。ページ連番・表示名を識別子にしない。
+- Tab／Shift+Tab／Enter／Space、設定内の表示切替後と設定終了時のfocus復帰、日本語Accessible Name、文字／icon／focusのcontrast、色以外の状態表示を検証する。Automation IDは既存の安定IDを可能な限り保ち、対象ID＋操作名等で一意にする。ページ連番・表示名を識別子にしない。
 - native Windowsの実DPI／Narrator確認とheadless測定を区別する。論理作業領域が最小window未満の環境で無条件に収まることや、WCAG適合認証を保証しない。
 
 ### 11.6 設定fileの読込と明示保存
@@ -697,7 +697,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 ### 11.8 往復・次回設定・現在runの分離
 
-- 同一起動中の値・対象ID・ページ・設定カテゴリ・入力途中の編集状態を往復で保持する。Input／Designが既存draftを所有し、設定はその編集面を束ねる。最新の編集元を1回同期し、古いcopyや再生成前のDesign参照で上書きしない。Undo／Redo engineや第三の汎用draft storeを作らない。
+- 同一起動中の値・対象ID・ページ・設定内の表示（共通のみ）・入力途中の編集状態を往復で保持する。Input／Designが既存draftを所有し、設定はその編集面を束ねる。最新の編集元を1回同期し、古いcopyや再生成前のDesign参照で上書きしない。Undo／Redo engineや第三の汎用draft storeを作らない。
 - 共通設定は今回の明示編集 → 保存済み共通設定 → 従来既定値の順に使い、出力先は§9.1に従う。保存modelの希望IDと実効選択を分離し、利用者の明示状態確認で候補に存在するときだけ実効選択へ反映する。
 - 希望modelが利用不可なら実効選択を未選択にして明示変更を要求し、別modelへfallbackしない。確認失敗だけで保存希望IDを消さない。希望ID未指定の初回は従来の明示確認後の初期選択を維持する。固定`auto`の別availability検証は行わない。
 - 画面遷移、Prompt／保存定義の適用、設定読込・保存から認証確認・login・AI runを自動開始しない。login完了時は、§11.3の6に従って認証状態とmodel一覧の再確認だけを自動で行い、loginの再開始やAI runは自動開始しない。起動時の自動確認・自動loginは§11.10に従う。開始requestには実際に利用可能と確認した値だけを入れる。
@@ -953,7 +953,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 出典: 依頼原文（2026-10-01「画面の[2.定量化設定]の[通常評価]で、各設問がコンボボックスで切り替えられるようになっています。これをタブで切り替えられるようにしてください。タブには設問名を表示してください。」）。本節は当初§11.18として追加したが、§11.18（思考レベル・Context Size）と番号が重複したため、2026-10-05に§11.22へ改番した。要求ID（FR-QT-01〜05）は変更しない。
 
-（2026-11-02注記: 通常評価は設定ではなく「2 採点設計」の統合画面へ移る（§11.23）。本節の要求は統合画面の設問タブへ読み替えて維持し、Automation IDは変えない。FR-QT-05の「設定画面を開いた直後の初期focus」は「統合画面を開いた直後の初期focus」と読む。）
+（2026-11-02注記: 通常評価は設定ではなく「2 採点設計」の統合画面へ移る（§11.23）。本節の要求は統合画面の設問タブへ読み替えて維持し、Automation IDは変えない。FR-QT-05の「設定画面を開いた直後の初期focus」は「統合画面を開いた直後の初期focus（基礎配点入力`BasePointsTextBox`）」と読む。）
 
 設定の「通常評価」（2.定量化設計の「通常評価」タブと同じ内容）で、編集する設問の切替手段をcombobox（ドロップダウン）からタブへ変更する。
 
@@ -963,7 +963,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 | FR-QT-02 | MUST | 各タブの文字は、その設問の表示名（`QuestionDesignItemViewModel.DisplayName`、例: `質問 1`）とする。設問の並び順は`Questions`の順と同じ。長い名前は240 DIP幅で省略記号で切り、全文はToolTipで確認できる。設問選択部品のAccessible Nameは「通常評価を編集する設問」とする。 |
 | FR-QT-03 | MUST | タブを選ぶと`SelectedQuestion`がその設問になり、評価方法・評価項目・編集欄は選んだ設問の内容へ切り替わる。`SelectedQuestion`が別の経路（入力の同期、並替え、他画面）で変わったときは、タブの選択が追従する。選択の解除（null選択）では`SelectedQuestion`を変えず、設問本文・配点・採点定義（`Draft`）は選択操作で変わらない。 |
 | FR-QT-04 | MUST | 設問が0件のときは、従来の「設問を選択してください。設問がない場合は、設問の設定で追加してください。」を表示する。 |
-| FR-QT-05 | MUST | タブ領域は、最小window（1024×720 DIP）と200%表示でも外側スクロールを要せず横へはみ出さない。タブが1行に収まらないときは折り返して最大2行（92 DIP）まで表示し、超える分は局所の縦スクロールで到達できる。各タブの高さは44 DIP以上、文字は14 DIPで、keyboard（Tab）でタブ領域へ到達でき、設定画面を開いた直後の初期focusは設問タブ領域とする。評価方法・評価項目の選択部品（combobox）は変更しない。 |
+| FR-QT-05 | MUST | タブ領域は、最小window（1024×720 DIP）と200%表示でも外側スクロールを要せず横へはみ出さない。タブが1行に収まらないときは折り返して最大2行（92 DIP）まで表示し、超える分は局所の縦スクロールで到達できる。各タブの高さは44 DIP以上、文字は14 DIPで、keyboard（Tab）でタブ領域へ到達でき、「2 採点設計」の統合画面（FR-001）を開いた直後の初期focusは基礎配点入力（`BasePointsTextBox`、統合画面で最初の入力部品）とする。評価方法・評価項目の選択部品（combobox）は変更しない。 |
 
 例: 設問が`質問 1`〜`質問 4`の4件なら、タブは`質問 1`〜`質問 4`の4つがこの順に並ぶ。`質問 3`のタブを選ぶと、評価方法・評価項目・編集欄が`質問 3`の内容へ切り替わる。設問の並替えで`質問 3`が先頭へ移ると、タブの選択も同じ設問に追従する。
 
@@ -998,7 +998,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
   - 検証レベル: system
 - 受入基準 AC-058: 固有評価項目と補助列を含む既存の採点定義を読み込んで保存し直しても、それらの内容は失われず、固有配点を含む獲得点・FinalRaw・FinalScoreが変更前と同じ値で計算される。`--input`と`--prompt`を指定した起動は起動errorにならず、読み込んだPromptはUIに表示されず、適用もされず、AI送信は0件である。
   - 検証レベル: unit
-- 受入基準 AC-059: `docs/`の利用者向け文書（getting-started、settings等）に、廃止した3機能の画面・操作（入力詳細の設定画面、固有評価の編集、読込Promptの一覧と適用）の説明が残らない。
+- 受入基準 AC-059: `docs/`の利用者向け文書（getting-started、settings等）に、廃止した3機能の画面・操作（入力詳細の設定画面、固有評価の編集、読込Promptの一覧と適用）の説明が残らない。docs/id-registry.md（ID台帳）の廃止項目に廃止機能名（「入力詳細」等）が含まれる場合は、利用者向け文書ではなく台帳なので本ACの対象外とする。
   - 検証レベル: integration
 
 質問票:
@@ -1007,7 +1007,8 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 |---|---|---|---|---|---|---|
 | Q-001 | 高 | 設定から削除する入力詳細・固有評価・読込Promptの機能の置き場所は。 | a) 統合画面内へ移す b) 機能ごと廃止する c) 入力画面へ移す | a | 回答済み | B（機能ごと廃止する。2026-11-02） |
 
-変更履歴: 2026-11-02 Q-001回答Bを反映。FR-DOC-01〜04・AC-044を廃止（廃止した3機能の操作説明のため。統合→AC-059）。A-MG-02を決定済みにし、C-1・C-4を解消。影響: 実装・テスト・利用者文書の更新が必要（上記AC、AC-037・AC-048のtest名と記述の更新はC-2・C-3として未解決のまま）。
+変更履歴: 2026-11-02 Q-001回答Bを反映。FR-DOC-01〜04・AC-044を廃止（廃止した3機能の操作説明のため。統合→AC-059）。A-MG-02を決定済みにし、C-1・C-4を解消。影響: 実装・テスト・利用者文書の更新が必要（上記AC、AC-037・AC-048のtest名の更新は実装側で必要）。
+変更履歴: 2026-11-02 利用者承認（「修正してよいです」）によりC-2・C-3を解決。FR-QT-05、AC-048 ⑥の初期focusを統合画面（FR-001）に、§11.5・§11.8・§11.22・AC-037・§18の「5カテゴリ」「カテゴリ」を「設定は共通のみ」「設定内の表示」に書き換えた（意味はFR-001〜003に合わせ、値・閾値は不変）。同日追記: 初期focusは実装・既存テスト（MainWindowSettingsTests・QuantificationDesignViewTests）と整合する最小変更として基礎配点入力（`BasePointsTextBox`）にした（設問タブ領域へのTab到達は維持）。過去の実測の記述（行1303付近）と履歴は過去事実のため変えない。影響: AC-037・AC-048の文言変更、台帳ケースの期待値の更新（test-designer）。
 
 ## 12. Promptファイルからの起動
 
@@ -1203,9 +1204,9 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 - clean extract、apphost起動、bundled CLI identityのWindows evidence
 - exact EXEのclean-host CH-01〜06と、EXE／ZIP／development MSIXのclosed 3-row matrix v2による公開判定
 - teacher, operator, engineer documentation and actual synthetic screenshots
-- 4ステップを維持した同一window内の設定5カテゴリ、通常最小サイズの外側スクロール不要、ページ切替と長文／狭小／拡大の到達性例外
+- 4ステップを維持した同一window内の設定（共通のみ。§11.23）、通常最小サイズの外側スクロール不要、ページ切替と長文／狭小／拡大の到達性例外
 - 利用者別setting.txtへの共通設定＋採点定義1件の明示保存、検証後の保存定義明示適用、明示出力先復元とnull時だけの入力隣接result
-- 値・対象・ページ・カテゴリの往復保持、保存model希望IDと実効選択の分離、現在run／次回draft／前回結果の区別
+- 値・対象・ページ・設定内の表示（共通のみ）の往復保持、保存model希望IDと実効選択の分離、現在run／次回draft／前回結果の区別
 - 実行・結果画面とジョブ単位ローカルJSON Linesログによる今回ジョブのAI使用量表示（SDK報告の原単位と、表示時に換算したAIクレジット。通貨換算なし）
 - 結果画面の見出し行への、今回のジョブの総実行時間（`HH:MM:SS`）とAIクレジットの表示（§11.21）
 - 利用できる全modelの選択（§11.13）と、model別の思考レベル・Context Sizeの選択・明示保存・run固定（§11.18）
@@ -1276,7 +1277,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | AC-034 | candidate run／source／version／bytes／hashに拘束されたexact EXEとCH-01〜06のPASSが一致した場合だけ新経路をprotected publishする。metadata限定JSON、candidate-bound MSIX検証記録、4 public assetsの再download照合を要求し、必須試験の欠落・FAIL・NOT_RUN・差替えを拒否する。未実測のOS-only／署名／installer claimを出さない。 |
 | AC-035 | 利用者別setting.txt（UTF-8 JSON、schema整数1）へ共通設定＋任意の採点定義1件を明示保存し（表示専用のmodel一覧cacheだけは§11.6の自動保存例外）、ID／decimal／Prompt／canonical hashを復元する。header由来の設問text・貼付内容は明示保存時に平文で含まれ、§11.6の非保存対象は保存しない。破損・未知schema・IO失敗は元fileとdraftを保持しoffline継続する。保存中再編集は未保存のまま、同時保存は最後の成功が優先する。明示出力先は再起動・入力変更後も復元し、初回の未指定または空欄への明示編集によるnullの場合だけ入力隣接resultを算出し、fallback・復元時directory作成をしない。 |
 | AC-036 | 保存定義はExcel読込後の明示操作で、保存headerのmetadata・sheet・行・列・定義全体を検証してからInput／Designへ一括適用する。失敗・取消時は現在状態とfileを変更せず、成功時はID・順序・設問text・Prompt・配点を保持する。Imported Prompt一覧は不変、run中の一括適用は禁止し、既存checkpoint admissionを緩めない。 |
-| AC-037 | 設定を第5ステップにせず、同じ対象へ1操作で移動し、値・対象ID・ページ・カテゴリ・入力途中の編集を保持して戻れる。希望modelは明示確認後だけ実効選択にし、不在なら未選択・no fallback、確認失敗だけで保存希望を消さない。遷移・設定読込／保存／適用で認証確認／login／runを自動開始せず、login完了時は§11.3の6の認証状態・model一覧の自動再確認だけを行う（起動時の自動確認・自動loginだけは§11.10・AC-040に従う）、実行中の次回draft編集は現在snapshotへ混入しない。全画面で進捗・停止を保持し、設定中完了は結果通知だけとする。前回結果・override・未保存修正版を次回設定から分離する。 |
+| AC-037 | 設定を第5ステップにせず、同じ対象へ1操作で移動し、値・対象ID・ページ・設定内の表示（設定は共通のみ。§11.23）・入力途中の編集を保持して戻れる。希望modelは明示確認後だけ実効選択にし、不在なら未選択・no fallback、確認失敗だけで保存希望を消さない。遷移・設定読込／保存／適用で認証確認／login／runを自動開始せず、login完了時は§11.3の6の認証状態・model一覧の自動再確認だけを行う（起動時の自動確認・自動loginだけは§11.10・AC-040に従う）、実行中の次回draft編集は現在snapshotへ混入しない。全画面で進捗・停止を保持し、設定中完了は結果通知だけとする。前回結果・override・未保存修正版を次回設定から分離する。 |
 | AC-038 | 中断後は部分結果のpartial pathと再開準備を表示し、同一セッションでは明示操作で、再起動後はpartial選択またはpath指定で再開条件を開始前に項目別検証する。不一致時はcheckpointを変更せず開始しない。入力・modelだけは明示操作で合わせられ、採点設計・runtimeは自動変更しない。window close時は有限時間の中断待機後に閉じる。 |
 | AC-039 | 実行・結果画面とジョブ単位のローカルJSON Linesログで、今回の開始操作に対応するAI使用量（入力・出力・推論・キャッシュtoken、`nano-AI units`、premium request消費量）を、AIを呼ぶ3 operation（参照回答・通常評価・固有評価）と再試行・失敗・取消・未保存行を含めて確認できる。未取得は0や推定値にせず理由とともに示し、明示0・未送信・送信状況不明・部分取得を区別する。項目別の取得元、試行番号・相関ID・終端結果、モデル内訳と総量の不一致を保持し、内訳を総量へ加算・配賦しない。SDK報告の原単位を保ち、通貨表示をしない。AIクレジットはnano-AI unitsから§11.21の規則で換算して示す（2026-10-01変更）。ログは数値・生成ID・閉じたコードだけを記録し、保存失敗でも観測済み表示と採点を壊さない。 |
 | AC-040 | 事前条件: fake認証境界とfake login processを注入した`ExecutionViewModel`（実CLI・実ブラウザー・実資格情報は使わない）。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~CopilotLoginCommandTests"`。期待結果（exit code 0）: ①window表示（Opened）で認証確認が1回だけ実行される（FR-AL-01）。②`Available`ならlogin processの起動0回・resolver呼出0回・状態文に「自動的にログインしました」（FR-AL-02）。③`AuthRequired`ならlogin processがちょうど1回起動し、完了後に認証を再確認し、2回目の起動時処理は何もしない（FR-AL-03、FR-AL-04）。④`CliUnavailable`／`RuntimeFailed`／`Cancelled`ではlogin起動0回で再試行案内を表示する（FR-AL-03、FR-AL-07）。⑤自動login中の「ログインを取り消す」で所有processだけを`Kill(false)`で1回終了し、再自動起動しない（FR-AL-04、FR-AL-05）。⑥run呼出0回・model fallbackなし（FR-AL-06）。⑦環境変数値`0`／`false`（大文字小文字・前後空白を無視）でlogin起動0回、未設定・空・その他値は有効（FR-AL-08）。⑧状態文・`ToString()`にcanary（token、device code、path、例外名）を含まない（SEC-AL-01〜02）。⑨dispose後・手動確認中・確認失敗時に例外を漏らさずloginを開始しない（FR-AL-07、NFR-AL-01）。証跡: テスト結果（.trx）。実資格情報での確認はAC-040に含めず、§18外の本人確認とする。 |
@@ -1287,7 +1288,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | AC-045 | 対応要求: FR-XD-01〜06。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultExcelDescriptionTests"`、`--filter "FullyQualifiedName~DocumentationContractTests"`、`--filter "FullyQualifiedName~Packaging"`の3回（いずれも同じprojectで、`--filter`の値だけを替える）。期待結果（exit code 0）: ①`docs/result-excel-description.md`が存在し、`README.md`（本文と「ガイド」）と`docs/README.md`からリンクされ、全local linkと見出しanchorが解決する（FR-XD-04）。②文書に警告文の固定文言、公開`v0.8.6`、旧公開`0.8.1`との区別、clean-host試験CH-01〜06と本人loginの未実施、4つのsheet名が含まれ、未リリース扱いの表記、`dev/docs`、実装の型名を含まない（FR-XD-03、FR-XD-05）。③`ResultsSheetWriter`のsuffix定数・列見出し定数の全値と、`ResultsStatusCodes`の12個の全値、`PRIMARY_ANSWER`／`SUPPORTING_COLUMN`／`NONE`が文書にある（FR-XD-01、FR-XD-02）。④実際に書いたConfig sheet（見出し33列の列記号と名前、全`RecordType`）、References sheet（8列）、Run sheet（`Field`26項目）の値がすべて文書の表にある（FR-XD-01、FR-MO-07）。⑤文書が単一EXE・ZIP・MSIXの公開文書allowlist（scripts・pubxml・試験の期待一覧）に含まれ、抽出後の全local linkが解決する（FR-XD-05）。証跡: テスト結果（.trx）。文章の平易さ（FR-XD-02）は自動判定できないため、レビュー者が教員の視点で通読し、専門用語が初出で説明されていることを確認する（許容差なし）。 |
 | AC-046 | 対応要求: FR-PREP-01〜07、FR-STEP-01〜03。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）、Avalonia headless。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~PreparationOnInputTests|FullyQualifiedName~MainWindowTests|FullyQualifiedName~ExecutionViewTests"`。期待結果（exit code 0）: ①メインwindowの「1 入力」に§11.15の表の全Automation IDの部品が存在し、「3 実行」には0件である（FR-PREP-01、FR-PREP-02）。②入力画面の切替button（初期は閉）で実行準備の区画が開閉し、開閉で入力値が保持される（FR-PREP-01）。入力画面の「Copilot 状態を確認」「GitHubにログイン」「ログインを取り消す」「checkpoint から再開」がメインwindowの`ExecutionViewModel`のcommand・状態へ結び付き、操作結果が「3 実行」の判断に反映され、画面往復後も保持される（FR-PREP-03、FR-PREP-05）。③入力画面を単体表示すると実行準備部品は表示されず、既存の入力部品の配置・寸法試験が変わらず成功する（FR-PREP-07、FR-PREP-04）。④「1 入力」の初期focusがファイルpath入力、実行画面が実行画面内の部品である（FR-PREP-06）。⑤step状態文が、現在以外の過去表示済みstepで「設定済み」、現在は「現在・選択中」、未表示は「未着手」で、Accessible Nameにも同じ文言が入り、「訪問済み」がどのstepにも出ない（FR-STEP-01〜03）。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
 | AC-047 | 対応要求: FR-SETLOGIN-01〜03。事前条件: Avalonia headless、fake認証境界。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~Common_settings_hosts_copilot_login"`。期待結果（exit code 0）: 共通設定タブに`SettingsCopilotLoginPanel`と3つのボタン・2つの状態文が存在し、各ボタンのCommandが`ExecutionViewModel`の対応コマンドと同一で、状態文が`ExecutionViewModel`の文字列と一致し、設定画面を開いただけでは認証確認・loginが開始されない。証跡: テスト結果（.trx）。 |
-| AC-048 | 対応要求: FR-QT-01〜05。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）、Avalonia headless、設問が4件以上の採点定義。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~EvaluatorSettingsViewTests|FullyQualifiedName~CompactWorkflowLayoutTests|FullyQualifiedName~MainWindowSettingsTests"`。期待結果（exit code 0）: ①Automation ID `EvaluatorSettingsQuestions`は`ComboBox`ではなく設問タブ部品で、各設問に1タブが設問の順に並び、タブ文字が設問の表示名である（FR-QT-01、FR-QT-02）。②タブを選ぶと`SelectedQuestion`が変わり、評価方法・評価項目・編集欄がその設問の内容へ切り替わる。`SelectedQuestion`を外部から変更するとタブの選択が追従する（FR-QT-03）。③null選択や入力の同期・並替え後も、ownerの選択は保持され、タブのitemsは`Questions`と同一である（FR-QT-03）。④設問0件では設問なしの案内が表示される（FR-QT-04）。⑤最小window（1024×720 DIP）と200%表示で、タブ領域が横へはみ出さず、各タブの高さが44 DIP以上である（FR-QT-05）。⑥タブ部品にkeyboard（Tab）で到達でき、設定画面を開いた直後の初期focusが設問タブ部品である（FR-QT-05）。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
+| AC-048 | 対応要求: FR-QT-01〜05。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）、Avalonia headless、設問が4件以上の採点定義。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~EvaluatorSettingsViewTests|FullyQualifiedName~CompactWorkflowLayoutTests|FullyQualifiedName~MainWindowSettingsTests"`。期待結果（exit code 0）: ①Automation ID `EvaluatorSettingsQuestions`は`ComboBox`ではなく設問タブ部品で、各設問に1タブが設問の順に並び、タブ文字が設問の表示名である（FR-QT-01、FR-QT-02）。②タブを選ぶと`SelectedQuestion`が変わり、評価方法・評価項目・編集欄がその設問の内容へ切り替わる。`SelectedQuestion`を外部から変更するとタブの選択が追従する（FR-QT-03）。③null選択や入力の同期・並替え後も、ownerの選択は保持され、タブのitemsは`Questions`と同一である（FR-QT-03）。④設問0件では設問なしの案内が表示される（FR-QT-04）。⑤最小window（1024×720 DIP）と200%表示で、タブ領域が横へはみ出さず、各タブの高さが44 DIP以上である（FR-QT-05）。⑥タブ部品にkeyboard（Tab）で到達でき、「2 採点設計」の統合画面（FR-001）を開いた直後の初期focusが基礎配点入力`BasePointsTextBox`である（FR-QT-05）。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
 | AC-049 | 対応要求: FR-MO-01〜05、NFR-MO-01。事前条件: fake認証・Avalonia headless、実通信なし。リポジトリルートで`dotnet test tests\StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ModelOptionsTests|FullyQualifiedName~CopilotModelEnumerationTests|FullyQualifiedName~ModelCatalogTests|FullyQualifiedName~SettingsViewTests|FullyQualifiedName~SettingsAccessibilityTests" --logger trx`を実行。期待: exit 0、SDK順の全model（4097件目も選択可）、重複・disabled・不正ID境界、空一覧、認証失敗からの復旧、思考の順序・defaultラベル・未知値・非対応・auto、272K/1Mと未知容量・int境界、model切替と再取得での無効選択block、設定の旧形式・保存復元・不正値・保存失敗・自動cache保存の非混入・読込競合を検証。選択欄を実画面へbindし、44 DIP・Accessible Name・keyboard到達・局所scrollを検証。証跡: TRXとassertした選択値・型・順序・不変file bytes。 |
 | AC-050 | 対応要求: FR-MO-06〜07。事前条件: fake transportと合成workbook、実通信なし。`dotnet test tests\StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ModelOptionsTests|FullyQualifiedName~EphemeralEvaluationRunnerTests|FullyQualifiedName~AuxiliaryEvaluationRunnerTests|FullyQualifiedName~Resume|FullyQualifiedName~Checkpoint|FullyQualifiedName~ResultExcelDescriptionTests|FullyQualifiedName~ExecutionSettingsTests|FullyQualifiedName~ConfigAndRunSheetWriterTests|FullyQualifiedName~ResultsOutputViewTests" --logger trx`。期待: exit 0、全3種sessionとretryが選択effort/tierを保持、既定tierはnull、拡張prompt budgetへ容量検査が追従、実行中変更は次回だけ、checkpoint round-tripと追記のtier一致・不正tier拒否、旧schema2は既定tier、tier不一致は送信0で`CHECKPOINT_MODEL_MISMATCH`、復元操作でeffort/tierを復旧、Runの26項目と`ContextTier`出力・説明の一致、override出力へのtier継承、入力bytes不変。証跡: TRX、fake sessionのconfig、checkpointと出力assert。 |
 | AC-051 | 対応要求: FR-RV-01〜06、SEC-RV-01、NFR-RV-01、FR-RS-04。事前条件: リポジトリのsource、Avalonia headless、合成definition（主回答列`A`・補助列`B`）と合成run、fakeの入力identity境界・行source、および一時directoryに作った合成`.xlsx`（実CLI・実AI・実資格情報・`sample/`は使わない）。操作: リポジトリルートで`dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultsAnswerReviewTests|FullyQualifiedName~ResultsQuestionTextTests|FullyQualifiedName~ResultsOutputViewTests|FullyQualifiedName~ResponsiveLayoutTests|FullyQualifiedName~PrimaryJourneyAccessibilityTests"`。期待結果（exit code 0）: ①詳細を開くと選択行の基準の`StudentAnswerText`がFR-RV-02の形式（`[列 A · 主回答]\n{値}\n\n[列 B · 補助]\n{値}`、空セルは`（空欄）`、改行保持）と完全一致し、実viewの`ResultsCriterionStudentAnswer`に同じ文字列が出る（FR-RV-01、FR-RV-02）。②一覧表示中は読込0回、詳細表示で選択行の1行だけを読み、同じ行の再表示で読み直さない。入力identityの確認が読込の前後2回行われる（FR-RV-03）。③identity不一致・読込例外で、FR-RV-04の各文言になり、値を出さない。失敗後の再選択で再読込する（FR-RV-04）。④理由・引用・根拠の場所・説明が、成功・引用なし・`NONE`・`SUPPORTING_COLUMN`・空回答・取消・技術失敗の各場合にFR-RV-05の文字列と完全一致し、`ResultsCriterionReason`／`ResultsCriterionEvidence`／`ResultsCriterionEvidenceSource`／`ResultsCriterionDescription`に表示される（FR-RV-05）。⑤表示によって未保存overrideが生じず、出力境界の呼出し0回・`Results`の採点値不変、合成`.xlsx`のバイト列と更新日時が不変で、実ファイルから読んだ回答が表示される（FR-RV-06、FR-RV-03）。⑥読込中に別の行を選んだ・別の実行結果を読み込んだ場合、古い結果が反映されない（NFR-RV-01）。⑦回答・理由・根拠のcanary文字列とファイルパスが、`ToString()`、状態文言、Automation の Name に現れない（SEC-RV-01）。⑧1024×720 DIPの詳細で、override入力欄がviewport内、回答欄・評価欄が高さ44 DIP以上で横にはみ出さず、Automation IDが一意である（NFR-RV-01、FR-RV-01）。⑨設問文は回答欄の先頭に原文で出る（FR-RS-04）。既存のResults系UI試験が引き続き成功する。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
@@ -1337,7 +1338,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 33. exact candidate EXEのfresh OS試験CH-01〜06と公開境界test。matrix v2のclosed 3行／public 4 assets、candidate workflow／run／source／version／hash／sidecar拘束、metadata限定JSONの型・長さ・許可field、MSIXのcandidate検証記録のみ受渡し・本体非upload、再download照合後の最終matrix確定を検証する。unknown／duplicate／missing row、必須試験欠落・FAIL・NOT_RUN、CH-06の任意化、別EXE証跡、機微field、MSIX公開を拒否し、ADV-01／02のNOT_RUNは許容する。開発host／fake成功をclean-host／本人認証の代用にしない（AC-028／029／034）。
 34. 一時absolute pathに限定した設定storeの明示保存・再読込test。fileなし、BOM、型／enum／範囲、schema欠損／不正型／未知版／未知項目、定義なし／不正draft、入力未読込時の保存定義保持、ID／decimal／Unicode／Prompt／canonical hash往復、保存中再編集、atomic置換と旧bytes保持・temp後始末を確認する。Windowsの排他file・file-valued親path等で実際のIO拒否を確認し、ReadOnlyディレクトリだけを拒否根拠にしない。合成header／貼付内容の平文保存、回答自動収集・credential／AI結果非保存・no-content logを検証する。未指定で入力A→Bのresult、明示先の再起動→入力Bでの復元、空欄→null、利用不可no fallback、復元時directory非作成を確認し、実利用者設定を使わない（AC-035）。
 35. 保存定義の明示適用test。Excel未読込／run中の禁止、同入力／別header／sheet・列・行不一致、取消・失敗時のInput metadata／draft／Design／保存file無変更、成功時のID・順序・設問text・Prompt・配点・canonical hash保持を確認する。後続主列変更の既存同期、Imported Prompt一覧・本文・順序不変、AI送信0、既存checkpoint admission維持を検証する（AC-036）。
-36. Input→Design→Settings→Input→Executionの往復と交互編集→保存、入力途中、選択ID／ページ／カテゴリ保持、同じ入力・定義での再開指定非初期化と変更時の再確認、保存希望modelの有／無／欠落・確認失敗、no fallback／no-auto-login/runをfake境界で検証する。実行中の次回編集で現在request／snapshot不変、全画面の進捗・停止、設定中完了の非強制遷移、前回結果とoverrideの保持を確認する。save→新VM／store→read-only Excel明示適用→fake run→別名出力・resumeのdeterministic E2Eで元本、exact100、zero／blank、formula、checkpoint契約を維持する。本人walkthroughは別途実施し未確認を合格にしない（AC-035〜037、AC-016〜019）。
+36. Input→Design→Settings→Input→Executionの往復と交互編集→保存、入力途中、選択ID／ページ／設定内の表示の保持、同じ入力・定義での再開指定非初期化と変更時の再確認、保存希望modelの有／無／欠落・確認失敗、no fallback／no-auto-login/runをfake境界で検証する。実行中の次回編集で現在request／snapshot不変、全画面の進捗・停止、設定中完了の非強制遷移、前回結果とoverrideの保持を確認する。save→新VM／store→read-only Excel明示適用→fake run→別名出力・resumeのdeterministic E2Eで元本、exact100、zero／blank、formula、checkpoint契約を維持する。本人walkthroughは別途実施し未確認を合格にしない（AC-035〜037、AC-016〜019）。
 
 37. 中断後の再開準備、partial picker取消時の状態不変、開始前の項目別再開検証、入力・modelの明示適用、window close時の有限中断待機をdeterministicに確認する。
 
@@ -1467,6 +1468,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | Settings login source | 2026-10-01の要求所有者依頼「GitHub Copilotへのログイン画面がありません。…アプリケーションの起動時に私が介在しなくても自動的にログインを行うようにしているかを確認してください。もしそうでなければ、ログインする機能を添付の[設定]の[共通設定]の中に追加してください。」。§11.17（FR-SETLOGIN-01〜03）とAC-047を追加し、2026-10-05にTR-49と§21の追跡行を補った。削除した要求IDはない。認証・login・token非収集の契約（§11.3、§11.10）は変更しない。新しい仮定はない。要求版はv4.6のままで、製品版・公開版とは独立 |
 | 0.8.6 publication exception | 製品`0.8.6`（2026-10-01公開）は、repository ownerの明示判断により、§13.6〜13.7・AC-028・AC-034が要求するexact EXEのclean-host試験CH-01〜06とprotected publish-release workflowを経ずに、draft解除で公開した。これは受入条件の充足ではなく、要求所有者による例外判断の記録である。受容したリスク: OS-only環境での起動・本人login・MOTW／SmartScreen下の動作が未実測のまま公開されていること。要求は緩和しない。CH-01〜06は`NOT_RUN_EXTERNAL_PREREQUISITE`のままとし、G4・clean-host PASSを付与しない。以後の公開は§13.6〜13.7に従う。例外を解消する条件: 公開済みexact EXEに対するCH-01〜06のPASS、または同条件を満たす後続版の公開 |
 | Requirements review source | 2026-10-05の要求所有者依頼「レビュー結果を詳細に吟味して、要求定義書を更新してください。」。要求定義書レビューの指摘を、実装（`ScoringAllocationCalculator`、`OutputPathPlanner`、`RetryAndCleanupCoordinator`、`SettingsViewModel`のmodel一覧cache自動保存、`ModelOptionPolicy`）と照合して整合した。変更: §1の3（類似度はローカル計算）、§4.4（現行契約と履歴の区別）、§6.2（端数の算出規則）、§7.6（rate limitの再試行回数と総attempt上限）、§8.2（記号）、§8.3（W=0でも参照回答を生成）、§9.1（時刻はOSローカル）、§9.2（`.Similarity_AI_Raw`の名前）、§10.3・§10.4・AC-015・TR-14（Context Size tier）、§11.6・AC-035（`modelPreferences`・`cachedModels`と自動保存の例外）、§11.8・AC-037（login完了後の自動再確認）、§11.9、§11の実行画面の記述、FR-MO-03（表示規則）、§11.12の例、§11.16の例の位置、設問タブの§11.18→§11.22への改番と出典、§11の節順の整列、§17.1、§19（TR-49〜50）、§21、§22（本行・Settings login source・0.8.6 publication exception）、§23の前文、冒頭の同版内追補の方針。要求IDの削除・意味変更はない（記述を実装済み挙動へ一致させた）。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Legacy ID cleanup source | 2026-11-02の利用者承認。ADR・preflight・fixturesの旧ID参照は節番号などへ付け替え完了。旧番号体系のID（FR-0xx・NFR-xxx-00x）の廃止定義59個を持つ§24を削除した。要求の意味は変更しない。§24は欠番とする。 |
 | Meaning | repository要求baselineの承認記録。実装完了・試験成功・release存在・tag／push／draft／公開操作の承認、組織の法務・教育・security承認または電子署名を意味しない |
 
 ## 23. 仮定・未解決事項
@@ -1523,134 +1525,11 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | A-CD-02 | [ASSUMPTION] | 依頼文のKnowledge Cover本文の「行ってださい」は誤字と判断し、「行ってください」で実装する。それ以外の文字（`{論点}`、`論点:`、`- xxx`）は依頼どおりとする。根拠: 同じ依頼のPrompt 分析本文が「行ってください」であり、意図が明らかな誤記。影響: 依頼原文と1文字（「だ」→「く」）異なる。覆す条件: 原文どおりの綴りを求められた場合は`DefaultCriterionDescriptions.Knowledge`を直す。 |
 | A-CD-03 | [ASSUMPTION] | 「初期値」は新規作成時の値であり、保存済み・読込済みの採点定義や既存の評価項目の説明は書き換えない。本文中の`{論点}`はAI Promptのplaceholderではなく説明文中の記載で、評価項目の説明はPromptへ値として挿入されるため再解釈されない（§5.4）。根拠: 既存データの暗黙の書換えは利用者の編集を失わせる。影響: 既存の定義の説明は従来のままである。覆す条件: 既存の説明の一括更新を求められた場合。 |
 
-## 24. 旧番号体系のID（参照互換）
-
-ADR（`dev/docs/adr/`）・preflight・release記録・試験fixture（`tests/fixtures/specs/`）が参照する数値ID（FR-0xx・NFR-xxx-00x）は、現行の要求定義書の番号体系（§3〜§16の節と FR-QT-01 などの接頭辞つきID）に引き継がれる前の旧番号である。現行の本書にその番号の要求本文はなく、内容の正本は本書の該当節である。本節は参照先を「廃止」として明示するだけで、要求を新設・変更しない。各IDの現行の節への対応付けは、担当 implementer の依頼として残す（要求の意味は変えない）。
-
-#### FR-004 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-005 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-006 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-007 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-008 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-009 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-010 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-011 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-013 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-015 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-016 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-017 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-020 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-028 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-030 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-031 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-032 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-035 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-036 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-038 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-041 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-042 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-044 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-045 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-047 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-048 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-052 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-058 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-060 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-063 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-064 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-065 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-070 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-071 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-072 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-073 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-074 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-075 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-076 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-080 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-081 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-083 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-085 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-087 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-088 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-089 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-092 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-102 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-103 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-104 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### FR-106 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### NFR-ACC-005 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### NFR-PRI-001 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### NFR-PRI-006 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### NFR-REL-003 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### NFR-SEC-001 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### NFR-SEC-003 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### NFR-SEC-005 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-#### NFR-SEC-006 旧番号
-- 決定状態: 廃止（依頼 2026-11-02）　出自: 旧版
-
 ## 25. 監査指摘
 
 | ID | 日付 | カテゴリ | 重大度 | 位置 | 要約 | 状態 |
 |---|---|---|---|---|---|---|
 | C-1 | 2026-11-02 | 矛盾 | 中 | FR-DOC-01 | 「設問の詳細」が入力詳細画面を開くという記述が、FR-003と食い違っていた。Q-001回答BでFR-DOC-01〜04・AC-044を廃止し解消（AC-059）。 | 解決済み |
-| C-2 | 2026-11-02 | 矛盾 | 低 | AC-048 ⑥ | 初期focusの記述が統合画面（FR-001）の構成と合わない。本文は利用者判断のため直さない。 | 未解決 |
-| C-3 | 2026-11-02 | 用語 | 低 | 行1184・行1281・§11.8・AC-037 | 「5 カテゴリ」「カテゴリ」の記述が統合後の画面構成と合わない。本文は利用者判断のため直さない。 | 未解決 |
+| C-2 | 2026-11-02 | 矛盾 | 低 | AC-048 ⑥ | 初期focusの記述が統合画面（FR-001）の構成と合わない。利用者承認（2026-11-02）で本文を直した（FR-QT-05、AC-048 ⑥）。 | 解決済み |
+| C-3 | 2026-11-02 | 用語 | 低 | 行1184・行1281・§11.8・AC-037 | 「5 カテゴリ」「カテゴリ」の記述が統合後の画面構成と合わない。利用者承認（2026-11-02）で本文を直した（§11.5・§11.8・§11.22・AC-037・§18）。 | 解決済み |
 | C-4 | 2026-11-02 | 競合 | 高 | FR-003 | 置き場所が未決のまま入口だけが除去されていた。Q-001回答Bで機能の廃止を決定し解消。実装の編集UI・読込Prompt適用のコードの除去はAC-057・058で確かめる。 | 解決済み |

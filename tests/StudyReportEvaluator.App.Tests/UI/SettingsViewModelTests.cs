@@ -134,7 +134,6 @@ public sealed class SettingsViewModelTests
         byte[] original = File.ReadAllBytes(harness.SettingsPath);
         QuantificationDefinition inputBefore = harness.Input.DefinitionDraft;
         QuantificationDefinition designBefore = harness.Design.Draft;
-        ImportedPromptViewModel[] prompts = harness.Design.ImportedPrompts.ToArray();
 
         await harness.Settings.InitializeAsync(TestContext.Current.CancellationToken);
 
@@ -150,7 +149,6 @@ public sealed class SettingsViewModelTests
         Assert.Same(designBefore, harness.Design.Draft);
         Assert.NotSame(saved.Definition, settings.StoredDefinition);
         AssertDefinition(saved.Definition!, settings.StoredDefinition);
-        Assert.Equal(prompts, harness.Design.ImportedPrompts);
         Assert.False(settings.CanApplySavedDefinition);
         Assert.False(settings.CanEditDefinition);
         Assert.False(settings.HasUnsavedChanges);
@@ -522,8 +520,6 @@ public sealed class SettingsViewModelTests
         harness.Design.PageIndex = 100;
         harness.Design.SelectedQuestion = null;
         harness.Design.SelectedQuestion = question;
-        harness.Design.SelectedImportedPrompt = harness.Design.ImportedPrompts[1];
-        harness.Design.SelectedPromptTarget = ImportedPromptTarget.SpecialEvaluation;
         harness.Settings.SynchronizeDrafts();
         harness.Settings.SynchronizeDrafts();
         harness.Settings.RequestCloseCommand.Execute(null);
@@ -878,7 +874,6 @@ public sealed class SettingsViewModelTests
         harness.Execution.Configure(latest, harness.Input.Metadata!, harness.InputPath);
         Assert.EndsWith("result", harness.Execution.OutputDirectory, StringComparison.Ordinal);
         Assert.Null(harness.Execution.OutputDirectoryOverride);
-        harness.Design.SelectedImportedPrompt = harness.Design.ImportedPrompts[1];
         harness.Settings.SelectedCategory = SettingsCategory.ImportedPrompts;
         harness.Execution.SelectedModelId = "unconfirmed-preference";
         harness.Execution.MaxConcurrency = 3;
@@ -929,7 +924,7 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task Explicit_apply_updates_both_editors_on_success_and_preserves_instances_and_imported_prompts()
+    public async Task Explicit_apply_updates_both_editors_on_success_and_preserves_instances()
     {
         using SettingsHarness harness = new();
         ApplicationSettings saved = SavedSettings(harness);
@@ -944,8 +939,6 @@ public sealed class SettingsViewModelTests
         QuestionDesignItemViewModel question = harness.Design.Questions[0];
         EvaluatorDesignItemViewModel evaluator = question.Evaluators[0];
         CriterionDesignItemViewModel criterion = evaluator.Criteria[0];
-        ImportedPromptViewModel[] prompts = harness.Design.ImportedPrompts.ToArray();
-        harness.Design.SelectedImportedPrompt = prompts[1];
         int previousCalls = harness.Loader.CallCount;
 
         harness.Settings.ApplySavedDefinitionCommand.Execute(null);
@@ -959,8 +952,6 @@ public sealed class SettingsViewModelTests
         Assert.Same(question, harness.Design.SelectedQuestion);
         Assert.Same(evaluator, question.SelectedEvaluator);
         Assert.Same(criterion, evaluator.SelectedCriterion);
-        Assert.Same(prompts[1], harness.Design.SelectedImportedPrompt);
-        Assert.Equal(prompts, harness.Design.ImportedPrompts);
         Assert.Contains("適用しました", harness.Settings.ApplyStatusText, StringComparison.Ordinal);
         Assert.False(harness.Settings.IsApplying);
         Assert.False(harness.Settings.HasUnsavedChanges);
@@ -1511,11 +1502,7 @@ public sealed class SettingsViewModelTests
         {
             Store = new SettingsFileStore(SettingsPath);
             Input = new InputViewModel(Loader);
-            Design = new QuantificationDesignViewModel(null, null,
-            [
-                new ImportedPrompt { Path = Path.Combine(Root, "02.txt"), DisplayName = "02.txt", Content = "UNAPPLIED-T10-CUSTOM {回答} {評価項目}" },
-                new ImportedPrompt { Path = Path.Combine(Root, "01.txt"), DisplayName = "01.txt", Content = "UNAPPLIED-T10-SPECIAL {回答}" },
-            ]);
+            Design = new QuantificationDesignViewModel(null, null);
             Authentication = new RecordingAuthenticationBoundary(authenticationState == ExecutionAuthenticationState.Available
                 ? new ExecutionAuthenticationSnapshot(ExecutionAuthenticationState.Available,
                     [U04TestSupport.Model("model-test"), U04TestSupport.Model("auto")], U04TestSupport.RuntimeIdentity())

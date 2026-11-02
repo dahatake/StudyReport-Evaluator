@@ -29,7 +29,6 @@ public sealed class DesignStateTests
         UiObservableObject[] items = EnumerateEditorItems(viewModel).ToArray();
         List<string?> propertyChanges = [];
         int collectionChanges = 0;
-        int commandChanges = 0;
         foreach (UiObservableObject item in items)
         {
             item.PropertyChanged += (_, args) => propertyChanges.Add(args.PropertyName);
@@ -51,7 +50,6 @@ public sealed class DesignStateTests
             }
         }
 
-        viewModel.ApplyImportedPromptCommand.CanExecuteChanged += (_, _) => commandChanges++;
         Assert.NotSame(draft, incoming);
         Assert.NotSame(draft.Questions[1], incoming.Questions[1]);
         Assert.NotSame(draft.Questions[1].Evaluators[1], incoming.Questions[1].Evaluators[1]);
@@ -84,7 +82,6 @@ public sealed class DesignStateTests
 
         Assert.Empty(propertyChanges);
         Assert.Equal(0, collectionChanges);
-        Assert.Equal(0, commandChanges);
         Assert.Equal(60m, viewModel.BasePoints);
         Assert.Equal(0m, viewModel.SpecialPoints);
         Assert.Equal(0.1m, viewModel.SimilarityPenaltyWeight);
@@ -461,8 +458,6 @@ public sealed class DesignStateTests
         specials[0].DeleteCommand.Execute(null);
         Assert.Null(question.SelectedSpecialEvaluation);
         Assert.Empty(question.SpecialEvaluations);
-        question.AddSpecialEvaluationCommand.Execute(null);
-        Assert.Same(Assert.Single(question.SpecialEvaluations), question.SelectedSpecialEvaluation);
 
         evaluators[1].DeleteCommand.Execute(null);
         Assert.Same(evaluators[2], question.SelectedEvaluator);
@@ -574,8 +569,6 @@ public sealed class DesignStateTests
         addedCriterion.DeleteCommand.Execute(null);
         AssertSelection(viewModel, question, evaluator, criterion, special);
 
-        question.AddSpecialEvaluationCommand.Execute(null);
-        SpecialEvaluationDesignItemViewModel addedSpecial = question.SpecialEvaluations[^1];
         special.DuplicateCommand.Execute(null);
         SpecialEvaluationDesignItemViewModel copiedSpecial = question.SpecialEvaluations[2];
         Assert.NotEqual(special.Id, copiedSpecial.Id);
@@ -583,7 +576,6 @@ public sealed class DesignStateTests
         Assert.Same(special, question.SpecialEvaluations[0]);
         special.MoveDownCommand.Execute(null);
         copiedSpecial.DeleteCommand.Execute(null);
-        addedSpecial.DeleteCommand.Execute(null);
         AssertSelection(viewModel, question, evaluator, criterion, special);
 
         question.QuestionText = "同期後の手動編集";
@@ -603,133 +595,6 @@ public sealed class DesignStateTests
         Assert.Equal("1", original.Definition.Revision);
         Assert.Null(original.Definition.Questions[1].Evaluators[1].Criteria[1].Range);
         AssertSelection(viewModel, question, evaluator, criterion, special);
-    }
-
-    [Fact]
-    public void Imported_prompts_remain_ordered_and_require_explicit_apply()
-    {
-        ImportedPrompt[] sources = CreatePrompts();
-        QuantificationDesignViewModel viewModel = CreateDesign(sources);
-        SelectSecondItems(viewModel);
-        QuestionDesignItemViewModel question = viewModel.Questions[1];
-        EvaluatorDesignItemViewModel evaluator = question.Evaluators[1];
-        SpecialEvaluationDesignItemViewModel special = question.SpecialEvaluations[1];
-        var prompts = viewModel.ImportedPrompts;
-        ImportedPromptViewModel first = prompts[0];
-        ImportedPromptViewModel second = prompts[1];
-        var apply = viewModel.ApplyImportedPromptCommand;
-        string? customTemplate = evaluator.CustomPromptTemplate;
-        string specialTemplate = special.PromptTemplate;
-        viewModel.SelectedImportedPrompt = second;
-        viewModel.SelectedPromptTarget = ImportedPromptTarget.SpecialEvaluation;
-
-        viewModel.SynchronizeFromInput(CloneForInput(viewModel.Draft), viewModel.AvailableColumnNames);
-        viewModel.SynchronizeFromInput(viewModel.Draft with { Name = "入力で改名" }, ["C", "B", "A"]);
-
-        Assert.Same(prompts, viewModel.ImportedPrompts);
-        Assert.Same(first, prompts[0]);
-        Assert.Same(second, prompts[1]);
-        Assert.Same(second, viewModel.SelectedImportedPrompt);
-        Assert.Same(apply, viewModel.ApplyImportedPromptCommand);
-        Assert.Same(sources[0], viewModel.ImportedPromptSources[0]);
-        Assert.Same(sources[1], viewModel.ImportedPromptSources[1]);
-        Assert.Equal(["02-custom.txt", "01-special.txt"], prompts.Select(item => item.DisplayName));
-        Assert.Equal(sources.Select(item => item.Content), prompts.Select(item => item.Content));
-        Assert.Equal(ImportedPromptTarget.SpecialEvaluation, viewModel.SelectedPromptTarget);
-        Assert.Equal(second.Content, viewModel.ImportedPromptPreview);
-        Assert.Equal(customTemplate, evaluator.CustomPromptTemplate);
-        Assert.Equal(specialTemplate, special.PromptTemplate);
-        Assert.True(apply.CanExecute(null));
-
-        apply.Execute(null);
-
-        Assert.Equal(second.Content, special.PromptTemplate);
-        Assert.Equal(customTemplate, evaluator.CustomPromptTemplate);
-        Assert.Equal(specialTemplate, question.SpecialEvaluations[0].PromptTemplate);
-        viewModel.SelectedPromptTarget = ImportedPromptTarget.CustomEvaluator;
-        viewModel.SelectedImportedPrompt = first;
-        apply.Execute(null);
-        Assert.Equal(first.Content, evaluator.CustomPromptTemplate);
-        Assert.Null(question.Evaluators[0].CustomPromptTemplate);
-        Assert.Equal(second.Content, special.PromptTemplate);
-
-        viewModel.SynchronizeFromInput(viewModel.Draft with { Questions = [] }, []);
-
-        Assert.Null(viewModel.SelectedQuestion);
-        Assert.False(apply.CanExecute(null));
-        Assert.Same(first, viewModel.SelectedImportedPrompt);
-        Assert.Same(prompts, viewModel.ImportedPrompts);
-        Assert.Equal(sources.Select(item => item.Content), prompts.Select(item => item.Content));
-        Assert.Equal(ImportedPromptTarget.CustomEvaluator, viewModel.SelectedPromptTarget);
-    }
-
-    [Fact]
-    public void Sync_refreshes_apply_command_when_evaluator_type_changes()
-    {
-        QuantificationDesignViewModel viewModel = CreateDesign(CreatePrompts());
-        SelectSecondItems(viewModel);
-        QuestionDesignItemViewModel question = viewModel.Questions[1];
-        EvaluatorDesignItemViewModel evaluator = question.Evaluators[1];
-        var apply = viewModel.ApplyImportedPromptCommand;
-        List<string?> properties = [];
-        int commandChanges = 0;
-        viewModel.PropertyChanged += (_, args) => properties.Add(args.PropertyName);
-        apply.CanExecuteChanged += (_, _) => commandChanges++;
-        Assert.True(apply.CanExecute(null));
-        QuantificationDefinition incoming = CloneForInput(viewModel.Draft);
-        QuestionDefinition nextQuestion = incoming.Questions[1];
-        nextQuestion = nextQuestion with
-        {
-            Evaluators = nextQuestion.Evaluators.SetItem(1, nextQuestion.Evaluators[1] with
-            {
-                Type = EvaluatorType.KnowledgeCoverage,
-                BuiltInTemplateVersion = BuiltInPromptTemplates.KnowledgeTemplateVersion,
-                CustomPromptTemplate = null,
-            }),
-        };
-        incoming = incoming with { Questions = incoming.Questions.SetItem(1, nextQuestion) };
-
-        viewModel.SynchronizeFromInput(incoming, viewModel.AvailableColumnNames);
-
-        Assert.Same(evaluator, question.SelectedEvaluator);
-        Assert.True(evaluator.IsKnowledge);
-        Assert.False(viewModel.CanApplyImportedPrompt);
-        Assert.False(apply.CanExecute(null));
-        Assert.True(commandChanges > 0);
-        Assert.Contains(nameof(QuantificationDesignViewModel.CanApplyImportedPrompt), properties);
-        QuantificationDefinition knowledgeDraft = viewModel.Draft;
-        apply.Execute(null);
-        Assert.Same(knowledgeDraft, viewModel.Draft);
-
-        nextQuestion = nextQuestion with
-        {
-            Evaluators = nextQuestion.Evaluators.SetItem(1, nextQuestion.Evaluators[1] with
-            {
-                Type = EvaluatorType.CustomPrompt,
-                BuiltInTemplateVersion = null,
-                CustomPromptTemplate = "編集中の不完全なtemplate",
-            }),
-        };
-        incoming = incoming with { Questions = incoming.Questions.SetItem(1, nextQuestion) };
-        properties.Clear();
-        commandChanges = 0;
-
-        viewModel.SynchronizeFromInput(incoming, viewModel.AvailableColumnNames);
-
-        Assert.Same(evaluator, question.SelectedEvaluator);
-        Assert.False(viewModel.IsValid);
-        Assert.Contains(viewModel.ValidationErrors, error => error.NodeId == evaluator.Id);
-        Assert.True(apply.CanExecute(null));
-        Assert.True(commandChanges > 0);
-        Assert.Contains(nameof(QuantificationDesignViewModel.CanApplyImportedPrompt), properties);
-        QuantificationDefinition invalidDraft = viewModel.Draft;
-        viewModel.SynchronizeFromInput(CloneForInput(invalidDraft), viewModel.AvailableColumnNames);
-        Assert.Same(invalidDraft, viewModel.Draft);
-
-        apply.Execute(null);
-
-        Assert.Equal(viewModel.ImportedPrompts[0].Content, evaluator.CustomPromptTemplate);
-        Assert.True(viewModel.IsValid);
     }
 
     [Fact]
@@ -764,7 +629,7 @@ public sealed class DesignStateTests
         Assert.Null(evaluator.SelectedCriterion);
     }
 
-    private static QuantificationDesignViewModel CreateDesign(IEnumerable<ImportedPrompt>? prompts = null)
+    private static QuantificationDesignViewModel CreateDesign()
     {
         QuantificationDefinition seed = new QuantificationDesignViewModel().Draft;
         QuestionDefinition question = seed.Questions[0];
@@ -810,24 +675,8 @@ public sealed class DesignStateTests
                     ],
                 }),
             ],
-        }, ["A", "B", "C"], prompts);
+        }, ["A", "B", "C"]);
     }
-
-    private static ImportedPrompt[] CreatePrompts() =>
-    [
-        new ImportedPrompt
-        {
-            Path = "02-custom.txt",
-            DisplayName = "02-custom.txt",
-            Content = "Custom import\n{回答} {評価項目}",
-        },
-        new ImportedPrompt
-        {
-            Path = "01-special.txt",
-            DisplayName = "01-special.txt",
-            Content = "Special import\r\n{回答}",
-        },
-    ];
 
     private static void SelectSecondItems(QuantificationDesignViewModel viewModel)
     {

@@ -536,11 +536,6 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
                         Assert-GuiStillLive
                         $settings = Find-Control 'SettingsView'
                         [void](Find-Control 'SettingsCategoryCommon' $settings)
-                        $removedCondition = [Windows.Automation.PropertyCondition]::new(
-                            [Windows.Automation.AutomationElement]::AutomationIdProperty, 'ImportedPromptSettingsView')
-                        if ($null -ne $settings.FindFirst([Windows.Automation.TreeScope]::Descendants, $removedCondition)) {
-                            throw 'Settings still exposes the removed imported-Prompt category.'
-                        }
                         $back = Find-Control 'SettingsRequestClose' $settings
                         if ($back.Current.Name -cne '設定から元のステップへ戻る' -or -not $back.Current.IsEnabled) {
                             throw 'Settings did not expose the labelled return-to-step button.'
@@ -929,25 +924,7 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
 
     private static string FindPowerShellCoreExecutable()
     {
-        HashSet<string> candidates = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
-                     .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            candidates.Add(Path.Combine(directory.Trim('"'), "pwsh.exe"));
-        }
-
-        string installed = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "PowerShell");
-        if (Directory.Exists(installed))
-        {
-            foreach (string directory in Directory.EnumerateDirectories(installed)) { candidates.Add(Path.Combine(directory, "pwsh.exe")); }
-        }
-
-        return candidates.Where(File.Exists).Select(path => (Path: path, Info: FileVersionInfo.GetVersionInfo(path)))
-            .Where(candidate => candidate.Info.FileMajorPart >= 7)
-            .OrderByDescending(candidate => new Version(candidate.Info.FileMajorPart, candidate.Info.FileMinorPart,
-                candidate.Info.FileBuildPart, candidate.Info.FilePrivatePart))
-            .Select(candidate => Path.GetFullPath(candidate.Path)).FirstOrDefault()
-            ?? throw new FileNotFoundException("P06 observer requires installed PowerShell Core 7+; no Windows PowerShell fallback.");
+        return PowerShellCoreLocator.Find("P06 observer requires installed PowerShell Core 7+; no Windows PowerShell fallback.");
     }
 
     private static string FindWindowsDesktopRuntime()

@@ -69,9 +69,9 @@ public sealed partial class RealDataSystemSmokeTests
 
         string repositoryRoot = FindRepositoryRoot();
         string inputPath = RequiredAbsoluteFile(InputEnvironmentVariable);
-        string canonicalSamplePath = Path.Combine(repositoryRoot, "sample", "SampleReport.xlsx");
         Assert.True(
-            PathsEqual(inputPath, canonicalSamplePath),
+            E02RepositoryLayout.EnumerateSampleDirectories()
+                .Any(directory => PathsEqual(inputPath, Path.Combine(directory, "SampleReport.xlsx"))),
             "The technical E2E input must be the canonical SampleReport.xlsx path.");
         string evidencePath = RequiredAbsolutePath(EvidenceEnvironmentVariable);
         AssertEvidencePathDoesNotOverwriteInput(evidencePath, inputPath);

@@ -501,16 +501,69 @@ internal static class E02RepositoryLayout
 
     internal static string GetRequiredSamplePath()
     {
-        string path = Path.Combine(
-            FindRepositoryRoot(),
-            "sample",
-            "SampleReport.xlsx");
-        if (!File.Exists(path))
+        foreach (string directory in EnumerateSampleDirectories())
         {
-            throw new InvalidOperationException("The required repository sample workbook is missing.");
+            string path = Path.Combine(directory, "SampleReport.xlsx");
+            if (File.Exists(path))
+            {
+                return path;
+            }
         }
 
-        return path;
+        throw new InvalidOperationException("The required repository sample workbook is missing.");
+    }
+
+    // Order: repository-relative sample/, STUDYREPORT_SAMPLE_DIR, sample/ of the main working tree
+    // (resolved through the .git file / commondir when running from a linked git worktree).
+    internal static IEnumerable<string> EnumerateSampleDirectories()
+    {
+        string root = FindRepositoryRoot();
+        yield return Path.Combine(root, "sample");
+
+        string? configured = Environment.GetEnvironmentVariable("STUDYREPORT_SAMPLE_DIR");
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            yield return configured.Trim().Trim('"');
+        }
+
+        string? main = FindMainWorkingTreeRoot(root);
+        if (main is not null)
+        {
+            yield return Path.Combine(main, "sample");
+        }
+    }
+
+    private static string? FindMainWorkingTreeRoot(string root)
+    {
+        try
+        {
+            string dotGit = Path.Combine(root, ".git");
+            string gitDirectory;
+            if (Directory.Exists(dotGit))
+            {
+                return root;
+            }
+
+            if (!File.Exists(dotGit))
+            {
+                return null;
+            }
+
+            string line = File.ReadLines(dotGit).FirstOrDefault(l => l.StartsWith("gitdir:", StringComparison.Ordinal)) ?? string.Empty;
+            gitDirectory = Path.GetFullPath(line["gitdir:".Length..].Trim(), root);
+            string commonFile = Path.Combine(gitDirectory, "commondir");
+            if (!File.Exists(commonFile))
+            {
+                return null;
+            }
+
+            string common = Path.GetFullPath(File.ReadAllText(commonFile).Trim(), gitDirectory);
+            return Path.GetDirectoryName(common.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return null;
+        }
     }
 
 

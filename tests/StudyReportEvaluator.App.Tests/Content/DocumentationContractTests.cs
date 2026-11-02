@@ -43,7 +43,9 @@ public sealed class DocumentationContractTests
             "設定 → 固有評価", "固有評価 → 項目設定", "Imported Prompts", "Imported Promptを",
         ];
         foreach (string path in Directory.EnumerateFiles(Path.Combine(root, "docs"), "*.md")
-                     .Where(file => !Path.GetFileName(file).StartsWith("requirements-definition", StringComparison.Ordinal)))
+                     .Where(file => !Path.GetFileName(file).StartsWith("requirements-definition", StringComparison.Ordinal))
+                     // AC-059 で対象外と明記: ID 台帳は廃止項目名を履歴として保持する。
+                     .Where(file => !string.Equals(Path.GetFileName(file), "id-registry.md", StringComparison.Ordinal)))
         {
             string text = File.ReadAllText(path);
             foreach (string phrase in retiredPhrases)
@@ -1248,7 +1250,7 @@ public sealed class DocumentationContractTests
             ("AC-013", ["VERIFIED_SCOPED"], "ExecutionSettingsTests"),
             ("AC-016", ["VERIFIED_SCOPED"], "ResponsiveLayoutTests"),
             ("AC-017", ["VERIFIED_SCOPED"], "EthicsWarningTests"),
-            ("AC-018", ["VERIFIED_SCOPED"], "ImportedPromptSettingsViewTests"),
+            ("AC-018", ["VERIFIED_SCOPED"], "LaunchOptionsTests"),
             ("AC-022", ["NOT_RUN_CURRENT_CANDIDATE", "VERIFIED_SCOPED", "PASS_REQUIRED"], "DocumentationContractTests"),
             ("AC-029", ["NOT_RUN_EXTERNAL_PREREQUISITE"], "CH-01"),
             ("AC-032", ["VERIFIED_SCOPED"], "WindowsSingleFilePackageTests"),
@@ -1258,7 +1260,7 @@ public sealed class DocumentationContractTests
             ("AC-036", ["VERIFIED_SCOPED"], "SavedDefinitionApplicationTests"),
             ("AC-037", ["VERIFIED_SCOPED"], "WorkflowStateTests"),
             ("TR-17", ["VERIFIED_SCOPED"], "CompactWorkflowLayoutTests"),
-            ("TR-18", ["VERIFIED_SCOPED"], "ImportedPromptSettingsViewTests"),
+            ("TR-18", ["VERIFIED_SCOPED"], "LaunchOptionsTests"),
             ("TR-22", ["NOT_RUN_CURRENT_CANDIDATE", "VERIFIED_SCOPED", "PASS_REQUIRED"], "DocumentationContractTests"),
             ("TR-31", ["VERIFIED_SCOPED"], "WindowsSingleFilePackageTests"),
             ("TR-32", ["NOT_RUN_EXTERNAL_PREREQUISITE"], "BundledCopilotLoginServiceTests"),

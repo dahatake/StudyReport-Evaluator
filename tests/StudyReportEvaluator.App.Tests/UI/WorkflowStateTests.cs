@@ -59,7 +59,6 @@ public sealed class WorkflowStateTests
         QuestionDesignItemViewModel question = fixture.Design.SelectedQuestion!;
         EvaluatorDesignItemViewModel evaluator = question.SelectedEvaluator!;
         CriterionDesignItemViewModel criterion = evaluator.SelectedCriterion!;
-        ImportedPromptViewModel[] prompts = fixture.Design.ImportedPrompts.ToArray();
 
         Edit(ById<TextBox>(designView, $"DesignEvaluator-{evaluator.Id}-Name"), "T24 evaluator");
         Edit(ById<TextBox>(designView, $"DesignEvaluator-{evaluator.Id}-Weight"), "2.5");
@@ -72,7 +71,6 @@ public sealed class WorkflowStateTests
         string outputDirectory = Path.Combine(fixture.Workbook.Directory, "明示出力先");
         Edit(ById<TextBox>(settings, "ExecutionOutputDirectory"), outputDirectory);
         Assert.IsType<TabControl>(CategoryContent(settings));
-        Assert.Equal(prompts, fixture.Design.ImportedPrompts);
 
         // Save directly from either final editing surface, not after a manual SynchronizeDrafts call.
         string finalQuestionText = "T24 手動の設問文";
@@ -552,7 +550,6 @@ public sealed class WorkflowStateTests
         ExecutionRunContext completed = await RunAsync(fixture);
         QuantificationRunRequest previous = fixture.Runner.LastRequest!;
         ResultsCriterionViewModel[] previousResults = fixture.Results.Results.ToArray();
-        ImportedPromptViewModel[] prompts = fixture.Design.ImportedPrompts.ToArray();
         Go(fixture, WorkflowStep.Execution);
         string partial = fixture.CreateCheckpointPartial();
         SetResume(fixture, partial, true);
@@ -592,7 +589,6 @@ public sealed class WorkflowStateTests
             Assert.Equal(failApply, fixture.Execution.IsResumeMode);
             Assert.Equal(failApply ? partial : string.Empty, fixture.Execution.ResumePartialPath);
             Assert.Equal(previousResults, fixture.Results.Results);
-            Assert.Equal(prompts, fixture.Design.ImportedPrompts);
             Assert.Same(reload, fixture.Shell.Settings.LastLoadTask);
             Assert.Null(fixture.Shell.Settings.LastSaveTask);
             Assert.Equal(2, fixture.Loader.CallCount);
@@ -894,13 +890,7 @@ public sealed class WorkflowStateTests
             WorkbookHash = SHA256.HashData(File.ReadAllBytes(workbook.Path));
             Input = input;
             Loader = loader;
-            Design = new QuantificationDesignViewModel(input.DefinitionDraft, input.AvailableColumnNames,
-                Enumerable.Range(1, 2).Select(index => new ImportedPrompt
-                {
-                    Path = Path.Combine(workbook.Directory, $"unapplied-{index}.txt"),
-                    DisplayName = $"unapplied-{index}.txt",
-                    Content = $"未適用 {index.ToString(CultureInfo.InvariantCulture)}: {{回答}} {{評価項目}}",
-                })); // In-memory synthetic launch inputs, never read through PromptFileLoader.
+            Design = new QuantificationDesignViewModel(input.DefinitionDraft, input.AvailableColumnNames);
             Runner = new RecordingRunBoundary((request, progress, token) => RunHandler(request, progress, token));
             Execution = new ExecutionViewModel(Authentication, Runner, new BundledCopilotLoginService(
                 Login, _ => throw new InvalidOperationException("T24 must not create a login process.")),

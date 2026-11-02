@@ -7,7 +7,7 @@
 |---|---|
 | 状態 | **承認済み・G-08完了・要求v1.2へG-RB反映済み（DEC-15/16/20最終選択はG-17待ち）** |
 | 対象決定 | DEC-15、DEC-16、DEC-20 |
-| 要求 | FR-103、NFR-SEC-005、NFR 9.6、SET-001〜008 |
+| 要求 | §13.2、NFR 9.6、SET-001〜008 |
 | 決定 | 候補、不変条件、試験matrixだけを固定する。native Wayland、印刷方式、package形式を実証前に採用しない |
 | 承認根拠 | ADR-0001 の承認証跡（実装前 decision gate は既定案） |
 | 記録日 | 2026-08-31 |
@@ -17,7 +17,7 @@
 G-08で承認するのは、G-17が比較する候補と合否条件である。G-RBはこの候補matrixと未解決blockerを正本へ取り込むだけで、DEC-15/16/20を採用済みに変換しない。G-17はG-RB後、かつEXT-07のrunner/signing/Arm64/printer入力が揃った行だけを実行し、そのevidenceから最終decisionを発行する。次はまだ承認しない。
 
 - 「Wayland」がnative Waylandだけを意味するか、Wayland desktop上のXWaylandを含むか。
-- FR-103を満たすproduction印刷adapter。
+- §13.2を満たすproduction印刷adapter。
 - Windows、macOS、Ubuntuで正式配布する各1形式。
 - 未取得のproduction code-signing identity、Apple notarization、Arm64実機、printer/spooler結果。
 
@@ -41,7 +41,7 @@ Avalonia coreだけに依存するproduction方式は未確定である。現行
 
 - `Avalonia.Controls.WebView` の `NativeWebDialog.ShowPrintUI()` はWindows/macOS/Linux desktopでplatform print dialogを開く。ただしLinuxではWebKitGTKとGTK 3等の追加runtimeが必要で、Wayland sessionでもWebKitGTKはXWaylandを使う。native browser profile/cacheとpackage/license/supply-chainを検証する必要がある。
 - WindowsにはGDI/XPS等のOS printing API、macOSには`NSPrintOperation`、Linuxには`GtkPrintOperation`/CUPSがある。いずれもAvalonia viewをそのまま安全に印刷できることを意味せず、platform adapter、pagination、lifetime、cancel、spooler privacyの実証が必要である。
-- PDF stream生成、XLSX export、browserへのfile handoffは印刷とは別操作である。appがそれらを生成する方式をFR-103の「印刷」の代替にしない。
+- PDF stream生成、XLSX export、browserへのfile handoffは印刷とは別操作である。appがそれらを生成する方式を§13.2の「印刷」の代替にしない。
 
 ### 配布
 
@@ -92,7 +92,7 @@ DISP-X11/DISP-WL-XWは1件でも未実行、失敗、backend不明ならその�
 
 ### Privacy-first input contract
 
-print adapterはcollection、workbook、file pathを受け取らず、R-11が生成するimmutableな単一 `RowExplanation` だけを受け取る。初版の表示/印刷fieldはFR-103の次の項目に閉じる。
+print adapterはcollection、workbook、file pathを受け取らず、R-11が生成するimmutableな単一 `RowExplanation` だけを受け取る。初版の表示/印刷fieldは§13.2の次の項目に閉じる。
 
 - 使用した設問のID/表示文。
 - 評価項目と点数anchor。
@@ -127,7 +127,7 @@ PRINT-NATIVEはOSごとに別adapterとしてよいが、同じ`RowExplanation`�
 7. app-owned cache/temp/log/sessionをclose直後とapp再起動後にcanary走査し、本文残存0。`RowExplanation`はpreview lifetimeを越えてdurable cacheへ保存せず、参照を解放し、mutable bufferだけbest-effort zeroする。managed memory、swap、OS crash dump、OS spoolerを完全消去できるとは称しないため、EXT-09 dump policyとprint operations policyがない実データ印刷をblockする。
 8. screen readerとkeyboardでpreview、Print、Cancel、error/actionを操作・認識できる。
 
-全OS/arch/display行で1候補が成立するまでFR-103 printを実装へ進めない。OSごとに別候補を採用する場合も、各行のowner承認を必要とする。成立しない場合はFR-103を正式改版し、PDF/XLSX exportへ無断置換しない。
+全OS/arch/display行で1候補が成立するまで§13.2 printを実装へ進めない。OSごとに別候補を採用する場合も、各行のowner承認を必要とする。成立しない場合は§13.2を正式改版し、PDF/XLSX exportへ無断置換しない。
 
 ## DEC-20: OS別package候補
 
