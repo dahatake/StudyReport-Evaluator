@@ -524,7 +524,6 @@ public sealed class SettingsViewTests
         AssertCanonical(saved, harness.Design.Draft);
         AssertCanonical(saved, harness.Input.DefinitionDraft);
         Assert.Contains("適用できませんでした", ById<TextBlock>(harness.View, "SettingsApplyStatus").Text!);
-        Assert.Equal(2, harness.Design.ImportedPrompts.Count);
         AssertPassive(harness);
     }
 
@@ -666,11 +665,9 @@ public sealed class SettingsViewTests
     }
 
     [AvaloniaFact]
-    public async Task Long_prompt_and_output_path_remain_complete_without_growing_the_outer_body()
+    public async Task Long_output_path_remains_complete_without_growing_the_outer_body()
     {
-        string prompt = string.Join('\n', Enumerable.Repeat("長い本文 {回答} {評価項目}", 400)) + "\n本文の末尾";
-        using SettingsHarness harness = new(withStore: false, importedPrompts:
-            [new ImportedPrompt { Path = "long.txt", DisplayName = "long.txt", Content = prompt }]);
+        using SettingsHarness harness = new(withStore: false);
         await harness.LoadInputAsync();
         harness.Show();
         string path = Path.Combine(harness.Root, new string('長', 220));
@@ -918,15 +915,11 @@ public sealed class SettingsViewTests
 
     private sealed class SettingsHarness : IDisposable
     {
-        public SettingsHarness(bool withStore = true, IReadOnlyList<ImportedPrompt>? importedPrompts = null)
+        public SettingsHarness(bool withStore = true)
         {
             Store = new SettingsFileStore(SettingsPath);
             Input = new InputViewModel(Loader);
-            Design = new QuantificationDesignViewModel(CreateDefinition(), ["A", "B", "C"], importedPrompts ??
-            [
-                new ImportedPrompt { Path = Path.Combine(Root, "02.txt"), DisplayName = "02.txt", Content = "未適用の原文1 {回答} {評価項目}" },
-                new ImportedPrompt { Path = Path.Combine(Root, "01.txt"), DisplayName = "01.txt", Content = "未適用の原文2\r\n{回答} {評価項目} 🧪" },
-            ]);
+            Design = new QuantificationDesignViewModel(CreateDefinition(), ["A", "B", "C"]);
             Execution = new ExecutionViewModel(Authentication, Runner);
             Settings = new SettingsViewModel(Input, Design, Execution, withStore ? Store : null);
             View = new SettingsView(Settings);

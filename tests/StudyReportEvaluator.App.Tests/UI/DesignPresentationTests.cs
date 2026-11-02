@@ -214,7 +214,6 @@ public sealed class DesignPresentationTests
         viewModel.SelectedQuestion = null;
 
         Assert.Null(viewModel.SelectedQuestion);
-        Assert.False(viewModel.CanApplyImportedPrompt);
         AssertPage(viewModel, 2, "9–9 / 9 件", [last], true, false);
         Assert.Same(draft, viewModel.Draft);
     }
@@ -672,7 +671,7 @@ public sealed class DesignPresentationTests
     }
 
     [Fact]
-    public void Presentation_preserves_all_canonical_values_collections_and_imported_prompts()
+    public void Presentation_preserves_all_canonical_values_and_collections()
     {
         QuantificationDefinition definition = CreateDefinition();
         definition = definition with
@@ -682,17 +681,10 @@ public sealed class DesignPresentationTests
             SimilarityPenaltyWeight = 0.123456789123456789m,
             Questions = definition.Questions.SetItem(1, definition.Questions[1] with { Enabled = false }),
         };
-        ImportedPrompt[] sources =
-        [
-            new() { Path = "02-custom.txt", DisplayName = "02-custom.txt", Content = "読込 {{literal}}\r\n{回答} {評価項目}" },
-            new() { Path = "01-special.txt", DisplayName = "01-special.txt", Content = "固有 🧪\n{回答}" },
-        ];
-        QuantificationDesignViewModel viewModel = new(definition, ["A", "B", "C", "D"], sources);
+        QuantificationDesignViewModel viewModel = new(definition, ["A", "B", "C", "D"]);
         QuantificationDefinition draft = viewModel.Draft;
         var questions = viewModel.Questions;
         var visible = viewModel.VisibleQuestions;
-        var prompts = viewModel.ImportedPrompts;
-        ImportedPromptViewModel[] originalPrompts = prompts.ToArray();
         var children = questions.Select(question =>
             (Question: question, Evaluators: question.Evaluators, Specials: question.SpecialEvaluations,
              Criteria: question.Evaluators.Select(evaluator => evaluator.Criteria).ToArray())).ToArray();
@@ -702,8 +694,6 @@ public sealed class DesignPresentationTests
         }
 
         questions[0].Evaluators[0].SelectedCriterion = null;
-        viewModel.SelectedImportedPrompt = originalPrompts[1];
-        viewModel.SelectedPromptTarget = ImportedPromptTarget.SpecialEvaluation;
 
         foreach (int pageSize in new[] { 1, 3, 4, 7, int.MaxValue })
         {
@@ -739,16 +729,6 @@ public sealed class DesignPresentationTests
         }
 
         Assert.Null(questions[0].Evaluators[0].SelectedCriterion);
-        Assert.Same(prompts, viewModel.ImportedPrompts);
-        Assert.Same(originalPrompts[1], viewModel.SelectedImportedPrompt);
-        Assert.Equal(ImportedPromptTarget.SpecialEvaluation, viewModel.SelectedPromptTarget);
-        for (int index = 0; index < sources.Length; index++)
-        {
-            Assert.Same(originalPrompts[index], prompts[index]);
-            Assert.Same(sources[index], viewModel.ImportedPromptSources[index]);
-            Assert.Equal(sources[index].DisplayName, prompts[index].DisplayName);
-            Assert.Equal(sources[index].Content, prompts[index].Content);
-        }
     }
 
     [Theory]

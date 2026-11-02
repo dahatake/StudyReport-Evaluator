@@ -1020,13 +1020,7 @@ internal sealed class WorkflowLayoutFixture : IDisposable
             await input.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
             Assert.True(await input.ApplySavedDefinitionAsync(ResponsiveLayoutTests.ManyItemDefinition(longContent: longContent),
                 TestContext.Current.CancellationToken));
-            ImportedPrompt[] prompts = [.. Enumerable.Range(1, 12).Select(index => new ImportedPrompt
-            {
-                Path = Path.Combine(workbook.Directory, $"prompt-{index}.txt"),
-                DisplayName = $"{index}: {ResponsiveLayoutTests.LongJapaneseName}.txt",
-                Content = ResponsiveLayoutTests.LongText + "\n{回答} {評価項目}",
-            })];
-            QuantificationDesignViewModel design = new(input.DefinitionDraft, ["A", "B", "C"], prompts);
+            QuantificationDesignViewModel design = new(input.DefinitionDraft, ["A", "B", "C"]);
             return new WorkflowLayoutFixture(workbook, input, design,
                 await ResponsiveLayoutTests.CreateResultsAsync(100, longContent: longContent));
         }

@@ -536,11 +536,6 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
                         Assert-GuiStillLive
                         $settings = Find-Control 'SettingsView'
                         [void](Find-Control 'SettingsCategoryCommon' $settings)
-                        $removedCondition = [Windows.Automation.PropertyCondition]::new(
-                            [Windows.Automation.AutomationElement]::AutomationIdProperty, 'ImportedPromptSettingsView')
-                        if ($null -ne $settings.FindFirst([Windows.Automation.TreeScope]::Descendants, $removedCondition)) {
-                            throw 'Settings still exposes the removed imported-Prompt category.'
-                        }
                         $back = Find-Control 'SettingsRequestClose' $settings
                         if ($back.Current.Name -cne '設定から元のステップへ戻る' -or -not $back.Current.IsEnabled) {
                             throw 'Settings did not expose the labelled return-to-step button.'
