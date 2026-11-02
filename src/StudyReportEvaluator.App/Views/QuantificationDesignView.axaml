@@ -88,7 +88,7 @@
           <TextBlock Grid.Column="2" Text="固有配点" Classes="label" />
           <TextBox x:Name="SpecialPointsTextBox" Grid.Column="3" Text="{Binding SpecialPoints, Mode=TwoWay}" TabIndex="1"
                    AutomationProperties.AutomationId="DesignSpecialPoints" AutomationProperties.Name="固有評価の総配点 Special points"
-                   ToolTip.Tip="固有評価全体の配点を0～100で入力します。正の値には1件以上の有効な固有評価が必要です。詳細は固有評価の設定で編集します。" />
+                   ToolTip.Tip="固有評価全体の配点を0～100で入力します。正の値には1件以上の有効な固有評価が必要です。読込済みの定義の固有評価項目は保持されます。" />
           <TextBlock Grid.Column="4" Text="類似度減点係数" Classes="label" />
           <TextBox x:Name="SimilarityPenaltyWeightTextBox" Grid.Column="5" Text="{Binding SimilarityPenaltyWeight, Mode=TwoWay}" TabIndex="2"
                    AutomationProperties.AutomationId="DesignSimilarityPenaltyWeight" AutomationProperties.Name="類似度減点係数（0～1）"
@@ -117,7 +117,7 @@
                        ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled"
                        SizeChanged="HandleQuestionListSizeChanged" TabIndex="0"
                        AutomationProperties.AutomationId="DesignQuestions" AutomationProperties.Name="表示ページの設問・有効状態・配点"
-                       ToolTip.Tip="方向キーで設問を選択し、右の有効・配点欄で編集します。ページ移動は編集中の設問を変えません。長い設問名は「設問の詳細」から全文を確認できます。">
+                       ToolTip.Tip="方向キーで設問を選択し、右の有効・配点欄で編集します。ページ移動は編集中の設問を変えません。長い設問名の全文は読み上げ名で確認できます。">
                 <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="viewModels:QuestionDesignItemViewModel">

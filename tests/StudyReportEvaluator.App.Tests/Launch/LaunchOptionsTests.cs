@@ -118,7 +118,7 @@ public sealed class LaunchOptionsTests
     }
 
     [Fact]
-    public async Task Valid_startup_prefills_and_loads_input_then_prompts_require_explicit_reusable_target_copy()
+    public async Task Valid_startup_prefills_and_loads_input_and_accepts_prompts_without_showing_or_applying_them()
     {
         using LaunchDirectory directory = new();
         using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
@@ -135,38 +135,23 @@ public sealed class LaunchOptionsTests
         Assert.True(startup.IsValid);
         Assert.Equal(workbook.Path, shell.InputViewModel.FilePath);
         Assert.False(shell.InputViewModel.HasLoadedWorkbook);
-        Assert.Equal(["01-custom.txt", "02-special.txt"],
-            shell.DesignViewModel.ImportedPrompts.Select(prompt => prompt.DisplayName));
+        // FR-003 AC-058: --prompt は受理するが、UIへ反映せず適用もしない。
+        Assert.Empty(shell.DesignViewModel.ImportedPrompts);
         Assert.Null(shell.ExecutionViewModel.LastRunContext);
         Assert.Equal(ExecutionAuthenticationState.NotChecked, shell.ExecutionViewModel.AuthenticationState);
         await shell.InputViewModel.LoadLaunchInputIfRequestedAsync(TestContext.Current.CancellationToken);
         Assert.True(shell.InputViewModel.HasLoadedWorkbook);
         shell.NextCommand.Execute(null);
         QuantificationDesignViewModel design = shell.DesignViewModel;
-        Assert.Equal(["01-custom.txt", "02-special.txt"],
-            design.ImportedPrompts.Select(prompt => prompt.DisplayName));
+        Assert.Empty(design.ImportedPrompts);
         QuestionDesignItemViewModel question = Assert.IsType<QuestionDesignItemViewModel>(design.SelectedQuestion);
-        EvaluatorDesignItemViewModel customEvaluator = design.AddEvaluator(question.Id, EvaluatorType.CustomPrompt);
-        question.SelectedEvaluator = customEvaluator;
-        string originalTemplate = customEvaluator.CustomPromptTemplate!;
-        Assert.NotEqual(customContent, originalTemplate);
-        design.SelectedImportedPrompt = design.ImportedPrompts[0];
-        design.SelectedPromptTarget = ImportedPromptTarget.CustomEvaluator;
-        Assert.True(design.CanApplyImportedPrompt);
-        design.ApplyImportedPrompt();
-        Assert.Equal(customContent, customEvaluator.CustomPromptTemplate);
-        SpecialEvaluationDesignItemViewModel specialTarget = design.AddSpecialEvaluation(question.Id);
-        question.SelectedSpecialEvaluation = specialTarget;
-        design.SelectedImportedPrompt = design.ImportedPrompts[1];
-        design.SelectedPromptTarget = ImportedPromptTarget.SpecialEvaluation;
-        Assert.True(design.CanApplyImportedPrompt);
-        design.ApplyImportedPrompt();
-        Assert.Equal(specialContent, specialTarget.PromptTemplate);
-        question.SelectedEvaluator = customEvaluator;
-        design.SelectedImportedPrompt = design.ImportedPrompts[0];
-        design.SelectedPromptTarget = ImportedPromptTarget.CustomEvaluator;
-        design.ApplyImportedPrompt();
-        Assert.Equal(customContent, customEvaluator.CustomPromptTemplate);
+        foreach (EvaluatorDesignItemViewModel evaluator in question.Evaluators)
+        {
+            Assert.DoesNotContain(customContent, evaluator.CustomPromptTemplate ?? string.Empty, StringComparison.Ordinal);
+        }
+
+        Assert.False(design.CanApplyImportedPrompt);
+        Assert.Equal(ExecutionAuthenticationState.NotChecked, shell.ExecutionViewModel.AuthenticationState);
         Assert.Null(shell.ExecutionViewModel.LastRunContext);
     }
 

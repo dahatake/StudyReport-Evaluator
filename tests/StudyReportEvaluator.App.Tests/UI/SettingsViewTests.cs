@@ -385,40 +385,6 @@ public sealed class SettingsViewTests
     }
 
     [AvaloniaFact]
-    public async Task Wrong_prompt_target_keeps_apply_disabled_with_reason_and_reenables_only_for_valid_target()
-    {
-        // FR-002: 読込Prompt は設定のカテゴリではなくなった。独立した ImportedPromptSettingsView
-        // （同じ Design の ApplyImportedPromptCommand）で適用先の検査を確かめる。
-        using SettingsHarness harness = new(withStore: false);
-        await harness.LoadInputAsync();
-        ImportedPromptSettingsView prompts = new(harness.Design);
-        harness.Window.Content = prompts;
-        harness.Window.Show();
-        Render();
-        QuestionDesignItemViewModel question = harness.Design.SelectedQuestion!;
-        EvaluatorDesignItemViewModel evaluator = question.SelectedEvaluator!;
-        harness.Design.ChangeEvaluatorType(question.Id, evaluator.Id, EvaluatorType.KnowledgeCoverage);
-        Render();
-        Button apply = ById<Button>(prompts, "ApplyImportedPrompt");
-        Assert.Same(harness.Design.ApplyImportedPromptCommand, apply.Command);
-        Assert.False(apply.IsEffectivelyEnabled);
-        Assert.Contains("Knowledgeは読取専用", ById<TextBlock>(prompts, "ImportedPromptApplyStatus").Text!);
-        QuantificationDefinition before = harness.Design.Draft;
-        harness.Design.SelectedQuestion = null;
-        Render();
-        Assert.False(apply.IsEffectivelyEnabled);
-        Assert.Contains("設問を選択", ById<TextBlock>(prompts, "ImportedPromptApplyStatus").Text!);
-        Assert.Same(before, harness.Design.Draft);
-
-        harness.Design.SelectedQuestion = question;
-        harness.Design.ChangeEvaluatorType(question.Id, evaluator.Id, EvaluatorType.CustomPrompt);
-        Render();
-        Assert.True(apply.IsEffectivelyEnabled);
-        Assert.True(ById<TextBox>(prompts, "ImportedPromptPreview").IsEffectivelyEnabled);
-        AssertPassive(harness);
-    }
-
-    [AvaloniaFact]
     public async Task Failed_save_preserves_bytes_current_edits_and_safe_status_then_explicit_save_can_retry()
     {
         using SettingsHarness harness = new();
@@ -720,19 +686,6 @@ public sealed class SettingsViewTests
         Assert.False(Directory.Exists(harness.Root));
         AssertPassive(harness);
 
-        // FR-002: 長い読込Prompt の全文表示は独立した ImportedPromptSettingsView で確かめる。
-        ImportedPromptSettingsView prompts = new(harness.Design);
-        harness.Window.Content = prompts;
-        Render();
-        TextBox preview = ById<TextBox>(prompts, "ImportedPromptPreview");
-        Assert.Equal(prompt, preview.Text);
-        Assert.True(preview.IsReadOnly);
-        ScrollViewer local = Assert.Single(preview.GetVisualDescendants().OfType<ScrollViewer>());
-        Assert.True(local.Extent.Height > local.Viewport.Height);
-        local.ScrollToEnd();
-        Render();
-        Assert.True(local.Offset.Y > 0d);
-        Assert.Equal(prompt, preview.Text);
         AssertPassive(harness);
     }
 
@@ -874,8 +827,7 @@ public sealed class SettingsViewTests
     {
         // FR-002: 設定に表示されるのは共通（TabControl）だけで、旧カテゴリの編集部は存在しない。
         Assert.Equal(typeof(TabControl), ActiveContent(view).GetType());
-        Assert.DoesNotContain(AllControls(view), control => control is MappingSettingsView
-            or EvaluatorSettingsView or SpecialEvaluationSettingsView or ImportedPromptSettingsView);
+        Assert.DoesNotContain(AllControls(view), control => control is EvaluatorSettingsView);
     }
 
     private static void AssertUniqueIds(Control root)

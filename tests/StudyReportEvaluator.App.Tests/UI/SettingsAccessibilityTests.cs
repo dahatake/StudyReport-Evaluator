@@ -136,69 +136,6 @@ public sealed class SettingsAccessibilityTests
         }
     }
 
-    [AvaloniaFact]
-    public void Imported_prompt_keyboard_navigation_enters_the_selected_item_not_the_nonfocusable_list()
-    {
-        QuantificationDesignViewModel design = new(U04TestSupport.Definition(2, 2), availableColumnNames: null, importedPrompts:
-        [
-            new ImportedPrompt { Path = "first.txt", DisplayName = "first.txt", Content = "最初の原文 {回答}" },
-            new ImportedPrompt { Path = "second.txt", DisplayName = "second.txt", Content = "次の原文 {回答}" },
-        ]);
-        RecordingAuthenticationBoundary authentication = new(new ExecutionAuthenticationSnapshot(ExecutionAuthenticationState.AuthRequired));
-        RecordingRunBoundary runner = new((_, _, _) => throw new InvalidOperationException("No run was requested."));
-        using ExecutionViewModel execution = new(authentication, runner);
-        // FR-002: 読込Prompt は設定のカテゴリではなくなった。独立した ImportedPromptSettingsView で
-        // 同じキーボード操作（選択項目へ入る・フォーカス不可の一覧には入らない）を確かめる。
-        ImportedPromptSettingsView view = new(design);
-        Window window = new() { Width = 950, Height = 450, Content = view };
-        try
-        {
-            window.Show();
-            Render();
-            Assert.Same(design, view.ViewModel);
-            QuantificationDefinition before = design.Draft;
-            ListBox list = ById<ListBox>(view, "ImportedPrompts");
-            TextBox preview = ById<TextBox>(view, "ImportedPromptPreview");
-            Assert.Same(design.ImportedPrompts, list.ItemsSource);
-            Assert.True(preview.IsReadOnly);
-            Assert.True(preview.Focus(NavigationMethod.Tab));
-            Render();
-            Assert.Same(preview, window.FocusManager?.GetFocusedElement());
-            Assert.False(list.Focusable);
-            Assert.False(list.Focus(NavigationMethod.Tab));
-            Assert.Same(preview, window.FocusManager?.GetFocusedElement());
-            Assert.Same(design.ImportedPrompts[0], list.SelectedItem);
-            Press(window, Key.Tab, RawInputModifiers.Shift);
-            ListBoxItem first = Assert.IsType<ListBoxItem>(list.ContainerFromIndex(0));
-            Assert.Same(design.ImportedPrompts[0], first.DataContext);
-            Assert.Same(first, window.FocusManager?.GetFocusedElement());
-            Press(window, Key.Down);
-            ListBoxItem selected = Assert.IsType<ListBoxItem>(list.ContainerFromIndex(1));
-            Assert.True(selected.IsSelected);
-            Assert.Same(design.ImportedPrompts[1], selected.DataContext);
-            Assert.Same(design.ImportedPrompts[1], design.SelectedImportedPrompt);
-            Assert.Equal(design.ImportedPrompts[1].Content, preview.Text);
-            Assert.Same(selected, window.FocusManager?.GetFocusedElement());
-            Assert.True(selected.MinHeight >= 44d);
-            Assert.True(selected.Bounds.Height >= 44d);
-            Assert.True(selected.Bounds.Width >= 44d);
-            Press(window, Key.Tab);
-            Assert.Same(preview, window.FocusManager?.GetFocusedElement());
-            Press(window, Key.Tab, RawInputModifiers.Shift);
-            Assert.Same(selected, window.FocusManager?.GetFocusedElement());
-            UniqueIds(view);
-            Assert.Same(before, design.Draft);
-            Assert.Equal(design.ApplyImportedPromptCommand.CanExecute(null), ById<Button>(view, "ApplyImportedPrompt").IsEffectivelyEnabled);
-            Assert.Equal(0, authentication.CallCount);
-            Assert.Equal(0, runner.CallCount);
-            Assert.Null(execution.LastLoginTask);
-        }
-        finally
-        {
-            window.Close();
-        }
-    }
-
     private static T ById<T>(Control root, string id) where T : Control =>
         Assert.Single(root.GetVisualDescendants().OfType<T>(), control => AutomationProperties.GetAutomationId(control) == id);
 
