@@ -7,7 +7,7 @@
 |---|---|
 | 状態 | **既定案承認済み・G-09 完了** |
 | 対象決定 | DEC-22 |
-| 対象要求 | FR-015、FR-028、FR-038、FR-058、FR-065、FR-076、FR-092、FR-106、NFR-PRI-006、NFR-ACC-005 |
+| 対象要求 | Mapping profile、Forms管理列提案、Few-shot例示、反復評価、保持責任、閾値校正、設定named range、最小化レビュー用複製、共有/同期folder検知、アクセシビリティ適合checklist |
 | 結論 | **全10件を`IMPLEMENT`。`DEFER` 0件** |
 | 基準 | `docs/requirements-definition.md` v1.2 第2節、`dev/docs/archive/work/20260831-implementation-plan.md` v2.1 第19節 |
 | 記録日 | 2026-08-31 |
@@ -24,16 +24,16 @@ ownerは現時点で個人を捏造せず、計画上のaccountable roleとし�
 
 | Task | Requirement | Decision | Accountable owner role | 実装期限 |
 |---|---|---|---|---|
-| P1-01 | FR-015 | IMPLEMENT | Mapping/Platform state責任者 | `UI-04`開始前 |
-| P1-02 | FR-028 | IMPLEMENT | Mapping責任者 | `L-01`開始前 |
-| P1-03 | FR-038 | IMPLEMENT | Prompt/Privacy責任者 | `L-04`開始前 |
-| P1-04 | FR-058 | IMPLEMENT | Run/Validation責任者 | `UI-06`開始前 |
-| P1-05 | FR-065 | IMPLEMENT | Policy/Privacy責任者 | `A-14`、`UI-01`、`UI-12`開始前 |
-| P1-06 | FR-076 | IMPLEMENT | Education validation責任者 | `UI-06`開始前 |
-| P1-07 | FR-092 | IMPLEMENT | Workbook/Formula責任者 | `O-05`開始前 |
-| P1-08 | FR-106 | IMPLEMENT | Workbook/Review privacy責任者 | `UI-10`開始前 |
-| P1-09 | NFR-PRI-006 | IMPLEMENT | Platform/Privacy責任者 | `UI-03`、`UI-12`開始前 |
-| P1-10 | NFR-ACC-005 | IMPLEMENT | Accessibility/QA責任者 | `D-07`開始前 |
+| P1-01 | Mapping profile | IMPLEMENT | Mapping/Platform state責任者 | `UI-04`開始前 |
+| P1-02 | Forms管理列提案 | IMPLEMENT | Mapping責任者 | `L-01`開始前 |
+| P1-03 | Few-shot例示 | IMPLEMENT | Prompt/Privacy責任者 | `L-04`開始前 |
+| P1-04 | 反復評価 | IMPLEMENT | Run/Validation責任者 | `UI-06`開始前 |
+| P1-05 | 保持責任 | IMPLEMENT | Policy/Privacy責任者 | `A-14`、`UI-01`、`UI-12`開始前 |
+| P1-06 | 閾値校正 | IMPLEMENT | Education validation責任者 | `UI-06`開始前 |
+| P1-07 | 設定named range | IMPLEMENT | Workbook/Formula責任者 | `O-05`開始前 |
+| P1-08 | 最小化レビュー用複製 | IMPLEMENT | Workbook/Review privacy責任者 | `UI-10`開始前 |
+| P1-09 | 共有/同期folder検知 | IMPLEMENT | Platform/Privacy責任者 | `UI-03`、`UI-12`開始前 |
+| P1-10 | アクセシビリティ適合checklist | IMPLEMENT | Accessibility/QA責任者 | `D-07`開始前 |
 
 calendar dateは根拠がないため捏造せず、依存task開始前を拘束力のある期限とする。対応するdeadlineを越えた場合、後続taskを開始せず`P1_DISPOSITION_VIOLATION`としてrelease blockerにする。
 
@@ -41,7 +41,7 @@ calendar dateは根拠がないため捏造せず、依存task開始前を拘束
 
 | 項目 | 内容 |
 |---|---|
-| 要求 | FR-015 |
+| 要求 | Mapping profile |
 | Decision | IMPLEMENT |
 | Owner | Mapping/Platform state責任者 |
 | 理由 | 同じ帳票系列の反復設定を減らせるが、file hashや位置だけの再利用は列ずれを見逃すため、見出しとquestion IDを結合した再確認付きprofileとして実装する |
@@ -55,7 +55,7 @@ calendar dateは根拠がないため捏造せず、依存task開始前を拘束
 
 | 項目 | 内容 |
 |---|---|
-| 要求 | FR-028 |
+| 要求 | Forms管理列提案 |
 | Decision | IMPLEMENT |
 | Owner | Mapping責任者 |
 | 理由 | Microsoft Formsの管理列を候補提示して初期設定を助ける一方、見出しheuristicを決定権にしない |
@@ -69,7 +69,7 @@ calendar dateは根拠がないため捏造せず、依存task開始前を拘束
 
 | 項目 | 内容 |
 |---|---|
-| 要求 | FR-038 |
+| 要求 | Few-shot例示 |
 | Decision | IMPLEMENT |
 | Owner | Prompt/Privacy責任者 |
 | 理由 | anchorを具体化できるが、実回答の無断保存・再送を避けるclosed example setが必要 |
@@ -83,13 +83,13 @@ calendar dateは根拠がないため捏造せず、依存task開始前を拘束
 
 | 項目 | 内容 |
 |---|---|
-| 要求 | FR-058 |
+| 要求 | 反復評価 |
 | Decision | IMPLEMENT |
 | Owner | Run/Validation責任者 |
 | 理由 | non-determinismを単一候補で隠さず、trial別候補と中央値/範囲を分離表示する |
 | 影響 | request budget、費用、session cleanup、保存列が増える。繰返し結果を最終点の自動確定に使ってはならない |
-| 暫定統制 | 完成まではproduct UIは1回実行だけを提供し、NFR-REL-003の非決定性警告と再現metadataを常に表示する。P0のrelease/教育評価harness `V-04`〜`V-06`は別経路で複数回測定を行い、UI featureで置換しない |
-| 実装/試験 | `P1-04`: `Core/Runs/RepeatedEvaluationPlan.cs`; `Core.Tests/Runs/RepeatedEvaluationPlanTests.cs`。trial countは2以上、上限は`floor(remaining run attempt budget / worst-case attempts per trial set)`を越えず、より小さいrelease resource limitがある場合はそれにも従う。根拠のない固定回数を既定化しない。各trial status/item候補、中央値/範囲を別型にし、全outbound attemptをFR-052 budgetへ開始前に原子的予約。trial間session共有0、cleanup失敗で後続停止 |
+| 暫定統制 | 完成まではproduct UIは1回実行だけを提供し、の非決定性警告と再現metadataを常に表示する。P0のrelease/教育評価harness `V-04`〜`V-06`は別経路で複数回測定を行い、UI featureで置換しない |
+| 実装/試験 | `P1-04`: `Core/Runs/RepeatedEvaluationPlan.cs`; `Core.Tests/Runs/RepeatedEvaluationPlanTests.cs`。trial countは2以上、上限は`floor(remaining run attempt budget / worst-case attempts per trial set)`を越えず、より小さいrelease resource limitがある場合はそれにも従う。根拠のない固定回数を既定化しない。各trial status/item候補、中央値/範囲を別型にし、全outbound attemptを§5.1 budgetへ開始前に原子的予約。trial間session共有0、cleanup失敗で後続停止 |
 | 期限/gate | `V-04`後、`UI-06`前。`UI-06`が唯一のproduct UI consumer。budget境界、cancel/retry/partial failure/cleanupと単一値へのcollapse禁止を試験 |
 | 承認 | DEC-22既定案のセッション承認。回数のproduction既定値は根拠なしに設定しない |
 
@@ -97,7 +97,7 @@ calendar dateは根拠がないため捏造せず、依存task開始前を拘束
 
 | 項目 | 内容 |
 |---|---|
-| 要求 | FR-065 |
+| 要求 | 保持責任 |
 | Decision | IMPLEMENT |
 | Owner | Policy/Privacy責任者 |
 | 理由 | 保存期間と削除責任を運用前に明示し、アプリが法的期限や原本削除を自動判断しないため |
@@ -111,12 +111,12 @@ calendar dateは根拠がないため捏造せず、依存task開始前を拘束
 
 | 項目 | 内容 |
 |---|---|
-| 要求 | FR-076 |
+| 要求 | 閾値校正 |
 | Decision | IMPLEMENT |
 | Owner | Education validation責任者 |
 | 理由 | 校正threshold候補のfalse positive/negativeを教員labelに対して可視化するため |
 | 影響 | label schema、missing/abstain扱い、denominator 0、metric説明が必要。数値をthreshold承認の代替にできない |
-| 暫定統制 | 完成まではprecision/recallを表示・推測せず、thresholdはFR-073の署名校正recordがなければ`MISSING` |
+| 暫定統制 | 完成まではprecision/recallを表示・推測せず、thresholdは§7.5の署名校正recordがなければ`MISSING` |
 | 実装/試験 | `P1-06`: `Core/Validation/ThresholdCalibrationMetrics.cs`; `Core.Tests/Validation/ThresholdCalibrationMetricsTests.cs`。教員が事前作成したbinary/relevant labelだけを入力し、TP/FP/FN、分母、missingを明示。label生成・補完・default threshold 0 |
 | 期限/gate | EXT-05をG-14で検証し、`V-01`が事前metric specを受理した後、`UI-06`前。EXT-05不在/不正では計算せず`BLOCKED`。golden confusion matrix、分母0、missing/invalid labelを試験 |
 | 承認 | DEC-22既定案のセッション承認。metric spec/labelはEXT-05承認待ち |
@@ -125,7 +125,7 @@ calendar dateは根拠がないため捏造せず、依存task開始前を拘束
 
 | 項目 | 内容 |
 |---|---|
-| 要求 | FR-092 |
+| 要求 | 設定named range |
 | Decision | IMPLEMENT |
 | Owner | Workbook/Formula責任者 |
 | 理由 | 評価項目追加時の参照追随と式可読性を確保するため、計画済みnamed-range writerを実装する |
@@ -139,7 +139,7 @@ calendar dateは根拠がないため捏造せず、依存task開始前を拘束
 
 | 項目 | 内容 |
 |---|---|
-| 要求 | FR-106 |
+| 要求 | 最小化レビュー用複製 |
 | Decision | IMPLEMENT |
 | Owner | Workbook/Review privacy責任者 |
 | 理由 | 教員間二重reviewを支援しつつ、識別列・不要設問・他用途dataを既定除外するため |
@@ -153,7 +153,7 @@ calendar dateは根拠がないため捏造せず、依存task開始前を拘束
 
 | 項目 | 内容 |
 |---|---|
-| 要求 | NFR-PRI-006 |
+| 要求 | 共有/同期folder検知 |
 | Decision | IMPLEMENT |
 | Owner | Platform/Privacy責任者 |
 | 理由 | 検出可能な同期/共有pathを保存前に警告し、意図しないcloud/他user共有を減らすため |
@@ -167,7 +167,7 @@ calendar dateは根拠がないため捏造せず、依存task開始前を拘束
 
 | 項目 | 内容 |
 |---|---|
-| 要求 | NFR-ACC-005 |
+| 要求 | アクセシビリティ適合checklist |
 | Decision | IMPLEMENT |
 | Owner | Accessibility/QA責任者 |
 | 理由 | WCAG 2.2 AA/WCAG2ICTの各criteriaをdesktopへ適用/非適用/証拠に分解し、曖昧な「準拠」claimを避けるため |

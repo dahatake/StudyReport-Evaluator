@@ -7,7 +7,7 @@
 |---|---|
 | 状態 | **承認済み・G-03完了・要求v1.2へG-RB反映済み** |
 | 対象決定 | DEC-03、DEC-04 |
-| 要求 | FR-003、FR-007〜014、FR-016、FR-087〜090、AC-002、AC-007 |
+| 要求 | FR-003、§4.2〜014、§9.3〜090、AC-002、AC-007 |
 | 決定 | 値と必要最小限の静的表示だけを新規 sheet へ投影し、変更対象を閉じた OPC allowlist に限定する |
 | 承認根拠 | ADR-0001 の承認証跡（実装前 decision gate は既定案） |
 | 記録日 | 2026-08-31 |
@@ -153,7 +153,7 @@ source font、fill、border、theme、conditional formatting、protection、hidd
 
 ### 文字列安全境界
 
-入力と LLM 由来の文字列は、検知結果にかかわらず明示的な inline/shared string cell として書き、`CellFormula`、DDE、hyperlink、external relationship を生成しない。本 ADR の新規 sheet は `t="inlineStr"` と単一の `<is><t>...</t></is>` に限定し、rich-text `<r>`/`<rPr>` を作らない。先頭/末尾空白または連続空白を保持する必要がある `<t>` には `xml:space="preserve"` を設定する。`= + - @`、全角対応文字、tab/CR/LF、Unicode White_Space/format control を含む FR-087 vector は危険表示を付けるが、危険文字の削除や先頭 apostrophe 追加によって元表示値を改変しない。
+入力と LLM 由来の文字列は、検知結果にかかわらず明示的な inline/shared string cell として書き、`CellFormula`、DDE、hyperlink、external relationship を生成しない。本 ADR の新規 sheet は `t="inlineStr"` と単一の `<is><t>...</t></is>` に限定し、rich-text `<r>`/`<rPr>` を作らない。先頭/末尾空白または連続空白を保持する必要がある `<t>` には `xml:space="preserve"` を設定する。`= + - @`、全角対応文字、tab/CR/LF、Unicode White_Space/format control を含む §9.3 vector は危険表示を付けるが、危険文字の削除や先頭 apostrophe 追加によって元表示値を改変しない。
 
 ## 正方向の受入条件
 
@@ -193,7 +193,7 @@ source font、fill、border、theme、conditional formatting、protection、hidd
 
 G-RB は少なくとも次を正本へ反映する。
 
-- FR-009 の「part bytes」は展開後 payload bytes とし、URI、content type、relationship tuple と併せて比較する。
+- §4.3 の「part bytes」は展開後 payload bytes とし、URI、content type、relationship tuple と併せて比較する。
 - `Eval` は値と必要最小限の app-owned canonical static displayだけを投影する。
 - external reference式は拒否する。local式は式存在とcached valueを警告し、承認後にcached valueだけを未検証 snapshot として投影する。式nodeはコピーしない。
 - `Evaluation_Config`/`Evaluation_Run` の予約名衝突は既存 sheet を変更せず fail-closed とする。

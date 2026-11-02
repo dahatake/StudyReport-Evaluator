@@ -7,14 +7,14 @@
 |---|---|
 | 状態 | **改版承認済み・G-05 完了（DEC-07/08維持、DEC-09をruntime ReportDefinition方式で解決）** |
 | 対象決定 | DEC-07、DEC-08、DEC-09 |
-| 要求 | FR-036、FR-047〜052、FR-060〜064、FR-102、NFR-SEC-001〜003 |
+| 要求 | §7.1〜052、§7.1〜064、§7.1〜003 |
 | 決定 | `submit_evaluation.evidence`だけを学生由来tool argumentの例外とし、result toolだけpermission promptをbypassする。reason/evidence規則、missing flags、field/ID/item上限、target languageは利用者が起動後にReportDefinitionへ設定し、runごとにclosed schemaを生成する |
 | 承認根拠 | ADR-0001 の承認証跡（実装前 decision gate は既定案） |
 | 記録日 | 2026-08-31 |
 
 ## 現状と依存
 
-要求正本 v1.1 は、FR-036で学生データをtool argumentへ転送しないとする一方、FR-048/FR-102で回答中の根拠抜粋を`submit_evaluation`のargumentとして受け、入力中の存在を検証するよう求めていた。また、FR-047の「全permission deny」と、GitHub Copilot SDK v1.0.11候補のcustom tool `SkipPermission`は同じ意味ではない。
+要求正本 v1.1 は、§7.1で学生データをtool argumentへ転送しないとする一方、§7.1/§7.1で回答中の根拠抜粋を`submit_evaluation`のargumentとして受け、入力中の存在を検証するよう求めていた。また、§7.1の「全permission deny」と、GitHub Copilot SDK v1.0.11候補のcustom tool `SkipPermission`は同じ意味ではない。
 
 本 ADR はこの2つの矛盾を要求変更案として精密化する。SDK型名・wire挙動は G-15 の source/live synthetic canaryで確認し、実測前に固定版の保証とはしない。
 
@@ -143,7 +143,7 @@ top level/itemとも`additionalProperties=false`、全property required、`null`
 
 | Ceiling | 値 | 用途 |
 |---|---:|---|
-| 1 string property | 32,767 characters | Excel/FR-052媒体上限 |
+| 1 string property | 32,767 characters | Excel/§5.1媒体上限 |
 | 1 request | 65,536 Unicode scalars以下、かつmodel contextの80%以下 | input/context admission |
 | 1 tool arguments | 32,767 Unicode scalars以下 | result protocol admission |
 | 1 run | 20,000 outbound attempts | resource/cost admission |
@@ -182,9 +182,9 @@ cleanup失敗では完了済みdomain resultと暗号化checkpointを保持し�
 
 G-RB は数値未確定部分を除き、少なくとも次を正本へ反映する。
 
-1. FR-036: 学生由来のtool argument禁止の限定例外は、外部I/Oを持たない唯一の `submit_evaluation` の `evidence`だけとする。
-2. FR-047: result toolだけpermission prompt対象外とし、発生したpermission requestは全Rejectする。公開tool数、result tool callback回数、他request拒否実績を別に試験する。
-3. FR-048/049: 通常assistant本文を採用せず、1 session/attemptにつき最初の1提出だけを検証し、複数提出をprotocol violationにする。
+1. §7.1: 学生由来のtool argument禁止の限定例外は、外部I/Oを持たない唯一の `submit_evaluation` の `evidence`だけとする。
+2. §7.1: result toolだけpermission prompt対象外とし、発生したpermission requestは全Rejectする。公開tool数、result tool callback回数、他request拒否実績を別に試験する。
+3. §7.1/049: 通常assistant本文を採用せず、1 session/attemptにつき最初の1提出だけを検証し、複数提出をprotocol violationにする。
 4. reasonは逐語引用の許可fieldではなく、evidenceだけをsource substring照合する。
 5. field/item/ID/flag/languageはReportDefinitionへ移し、C-01はsnapshotごとのclosed schema、C-02/C-03はsnapshot validation、T-06はtechnical hard ceilingと最大instance preflightを実装する。
 
