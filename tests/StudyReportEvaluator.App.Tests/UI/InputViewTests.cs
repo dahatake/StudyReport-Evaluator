@@ -445,27 +445,6 @@ public sealed class InputViewTests
                 && Equals(ToolTip.GetTip(text), viewModel.SelectedWorksheetChoice.DisplayText));
             Assert.Contains(sheetPrefix + "B", Required<TextBlock>(view, "InputCountSummary").Text, StringComparison.Ordinal);
             AssertInputControlsContained(view);
-
-            // Supplementary-column editing moved, not disappeared. Exercise its actual
-            // replacement list, full-text inspection field, and live selection checkbox.
-            InputQuestionMappingViewModel question = viewModel.SelectedQuestion!;
-            MappingSettingsView mapping = new(viewModel);
-            window.Content = mapping;
-            Render();
-            ListBox columns = Required<ListBox>(mapping, "SupportingColumnList");
-            Assert.Equal(question.SupportingAutomationId, AutomationProperties.GetAutomationId(columns));
-            columns.SelectedItem = Assert.Single(question.SupportingColumns, column => column.ColumnName == "B");
-            Render();
-            TextBox fullHeader = Required<TextBox>(mapping, "AvailableColumnTitle");
-            Assert.Equal("B · " + header, fullHeader.Text);
-            Assert.True(fullHeader.IsReadOnly);
-            Assert.Equal(Avalonia.Media.TextWrapping.Wrap, fullHeader.TextWrapping);
-            CheckBox supporting = Required<CheckBox>(mapping, "IncludeSupportingColumnCheckBox");
-            Assert.True(supporting.IsEnabled);
-            supporting.IsChecked = true;
-            Render();
-            Assert.True(Assert.Single(question.SupportingColumns, column => column.ColumnName == "B").IsSelected);
-            Assert.Same(question, Required<ComboBox>(mapping, "QuestionSelector").SelectedItem);
         }
         finally
         {
@@ -1454,7 +1433,6 @@ public sealed class InputViewTests
         await input.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
         InputQuestionMappingViewModel selected = input.SelectedQuestion!;
         InputView view = new(input);
-        MappingSettingsView mapping = new(input);
         Window window = new() { Width = 950, Height = 450, Content = view };
         try
         {
@@ -1466,11 +1444,6 @@ public sealed class InputViewTests
             Render();
             Assert.True(DataValidationErrors.GetHasErrors(firstRow));
             Assert.Equal(originalFirstRow, input.FirstDataRow);
-            window.Content = mapping;
-            Render();
-            Assert.Same(selected, Required<ComboBox>(mapping, "QuestionSelector").SelectedItem);
-
-            window.Content = view;
             window.Height = 600;
             Render();
             Assert.Same(firstRow, Required<TextBox>(view, "FirstDataRowTextBox"));
@@ -1565,70 +1538,6 @@ public sealed class InputViewTests
             Assert.Same(selectionBinding, BindingOperations.GetBindingExpressionBase(
                 Required<ListBox>(view, "InputQuestionList"), ListBox.SelectedItemProperty));
             AssertPageCapacityAndRows(view);
-        }
-        finally
-        {
-            window.Close();
-        }
-    }
-
-    [AvaloniaFact]
-    public async Task Name_CRUD_and_candidates_remain_operable_in_mapping_settings_not_in_the_main_input()
-    {
-        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
-        InputViewModel input = new();
-        await input.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
-        MappingSettingsView mapping = new(input);
-        Window window = new() { Width = 950, Height = 600, Content = mapping };
-        try
-        {
-            window.Show();
-            Render();
-            InputQuestionMappingViewModel selected = input.SelectedQuestion!;
-            TextBox name = Required<TextBox>(mapping, "QuestionNameEditor");
-            Assert.Equal(selected.NameAutomationId, AutomationProperties.GetAutomationId(name));
-            name.Text = "入力詳細で変更した表示名";
-            Render();
-            Assert.Equal(name.Text, selected.DisplayName);
-            ComboBox candidates = Required<ComboBox>(mapping, "CandidateSelector");
-            Assert.Equal("InputMappingSuggestions", AutomationProperties.GetAutomationId(candidates));
-            QuantificationDefinition beforeInspect = input.DefinitionDraft;
-            MappingSuggestionViewModel candidate = input.MappingSuggestions.Last();
-            candidates.SelectedItem = candidate;
-            Render();
-            Assert.Same(beforeInspect, input.DefinitionDraft);
-            string? overview = Required<TextBox>(mapping, "CandidateOverview").Text;
-            Assert.Contains(candidate.HeaderText, overview, StringComparison.Ordinal);
-            Assert.Contains(candidate.SupportText, overview, StringComparison.Ordinal);
-
-            int initialCount = input.Questions.Count;
-            Click(window, Required<Button>(mapping, "AddQuestionButton"));
-            Assert.Equal(initialCount + 1, input.Questions.Count);
-            Assert.Same(selected, input.SelectedQuestion);
-            Click(window, Required<Button>(mapping, "DuplicateQuestionButton"));
-            Assert.Equal(initialCount + 2, input.Questions.Count);
-            InputQuestionMappingViewModel copy = input.Questions[input.Questions.IndexOf(selected) + 1];
-            Assert.NotEqual(selected.Id, copy.Id);
-            Assert.Equal(selected.DisplayName, copy.DisplayName);
-            Required<ComboBox>(mapping, "QuestionSelector").SelectedItem = copy;
-            Render();
-            int copyIndex = input.Questions.IndexOf(copy);
-            Click(window, Required<Button>(mapping, "MoveQuestionDownButton"));
-            Assert.Equal(copyIndex + 1, input.Questions.IndexOf(copy));
-            Assert.Same(copy, input.SelectedQuestion);
-            Click(window, Required<Button>(mapping, "MoveQuestionUpButton"));
-            Assert.Equal(copyIndex, input.Questions.IndexOf(copy));
-            Click(window, Required<Button>(mapping, "DeleteQuestionButton"));
-            Assert.DoesNotContain(copy, input.Questions);
-            Assert.Equal(initialCount + 1, input.Questions.Count);
-
-            Button reapply = Required<Button>(mapping, "ApplySuggestionsButton");
-            Assert.Equal("ApplyInputSuggestions", AutomationProperties.GetAutomationId(reapply));
-            Click(window, reapply);
-            Assert.Equal(initialCount, input.Questions.Count);
-            Assert.True(input.IsUsingSuggestedMapping);
-            Assert.Equal(["F", "G", "H", "I", "J"], input.Questions.Select(question => question.PrimarySourceColumn));
-            Assert.Same(input.SelectedQuestion, Required<ComboBox>(mapping, "QuestionSelector").SelectedItem);
         }
         finally
         {

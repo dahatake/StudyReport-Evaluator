@@ -53,7 +53,7 @@
     </Style>
     <!-- Embedded editors receive the remaining body, not a separate 450-DIP slot.
          A side strip preserves vertical room; standalone child layouts are unchanged. -->
-    <Style Selector="views|EvaluatorSettingsView TabControl, views|SpecialEvaluationSettingsView TabControl">
+    <Style Selector="views|EvaluatorSettingsView TabControl">
       <Setter Property="Padding" Value="0" />
     </Style>
   </UserControl.Styles>

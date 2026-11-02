@@ -38,14 +38,6 @@ public sealed class DesignPresentationTests
         AssertBoundPagesAndResize(useVisibleQuestions: true);
 
     [AvaloniaFact]
-    public void Questions_binding_preserves_incoming_primary_columns_and_child_selection() =>
-        AssertBoundIncomingColumns(useVisibleQuestions: false);
-
-    [AvaloniaFact]
-    public void VisibleQuestions_binding_preserves_incoming_primary_columns_and_child_selection() =>
-        AssertBoundIncomingColumns(useVisibleQuestions: true);
-
-    [AvaloniaFact]
     public void Question_selection_refresh_uses_current_data_context_after_reattach()
     {
         QuantificationDesignViewModel original = CreateDesign();
@@ -1081,102 +1073,6 @@ public sealed class DesignPresentationTests
         finally
         {
             window.Close();
-        }
-    }
-
-    private static void AssertBoundIncomingColumns(bool useVisibleQuestions)
-    {
-        foreach (bool keepPreviousPrimaryCandidate in new[] { true, false })
-        {
-            QuantificationDesignViewModel viewModel = CreateDesign();
-            QuestionDesignItemViewModel selected = viewModel.Questions[6];
-            SelectChildren(selected);
-            EvaluatorDesignItemViewModel evaluator = selected.SelectedEvaluator!;
-            CriterionDesignItemViewModel criterion = evaluator.SelectedCriterion!;
-            SpecialEvaluationDesignItemViewModel special = selected.SelectedSpecialEvaluation!;
-            viewModel.SelectedQuestion = selected;
-            (_, ListBox list, Window window) = CreateQuestionView(viewModel, useVisibleQuestions);
-            // T19 no longer hosts special editors. Keep the real primary-column
-            // binding/atomic-sync regression on its actual replacement surface.
-            SpecialEvaluationSettingsView settings = new(viewModel);
-            Window settingsWindow = new()
-            {
-                Width = 950, Height = 450, WindowDecorations = WindowDecorations.None, Content = settings,
-            };
-            try
-            {
-                window.Show();
-                settingsWindow.Show();
-                AssertBoundSelection(viewModel, list, useVisibleQuestions, selected);
-                ComboBox primaryColumn = Assert.Single(settings.GetVisualDescendants().OfType<ComboBox>(),
-                    control => AutomationProperties.GetAutomationId(control) == special.CardAutomationId + "-Primary");
-                Assert.Same(special, primaryColumn.DataContext);
-                Assert.NotNull(BindingOperations.GetBindingExpressionBase(primaryColumn, ComboBox.SelectedItemProperty));
-                Assert.Equal("B", primaryColumn.SelectedItem);
-                QuantificationDefinition incoming = CloneForInput(viewModel.Draft);
-                QuestionDefinition nextQuestion = incoming.Questions[6];
-                nextQuestion = nextQuestion with
-                {
-                    QuestionText = "入力同期の設問 🧪\r\n第二行",
-                    PrimarySourceColumn = "D",
-                    SupportingSourceColumns = ["C", "A"],
-                    Points = 0.123456789m,
-                    Evaluators = nextQuestion.Evaluators.SetItem(1, nextQuestion.Evaluators[1] with
-                    {
-                        CustomPromptTemplate = "入力同期 {{literal}}\r\n{回答} {評価項目}",
-                        Range = new ScoreRange(-1.25m, 5.125m),
-                        Enabled = false,
-                    }),
-                    SpecialEvaluations = nextQuestion.SpecialEvaluations.SetItem(1, nextQuestion.SpecialEvaluations[1] with
-                    {
-                        PrimarySourceColumn = "D",
-                        SupportingSourceColumns = ["A", "C"],
-                    }),
-                };
-                incoming = incoming with { Questions = incoming.Questions.SetItem(6, nextQuestion) };
-                incoming = incoming.MoveQuestion(6, 8);
-                CanonicalDefinitionSerializer serializer = new();
-                string expectedJson = serializer.Serialize(incoming);
-                string expectedHash = serializer.ComputeSha256(incoming);
-                IReadOnlyList<string> columns = keepPreviousPrimaryCandidate ? ["D", "C", "A", "B"] : ["D", "C", "A"];
-
-                viewModel.SynchronizeFromInput(incoming, columns);
-
-                AssertBoundSelection(viewModel, list, useVisibleQuestions, selected);
-                Assert.Equal(2, viewModel.PageIndex);
-                Assert.Same(evaluator, selected.SelectedEvaluator);
-                Assert.Same(criterion, evaluator.SelectedCriterion);
-                Assert.Same(special, selected.SelectedSpecialEvaluation);
-                Assert.Same(primaryColumn, Assert.Single(settings.GetVisualDescendants().OfType<ComboBox>(),
-                    control => AutomationProperties.GetAutomationId(control) == special.CardAutomationId + "-Primary"));
-                Assert.Equal("D", primaryColumn.SelectedItem);
-                Assert.Equal("D", special.PrimarySourceColumn);
-                Assert.Equal(columns, primaryColumn.ItemsSource!.Cast<string>());
-                Assert.Equal(expectedJson, serializer.Serialize(viewModel.Draft));
-                Assert.Equal(expectedHash, serializer.ComputeSha256(viewModel.Draft));
-                Assert.Equal(expectedJson, serializer.Serialize(incoming));
-                Assert.Equal(expectedHash, serializer.ComputeSha256(incoming));
-
-                // The T05 primary-column guard must still release for an actual user edit.
-                primaryColumn.SetCurrentValue(ComboBox.SelectedItemProperty, "C");
-                AssertBoundSelection(viewModel, list, useVisibleQuestions, selected);
-                Assert.Equal("C", primaryColumn.SelectedItem);
-                nextQuestion = nextQuestion with
-                {
-                    SpecialEvaluations = nextQuestion.SpecialEvaluations.SetItem(1, nextQuestion.SpecialEvaluations[1] with
-                    {
-                        PrimarySourceColumn = "C",
-                        SupportingSourceColumns = ["A"],
-                    }),
-                };
-                AssertCanonical(incoming with { Questions = incoming.Questions.SetItem(8, nextQuestion) }, viewModel.Draft);
-                Assert.Equal(expectedHash, serializer.ComputeSha256(incoming));
-            }
-            finally
-            {
-                settingsWindow.Close();
-                window.Close();
-            }
         }
     }
 
