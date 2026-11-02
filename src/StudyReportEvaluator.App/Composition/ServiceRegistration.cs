@@ -100,8 +100,8 @@ public sealed class ServiceRegistration
             input,
             new QuantificationDesignViewModel(
                 initialDefinition: null,
-                availableColumnNames: null,
-                importedPrompts: Startup.Prompts),
+                availableColumnNames: null),
+            // FR-003: --prompt は受理するが、UIへは反映せず適用もしない（Startup.Prompts は渡さない）。
             execution,
             new ResultsOutputViewModel(),
             settingsStore);

@@ -2,7 +2,8 @@
   "version": 1,
   "ac_digests": {
     "AC-054": "sha256:a3cd597d3525746c",
-    "AC-055": "sha256:aa4bffeb05a711e0"
+    "AC-055": "sha256:aa4bffeb05a711e0",
+    "AC-057": "sha256:6e9e524f200fa485"
   },
   "cases": [
     {
@@ -18,9 +19,9 @@
       "command": "dotnet test tests/system/ui --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
       "status": "pass",
-      "last_commit": "534a02c",
-      "last_run_at": "2026-11-02T14:46:54+09:00",
-      "evidence": "work/runs/202611021118/logs/system-test/E2E-001-202611021446.log",
+      "last_commit": "e30d950",
+      "last_run_at": "2026-11-02T16:03:14+09:00",
+      "evidence": "work/runs/202611021453/logs/system-test/E2E-001-202611021602.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
@@ -49,9 +50,9 @@
       "command": "dotnet test tests/system/ui --filter \"FullyQualifiedName~FR002_AC055\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "534a02c",
-      "last_run_at": "2026-11-02T14:46:54+09:00",
-      "evidence": "work/runs/202611021118/logs/system-test/E2E-002-202611021446.log",
+      "last_commit": "e30d950",
+      "last_run_at": "2026-11-02T16:03:14+09:00",
+      "evidence": "work/runs/202611021453/logs/system-test/E2E-002-202611021602.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
@@ -64,6 +65,31 @@
           "by": "test-designer",
           "change": "command: 'dotnet test tests/system/ui --filter-method *FR002_AC055*' -> 'dotnet test tests/system/ui --filter \"FullyQualifiedName~FR002_AC055\"'",
           "reason": "filter 構文の修正"
+        }
+      ]
+    },
+    {
+      "id": "E2E-003",
+      "requirement_ids": [
+        "FR-003"
+      ],
+      "ac_ids": [
+        "AC-057"
+      ],
+      "title": "削除3機能の不在: 入力詳細・固有評価・読込Promptの編集UIが全画面に存在せず、通常評価の編集は残る",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/ui --filter \"FullyQualifiedName~FR003_AC057\"",
+      "canary": false,
+      "status": "pass",
+      "last_commit": "e30d950",
+      "last_run_at": "2026-11-02T16:03:14+09:00",
+      "evidence": "work/runs/202611021453/logs/system-test/E2E-003-202611021602.log",
+      "history": [
+        {
+          "at": "2026-11-02T15:00:42+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
         }
       ]
     }

@@ -79,7 +79,7 @@ native pickerが開かない場合はfull pathを直接入力できます。pick
 - 相対pathの基準は**起動時のcwd**です。EXE配置先や.NET抽出cacheではありません。起動時の作業directoryと指定pathの組合せを確認するか、実在するfull pathを指定してください。入力やPromptをcacheへ移動する必要はありません。
 - 日本語・空白を含むpathは1つのargumentとして引用します。`--input`は0または1回、`--prompt`は複数指定でき、指定順を維持します。同じPrompt pathの重複は最初の1件だけを使います。
 - unknown option、重複`--input`、値なしは拒否されます。Promptはstrict UTF-8の`.txt`、1〜32,767 UTF-16 code unitsです。詳細は[Promptファイルから起動](prompt-launch.md)を確認してください。
-- 起動引数はGUIの準備用です。Promptは適用先を選んで**Promptを適用**した時だけcopyされ、起動・適用からloginやAI評価を自動開始しません。
+- 起動引数はGUIの準備用です。`--prompt`は受理しますが、画面へ表示せず適用もしません。起動からloginやAI評価を自動開始しません。
 
 ## mappingを完了できない
 
@@ -151,7 +151,7 @@ Windowsのフォルダーの**ReadOnly属性だけでは書込拒否を保証し
 | `SAVED_DEFINITION_LOAD_FAILED`／定義検証error | Excelの形式・アクセス権・破損、定義のPrompt・配点等を確認。強制適用せず、現在の入力・設計と元fileを保持する |
 | `SAVED_DEFINITION_CANCELLED`／適用失敗 | 現在のmetadata・Input／Designのdraftと設定fileは変更しない。入力と現在の処理状態を確認してから明示的に再試行する |
 
-成功時だけ保存ID・順序・質問文・Prompt・配点を保持してInput／Designへ反映します。候補の再生成や新しいheader値への暗黙置換は行いません。その後に主回答列を変更した場合は交差セルの質問文を反映し、質問行変更後の再読込前は旧行の値を使わず現在の質問文を保持します。Imported Prompt一覧・本文・順序は保存定義の適用で変わりません。
+成功時だけ保存ID・順序・質問文・Prompt・配点を保持してInput／Designへ反映します。候補の再生成や新しいheader値への暗黙置換は行いません。その後に主回答列を変更した場合は交差セルの質問文を反映し、質問行変更後の再読込前は旧行の値を使わず現在の質問文を保持します。起動時の`--prompt`の内容は保存定義の適用で取り込まれません。
 
 技術検証の成功は、別Excelの授業内容が同じことやcheckpoint再開可能性の保証ではありません。[既存の再開条件](#checkpointから再開できない)は別に確認します。設定保存・再読込・適用から認証確認・login・AI評価は自動開始しません。
 

@@ -31,29 +31,40 @@ public sealed class DocumentationContractTests
         "images/README.md",
     ];
 
+    // FR-003 AC-059: 廃止した3機能（入力詳細の編集・固有評価の編集・読込Promptの一覧と適用）の説明が、
+    // 利用者向け文書に残らない。
     [Fact]
-    public void Getting_started_explains_the_question_details_screen_for_teachers()
+    public void Retired_features_are_not_described_in_user_documents_AC059()
     {
-        string document = Read("docs/getting-started.md");
-        int design = document.IndexOf("## 2. 採点設計", StringComparison.Ordinal);
-        int execution = document.IndexOf("## 3. 実行", StringComparison.Ordinal);
-        int section = document.IndexOf("### 「設問の詳細」を押した後の画面", StringComparison.Ordinal);
-        Assert.True(design >= 0 && design < section && section < execution);
-        Assert.Single(Regex.Matches(document, "### 「設問の詳細」を押した後の画面"));
+        string root = FindRepositoryRoot();
+        string[] retiredPhrases =
+        [
+            "入力詳細", "設問の詳細", "読込Prompt", "Promptを適用", "候補一式を再適用", "固有評価の編集", "固有評価の設定",
+            "設定 → 固有評価", "固有評価 → 項目設定", "Imported Prompts", "Imported Promptを",
+        ];
+        foreach (string path in Directory.EnumerateFiles(Path.Combine(root, "docs"), "*.md")
+                     .Where(file => !Path.GetFileName(file).StartsWith("requirements-definition", StringComparison.Ordinal)))
+        {
+            string text = File.ReadAllText(path);
+            foreach (string phrase in retiredPhrases)
+            {
+                Assert.False(text.Contains(phrase, StringComparison.Ordinal),
+                    $"{Path.GetFileName(path)} still describes a retired feature: {phrase}");
+            }
+        }
 
-        string body = document[section..execution];
-        Assert.Single(Regex.Matches(body, @"!\[[^\]]+\]\(\.\./images/02-input-mapping\.png\)"));
-        Assert.True(File.Exists(Path.Combine(FindRepositoryRoot(), "images", "02-input-mapping.png")));
-        Assert.Equal(8, Directory.EnumerateFiles(Path.Combine(FindRepositoryRoot(), "images"), "*.png").Count());
-        AssertContainsAll(
-            body,
-            "設問", "追加", "複製", "上へ", "下へ", "削除", "設問名", "設問文", "補助列", "補助に含める",
-            "列候補の詳細", "候補一式を再適用", "設定から戻る", "設定を保存",
-            "**基本の使い方**", "**注意してください**",
-            "手で直した設定や設問文は置き換わる",
-            "配点は自動では調整されません",
-            "「1. 入力」で変更します",
-            "保存もされず、編集内容の破棄もされません");
+        foreach (string path in new[] { Path.Combine(root, "README.md") })
+        {
+            string text = File.ReadAllText(path);
+            foreach (string phrase in new[] { "入力詳細", "設問の詳細", "読込Prompt", "Promptを適用" })
+            {
+                Assert.DoesNotContain(phrase, text, StringComparison.Ordinal);
+            }
+        }
+
+        // 維持するもの: 設定は共通だけ、--prompt は受理するが適用しない旨。
+        string settings = Read("docs/settings.md");
+        AssertContainsAll(settings, "`--prompt`は受理しますが、画面には表示せず、どこにも適用しません");
     }
 
     [Fact]
@@ -530,7 +541,7 @@ public sealed class DocumentationContractTests
             "BOMあり／なしを受理",
             "1〜32,767 UTF-16 code units",
             "`--run`や`--resume`はありません",
-            "filenameによる自動割当や、選択だけでの適用は行いません");
+            "読み込んだ内容は画面に表示せず、どの評価にも適用しません");
         Assert.Equal(32_767, PromptFileLoader.MaximumCharacters);
         Assert.NotNull(LaunchOptions.Parse([]));
     }
@@ -632,7 +643,7 @@ public sealed class DocumentationContractTests
             "古いheader metadataを流用しません",
             "成功時だけInput metadata・選択値・draftとDesignを更新し、失敗・取消では現在のInput／Designを置き換えず、設定fileも変更しません",
             "保存したID・順序・設問text・Prompt・配点を保持",
-            "Imported Promptの一覧・本文・順序は変更・消去せず、未適用Promptを定義へ取り込みません",
+            "起動時の`--prompt`は定義へ取り込みません",
             "見出しセルから取り込まれた設問textは、定義を明示保存すると平文で含まれます",
             "貼り付けた学生回答・氏名・秘密情報も、定義に入れば保存され得ます",
             "`setting.txt`は暗号化containerではなく",
@@ -640,7 +651,7 @@ public sealed class DocumentationContractTests
             "AI結果、reason、evidence、参照回答、結果override",
             "run／checkpoint状態、新規／再開mode、partial指定",
             "認証情報としてのcredential・account情報・login状態、CLI hash等のruntime診断（model一覧のキャッシュとは別）",
-            "Imported Promptの取込file一覧・未適用本文・順序",
+            "起動時の`--prompt`の内容（受理するだけで保持しません）",
             "同schemaの未知項目・重複項目等を拒否",
             "その後に有効な設定を明示保存すると元fileを置き換えます",
             "複数profileの管理・切替と保存済みfinal workbookの再importは未対応");

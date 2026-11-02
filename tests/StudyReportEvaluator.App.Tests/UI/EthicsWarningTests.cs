@@ -60,8 +60,7 @@ public sealed class EthicsWarningTests
                 AssertWarning(window, warning, message);
                 // FR-001: 通常評価エディター（EvaluatorSettingsView）は採点設計の画面にだけ 1 つある。
                 // 固有評価・読込Prompt の編集部はどの画面にもない。
-                Assert.DoesNotContain(AllControls(originalView), control => control is SpecialEvaluationSettingsView
-                    or ImportedPromptSettingsView or MappingSettingsView);
+                Assert.DoesNotContain(AllControls(originalView), control => control is EvaluatorSettingsView && step != WorkflowStep.Design);
                 Assert.Equal(step == WorkflowStep.Design ? 1 : 0, AllControls(originalView).Count(control => control is EvaluatorSettingsView));
                 Button invoker = originalView switch
                 {

@@ -358,6 +358,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
+        // FR-003: 設定は画面の段階が変わったら閉じる（設定から段階へ戻れる）。
+        CloseSettings(synchronizeDrafts: true);
         RefreshExecutionConfiguration();
         stepPresentations = BuildStepPresentations();
         OnPropertyChanged(nameof(DesignViewModel));

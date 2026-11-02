@@ -149,6 +149,60 @@ public sealed class IntegratedDesignAndSettingsTests
         }
     }
 
+    // FR-003 AC-057: 入力詳細の編集UI・固有評価の編集UI・読込Promptの一覧/適用が、どの画面にも存在しない。
+    // 通常評価の設問タブ・評価方法・評価項目の編集は残る。
+    [AvaloniaFact]
+    public void FR003_AC057_Removed_three_features_are_unreachable_from_every_screen()
+    {
+        string[] forbiddenTexts =
+        {
+            "設問の詳細", "固有評価", "Promptを適用", "Prompt を適用", "候補一式を再適用", "候補を再適用", "設問を追加", "設問を複製",
+        };
+        string[] forbiddenIdParts =
+        {
+            "QuestionDetail", "InputDetail", "SpecialEvaluat", "SpecialEvaluation", "ImportedPrompt", "ApplyPrompt",
+            "ReapplyCandidates", "SettingsCategoryMapping", "SettingsCategorySpecial", "SettingsCategoryImportedPrompts",
+        };
+
+        void AssertAbsent(MainWindow window, string where)
+        {
+            foreach (Control c in window.GetVisualDescendants().OfType<Control>())
+            {
+                string id = AutomationProperties.GetAutomationId(c) ?? string.Empty;
+                foreach (string part in forbiddenIdParts)
+                {
+                    Assert.False(id.Contains(part, StringComparison.OrdinalIgnoreCase), $"{where}: removed control '{id}' exists");
+                }
+
+                if (c is Button b && b.Content is string text)
+                {
+                    foreach (string t in forbiddenTexts)
+                    {
+                        Assert.False(text.Contains(t, StringComparison.Ordinal), $"{where}: removed button '{text}' exists");
+                    }
+                }
+            }
+        }
+
+        MainWindow window = OpenWindow(1280, 800);
+        foreach (WorkflowStep step in new[] { WorkflowStep.Input, WorkflowStep.Design, WorkflowStep.Execution })
+        {
+            window.ViewModel.Navigator.NavigateTo(step);
+            Render();
+            AssertAbsent(window, step.ToString());
+        }
+
+        Click(Required<Button>(window, "SettingsOpenButton"));
+        AssertAbsent(window, "Settings");
+
+        // 異常系: 設定へ入っても存在しない入口を経由して到達できない（保持される通常評価の編集は残る）。
+        window.ViewModel.Navigator.NavigateTo(WorkflowStep.Design);
+        Render();
+        Assert.NotNull(Find<Control>(window, "EvaluatorSettingsQuestions"));
+        Assert.NotNull(Find<Control>(window, "EvaluatorSettingsEvaluators"));
+        Assert.NotNull(Find<Control>(window, "EvaluatorSettingsCriteria"));
+    }
+
     // FR-002 AC-055: 2 採点設計から旧設定への入口は、存在するカテゴリだけを指す。
     [AvaloniaFact]
     public void FR002_AC055_Design_entry_buttons_never_point_to_removed_settings_categories()

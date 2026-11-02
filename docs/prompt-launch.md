@@ -9,7 +9,7 @@ StudyReport Evaluatorは、入力workbookと複数の評価Promptを起動時に
 - **公開`v0.8.6`（単一EXE）**: 配布名は`StudyReportEvaluator-win-x64.exe`です。通常はGitHub Releaseの`v0.8.6`から取得し、必要に応じて`StudyReportEvaluator-win-x64.exe.sha256`でSHA-256を照合します。clean-host試験CH-01〜06と本人loginは公開前に実施していません。
 - **公開`v0.8.6`（ZIP代替経路）**: `StudyReportEvaluator-win-x64.zip`を展開した`StudyReportEvaluator.App.exe`も使えます。この起動名と引数は従来どおり維持します。旧`v0.8.1`は前回公開版です。
 
-以下の画面操作は、特記しない限り候補版の新UIです。Imported Promptsの本文・適用先は**設定 → 読込Prompt**、モデル・並列度・指定出力先の編集は**設定 → 共通**にあります。旧`v0.8.1`の操作は後述の「旧 v0.8.1（ZIP）の旧画面」に分けています。
+以下の画面操作は、特記しない限り候補版の新UIです。モデル・並列度・指定出力先の編集は**設定 → 共通**にあります。旧`v0.8.1`の操作は後述の「旧 v0.8.1（ZIP）の旧画面」に分けています。
 
 > **既存P06の確認範囲（製品`0.8.4`の検証履歴）:** 開発host上の実GUIで日本語pathの入力workbookと複数Promptの指定順維持を確認済みで、P06全7件PASS・review未解決指摘0です。この履歴を版更新後の最終成果物の検証結果へ流用しません。追加ソフト未導入のfresh OS（clean-host）での試験と利用者本人のloginは`NOT_RUN`であり、その成功や`v0.8.6`公開後もclean-host成功を示しません。
 
@@ -37,7 +37,7 @@ StudyReportEvaluator.App.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prom
 | Option | 回数 | 動作 |
 |---|---:|---|
 | `--input` | 0または1 | Input画面へpathを設定し、safe read-only読込を開始 |
-| `--prompt` | 0回以上 | 指定順でImported Promptsへ読込。候補版では設定 → 読込Promptで確認 |
+| `--prompt` | 0回以上 | 受理する（画面へ表示せず、適用もしない） |
 
 - option名は大文字・小文字を区別しません。
 - relative pathは起動時のworking directory（cwd）を基準にabsolute化します。基準は起動元のdirectoryのままで、EXE配置先や単一EXEの抽出cacheへ変更しません。
@@ -52,11 +52,7 @@ StudyReportEvaluator.App.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prom
 - length: 1〜32,767 UTF-16 code units
 - empty、invalid UTF-8、読込失敗は拒否
 
-候補版では、採点設計の**読込Prompt (件数)**から**設定 → 読込Prompt**を1操作で開けます。設問がある場合は同じ設問ID（`questionId`）を保ちます。入力前でも設定から原文を閲覧でき、適用には設問と適用対象が必要です。
-
-一覧は起動引数順のファイル名（basename）を表示し、選択したPromptの本文全体を読取専用で確認できます。**適用先の設問**と**適用先の種類**、通常Custom evaluatorまたは固有評価の項目を選び、適用先の概要を確認して**Promptを適用**した時だけtemplateへcopyします。Knowledgeには適用できません。filenameによる自動割当や、選択だけでの適用は行いません。
-
-適用しても一覧の順序・ファイル名・原文を保持し、同じPromptを再利用できます。同一起動中の画面往復では、残っている対象の設問・評価方法・固有項目と適用先の種類も保持します。適用後の本文編集と技術検証は**設定 → 通常評価 → Prompt**または**設定 → 固有評価 → Prompt**で行います。previewは仮値による表示で、実学生の回答やAIによる評価結果ではありません。
+`--prompt`は受理され、起動エラーにはなりません。読み込んだ内容は画面に表示せず、どの評価にも適用しません。AIへも送りません。
 
 起動引数やPrompt適用からloginやAI処理を自動開始しません。Promptの適用は設定fileへの保存やステップ移動も行いません。AI評価の開始にはExecution画面の**定量化を開始**を利用者自身が選ぶ必要があります。候補版の**GitHubにログイン**も別の明示操作です。
 
@@ -164,13 +160,12 @@ StudyReportEvaluator.App.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prom
 - 目的の`.xlsx`がread-onlyで読み込まれた
 - sheet、質問文の行1/2、回答行が正しい
 - 主画面で対象設問・有効状態・主回答列・設問文を確認した。主列変更で見出しの交差セル値が反映されるため、必要なら設問文を手動修正した
-- 通常の補助列は**設定 → 入力詳細**、固有評価の主対象列・補助列は**設定 → 固有評価 → 項目設定**で確認した
 
 ### Design
 
 - 主画面でBase、Special、enabled Question pointsの合計が**正確に100**で、不足／超過がない。ページ外の有効設問も合計に含む
 - 選択設問の絶対配点と評価方法・評価項目の概要を確認した。Knowledge／Custom、criterionのrange・weightは**設定 → 通常評価**で編集する。Knowledgeのinstructionは読取専用
-- **設定 → 読込Prompt**でImported Promptを正しい対象へ明示適用し、Custom／固有評価の必須placeholderとコピー後の本文を確認した
+- Custom評価のPromptに必須placeholderがあることを確認した
 - Similarity penalty weightを確認した。**係数0はSimilarity処理を無効にしない**。一方、**Special pointsが0なら固有評価AIを実行しない**
 - 技術エラーは一覧・**全文**で確認し、**問題箇所へ**で入力欄や設定を修正した
 
@@ -201,10 +196,9 @@ checkpointのinput、definition、modelが一致しない場合、またはrunti
 
 この節だけは旧`v0.8.1`の旧配置です。上記の候補版の設定画面と混同しないでください。
 
-- Imported Promptsは**Design画面内**で確認し、対象を選んで**Promptを適用**します。選択だけでの適用やfilenameによる自動割当はしません。
 - モデル・並列度・出力directoryは**Execution画面の編集欄**で指定します。
 - checkpoint再開は旧Execution画面の**既存checkpointから再開**で`.partial.xlsx`を指定します。新しいresume引数はありません。
-- このガイドで説明する設定画面と`setting.txt`への共通設定・採点定義1件の保存は、旧`v0.8.1`の機能ではありません。起動引数の順序、Promptの明示適用、no-auto-runの契約は従来どおりです。
+- このガイドで説明する設定画面と`setting.txt`への共通設定・採点定義1件の保存は、旧`v0.8.1`の機能ではありません。起動引数の順序、no-auto-runの契約は従来どおりです。
 
 ## privacy
 

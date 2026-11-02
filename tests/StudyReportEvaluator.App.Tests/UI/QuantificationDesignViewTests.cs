@@ -758,7 +758,6 @@ public sealed class QuantificationDesignViewTests
 
             Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
             Assert.False(shell.IsSettingsOpen);
-            Assert.DoesNotContain(window.GetVisualDescendants(), control => control is MappingSettingsView);
             InputView inputView = Assert.Single(window.GetVisualDescendants().OfType<InputView>());
             Assert.Same(input, inputView.DataContext);
             Control editor = inputView.FindControl<Control>(editorName)!;
@@ -892,26 +891,9 @@ public sealed class QuantificationDesignViewTests
             Assert.Same(viewModel, embedded.DataContext);
             Assert.Equal(custom.DisplayName, Assert.Single(embedded.GetVisualDescendants().OfType<TextBox>(),
                 box => AutomationProperties.GetAutomationId(box) == $"DesignEvaluator-{custom.Id}-Name").Text);
-            ImportedPromptSettingsView prompts = new(viewModel);
-            window.Content = prompts;
-            Render();
-            TextBlock promptTarget = Required<TextBlock>(prompts, "SelectedPromptTargetSummary");
-            Assert.Equal($"設問A → Custom: {custom.DisplayName}", promptTarget.Text);
-            Assert.Same(viewModel.ImportedPrompts, Required<ListBox>(prompts, "ImportedPromptList").ItemsSource);
-            Assert.True(Required<TextBox>(prompts, "ImportedPromptPreview").IsReadOnly);
-            Assert.Equal(source.Content, Required<TextBox>(prompts, "ImportedPromptPreview").Text);
-            viewModel.SelectedPromptTarget = ImportedPromptTarget.SpecialEvaluation;
-            Render();
-            Assert.Equal($"設問A → 固有評価: {special.DisplayName}", promptTarget.Text);
-
-            viewModel.SelectedPromptTarget = ImportedPromptTarget.CustomEvaluator;
-
             viewModel.SelectedQuestion = second;
             Render();
 
-            Assert.Equal("設問B → Custom評価方法を選択してください", promptTarget.Text);
-            window.Content = view;
-            Render();
             ListBoxItem selectedCard = Assert.Single(
                 Required<ListBox>(view, "QuestionEditorList").GetVisualDescendants().OfType<ListBoxItem>(),
                 item => ReferenceEquals(item.DataContext, second));
@@ -923,11 +905,6 @@ public sealed class QuantificationDesignViewTests
 
             Assert.Same(first, viewModel.SelectedQuestion);
             AssertMeasuredPage(view, viewModel);
-            window.Content = prompts;
-            Render();
-            Assert.Equal($"設問A → Custom: {custom.DisplayName}", promptTarget.Text);
-            Assert.Same(first, Required<ComboBox>(prompts, "ImportedPromptQuestionSelector").SelectedItem);
-            Assert.Same(source, Assert.Single(viewModel.ImportedPromptSources));
         }
         finally
         {
@@ -1051,16 +1028,6 @@ public sealed class QuantificationDesignViewTests
             Press(window, Key.Tab, RawInputModifiers.Shift);
             Assert.Same(customEditor, window.FocusManager?.GetFocusedElement());
 
-            SpecialEvaluationDesignItemViewModel special = viewModel.AddSpecialEvaluation(question.Id);
-            SpecialEvaluationSettingsView specials = new(viewModel);
-            window.Content = specials;
-            Render();
-            TabItem promptTab = RequiredByAutomationId<TabItem>(specials, "SpecialSettingsPromptTab");
-            promptTab.GetVisualAncestors().OfType<TabControl>().Single().SelectedItem = promptTab;
-            Render();
-            Assert.False(RequiredByAutomationId<TextBox>(specials, special.PromptAutomationId).IsReadOnly);
-            Assert.Equal(special.PromptTemplate, RequiredByAutomationId<TextBox>(specials, special.PromptAutomationId).Text);
-            Assert.True(RequiredByAutomationId<TextBox>(specials, special.CardAutomationId + "-PromptPreview").IsReadOnly);
         }
         finally
         {
