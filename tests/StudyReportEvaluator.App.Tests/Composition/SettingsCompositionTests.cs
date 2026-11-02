@@ -200,7 +200,6 @@ public sealed class SettingsCompositionTests
         QuantificationDefinition design = harness.Shell.DesignViewModel.Draft;
         // FR-003 AC-058: --prompt は受理するが、UIへ反映せず適用もしない。
         Assert.True(startup.IsValid);
-        Assert.Empty(harness.Shell.DesignViewModel.ImportedPrompts);
 
         Task initialization = services.InitializeAsync(harness.Shell, TestContext.Current.CancellationToken);
         Assert.Same(initialization, harness.Shell.Settings.LastLoadTask);
@@ -213,7 +212,6 @@ public sealed class SettingsCompositionTests
         AssertDefinition(saved.Definition!, harness.Shell.Settings.StoredDefinition);
         Assert.Same(input, harness.Input.DefinitionDraft);
         Assert.Same(design, harness.Shell.DesignViewModel.Draft);
-        Assert.Empty(harness.Shell.DesignViewModel.ImportedPrompts);
         Assert.Equal(string.Empty, harness.Input.FilePath);
         Assert.False(harness.Input.HasLoadedWorkbook);
         Assert.False(harness.Shell.Settings.CanApplySavedDefinition);
@@ -616,7 +614,6 @@ public sealed class SettingsCompositionTests
             Assert.True(shell.InputViewModel.HasLoadedWorkbook);
             Assert.Equal(workbook.Path, shell.InputViewModel.FilePath);
             Assert.NotEqual(saved.Definition!.Id, shell.InputViewModel.DefinitionDraft.Id);
-            Assert.Empty(shell.DesignViewModel.ImportedPrompts);
             AssertDefinition(saved.Definition!, shell.Settings.StoredDefinition);
             Assert.Null(shell.Settings.LastApplySavedDefinitionTask);
             Assert.Null(shell.Settings.LastSaveTask);

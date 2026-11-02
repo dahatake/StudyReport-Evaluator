@@ -136,21 +136,18 @@ public sealed class LaunchOptionsTests
         Assert.Equal(workbook.Path, shell.InputViewModel.FilePath);
         Assert.False(shell.InputViewModel.HasLoadedWorkbook);
         // FR-003 AC-058: --prompt は受理するが、UIへ反映せず適用もしない。
-        Assert.Empty(shell.DesignViewModel.ImportedPrompts);
         Assert.Null(shell.ExecutionViewModel.LastRunContext);
         Assert.Equal(ExecutionAuthenticationState.NotChecked, shell.ExecutionViewModel.AuthenticationState);
         await shell.InputViewModel.LoadLaunchInputIfRequestedAsync(TestContext.Current.CancellationToken);
         Assert.True(shell.InputViewModel.HasLoadedWorkbook);
         shell.NextCommand.Execute(null);
         QuantificationDesignViewModel design = shell.DesignViewModel;
-        Assert.Empty(design.ImportedPrompts);
         QuestionDesignItemViewModel question = Assert.IsType<QuestionDesignItemViewModel>(design.SelectedQuestion);
         foreach (EvaluatorDesignItemViewModel evaluator in question.Evaluators)
         {
             Assert.DoesNotContain(customContent, evaluator.CustomPromptTemplate ?? string.Empty, StringComparison.Ordinal);
         }
 
-        Assert.False(design.CanApplyImportedPrompt);
         Assert.Equal(ExecutionAuthenticationState.NotChecked, shell.ExecutionViewModel.AuthenticationState);
         Assert.Null(shell.ExecutionViewModel.LastRunContext);
     }

@@ -58,33 +58,6 @@ public sealed record EvaluatorTypeChoice(
     string DisplayName,
     string ContractName);
 
-public enum ImportedPromptTarget
-{
-    CustomEvaluator,
-    SpecialEvaluation,
-}
-
-public sealed record ImportedPromptTargetChoice(
-    ImportedPromptTarget Target,
-    string DisplayName);
-
-public sealed class ImportedPromptViewModel
-{
-    internal ImportedPromptViewModel(ImportedPrompt source)
-    {
-        Source = source ?? throw new ArgumentNullException(nameof(source));
-    }
-
-    internal ImportedPrompt Source { get; }
-
-    public string DisplayName => Source.DisplayName;
-
-    public string Content => Source.Content;
-
-    public override string ToString() =>
-        $"{nameof(ImportedPromptViewModel)} {{ DisplayName = {DisplayName}, Content = <redacted> }}";
-}
-
 public sealed class QuestionDesignItemViewModel : UiObservableObject
 {
     private readonly QuantificationDesignViewModel owner;
@@ -95,7 +68,6 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
     private readonly ViewModelCommand deleteCommand;
     private readonly ViewModelCommand addKnowledgeEvaluatorCommand;
     private readonly ViewModelCommand addCustomEvaluatorCommand;
-    private readonly ViewModelCommand addSpecialEvaluationCommand;
     private EvaluatorDesignItemViewModel? selectedEvaluator;
     private SpecialEvaluationDesignItemViewModel? selectedSpecialEvaluation;
 
@@ -113,7 +85,6 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
         deleteCommand = new ViewModelCommand(_ => owner.DeleteQuestion(Id));
         addKnowledgeEvaluatorCommand = new ViewModelCommand(_ => owner.AddEvaluator(Id, EvaluatorType.KnowledgeCoverage));
         addCustomEvaluatorCommand = new ViewModelCommand(_ => owner.AddEvaluator(Id, EvaluatorType.CustomPrompt));
-        addSpecialEvaluationCommand = new ViewModelCommand(_ => owner.AddSpecialEvaluation(Id));
         SynchronizeEvaluators();
         SynchronizeSpecialEvaluations();
     }
@@ -167,25 +138,13 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
     public EvaluatorDesignItemViewModel? SelectedEvaluator
     {
         get => selectedEvaluator;
-        set
-        {
-            if (SetProperty(ref selectedEvaluator, value))
-            {
-                owner.NotifyPromptTargetChanged();
-            }
-        }
+        set => SetProperty(ref selectedEvaluator, value);
     }
 
     public SpecialEvaluationDesignItemViewModel? SelectedSpecialEvaluation
     {
         get => selectedSpecialEvaluation;
-        set
-        {
-            if (SetProperty(ref selectedSpecialEvaluation, value))
-            {
-                owner.NotifyPromptTargetChanged();
-            }
-        }
+        set => SetProperty(ref selectedSpecialEvaluation, value);
     }
 
     public bool HasErrors => owner.HasErrorsFor(Id);
@@ -209,8 +168,6 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
     public ICommand AddKnowledgeEvaluatorCommand => addKnowledgeEvaluatorCommand;
 
     public ICommand AddCustomEvaluatorCommand => addCustomEvaluatorCommand;
-
-    public ICommand AddSpecialEvaluationCommand => addSpecialEvaluationCommand;
 
     internal void Synchronize(QuestionDefinition updated)
     {
@@ -997,11 +954,6 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         new EvaluatorTypeChoice(EvaluatorType.KnowledgeCoverage, "Knowledge", "KNOWLEDGE_COVERAGE"),
         new EvaluatorTypeChoice(EvaluatorType.CustomPrompt, "Custom", "CUSTOM_PROMPT"),
     ]);
-    private static readonly IReadOnlyList<ImportedPromptTargetChoice> ClosedPromptTargets = Array.AsReadOnly(
-    [
-        new ImportedPromptTargetChoice(ImportedPromptTarget.CustomEvaluator, "選択中のCustom evaluator"),
-        new ImportedPromptTargetChoice(ImportedPromptTarget.SpecialEvaluation, "選択中の固有評価"),
-    ]);
 
     private static readonly PromptRenderContext PreviewContext = new(
         "【設問 preview】",
@@ -1015,14 +967,11 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
     private readonly ScoringAllocationCalculator allocationCalculator = new();
     private readonly PromptTemplateRenderer promptRenderer = new();
     private IReadOnlyList<string> availableColumnNames;
-    private readonly ImmutableArray<ImportedPrompt> importedPromptSources;
     private readonly ObservableCollection<QuestionDesignItemViewModel> questionItems = [];
     private readonly ObservableCollection<QuestionDesignItemViewModel> visibleQuestionItems = [];
-    private readonly ObservableCollection<ImportedPromptViewModel> importedPromptItems = [];
     private readonly ObservableCollection<DesignValidationError> validationErrorItems = [];
     private readonly ViewModelCommand addQuestionCommand;
     private readonly ViewModelCommand equalizeQuestionPointsCommand;
-    private readonly ViewModelCommand applyImportedPromptCommand;
     private readonly ViewModelCommand validateCommand;
     private readonly ViewModelCommand previousPageCommand;
     private readonly ViewModelCommand nextPageCommand;
@@ -1031,35 +980,26 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
     private int pageSize = 4;
     private int pageIndex;
     private bool updatingPresentation;
-    private ImportedPromptViewModel? selectedImportedPrompt;
-    private ImportedPromptTarget selectedPromptTarget = ImportedPromptTarget.CustomEvaluator;
 
     public QuantificationDesignViewModel()
-        : this(null, null, null)
+        : this(null, null)
     {
     }
 
     public QuantificationDesignViewModel(QuantificationDefinition? initialDefinition)
-        : this(initialDefinition, null, null)
+        : this(initialDefinition, null)
     {
     }
 
     public QuantificationDesignViewModel(
         QuantificationDefinition? initialDefinition,
-        IEnumerable<string>? availableColumnNames,
-        IEnumerable<ImportedPrompt>? importedPrompts = null)
+        IEnumerable<string>? availableColumnNames)
     {
         QuantificationDefinition seed = initialDefinition ?? CreateSafeDefault();
         this.availableColumnNames = NormalizeAvailableColumns(seed, availableColumnNames);
-        importedPromptSources = (importedPrompts ?? []).ToImmutableArray();
-        if (importedPromptSources.Any(prompt => prompt is null))
-        {
-            throw new ArgumentException("Imported prompts cannot contain null values.", nameof(importedPrompts));
-        }
 
         Questions = new ReadOnlyObservableCollection<QuestionDesignItemViewModel>(questionItems);
         VisibleQuestions = new ReadOnlyObservableCollection<QuestionDesignItemViewModel>(visibleQuestionItems);
-        ImportedPrompts = new ReadOnlyObservableCollection<ImportedPromptViewModel>(importedPromptItems);
         ValidationErrors = new ReadOnlyObservableCollection<DesignValidationError>(validationErrorItems);
         draft = CloneDefinition(seed);
         addQuestionCommand = new ViewModelCommand(_ => AddQuestion());
@@ -1067,27 +1007,14 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             _ => EqualizeQuestionPoints(),
             _ => draft.Questions.Any(question => question.Enabled)
                 && draft.BasePoints + draft.SpecialPoints <= 100m);
-        applyImportedPromptCommand = new ViewModelCommand(
-            _ => ApplyImportedPrompt(),
-            _ => CanApplyImportedPrompt);
         validateCommand = new ViewModelCommand(_ => Revalidate());
         previousPageCommand = new ViewModelCommand(_ => PageIndex--, _ => pageIndex > 0);
         nextPageCommand = new ViewModelCommand(_ => PageIndex++, _ => pageIndex < LastPageIndex);
-        foreach (ImportedPrompt prompt in importedPromptSources)
-        {
-            importedPromptItems.Add(new ImportedPromptViewModel(prompt));
-        }
-
-        selectedImportedPrompt = importedPromptItems.FirstOrDefault();
         SynchronizeQuestions();
         Revalidate();
     }
 
     public static IReadOnlyList<EvaluatorTypeChoice> EvaluatorTypes => ClosedEvaluatorTypes;
-
-    public static IReadOnlyList<ImportedPromptTargetChoice> PromptTargets => ClosedPromptTargets;
-
-    public IReadOnlyList<ImportedPromptTargetChoice> AvailablePromptTargets => ClosedPromptTargets;
 
     public ReadOnlyObservableCollection<QuestionDesignItemViewModel> Questions { get; }
 
@@ -1170,83 +1097,6 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         }
     }
 
-    public ReadOnlyObservableCollection<ImportedPromptViewModel> ImportedPrompts { get; }
-
-    public IReadOnlyList<ImportedPrompt> ImportedPromptSources => importedPromptSources;
-
-    public ImportedPromptViewModel? SelectedImportedPrompt
-    {
-        get => selectedImportedPrompt;
-        set
-        {
-            if (SetProperty(ref selectedImportedPrompt, value))
-            {
-                OnPropertiesChanged(nameof(ImportedPromptPreview), nameof(CanApplyImportedPrompt));
-                applyImportedPromptCommand.RaiseCanExecuteChanged();
-            }
-        }
-    }
-
-    public ImportedPromptTarget SelectedPromptTarget
-    {
-        get => selectedPromptTarget;
-        set
-        {
-            if (!Enum.IsDefined(value))
-            {
-                throw new ArgumentOutOfRangeException(nameof(value));
-            }
-
-            if (SetProperty(ref selectedPromptTarget, value))
-            {
-                OnPropertiesChanged(
-                    nameof(SelectedPromptTargetChoice),
-                    nameof(SelectedPromptTargetSummary),
-                    nameof(CanApplyImportedPrompt));
-                applyImportedPromptCommand.RaiseCanExecuteChanged();
-            }
-        }
-    }
-
-    public ImportedPromptTargetChoice SelectedPromptTargetChoice
-    {
-        get => ClosedPromptTargets.Single(choice => choice.Target == SelectedPromptTarget);
-        set
-        {
-            if (value is not null)
-            {
-                SelectedPromptTarget = value.Target;
-            }
-        }
-    }
-
-    public string ImportedPromptPreview => SelectedImportedPrompt?.Content
-        ?? "command lineで --prompt を指定するとここに表示されます。";
-
-    public string SelectedPromptTargetSummary => SelectedQuestion is not { } question
-        ? "設問を選択してください"
-        : SelectedPromptTarget switch
-        {
-            ImportedPromptTarget.CustomEvaluator when question.SelectedEvaluator?.IsCustom == true =>
-                $"{question.DisplayName} → Custom: {question.SelectedEvaluator.DisplayName}",
-            ImportedPromptTarget.CustomEvaluator =>
-                $"{question.DisplayName} → Custom評価方法を選択してください",
-            ImportedPromptTarget.SpecialEvaluation when question.SelectedSpecialEvaluation is not null =>
-                $"{question.DisplayName} → 固有評価: {question.SelectedSpecialEvaluation.DisplayName}",
-            ImportedPromptTarget.SpecialEvaluation =>
-                $"{question.DisplayName} → 固有評価を選択してください",
-            _ => throw new ArgumentOutOfRangeException(nameof(SelectedPromptTarget)),
-        };
-
-    public bool CanApplyImportedPrompt => SelectedImportedPrompt is not null
-        && SelectedQuestion is not null
-        && (SelectedPromptTarget switch
-        {
-            ImportedPromptTarget.CustomEvaluator => SelectedQuestion.SelectedEvaluator?.IsCustom == true,
-            ImportedPromptTarget.SpecialEvaluation => SelectedQuestion.SelectedSpecialEvaluation is not null,
-            _ => false,
-        });
-
     public ReadOnlyObservableCollection<DesignValidationError> ValidationErrors { get; }
 
     public IReadOnlyList<string> AvailableColumnNames => availableColumnNames;
@@ -1323,8 +1173,6 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
 
     public ICommand EqualizeQuestionPointsCommand => equalizeQuestionPointsCommand;
 
-    public ICommand ApplyImportedPromptCommand => applyImportedPromptCommand;
-
     public ICommand ValidateCommand => validateCommand;
 
     public ICommand PreviousPageCommand => previousPageCommand;
@@ -1365,7 +1213,6 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             if (definitionChanged)
             {
                 Commit(definition);
-                NotifyPromptTargetChanged();
             }
             else
             {
@@ -1384,33 +1231,6 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         {
             IsSynchronizingFromInput = wasSynchronizingFromInput;
         }
-    }
-
-    public void ApplyImportedPrompt()
-    {
-        if (!CanApplyImportedPrompt
-            || SelectedImportedPrompt is null
-            || SelectedQuestion is null)
-        {
-            return;
-        }
-
-        string template = SelectedImportedPrompt.Content;
-        switch (SelectedPromptTarget)
-        {
-            case ImportedPromptTarget.CustomEvaluator:
-                EvaluatorDesignItemViewModel evaluator = SelectedQuestion.SelectedEvaluator!;
-                evaluator.CustomPromptTemplate = template;
-                break;
-            case ImportedPromptTarget.SpecialEvaluation:
-                SpecialEvaluationDesignItemViewModel special = SelectedQuestion.SelectedSpecialEvaluation!;
-                special.PromptTemplate = template;
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(SelectedPromptTarget));
-        }
-
-        NotifyPromptTargetChanged();
     }
 
     public void EqualizeQuestionPoints()
@@ -1547,7 +1367,8 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         UpdateQuestion(questionId, question => question.RemoveEvaluator(evaluatorIndex));
     }
 
-    public SpecialEvaluationDesignItemViewModel AddSpecialEvaluation(string questionId)
+    /// <summary>Retired UI entry point (FR-003); kept internal for building definitions with 固有評価 in tests.</summary>
+    internal SpecialEvaluationDesignItemViewModel AddSpecialEvaluation(string questionId)
     {
         QuestionDefinition question = GetQuestion(questionId);
         string specialId = NewId("special");
@@ -1754,7 +1575,6 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             },
             _ => throw new ArgumentOutOfRangeException(nameof(type)),
         });
-        NotifyPromptTargetChanged();
     }
 
     public bool TryBuildSnapshot(out QuantificationSnapshot? snapshot)
@@ -1794,12 +1614,6 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         }
 
         Commit(draft with { Questions = draft.Questions.SetItem(questionIndex, updated) });
-    }
-
-    internal void NotifyPromptTargetChanged()
-    {
-        OnPropertiesChanged(nameof(SelectedPromptTargetSummary), nameof(CanApplyImportedPrompt));
-        applyImportedPromptCommand.RaiseCanExecuteChanged();
     }
 
     internal void UpdateEvaluator(
@@ -1943,7 +1757,6 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             nameof(AllocationRemaining),
             nameof(IsAllocationValid),
             nameof(AllocationSummary),
-            nameof(SelectedPromptTargetSummary),
             nameof(HierarchySummary));
         equalizeQuestionPointsCommand.RaiseCanExecuteChanged();
     }
@@ -2020,10 +1833,6 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             // Signal settled items while writebacks are still guarded. The view uses
             // UpdateTarget: a compiled TwoWay binding suppresses same-reference notifications.
             OnPropertiesChanged(nameof(PageSummary), nameof(SelectedQuestion));
-            if (selectionChanged)
-            {
-                NotifyPromptTargetChanged();
-            }
 
             previousPageCommand.RaiseCanExecuteChanged();
             nextPageCommand.RaiseCanExecuteChanged();
