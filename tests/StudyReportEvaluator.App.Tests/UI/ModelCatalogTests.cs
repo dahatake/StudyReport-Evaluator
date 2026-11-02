@@ -276,16 +276,15 @@ public sealed class ModelCatalogTests
         }
 
         Assert.Same(collection, harness.Execution.AvailableModelIds);
-        Assert.Equal(next.Select(model => model.Id), collection);
+        Assert.Equal(next.Select(model => model.Id).OrderBy(id => id == "auto").ThenBy(id => id, StringComparer.OrdinalIgnoreCase), collection);
         AssertCatalog(next, harness.Execution.CachedModels);
         AssertCatalog(next, (await harness.ReadAsync()).CachedModels);
         Assert.DoesNotContain(NotifyCollectionChangedAction.Reset, changes);
         Assert.DoesNotContain(NotifyCollectionChangedAction.Replace, changes);
-        if (change == "limits") Assert.Empty(changes);
+        if (change is "limits" or "reorder") Assert.Empty(changes); // display order is alphabetical, so SDK order changes do not move items
         else Assert.NotEmpty(changes);
         if (change is "add" or "combined") Assert.Contains(NotifyCollectionChangedAction.Add, changes);
         if (change is "delete" or "combined" or "empty") Assert.Contains(NotifyCollectionChangedAction.Remove, changes);
-        if (change is "reorder" or "combined") Assert.Contains(NotifyCollectionChangedAction.Move, changes);
         Assert.Equal("model-a", harness.Execution.PreferredModelId);
         Assert.Equal(change == "empty" ? null : "model-a", harness.Execution.SelectedModelId);
         Assert.Equal(change != "empty", harness.Execution.CanStart);
@@ -600,7 +599,7 @@ public sealed class ModelCatalogTests
         await harness.Execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
         harness.Execution.SelectedModelId = ids[^1];
 
-        Assert.Equal(ids, harness.Execution.AvailableModelIds);
+        Assert.Equal(ids.OrderBy(id => id, StringComparer.OrdinalIgnoreCase), harness.Execution.AvailableModelIds);
         Assert.Equal(ids[^1], harness.Execution.SelectedModelId);
         Assert.Null(harness.Execution.CachedModels);
         Assert.False(Directory.Exists(harness.Root));

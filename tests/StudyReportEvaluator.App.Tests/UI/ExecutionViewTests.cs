@@ -375,7 +375,8 @@ public sealed class ExecutionViewTests
 
         await viewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(["auto", "model-known"], viewModel.AvailableModelIds);
+        Assert.Equal(["model-known", "auto"], viewModel.AvailableModelIds);
+        viewModel.SelectedModelId = "auto";
         Assert.Equal("auto", viewModel.SelectedModelId);
         Assert.Null(viewModel.SelectedModelPromptTokenLimit);
         Assert.Equal("SDK未公開・事前検証なし", viewModel.SelectedModelLimitText);
@@ -950,7 +951,7 @@ public sealed class ExecutionViewTests
         await input.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
         using LoginViewHarness harness = new(new ExecutionAuthenticationSnapshot(
             ExecutionAuthenticationState.Available,
-            [U04TestSupport.Model("model-test"), U04TestSupport.Model("model-other"), U04TestSupport.Model("auto")],
+            [U04TestSupport.Model("model-test"), U04TestSupport.Model("model-z-other"), U04TestSupport.Model("auto")],
             U04TestSupport.RuntimeIdentity()));
         using MainWindowViewModel main = new(new WorkflowNavigator(), input,
             new QuantificationDesignViewModel(input.DefinitionDraft, input.AvailableColumnNames),
@@ -995,13 +996,13 @@ public sealed class ExecutionViewTests
         Assert.Same(harness.ViewModel.ConcurrencyOptions, concurrency.ItemsSource);
         Assert.NotNull(BindingOperations.GetBindingExpressionBase(output, TextBox.TextProperty));
         Assert.False(output.IsReadOnly);
-        model.SetCurrentValue(ComboBox.SelectedItemProperty, "model-other");
+        model.SetCurrentValue(ComboBox.SelectedItemProperty, "model-z-other");
         concurrency.SetCurrentValue(ComboBox.SelectedItemProperty, 3);
         string explicitOutput = Path.Combine(Path.GetTempPath(), "T20-explicit-output");
         output.SetCurrentValue(TextBox.TextProperty, explicitOutput);
         Render();
-        Assert.Equal("model-other", harness.ViewModel.SelectedModelId);
-        Assert.Equal("model-other", harness.ViewModel.PreferredModelId);
+        Assert.Equal("model-z-other", harness.ViewModel.SelectedModelId);
+        Assert.Equal("model-z-other", harness.ViewModel.PreferredModelId);
         Assert.Equal(3, harness.ViewModel.MaxConcurrency);
         Assert.Equal(explicitOutput, harness.ViewModel.OutputDirectoryOverride);
         Assert.Equal(explicitOutput, ById<TextBox>(settings, "SettingsEffectiveOutputDirectory").Text);
@@ -1016,7 +1017,7 @@ public sealed class ExecutionViewTests
 
         Assert.False(main.IsSettingsOpen);
         Assert.Same(harness.View, harness.Window.Content);
-        Assert.Equal("次回 model-other 並列3 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-other · 上限: 64,000 tokens", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+        Assert.Equal("次回 model-z-other 並列3 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-z-other · 上限: 64,000 tokens", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
         Assert.Equal("次回並列\n3 件", Required<TextBlock>(harness.View, "ConcurrencySummary").Text);
         Assert.Equal(explicitOutput, Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox").Text);
         Assert.Contains("明示指定", Required<TextBlock>(harness.View, "OutputDirectorySource").Text, StringComparison.Ordinal);

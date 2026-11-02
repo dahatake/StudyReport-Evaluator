@@ -24,7 +24,7 @@ public sealed class SettingsAccessibilityTests
         QuantificationDefinition definition = U04TestSupport.Definition(2, 2);
         RecordingAuthenticationBoundary authentication = new(new ExecutionAuthenticationSnapshot(
             ExecutionAuthenticationState.Available,
-            [U04TestSupport.Model("model-test"), U04TestSupport.Model("model-other"), U04TestSupport.Model("auto")],
+            [U04TestSupport.Model("model-test"), U04TestSupport.Model("model-z-other"), U04TestSupport.Model("auto")],
             U04TestSupport.RuntimeIdentity()));
         RecordingRunBoundary runner = new((_, _, _) => throw new InvalidOperationException("No run was requested."));
         using ExecutionViewModel execution = new(authentication, runner);
@@ -76,14 +76,14 @@ public sealed class SettingsAccessibilityTests
             Press(window, Key.Tab);
             Assert.Same(output, window.FocusManager?.GetFocusedElement());
 
-            model.SetCurrentValue(ComboBox.SelectedItemProperty, "model-other");
+            model.SetCurrentValue(ComboBox.SelectedItemProperty, "model-z-other");
             concurrency.SetCurrentValue(ComboBox.SelectedItemProperty, 3);
             string explicitOutput = Path.Combine(Path.GetTempPath(), "synthetic-T25-explicit-output");
             output.SetCurrentValue(TextBox.TextProperty, explicitOutput);
             Press(window, Key.Tab);
             Assert.Same(effective, window.FocusManager?.GetFocusedElement());
-            Assert.Equal("model-other", execution.SelectedModelId);
-            Assert.Equal("model-other", execution.PreferredModelId);
+            Assert.Equal("model-z-other", execution.SelectedModelId);
+            Assert.Equal("model-z-other", execution.PreferredModelId);
             Assert.Equal(3, execution.MaxConcurrency);
             Assert.Equal(explicitOutput, execution.OutputDirectoryOverride);
             Assert.Equal(explicitOutput, effective.Text);
@@ -104,7 +104,7 @@ public sealed class SettingsAccessibilityTests
                 id is "ExecutionModel" or "ExecutionConcurrency" or "ExecutionOutputDirectory");
             TextBox actualModel = ById<TextBox>(executionView, "ExecutionEffectiveModel");
             Assert.True(actualModel.IsReadOnly);
-            Assert.Equal("次回 model-other 並列3 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-other · 上限: 64,000 tokens", actualModel.Text);
+            Assert.Equal("次回 model-z-other 並列3 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-z-other · 上限: 64,000 tokens", actualModel.Text);
             TextBox actualOutput = ById<TextBox>(executionView, "ExecutionEffectiveOutputDirectory");
             Assert.True(actualOutput.IsReadOnly);
             Assert.Equal(explicitOutput, actualOutput.Text);
@@ -116,7 +116,7 @@ public sealed class SettingsAccessibilityTests
             Assert.Same(concurrency, ById<ComboBox>(view, "ExecutionConcurrency"));
             Assert.Same(output, ById<TextBox>(view, "ExecutionOutputDirectory"));
             Assert.Equal(originalIds, UniqueIds(view));
-            Assert.Equal("model-other", model.SelectedItem);
+            Assert.Equal("model-z-other", model.SelectedItem);
             Assert.Equal(3, concurrency.SelectedItem);
             Assert.True(output.Focus(NavigationMethod.Tab));
             output.SetCurrentValue(TextBox.TextProperty, string.Empty);

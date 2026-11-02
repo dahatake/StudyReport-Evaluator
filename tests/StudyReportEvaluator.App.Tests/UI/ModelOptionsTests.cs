@@ -25,6 +25,23 @@ public sealed class ModelOptionsTests
         new("model-a", 272_000, 400_000, ["high", "low", "medium", "high"], "medium", 1_000_000);
 
     [Fact]
+    public async Task Model_list_is_alphabetical_with_auto_last_regardless_of_sdk_order()
+    {
+        ExecutionViewModel vm = new(
+            new RecordingAuthenticationBoundary(new ExecutionAuthenticationSnapshot(
+                ExecutionAuthenticationState.Available,
+                [U04TestSupport.Model("gpt-5"), U04TestSupport.AutoModel(), U04TestSupport.Model("Claude-x"),
+                    U04TestSupport.Model("claude-a")],
+                U04TestSupport.RuntimeIdentity())),
+            new RecordingRunBoundary((_, _, _) => throw new InvalidOperationException()));
+        using (vm)
+        {
+            await vm.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(["claude-a", "Claude-x", "gpt-5", "auto"], vm.AvailableModelIds);
+        }
+    }
+
+    [Fact]
     public async Task Model_specific_options_preserve_explicit_choices_and_do_not_make_network_calls()
     {
         MutableAuthentication auth = new();

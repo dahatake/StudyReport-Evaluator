@@ -1968,15 +1968,20 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         }
     }
 
-    private void SynchronizeModelIds(IReadOnlyList<string> ids)
+    private void SynchronizeModelIds(IReadOnlyList<string> unsortedIds)
     {
+        string[] ids = [.. unsortedIds
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(id => id == "auto")
+            .ThenBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(id => id, StringComparer.Ordinal)];
         HashSet<string> desired = new(ids, StringComparer.Ordinal);
         for (int index = modelItems.Count - 1; index >= 0; index--)
         {
             if (!desired.Contains(modelItems[index])) modelItems.RemoveAt(index);
         }
 
-        for (int index = 0; index < ids.Count; index++)
+        for (int index = 0; index < ids.Length; index++)
         {
             if (index < modelItems.Count && modelItems[index] == ids[index]) continue;
             int existing = modelItems.IndexOf(ids[index]);
