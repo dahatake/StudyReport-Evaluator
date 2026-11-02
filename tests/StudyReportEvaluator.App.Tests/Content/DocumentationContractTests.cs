@@ -43,7 +43,9 @@ public sealed class DocumentationContractTests
             "設定 → 固有評価", "固有評価 → 項目設定", "Imported Prompts", "Imported Promptを",
         ];
         foreach (string path in Directory.EnumerateFiles(Path.Combine(root, "docs"), "*.md")
-                     .Where(file => !Path.GetFileName(file).StartsWith("requirements-definition", StringComparison.Ordinal)))
+                     .Where(file => !Path.GetFileName(file).StartsWith("requirements-definition", StringComparison.Ordinal))
+                     // AC-059 で対象外と明記: ID 台帳は廃止項目名を履歴として保持する。
+                     .Where(file => !string.Equals(Path.GetFileName(file), "id-registry.md", StringComparison.Ordinal)))
         {
             string text = File.ReadAllText(path);
             foreach (string phrase in retiredPhrases)
