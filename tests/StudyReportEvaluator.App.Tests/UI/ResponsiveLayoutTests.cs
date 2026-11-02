@@ -652,8 +652,7 @@ public sealed class ResponsiveLayoutTests(ITestOutputHelper output)
                 break;
             case QuantificationDesignView:
                 State("DesignQuestionsPageSummary", TextWrapping.NoWrap, ellipsis: true);
-                State("DesignEvaluatorSummary", ellipsis: true, maxLines: 2);
-                State("DesignSpecialSummary", ellipsis: true, maxLines: 2);
+                // FR-001: 通常評価の概要・固有評価の概要は統合エディターに置き換わった（DesignEvaluatorSummary / DesignSpecialSummary は廃止）。
                 State("DesignStatus", TextWrapping.NoWrap, ellipsis: true);
                 break;
             case ExecutionView:
@@ -693,20 +692,6 @@ public sealed class ResponsiveLayoutTests(ITestOutputHelper output)
                                 State("SettingsApplyStatus");
                             }
                         }
-                        break;
-                    case SettingsCategory.Mapping:
-                        State("MappingSettingsValidationSummary", TextWrapping.NoWrap);
-                        State(settings.ViewModel.Input.SelectedQuestion is null
-                            ? "MappingSettingsNoQuestion" : "MappingSettingsPrimarySummary");
-                        break;
-                    case SettingsCategory.Special:
-                        State("SpecialSettingsPointsStatus", TextWrapping.NoWrap);
-                        State("SpecialSettingsValidationSummary", TextWrapping.NoWrap);
-                        break;
-                    case SettingsCategory.ImportedPrompts:
-                        State("ImportedPromptCount", TextWrapping.NoWrap);
-                        State("SelectedPromptTargetSummary", TextWrapping.NoWrap, ellipsis: true);
-                        State("ImportedPromptApplyStatus");
                         break;
                 }
                 break;

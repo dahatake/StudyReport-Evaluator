@@ -100,11 +100,12 @@ public sealed class MainWindowTests
             Assert.Same(viewModel.InputViewModel, viewModel.CurrentEditorViewModel);
             Assert.Equal(ExecutionAuthenticationState.NotChecked, execution.AuthenticationState);
 
+            // FR-002: 削除済みカテゴリの値を渡しても設定は共通を開く。
             viewModel.OpenSettings(SettingsCategory.Evaluation);
 
             Assert.True(viewModel.IsSettingsOpen);
             Assert.Equal(WorkflowStep.Input, viewModel.CurrentStep);
-            Assert.Equal(SettingsCategory.Evaluation, viewModel.Settings.SelectedCategory);
+            Assert.Equal(SettingsCategory.Common, viewModel.Settings.SelectedCategory);
             Assert.Same(viewModel.Settings, viewModel.CurrentEditorViewModel);
             Assert.Same(design, viewModel.DesignViewModel);
 
@@ -488,24 +489,25 @@ public sealed class MainWindowTests
     }
 
     [Fact]
-    public void Parameterless_settings_reopen_preserves_category_and_only_accepts_defined_enum_parameters()
+    public void Parameterless_settings_reopen_preserves_common_category_and_only_accepts_defined_enum_parameters()
     {
+        // FR-002: 設定のカテゴリは共通だけ。定義済みの値はすべて共通を開き、未定義の値は拒否する。
         using ShellHarness harness = new();
         MainWindowViewModel viewModel = harness.ViewModel;
         foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
         {
             Assert.True(viewModel.OpenSettingsCommand.CanExecute(category));
             viewModel.OpenSettingsCommand.Execute(category);
-            Assert.Equal(category, viewModel.Settings.SelectedCategory);
+            Assert.Equal(SettingsCategory.Common, viewModel.Settings.SelectedCategory);
             viewModel.CloseSettings();
 
             viewModel.OpenSettingsCommand.Execute(null);
             Assert.True(viewModel.IsSettingsOpen);
-            Assert.Equal(category, viewModel.Settings.SelectedCategory);
+            Assert.Equal(SettingsCategory.Common, viewModel.Settings.SelectedCategory);
             viewModel.Settings.RequestCloseCommand.Execute(null);
 
             viewModel.OpenSettings();
-            Assert.Equal(category, viewModel.Settings.SelectedCategory);
+            Assert.Equal(SettingsCategory.Common, viewModel.Settings.SelectedCategory);
             Assert.Equal(WorkflowStep.Input, viewModel.CurrentStep);
             viewModel.CloseSettings();
         }
@@ -515,7 +517,7 @@ public sealed class MainWindowTests
             Assert.False(viewModel.OpenSettingsCommand.CanExecute(invalid));
             viewModel.OpenSettingsCommand.Execute(invalid);
             Assert.False(viewModel.IsSettingsOpen);
-            Assert.Equal(SettingsCategory.ImportedPrompts, viewModel.Settings.SelectedCategory);
+            Assert.Equal(SettingsCategory.Common, viewModel.Settings.SelectedCategory);
         }
 
         Assert.Throws<ArgumentOutOfRangeException>(() => viewModel.OpenSettings((SettingsCategory)99));
@@ -552,9 +554,11 @@ public sealed class MainWindowTests
     [InlineData(WorkflowStep.Input, SettingsCategory.Evaluation)]
     [InlineData(WorkflowStep.Input, SettingsCategory.Special)]
     [InlineData(WorkflowStep.Input, SettingsCategory.ImportedPrompts)]
-    public async Task Targeted_settings_open_synchronizes_the_source_question_ID_after_the_latest_draft(
+    public async Task Legacy_category_open_is_coerced_to_common_and_keeps_independent_selections_after_the_latest_draft(
         WorkflowStep sourceStep, SettingsCategory targetCategory)
     {
+        // FR-002: 削除済みカテゴリを指定しても共通が開く。共通には設問の対象がないため、
+        // 入力・採点設計の選択は揃えず、最新の下書きだけが両方に届く。
         using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
         InputViewModel input = new();
         await input.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
@@ -570,19 +574,16 @@ public sealed class MainWindowTests
         QuestionDesignItemViewModel designB = harness.Design.Questions[1];
         input.SelectedQuestion = inputA;
         harness.Design.SelectedQuestion = designB;
-        string expectedId;
         QuantificationDefinition expected;
         if (sourceStep == WorkflowStep.Input)
         {
             inputA.QuestionText = "設定へ渡す最新の入力本文";
-            expectedId = inputA.Id;
             expected = input.DefinitionDraft;
         }
         else
         {
             // Equal display names must not confuse the cross-editor ID match.
             designB.DisplayName = harness.Design.Questions[0].DisplayName;
-            expectedId = designB.Id;
             expected = harness.Design.Draft;
         }
 
@@ -590,32 +591,28 @@ public sealed class MainWindowTests
 
         Assert.True(shell.IsSettingsOpen);
         Assert.Equal(sourceStep, shell.CurrentStep);
-        Assert.Equal(targetCategory, shell.Settings.SelectedCategory);
-        Assert.Same(input.Questions.Single(question => question.Id == expectedId), input.SelectedQuestion);
-        Assert.Same(harness.Design.Questions.Single(question => question.Id == expectedId), harness.Design.SelectedQuestion);
+        Assert.Equal(SettingsCategory.Common, shell.Settings.SelectedCategory);
+        Assert.Same(inputA, input.SelectedQuestion);
+        Assert.Same(designB, harness.Design.SelectedQuestion);
         AssertDefinition(expected, input.DefinitionDraft);
         AssertDefinition(expected, harness.Design.Draft);
         shell.CloseSettings();
-        Assert.Equal(expectedId, input.SelectedQuestion?.Id);
-        Assert.Equal(expectedId, harness.Design.SelectedQuestion?.Id);
+        Assert.Same(inputA, input.SelectedQuestion);
+        Assert.Same(designB, harness.Design.SelectedQuestion);
         AssertNoAutomaticActivity(harness);
     }
 
     [Theory]
-    [InlineData(SettingsCategory.Mapping, SettingsCategory.Evaluation, false)]
-    [InlineData(SettingsCategory.Mapping, SettingsCategory.Special, false)]
-    [InlineData(SettingsCategory.Mapping, SettingsCategory.ImportedPrompts, false)]
-    [InlineData(SettingsCategory.Evaluation, SettingsCategory.Mapping, false)]
-    [InlineData(SettingsCategory.Special, SettingsCategory.Mapping, false)]
-    [InlineData(SettingsCategory.ImportedPrompts, SettingsCategory.Mapping, false)]
-    [InlineData(SettingsCategory.Mapping, SettingsCategory.Evaluation, true)]
-    [InlineData(SettingsCategory.Mapping, SettingsCategory.Special, true)]
-    [InlineData(SettingsCategory.Mapping, SettingsCategory.ImportedPrompts, true)]
-    [InlineData(SettingsCategory.Evaluation, SettingsCategory.Mapping, true)]
-    [InlineData(SettingsCategory.Special, SettingsCategory.Mapping, true)]
-    [InlineData(SettingsCategory.ImportedPrompts, SettingsCategory.Mapping, true)]
-    public async Task Settings_cross_category_selection_uses_the_active_category_not_the_underlying_step(
-        SettingsCategory sourceCategory, SettingsCategory targetCategory, bool useMainCommand)
+    [InlineData(SettingsCategory.Mapping, false)]
+    [InlineData(SettingsCategory.Evaluation, false)]
+    [InlineData(SettingsCategory.Special, false)]
+    [InlineData(SettingsCategory.ImportedPrompts, false)]
+    [InlineData(SettingsCategory.Mapping, true)]
+    [InlineData(SettingsCategory.Evaluation, true)]
+    [InlineData(SettingsCategory.Special, true)]
+    [InlineData(SettingsCategory.ImportedPrompts, true)]
+    public async Task Settings_category_selection_from_common_does_not_align_selections_or_replace_drafts(
+        SettingsCategory targetCategory, bool useMainCommand)
     {
         using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
         InputViewModel input = new();
@@ -623,17 +620,13 @@ public sealed class MainWindowTests
         using ShellHarness harness = new(input);
         MainWindowViewModel shell = harness.ViewModel;
         shell.NextCommand.Execute(null);
-        if (sourceCategory != SettingsCategory.Mapping)
-        {
-            shell.PreviousCommand.Execute(null);
-        }
+        shell.PreviousCommand.Execute(null);
 
-        shell.OpenSettings(sourceCategory);
+        shell.OpenSettings(SettingsCategory.Common);
         InputQuestionMappingViewModel inputA = input.Questions[0];
         QuestionDesignItemViewModel designB = harness.Design.Questions[1];
         input.SelectedQuestion = inputA;
         harness.Design.SelectedQuestion = designB;
-        string expectedId = sourceCategory == SettingsCategory.Mapping ? inputA.Id : designB.Id;
         QuantificationDefinition inputDraft = input.DefinitionDraft;
         QuantificationDefinition designDraft = harness.Design.Draft;
         WorkflowStep underlyingStep = shell.CurrentStep;
@@ -641,18 +634,24 @@ public sealed class MainWindowTests
         if (useMainCommand)
         {
             shell.OpenSettingsCommand.Execute(targetCategory);
+            Assert.Equal(SettingsCategory.Common, shell.Settings.SelectedCategory);
         }
         else
         {
-            // The actual T17 category buttons bypass Main.OpenSettingsCommand.
+            // The category button bypasses Main.OpenSettingsCommand.
             shell.Settings.SelectCategoryCommand.Execute(targetCategory);
+            Assert.Equal(targetCategory, shell.Settings.SelectedCategory);
         }
 
-        Assert.Equal(targetCategory, shell.Settings.SelectedCategory);
         Assert.Equal(underlyingStep, shell.CurrentStep);
         Assert.True(shell.IsSettingsOpen);
-        Assert.Same(input.Questions.Single(question => question.Id == expectedId), input.SelectedQuestion);
-        Assert.Same(harness.Design.Questions.Single(question => question.Id == expectedId), harness.Design.SelectedQuestion);
+        if (useMainCommand)
+        {
+            // 直接のカテゴリ値は UI から選べない。選択の同期は、コマンド経由のときだけ共通のまま変わらない。
+            Assert.Same(inputA, input.SelectedQuestion);
+            Assert.Same(designB, harness.Design.SelectedQuestion);
+        }
+
         Assert.Same(inputDraft, input.DefinitionDraft);
         Assert.Same(designDraft, harness.Design.Draft);
         AssertNoAutomaticActivity(harness);

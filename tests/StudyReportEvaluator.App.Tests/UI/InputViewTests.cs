@@ -1400,8 +1400,9 @@ public sealed class InputViewTests
     }
 
     [AvaloniaFact]
-    public async Task Jump_and_details_open_mapping_for_the_same_ID_without_starting_a_ready_execution()
+    public async Task Jump_selects_the_same_question_and_has_no_input_details_button_without_starting_a_ready_execution()
     {
+        // FR-002: 「入力詳細…」ボタンは廃止（削除済みの入力詳細カテゴリを指さない）。
         using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
         InputViewModel input = new();
         await input.SetFilePathAsync(workbook.Path, TestContext.Current.CancellationToken);
@@ -1415,8 +1416,6 @@ public sealed class InputViewTests
             new WorkflowNavigator(), input, new QuantificationDesignViewModel(), execution, new ResultsOutputViewModel());
         InputView view = new(input);
         Window window = new() { Width = 950, Height = 450, DataContext = shell, Content = new Border { Child = view } };
-        int standaloneRequests = 0;
-        view.SettingsRequested += (_, _) => standaloneRequests++;
         try
         {
             window.Show();
@@ -1427,26 +1426,15 @@ public sealed class InputViewTests
             Render();
             Assert.Equal(input.Questions.IndexOf(target) / input.PageSize, input.PageIndex);
             Assert.Same(target, Required<ListBox>(view, "InputQuestionList").SelectedItem);
-            Required<TextBox>(view, "QuestionTextEditor").Text = "詳細へ引き継ぐ編集本文";
-            Button details = Required<Button>(view, "MappingDetailsButton");
-            Assert.Equal($"InputQuestion-{target.Id}-Details", AutomationProperties.GetAutomationId(details));
-            Click(window, details);
+            Required<TextBox>(view, "QuestionTextEditor").Text = "引き継ぐ編集本文";
 
-            Assert.True(shell.IsSettingsOpen);
-            Assert.Equal(SettingsCategory.Mapping, shell.Settings.SelectedCategory);
+            Assert.Null(view.FindControl<Button>("MappingDetailsButton"));
+            Assert.DoesNotContain(view.GetVisualDescendants().OfType<Button>(), button =>
+                (AutomationProperties.GetAutomationId(button) ?? string.Empty).EndsWith("-Details", StringComparison.Ordinal));
+            Assert.False(shell.IsSettingsOpen);
             Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
-            Assert.Same(input, shell.Settings.Input);
-            Assert.Same(target, shell.Settings.Input.SelectedQuestion);
-            Assert.Equal("詳細へ引き継ぐ編集本文", target.QuestionText);
-            Assert.Equal(0, standaloneRequests);
-
-            // T23 owns shell composition. Check the existing category view's actual
-            // selector contract without replacing its production template or navigation.
-            MappingSettingsView mapping = new(shell.Settings.Input);
-            window.Content = mapping;
-            Render();
-            Assert.Same(target, Required<ComboBox>(mapping, "QuestionSelector").SelectedItem);
-            Assert.Equal(target.NameAutomationId, AutomationProperties.GetAutomationId(Required<TextBox>(mapping, "QuestionNameEditor")));
+            Assert.Same(target, input.SelectedQuestion);
+            Assert.Equal("引き継ぐ編集本文", target.QuestionText);
             Assert.True(execution.CanStart);
             Assert.Equal(0, run.StartCount);
             Assert.Equal(1, authentication.CheckCount);
@@ -1459,7 +1447,7 @@ public sealed class InputViewTests
     }
 
     [AvaloniaFact]
-    public async Task Standalone_details_event_and_cached_view_keep_pending_input_and_same_question()
+    public async Task Cached_view_keeps_pending_input_and_same_question_across_host_content_swaps()
     {
         using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSampleLike();
         InputViewModel input = new();
@@ -1468,14 +1456,6 @@ public sealed class InputViewTests
         InputView view = new(input);
         MappingSettingsView mapping = new(input);
         Window window = new() { Width = 950, Height = 450, Content = view };
-        int requests = 0;
-        view.SettingsRequested += (sender, _) =>
-        {
-            Assert.Same(view, sender);
-            Assert.Same(selected, view.ViewModel.SelectedQuestion);
-            requests++;
-            window.Content = mapping;
-        };
         try
         {
             window.Show();
@@ -1486,8 +1466,8 @@ public sealed class InputViewTests
             Render();
             Assert.True(DataValidationErrors.GetHasErrors(firstRow));
             Assert.Equal(originalFirstRow, input.FirstDataRow);
-            Click(window, Required<Button>(view, "MappingDetailsButton"));
-            Assert.Equal(1, requests);
+            window.Content = mapping;
+            Render();
             Assert.Same(selected, Required<ComboBox>(mapping, "QuestionSelector").SelectedItem);
 
             window.Content = view;
@@ -1498,7 +1478,6 @@ public sealed class InputViewTests
             Assert.True(DataValidationErrors.GetHasErrors(firstRow));
             Assert.Same(selected, input.SelectedQuestion);
             Assert.Same(selected, Required<ListBox>(view, "InputQuestionList").SelectedItem);
-            Assert.Equal(1, requests);
             AssertPageCapacityAndRows(view);
         }
         finally
@@ -1665,7 +1644,7 @@ public sealed class InputViewTests
             "FilePathTextBox", "PickFileButton", "LoadFileButton", "WorksheetComboBox", "HeaderRowComboBox",
             "FirstDataRowTextBox", "LastDataRowTextBox", "RefreshHeaderButton", "QuestionSelector",
             "InputQuestionList", "PreviousPageButton", "NextPageButton", "QuestionEnabledCheckBox",
-            "PrimaryColumnComboBox", "MappingDetailsButton", "QuestionTextEditor", "InputValidationErrorList",
+            "PrimaryColumnComboBox", "QuestionTextEditor", "InputValidationErrorList",
             "InputValidationDetail", "InputGoToProblemButton",
         ];
         foreach (string name in names)
@@ -1686,7 +1665,7 @@ public sealed class InputViewTests
         Grid editor = Required<Grid>(view, "SelectedQuestionEditor");
         AssertContained(editor, Required<ComboBox>(view, "PrimaryColumnComboBox"));
         AssertContained(editor, Required<TextBox>(view, "QuestionTextEditor"));
-        AssertContained(editor, Required<Button>(view, "MappingDetailsButton"));
+        Assert.Null(view.FindControl<Button>("MappingDetailsButton"));
         Assert.All(view.GetVisualDescendants().OfType<ScrollViewer>(), scroll =>
             Assert.Contains(scroll.GetVisualAncestors(), ancestor => ancestor is TextBox or ListBox or ComboBox));
     }

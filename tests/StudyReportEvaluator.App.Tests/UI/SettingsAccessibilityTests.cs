@@ -147,22 +147,22 @@ public sealed class SettingsAccessibilityTests
         RecordingAuthenticationBoundary authentication = new(new ExecutionAuthenticationSnapshot(ExecutionAuthenticationState.AuthRequired));
         RecordingRunBoundary runner = new((_, _, _) => throw new InvalidOperationException("No run was requested."));
         using ExecutionViewModel execution = new(authentication, runner);
-        using SettingsViewModel settings = new(new InputViewModel(), design, execution)
-        {
-            SelectedCategory = SettingsCategory.ImportedPrompts,
-        };
-        SettingsView view = new(settings);
+        // FR-002: 読込Prompt は設定のカテゴリではなくなった。独立した ImportedPromptSettingsView で
+        // 同じキーボード操作（選択項目へ入る・フォーカス不可の一覧には入らない）を確かめる。
+        ImportedPromptSettingsView view = new(design);
         Window window = new() { Width = 950, Height = 450, Content = view };
         try
         {
             window.Show();
             Render();
-            Assert.Same(design, ById<ImportedPromptSettingsView>(view, "ImportedPromptSettingsView").ViewModel);
+            Assert.Same(design, view.ViewModel);
             QuantificationDefinition before = design.Draft;
             ListBox list = ById<ListBox>(view, "ImportedPrompts");
             TextBox preview = ById<TextBox>(view, "ImportedPromptPreview");
             Assert.Same(design.ImportedPrompts, list.ItemsSource);
             Assert.True(preview.IsReadOnly);
+            Assert.True(preview.Focus(NavigationMethod.Tab));
+            Render();
             Assert.Same(preview, window.FocusManager?.GetFocusedElement());
             Assert.False(list.Focusable);
             Assert.False(list.Focus(NavigationMethod.Tab));
@@ -188,12 +188,10 @@ public sealed class SettingsAccessibilityTests
             Assert.Same(selected, window.FocusManager?.GetFocusedElement());
             UniqueIds(view);
             Assert.Same(before, design.Draft);
-            Assert.False(ById<Button>(view, "ApplyImportedPrompt").IsEffectivelyEnabled);
+            Assert.Equal(design.ApplyImportedPromptCommand.CanExecute(null), ById<Button>(view, "ApplyImportedPrompt").IsEffectivelyEnabled);
             Assert.Equal(0, authentication.CallCount);
             Assert.Equal(0, runner.CallCount);
             Assert.Null(execution.LastLoginTask);
-            Assert.Null(settings.LastLoadTask);
-            Assert.Null(settings.LastSaveTask);
         }
         finally
         {

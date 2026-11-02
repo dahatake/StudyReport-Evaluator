@@ -231,6 +231,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
+        // FR-002: 設定のカテゴリは「共通」だけ。削除済みカテゴリの指定は共通へ寄せる。
+        category = SettingsCategory.Common;
+
         // A category change already synchronizes. A same-category open must do so
         // explicitly, before showing editors that may still contain the old input.
         // Capture the source ID BEFORE draft synchronization can replace editors.

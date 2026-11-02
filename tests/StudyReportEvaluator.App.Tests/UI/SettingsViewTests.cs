@@ -62,37 +62,36 @@ public sealed class SettingsViewTests
     }
 
     [AvaloniaFact]
-    public async Task Five_enum_categories_render_only_the_selected_editor_and_reuse_its_owner_and_control()
+    public async Task Settings_has_only_the_common_category_and_every_enum_value_reuses_the_same_common_editor_and_owner()
     {
+        // FR-002 (AC-055): 設定のカテゴリは「共通」だけ。旧カテゴリの値が来ても共通を表示する。
         using SettingsHarness harness = new(withStore: false);
         await harness.LoadInputAsync();
         harness.Show();
-        Dictionary<SettingsCategory, Control> firstViews = [];
         QuantificationDefinition before = harness.Design.Draft;
 
-        foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
+        Button current = ById<Button>(harness.View, "SettingsCategoryCommon");
+        Assert.Same(current, Assert.Single(Required<Grid>(harness.View, "SettingsCategoryBar").Children.OfType<Button>()));
+        foreach (string removed in new[] { "Mapping", "Evaluation", "Special", "ImportedPrompts" })
         {
-            SelectCategory(harness, category);
-            Control active = ActiveContent(harness.View);
-            Assert.Same(category == SettingsCategory.Mapping ? (object)harness.Input
-                : category == SettingsCategory.Common ? harness.Settings : harness.Design, active.DataContext);
-            firstViews.Add(category, active);
-            AssertOnlyActiveEditor(harness.View, category);
-            AssertUniqueIds(harness.View);
-            Button current = ById<Button>(harness.View, "SettingsCategory" + category);
-            Assert.Same(harness.Settings.SelectCategoryCommand, current.Command);
-            Assert.Equal(category, Assert.IsType<SettingsCategory>(current.CommandParameter));
-            Assert.Contains("selected", current.Classes);
-            Assert.Contains("選択中", AutomationProperties.GetHelpText(current)!);
-            Assert.Equal(1, Required<Grid>(harness.View, "SettingsCategoryBar").Children.OfType<Button>()
-                .Count(button => button.Classes.Contains("selected")));
+            Assert.DoesNotContain(AllControls(harness.View), control =>
+                AutomationProperties.GetAutomationId(control) == "SettingsCategory" + removed);
         }
+
+        SelectCategory(harness, SettingsCategory.Common);
+        Control first = ActiveContent(harness.View);
+        Assert.Same(harness.Settings, first.DataContext);
+        Assert.Same(harness.Settings.SelectCategoryCommand, current.Command);
+        Assert.Equal(SettingsCategory.Common, Assert.IsType<SettingsCategory>(current.CommandParameter));
+        Assert.Contains("selected", current.Classes);
+        Assert.Contains("選択中", AutomationProperties.GetHelpText(current)!);
 
         foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>().Reverse())
         {
-            SelectCategory(harness, category);
-            Assert.Same(firstViews[category], ActiveContent(harness.View));
-            AssertOnlyActiveEditor(harness.View, category);
+            harness.Settings.SelectedCategory = category;
+            Render();
+            Assert.Same(first, ActiveContent(harness.View));
+            AssertOnlyActiveEditor(harness.View);
             AssertUniqueIds(harness.View);
         }
 
@@ -105,7 +104,7 @@ public sealed class SettingsViewTests
     }
 
     [AvaloniaFact]
-    public async Task Alternating_category_edits_and_imported_prompt_reach_the_latest_draft_before_explicit_save()
+    public async Task Repeated_common_edits_reach_the_latest_draft_before_explicit_save()
     {
         using SettingsHarness harness = new();
         await harness.LoadInputAsync();
@@ -117,50 +116,19 @@ public sealed class SettingsViewTests
         ById<ComboBox>(harness.View, "ExecutionConcurrency").SetCurrentValue(ComboBox.SelectedItemProperty, 3);
         Edit(harness.View, "ExecutionOutputDirectory", harness.OutputPath);
 
-        SelectCategory(harness, SettingsCategory.Mapping);
-        InputQuestionMappingViewModel mapping = harness.Input.SelectedQuestion!;
-        Edit(harness.View, mapping.NameAutomationId, "入力詳細で編集した設問");
-        Edit(harness.View, $"InputQuestion-{mapping.Id}-Text", "入力で編集した最新の設問文");
-        MappingSettingsView mappingView = Assert.IsType<MappingSettingsView>(ActiveContent(harness.View));
-        Required<ListBox>(mappingView, "SupportingColumnList").SetCurrentValue(ListBox.SelectedItemProperty,
-            mapping.SupportingColumns.Single(column => column.ColumnName == "C"));
-        Render();
-        ById<CheckBox>(harness.View, $"InputQuestion-{mapping.Id}-Support-C")
-            .SetCurrentValue(ToggleButton.IsCheckedProperty, true);
-        Render();
-
-        SelectCategory(harness, SettingsCategory.Evaluation);
+        // FR-001/FR-002: 設問・通常評価・固有評価・読込Prompt の編集は設定にない（採点設計画面で行う）。
+        // 設定を共通のまま繰り返し開き直しても、選択と最新の下書きは変わらない。
         QuestionDesignItemViewModel question = harness.Design.SelectedQuestion!;
         EvaluatorDesignItemViewModel evaluator = question.SelectedEvaluator!;
         CriterionDesignItemViewModel criterion = evaluator.SelectedCriterion!;
-        Assert.Equal(mapping.QuestionText, question.QuestionText);
-        Assert.Contains("C", harness.Design.Draft.Questions[0].SupportingSourceColumns);
-        Edit(harness.View, $"DesignEvaluator-{evaluator.Id}-Name", "通常評価の最新編集");
-        Edit(harness.View, criterion.NameAutomationId, "観点の最新編集");
-        Edit(harness.View, $"DesignEvaluator-{evaluator.Id}-Weight", "2.125");
-
-        SelectCategory(harness, SettingsCategory.Special);
         SpecialEvaluationDesignItemViewModel special = question.SelectedSpecialEvaluation!;
-        Assert.Equal("通常評価の最新編集", harness.Input.DefinitionDraft.Questions[0].Evaluators[0].DisplayName);
-        Edit(harness.View, special.CardAutomationId + "-Name", "固有項目の最新編集");
-        ById<TabControl>(harness.View, "SpecialSettingsEditorTabs").SelectedIndex = 1;
-        Render();
-        Edit(harness.View, special.PromptAutomationId, "固有Promptの編集 {回答}");
+        foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
+        {
+            harness.Settings.SelectedCategory = category;
+            Render();
+            AssertOnlyActiveEditor(harness.View);
+        }
 
-        SelectCategory(harness, SettingsCategory.ImportedPrompts);
-        ImportedPromptViewModel prompt = harness.Design.ImportedPrompts[1];
-        ById<ListBox>(harness.View, "ImportedPrompts").SetCurrentValue(ListBox.SelectedItemProperty, prompt);
-        Render();
-        Assert.NotEqual(prompt.Content, evaluator.CustomPromptTemplate);
-        Assert.Same(harness.Design.ApplyImportedPromptCommand, ById<Button>(harness.View, "ApplyImportedPrompt").Command);
-        Activate(ById<Button>(harness.View, "ApplyImportedPrompt"));
-        Assert.Equal(prompt.Content, evaluator.CustomPromptTemplate);
-
-        SelectCategory(harness, SettingsCategory.Mapping);
-        Assert.Same(mappingView, ActiveContent(harness.View));
-        Assert.Same(mapping, harness.Input.SelectedQuestion);
-        Assert.Equal(prompt.Content, harness.Input.DefinitionDraft.Questions[0].Evaluators[0].CustomPromptTemplate);
-        Assert.Equal("固有項目の最新編集", harness.Input.DefinitionDraft.Questions[0].SpecialEvaluations[0].DisplayName);
         SelectCategory(harness, SettingsCategory.Common);
         Assert.Equal("共通で編集した定義名", ById<TextBox>(harness.View, "DesignDefinitionName").Text);
         Assert.Equal("revision-T17", ById<TextBox>(harness.View, "DesignRevision").Text);
@@ -172,7 +140,6 @@ public sealed class SettingsViewTests
         Assert.True(harness.Settings.HasUnsavedChanges);
         Assert.False(File.Exists(harness.SettingsPath));
 
-        SelectCategory(harness, SettingsCategory.Special);
         QuantificationDefinition latest = harness.Design.Draft;
         await Save(harness);
         ApplicationSettings saved = await harness.ReadSettingsAsync();
@@ -198,34 +165,20 @@ public sealed class SettingsViewTests
         int originalRounding = harness.Design.RoundingDigits;
         Edit(harness.View, "DesignRoundingDigits", "未確定");
         Assert.Equal(originalRounding, harness.Design.RoundingDigits);
-        SelectCategory(harness, SettingsCategory.Evaluation);
-        EvaluatorDesignItemViewModel evaluator = harness.Design.SelectedQuestion!.SelectedEvaluator!;
-        TabControl evaluatorTabs = ById<TabControl>(harness.View, "EvaluatorSettingsTabs");
-        TextBox weight = ById<TextBox>(harness.View, $"DesignEvaluator-{evaluator.Id}-Weight");
-        BindingExpressionBase? weightBinding = BindingOperations.GetBindingExpressionBase(weight, TextBox.TextProperty);
-        decimal originalWeight = evaluator.Weight;
-        Edit(harness.View, $"DesignEvaluator-{evaluator.Id}-Weight", "-");
-        Assert.Equal(originalWeight, evaluator.Weight);
-        SelectCategory(harness, SettingsCategory.ImportedPrompts);
-        Assert.Equal(Dock.Left, evaluatorTabs.TabStripPlacement);
-        SelectCategory(harness, SettingsCategory.Mapping);
         SelectCategory(harness, SettingsCategory.Common);
+        ShowCommonTab(harness, 1);
+        ShowCommonTab(harness, 0);
         Assert.Same(rounding, ById<TextBox>(harness.View, "DesignRoundingDigits"));
         Assert.Equal("未確定", rounding.Text);
         Assert.Same(roundingBinding, BindingOperations.GetBindingExpressionBase(rounding, TextBox.TextProperty));
-        SelectCategory(harness, SettingsCategory.Evaluation);
-        Assert.Same(weight, ById<TextBox>(harness.View, $"DesignEvaluator-{evaluator.Id}-Weight"));
-        Assert.Equal("-", weight.Text);
 
         harness.Window.Content = null;
         Render();
-        Assert.Equal(Dock.Left, evaluatorTabs.TabStripPlacement);
         harness.Window.Content = harness.View;
         Render();
-        Assert.Equal("-", weight.Text);
-        Assert.NotNull(weightBinding);
-        Assert.Same(weightBinding, BindingOperations.GetBindingExpressionBase(weight, TextBox.TextProperty));
-        Assert.Equal(originalWeight, evaluator.Weight);
+        Assert.Equal("未確定", rounding.Text);
+        Assert.NotNull(roundingBinding);
+        Assert.Same(roundingBinding, BindingOperations.GetBindingExpressionBase(rounding, TextBox.TextProperty));
         Assert.Equal(originalRounding, harness.Design.RoundingDigits);
         Assert.Null(harness.Settings.LastSaveTask);
         AssertPassive(harness);
@@ -360,7 +313,7 @@ public sealed class SettingsViewTests
         Assert.True(ById<TextBox>(harness.View, "ExecutionOutputDirectory").Focus(NavigationMethod.Tab));
         Press(harness.Window, Key.Enter);
         Press(harness.Window, Key.Escape);
-        foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
+        foreach (SettingsCategory category in new[] { SettingsCategory.Common })
         {
             SelectCategory(harness, category);
             Assert.True(save.IsEffectivelyVisible);
@@ -383,7 +336,7 @@ public sealed class SettingsViewTests
     }
 
     [AvaloniaFact]
-    public async Task No_input_keeps_stored_definition_and_all_categories_but_allows_only_prompt_inspection()
+    public async Task No_input_keeps_stored_definition_and_common_settings_but_disables_definition_editing()
     {
         using SettingsHarness harness = new();
         QuantificationDefinition stored = CreateDefinition() with { Name = "消してはいけない保存定義", Revision = "stored" };
@@ -404,24 +357,16 @@ public sealed class SettingsViewTests
         Assert.False(ById<Button>(harness.View, "SettingsApplySavedDefinition").IsEffectivelyEnabled);
         Assert.Contains("Excel", ById<TextBlock>(harness.View, "SettingsApplyAvailability").Text!);
 
-        foreach (SettingsCategory category in new[] { SettingsCategory.Mapping, SettingsCategory.Evaluation, SettingsCategory.Special })
+        // FR-002: 旧カテゴリは設定にない。入力がなくても共通だけが表示され、保存定義は消えない。
+        foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
         {
-            SelectCategory(harness, category);
-            Assert.False(ActiveContent(harness.View).IsEffectivelyEnabled);
-            Assert.True(ById<TextBlock>(harness.View, "SettingsDefinitionAvailability").IsEffectivelyVisible);
-            Assert.Contains("Excel", ById<TextBlock>(harness.View, "SettingsDefinitionAvailability").Text!);
+            harness.Settings.SelectedCategory = category;
+            Render();
+            AssertOnlyActiveEditor(harness.View);
         }
 
-        SelectCategory(harness, SettingsCategory.ImportedPrompts);
+        SelectCategory(harness, SettingsCategory.Common);
         Assert.True(ActiveContent(harness.View).IsEffectivelyEnabled);
-        Assert.True(harness.Design.CanApplyImportedPrompt); // A placeholder Design is not a loaded workbook.
-        Assert.False(ById<Button>(harness.View, "ApplyImportedPrompt").IsEffectivelyEnabled);
-        TextBox preview = ById<TextBox>(harness.View, "ImportedPromptPreview");
-        Assert.True(preview.IsReadOnly);
-        Assert.True(preview.IsEffectivelyEnabled);
-        ById<ListBox>(harness.View, "ImportedPrompts").SetCurrentValue(ListBox.SelectedItemProperty, harness.Design.ImportedPrompts[1]);
-        Render();
-        Assert.Equal(harness.Design.ImportedPrompts[1].Content, preview.Text);
         Assert.Same(input, harness.Input.DefinitionDraft);
         Assert.Same(design, harness.Design.Draft);
         Assert.Equal(original, File.ReadAllBytes(harness.SettingsPath));
@@ -440,37 +385,36 @@ public sealed class SettingsViewTests
     }
 
     [AvaloniaFact]
-    public async Task Wrong_prompt_target_keeps_apply_disabled_with_reason_and_reenables_only_for_valid_input_target()
+    public async Task Wrong_prompt_target_keeps_apply_disabled_with_reason_and_reenables_only_for_valid_target()
     {
+        // FR-002: 読込Prompt は設定のカテゴリではなくなった。独立した ImportedPromptSettingsView
+        // （同じ Design の ApplyImportedPromptCommand）で適用先の検査を確かめる。
         using SettingsHarness harness = new(withStore: false);
         await harness.LoadInputAsync();
-        harness.Show();
-        SelectCategory(harness, SettingsCategory.ImportedPrompts);
+        ImportedPromptSettingsView prompts = new(harness.Design);
+        harness.Window.Content = prompts;
+        harness.Window.Show();
+        Render();
         QuestionDesignItemViewModel question = harness.Design.SelectedQuestion!;
         EvaluatorDesignItemViewModel evaluator = question.SelectedEvaluator!;
         harness.Design.ChangeEvaluatorType(question.Id, evaluator.Id, EvaluatorType.KnowledgeCoverage);
         Render();
-        Button apply = ById<Button>(harness.View, "ApplyImportedPrompt");
+        Button apply = ById<Button>(prompts, "ApplyImportedPrompt");
         Assert.Same(harness.Design.ApplyImportedPromptCommand, apply.Command);
         Assert.False(apply.IsEffectivelyEnabled);
-        Assert.Contains("Knowledgeは読取専用", ById<TextBlock>(harness.View, "ImportedPromptApplyStatus").Text!);
+        Assert.Contains("Knowledgeは読取専用", ById<TextBlock>(prompts, "ImportedPromptApplyStatus").Text!);
         QuantificationDefinition before = harness.Design.Draft;
         harness.Design.SelectedQuestion = null;
         Render();
         Assert.False(apply.IsEffectivelyEnabled);
-        Assert.Contains("設問を選択", ById<TextBlock>(harness.View, "ImportedPromptApplyStatus").Text!);
+        Assert.Contains("設問を選択", ById<TextBlock>(prompts, "ImportedPromptApplyStatus").Text!);
         Assert.Same(before, harness.Design.Draft);
 
         harness.Design.SelectedQuestion = question;
         harness.Design.ChangeEvaluatorType(question.Id, evaluator.Id, EvaluatorType.CustomPrompt);
         Render();
         Assert.True(apply.IsEffectivelyEnabled);
-        harness.Input.FilePath = string.Empty;
-        Render();
-        Assert.True(harness.Design.CanApplyImportedPrompt);
-        Assert.False(apply.IsEffectivelyEnabled);
-        Assert.Contains("Excel", ById<TextBlock>(harness.View, "SettingsDefinitionAvailability").Text!);
-        Assert.True(ById<TextBox>(harness.View, "ImportedPromptPreview").IsEffectivelyEnabled);
+        Assert.True(ById<TextBox>(prompts, "ImportedPromptPreview").IsEffectivelyEnabled);
         AssertPassive(harness);
     }
 
@@ -657,7 +601,7 @@ public sealed class SettingsViewTests
         await previous.LoadInputAsync();
         await current.LoadInputAsync();
         previous.Show();
-        SelectCategory(previous, SettingsCategory.Mapping);
+        SelectCategory(previous, SettingsCategory.Common);
         Control oldEditor = ActiveContent(previous.View);
         previous.View.DataContext = current.Settings;
         Render();
@@ -677,9 +621,9 @@ public sealed class SettingsViewTests
         current.Settings.SelectedCategory = SettingsCategory.Mapping;
         previous.Window.Content = previous.View;
         Render();
-        Assert.Same(current.Input, Assert.IsType<MappingSettingsView>(ActiveContent(previous.View)).DataContext);
+        Assert.Same(current.Settings, ActiveContent(previous.View).DataContext);
         Assert.NotSame(oldEditor, ActiveContent(previous.View));
-        AssertOnlyActiveEditor(previous.View, SettingsCategory.Mapping);
+        AssertOnlyActiveEditor(previous.View);
         AssertUniqueIds(previous.View);
         AssertPassive(previous);
         AssertPassive(current);
@@ -696,7 +640,7 @@ public sealed class SettingsViewTests
         Assert.Equal(44d, Required<Grid>(harness.View, "SettingsCategoryBar").Bounds.Height);
         Assert.Equal(44d, Required<Grid>(harness.View, "SettingsFooter").Bounds.Height);
 
-        foreach (SettingsCategory category in Enum.GetValues<SettingsCategory>())
+        foreach (SettingsCategory category in new[] { SettingsCategory.Common })
         {
             SelectCategory(harness, category);
             ContentControl content = Required<ContentControl>(harness.View, "CurrentSettingsContent");
@@ -707,21 +651,12 @@ public sealed class SettingsViewTests
             Assert.True(outer.Extent.Height <= outer.Viewport.Height + 1d, category.ToString());
             Assert.True(outer.Extent.Width <= outer.Viewport.Width + 1d, category.ToString());
             Assert.Equal(default, outer.Offset);
-            AssertOnlyActiveEditor(harness.View, category);
+            AssertOnlyActiveEditor(harness.View);
             AssertUniqueIds(harness.View);
             AssertInteractiveBounds(harness.View);
-            int pages = category == SettingsCategory.Common ? 3
-                : category is SettingsCategory.Evaluation or SettingsCategory.Special ? 2 : 1;
-            string? tabsId = category switch
+            for (int index = 1; index < 3; index++)
             {
-                SettingsCategory.Common => "SettingsCommonTabs",
-                SettingsCategory.Evaluation => "EvaluatorSettingsTabs",
-                SettingsCategory.Special => "SpecialSettingsEditorTabs",
-                _ => null,
-            };
-            for (int index = 1; index < pages; index++)
-            {
-                ById<TabControl>(harness.View, tabsId!).SelectedIndex = index;
+                ById<TabControl>(harness.View, "SettingsCommonTabs").SelectedIndex = index;
                 Render();
                 AssertInteractiveBounds(harness.View);
                 AssertUniqueIds(harness.View);
@@ -778,9 +713,18 @@ public sealed class SettingsViewTests
         Assert.Equal(path, ById<TextBox>(harness.View, "SettingsEffectiveOutputDirectory").Text);
         ScrollViewer outer = Required<ScrollViewer>(harness.View, "SettingsBodyScroll");
         Assert.True(outer.Extent.Height <= outer.Viewport.Height + 1d);
+        Assert.True(outer.Extent.Width <= outer.Viewport.Width + 1d);
+        Assert.Equal(default, outer.Offset);
+        AssertFullyInside(ById<Button>(harness.View, "SettingsSave"), harness.View);
+        AssertFullyInside(ById<Button>(harness.View, "SettingsRequestClose"), harness.View);
+        Assert.False(Directory.Exists(harness.Root));
+        AssertPassive(harness);
 
-        SelectCategory(harness, SettingsCategory.ImportedPrompts);
-        TextBox preview = ById<TextBox>(harness.View, "ImportedPromptPreview");
+        // FR-002: 長い読込Prompt の全文表示は独立した ImportedPromptSettingsView で確かめる。
+        ImportedPromptSettingsView prompts = new(harness.Design);
+        harness.Window.Content = prompts;
+        Render();
+        TextBox preview = ById<TextBox>(prompts, "ImportedPromptPreview");
         Assert.Equal(prompt, preview.Text);
         Assert.True(preview.IsReadOnly);
         ScrollViewer local = Assert.Single(preview.GetVisualDescendants().OfType<ScrollViewer>());
@@ -789,13 +733,6 @@ public sealed class SettingsViewTests
         Render();
         Assert.True(local.Offset.Y > 0d);
         Assert.Equal(prompt, preview.Text);
-        Assert.True(outer.Extent.Height <= outer.Viewport.Height + 1d);
-        Assert.True(outer.Extent.Width <= outer.Viewport.Width + 1d);
-        Assert.Equal(default, outer.Offset);
-        AssertFullyInside(preview, Required<ContentControl>(harness.View, "CurrentSettingsContent"));
-        AssertFullyInside(ById<Button>(harness.View, "SettingsSave"), harness.View);
-        AssertFullyInside(ById<Button>(harness.View, "SettingsRequestClose"), harness.View);
-        Assert.False(Directory.Exists(harness.Root));
         AssertPassive(harness);
     }
 
@@ -809,14 +746,13 @@ public sealed class SettingsViewTests
         Button common = ById<Button>(harness.View, "SettingsCategoryCommon");
         Assert.True(common.Focus(NavigationMethod.Tab));
         Press(harness.Window, Key.Tab);
-        Assert.Same(ById<Button>(harness.View, "SettingsCategoryMapping"), harness.Window.FocusManager?.GetFocusedElement());
-        Press(harness.Window, Key.Tab, RawInputModifiers.Shift);
-        Assert.Same(common, harness.Window.FocusManager?.GetFocusedElement());
+        // FR-002: カテゴリは共通だけなので、次の Tab はカテゴリ列を出て内容（共通のタブ列・入力欄）へ進む。
+        Control afterCommon = Assert.IsAssignableFrom<Control>(harness.Window.FocusManager?.GetFocusedElement());
+        Assert.NotSame(common, afterCommon);
+        Assert.Contains(afterCommon.GetVisualAncestors().Prepend(afterCommon),
+            ancestor => ReferenceEquals(ancestor, Required<ContentControl>(harness.View, "CurrentSettingsContent")));
 
-        SelectCategory(harness, SettingsCategory.Mapping);
-        Assert.Same(ById<ComboBox>(harness.View, "MappingSettingsQuestions"), harness.Window.FocusManager?.GetFocusedElement());
         SelectCategory(harness, SettingsCategory.Common);
-        Assert.Same(ById<ComboBox>(harness.View, "ExecutionModel"), harness.Window.FocusManager?.GetFocusedElement());
         WrapPanel tabStrip = Assert.Single(ById<TabControl>(harness.View, "SettingsCommonTabs")
             .GetVisualDescendants().OfType<WrapPanel>(), panel => panel.Children.All(child => child is TabItem));
         Assert.Equal(KeyboardNavigationMode.Once, KeyboardNavigation.GetTabNavigation(tabStrip));
@@ -934,27 +870,12 @@ public sealed class SettingsViewTests
     private static IEnumerable<Control> AllControls(Control root) => root.GetVisualDescendants().OfType<Control>()
         .Concat(root.GetLogicalDescendants().OfType<Control>()).Prepend(root).Distinct();
 
-    private static void AssertOnlyActiveEditor(SettingsView view, SettingsCategory category)
+    private static void AssertOnlyActiveEditor(SettingsView view)
     {
-        Control content = ActiveContent(view);
-        Assert.Equal(category switch
-        {
-            SettingsCategory.Common => typeof(TabControl),
-            SettingsCategory.Mapping => typeof(MappingSettingsView),
-            SettingsCategory.Evaluation => typeof(EvaluatorSettingsView),
-            SettingsCategory.Special => typeof(SpecialEvaluationSettingsView),
-            _ => typeof(ImportedPromptSettingsView),
-        }, content.GetType());
-        Control[] editors = AllControls(view).Where(control => control is MappingSettingsView
-            or EvaluatorSettingsView or SpecialEvaluationSettingsView or ImportedPromptSettingsView).ToArray();
-        if (category == SettingsCategory.Common)
-        {
-            Assert.Empty(editors);
-        }
-        else
-        {
-            Assert.Same(content, Assert.Single(editors));
-        }
+        // FR-002: 設定に表示されるのは共通（TabControl）だけで、旧カテゴリの編集部は存在しない。
+        Assert.Equal(typeof(TabControl), ActiveContent(view).GetType());
+        Assert.DoesNotContain(AllControls(view), control => control is MappingSettingsView
+            or EvaluatorSettingsView or SpecialEvaluationSettingsView or ImportedPromptSettingsView);
     }
 
     private static void AssertUniqueIds(Control root)

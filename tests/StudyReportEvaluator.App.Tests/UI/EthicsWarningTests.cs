@@ -40,10 +40,10 @@ public sealed class EthicsWarningTests
             TextBlock message = Required<TextBlock>(window, "EthicsWarningMessage");
             MainWindowViewModel shell = window.ViewModel;
             WorkflowStep[] steps = Enum.GetValues<WorkflowStep>();
-            SettingsCategory[] categories = Enum.GetValues<SettingsCategory>();
+            // FR-002: 設定のカテゴリは共通だけ（旧カテゴリの値は共通へ寄せられる）。
+            SettingsCategory[] categories = [SettingsCategory.Common];
             Assert.Equal(4, steps.Length);
             Assert.Equal(4, shell.Steps.Length);
-            Assert.Equal(5, categories.Length);
             Dictionary<SettingsCategory, (Control View, string[] Ids)> cachedCategories = [];
             foreach (WorkflowStep step in steps)
             {
@@ -58,11 +58,13 @@ public sealed class EthicsWarningTests
                 }, originalView.GetType());
                 AssertOnlyCurrentView(window);
                 AssertWarning(window, warning, message);
-                Assert.DoesNotContain(AllControls(originalView), control => control is EvaluatorSettingsView
-                    or SpecialEvaluationSettingsView or ImportedPromptSettingsView);
+                // FR-001: 通常評価エディター（EvaluatorSettingsView）は採点設計の画面にだけ 1 つある。
+                // 固有評価・読込Prompt の編集部はどの画面にもない。
+                Assert.DoesNotContain(AllControls(originalView), control => control is SpecialEvaluationSettingsView
+                    or ImportedPromptSettingsView or MappingSettingsView);
+                Assert.Equal(step == WorkflowStep.Design ? 1 : 0, AllControls(originalView).Count(control => control is EvaluatorSettingsView));
                 Button invoker = originalView switch
                 {
-                    QuantificationDesignView design => Required<Button>(design, "OpenEvaluatorSettingsButton"),
                     ExecutionView execution => Required<Button>(execution, "ChangeExecutionSettingsButton"),
                     _ => Required<Button>(window, "SettingsOpenButton"),
                 };
@@ -71,6 +73,8 @@ public sealed class EthicsWarningTests
                 Assert.Same(shell.Settings, settings.DataContext);
                 Assert.Equal(step, shell.CurrentStep); // Settings is not a fifth workflow step.
                 Assert.True(shell.IsSettingsOpen);
+                Assert.Single(settings.GetVisualDescendants().OfType<Button>(), button =>
+                    (AutomationProperties.GetAutomationId(button) ?? string.Empty).StartsWith("SettingsCategory", StringComparison.Ordinal));
                 Button[] categoryButtons = categories.Select(category => ById<Button>(settings, "SettingsCategory" + category)).ToArray();
                 for (int index = 0; index < categories.Length; index++)
                 {
@@ -101,16 +105,8 @@ public sealed class EthicsWarningTests
                     Assert.Equal(step, shell.CurrentStep);
                     Assert.Same(settings, CurrentView(window));
                     Control categoryView = Assert.IsAssignableFrom<Control>(Required<ContentControl>(settings, "CurrentSettingsContent").Content);
-                    Assert.Equal(category switch
-                    {
-                        SettingsCategory.Common => typeof(TabControl),
-                        SettingsCategory.Mapping => typeof(MappingSettingsView),
-                        SettingsCategory.Evaluation => typeof(EvaluatorSettingsView),
-                        SettingsCategory.Special => typeof(SpecialEvaluationSettingsView),
-                        _ => typeof(ImportedPromptSettingsView),
-                    }, categoryView.GetType());
-                    Assert.Same(category == SettingsCategory.Common ? (object)shell.Settings
-                        : category == SettingsCategory.Mapping ? shell.InputViewModel : shell.DesignViewModel, categoryView.DataContext);
+                    Assert.IsType<TabControl>(categoryView);
+                    Assert.Same(shell.Settings, categoryView.DataContext);
                     string[] ids = UniqueIds(settings);
                     if (cachedCategories.TryGetValue(category, out var first))
                     {
@@ -141,7 +137,7 @@ public sealed class EthicsWarningTests
                 Control adjacent = step switch
                 {
                     WorkflowStep.Input => Required<Button>(window, "DesignStepButton"),
-                    WorkflowStep.Design => Required<Button>(originalView, "OpenSpecialSettingsButton"),
+                    WorkflowStep.Design => Required<TextBox>(originalView, "BasePointsTextBox"),
                     WorkflowStep.Execution => Required<CheckBox>(originalView, "ExecutionCostToggle"),
                     _ => Required<Button>(window, "ResultsStepButton"),
                 };
@@ -158,7 +154,7 @@ public sealed class EthicsWarningTests
                 AssertPassive();
             }
 
-            Assert.Equal(5, cachedCategories.Count);
+            Assert.Single(cachedCategories);
 
             void AssertPassive()
             {
