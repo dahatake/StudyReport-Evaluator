@@ -404,7 +404,7 @@ public sealed class DurableQuantificationOrchestratorTests
         Workbook workbookRoot = final.WorkbookPart?.Workbook
             ?? throw new InvalidDataException("Workbook root missing.");
         Sheet[] sheets = workbookRoot.Descendants<Sheet>().ToArray();
-        Assert.Equal(5, sheets.Length);
+        Assert.Equal(6, sheets.Length);
         Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.ConfigBaseName);
         Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.ReferencesBaseName);
         Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.ResultsBaseName);

@@ -513,7 +513,7 @@ public sealed class SyntheticQuantificationJourneyTests
         Workbook workbook = document.WorkbookPart?.Workbook
             ?? throw new InvalidDataException("The durable output workbook root is missing.");
         Sheet[] sheets = workbook.Descendants<Sheet>().ToArray();
-        Assert.Equal(5, sheets.Length);
+        Assert.Equal(6, sheets.Length);
         Assert.Equal(SyntheticWorkbookFactory.SourceSheetName, sheets[0].Name?.Value);
         Assert.Equal(originalWorksheetXml, GetWorksheet(document, SyntheticWorkbookFactory.SourceSheetName).OuterXml);
         Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.ConfigBaseName);
