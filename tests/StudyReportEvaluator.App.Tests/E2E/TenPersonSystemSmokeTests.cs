@@ -388,7 +388,7 @@ public sealed class TenPersonSystemSmokeTests
         Assert.Empty(new OpenXmlValidator().Validate(document));
         Workbook workbook = document.WorkbookPart?.Workbook
             ?? throw new InvalidDataException("The final workbook root is missing.");
-        Assert.Equal(5, workbook.Descendants<Sheet>().Count());
+        Assert.Equal(6, workbook.Descendants<Sheet>().Count());
         Assert.DoesNotContain(workbook.Descendants<Sheet>(), sheet => string.Equals(
             sheet.Name?.Value,
             CheckpointStore.CheckpointSheetName,

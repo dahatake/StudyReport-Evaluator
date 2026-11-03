@@ -7,7 +7,8 @@
     "AC-060": "sha256:8abc027ab57b29d1",
     "AC-061": "sha256:43dea9c66234d684",
     "AC-062": "sha256:ac1fa9d6a4ec956e",
-    "AC-063": "sha256:0c12d44db6950d87"
+    "AC-063": "sha256:0c12d44db6950d87",
+    "AC-074": "sha256:b2e9bba79b040925"
   },
   "cases": [
     {
@@ -23,9 +24,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
       "status": "pass",
-      "last_commit": "c1dfdf7",
-      "last_run_at": "2026-11-03T23:58:15+09:00",
-      "evidence": "work/runs/202611032335/logs/system-test/E2E-001-202611032357.log",
+      "last_commit": "52c19e4",
+      "last_run_at": "2026-11-04T01:05:58+09:00",
+      "evidence": "work/runs/202611040007/logs/system-test/E2E-001-202611040105.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
@@ -60,9 +61,9 @@
       "command": "python -m pytest tests/system/test_fr002_output_folder.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "c1dfdf7",
-      "last_run_at": "2026-11-03T23:58:15+09:00",
-      "evidence": "work/runs/202611032335/logs/system-test/E2E-002-202611032357.log",
+      "last_commit": "52c19e4",
+      "last_run_at": "2026-11-04T01:05:58+09:00",
+      "evidence": "work/runs/202611040007/logs/system-test/E2E-002-202611040105.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
@@ -103,9 +104,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR003_AC057\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "c1dfdf7",
-      "last_run_at": "2026-11-03T23:58:15+09:00",
-      "evidence": "work/runs/202611032335/logs/system-test/E2E-003-202611032358.log",
+      "last_commit": "74afe89",
+      "last_run_at": "2026-11-04T00:43:46+09:00",
+      "evidence": "work/runs/202611040007/logs/system-test/E2E-003-202611040043.log",
       "history": [
         {
           "at": "2026-11-02T15:00:42+09:00",
@@ -182,6 +183,31 @@
           "by": "test-designer",
           "change": "blocked",
           "reason": "AC-062/063 は検証レベル=integration で System Test 対象外（CHK-10）。実装役が integration で担保。テスト tests/system/integration は参考として保持"
+        }
+      ]
+    },
+    {
+      "id": "E2E-006",
+      "requirement_ids": [
+        "FR-113"
+      ],
+      "ac_ids": [
+        "AC-074"
+      ],
+      "title": "FR-113 採点結果シートの見出し・行数・ID・.partial非収録・名前衝突",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/integration --filter \"FullyQualifiedName~FR113_AC074\"",
+      "canary": false,
+      "status": "pass",
+      "last_commit": "52c19e4",
+      "last_run_at": "2026-11-04T01:05:58+09:00",
+      "evidence": "work/runs/202611040007/logs/system-test/E2E-006-202611040105.log",
+      "history": [
+        {
+          "at": "2026-11-04T00:15:51+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
         }
       ]
     }
