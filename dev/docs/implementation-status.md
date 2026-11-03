@@ -1,5 +1,10 @@
 # Current implementation status
 
+## テスト実行（durable 再開の速い／フル検証）
+
+- 通常の速い実行: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "Category!=SlowDurable"`（durable 新規→中断→再開は 60 行版が走る）。
+- フル検証: フィルターなし、または `--filter "Category=SlowDurable"`（531 行版。fsync 付き CheckpointStore 更新約 1,330 回で約 8〜9 分）。
+
 ## 2026-10-01 — v0.8.6公開状態
 
 - **公開状態**: StudyReport Evaluator `v0.8.6`は2026-10-01 21:42 JSTにGitHub Releasesへ公開済み。release candidate run 36860591724は成功し、公開assetは`StudyReportEvaluator-win-x64.exe`、`.exe.sha256`、`.zip`、`.zip.sha256`の4件。

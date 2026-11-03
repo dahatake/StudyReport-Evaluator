@@ -240,7 +240,17 @@ public sealed class SyntheticQuantificationJourneyTests
     }
 
     [Fact]
-    public async Task Fixed_seed_531_row_durable_new_and_resume_matches_uninterrupted_run()
+    public Task Fixed_seed_60_row_durable_new_and_resume_matches_uninterrupted_run() =>
+        RunDurableNewAndResumeAsync(dataRowCount: 60, interruptAtCompletedRows: 30);
+
+    [Fact]
+    [Trait("Category", "SlowDurable")]
+    public Task Fixed_seed_531_row_durable_new_and_resume_matches_uninterrupted_run() =>
+        RunDurableNewAndResumeAsync(
+            SyntheticWorkbookFactory.DataRowCount,
+            interruptAtCompletedRows: 265);
+
+    private static async Task RunDurableNewAndResumeAsync(int dataRowCount, int interruptAtCompletedRows)
     {
         using SyntheticWorkbook workbook = SyntheticWorkbookFactory.Create();
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
@@ -251,6 +261,10 @@ public sealed class SyntheticQuantificationJourneyTests
             SyntheticWorkbookFactory.SourceSheetName);
         WorkbookMetadata metadata = new WorkbookMetadataReader().Read(workbook.Path);
         QuantificationDefinition definition = CreateDurableDefinition();
+        definition = definition with
+        {
+            LastDataRow = SyntheticWorkbookFactory.FirstDataRow + dataRowCount - 1,
+        };
         Assert.True(new ColumnMappingValidator().Validate(metadata, definition).IsValid);
 
         string baselineDirectory = Path.Combine(workbook.RootDirectory, "durable-baseline");
@@ -274,9 +288,9 @@ public sealed class SyntheticQuantificationJourneyTests
                 DurableRequest(definition, metadata, workbook.Path, baselineDirectory),
                 cancellationToken: cancellationToken));
 
-        int expectedEmptyCount = workbook.CountBlankRows("F") + workbook.CountBlankRows("J");
-        int expectedNormalCalls = (SyntheticWorkbookFactory.DataRowCount * 2) - expectedEmptyCount;
-        int expectedSpecialCalls = SyntheticWorkbookFactory.DataRowCount - workbook.CountBlankRows("J");
+        int expectedEmptyCount = workbook.CountBlankRows("F", dataRowCount) + workbook.CountBlankRows("J", dataRowCount);
+        int expectedNormalCalls = (dataRowCount * 2) - expectedEmptyCount;
+        int expectedSpecialCalls = dataRowCount - workbook.CountBlankRows("J", dataRowCount);
 
         using CancellationTokenSource interruption = new();
         FakeCopilotTransport interruptedNormal = new(workbook);
@@ -287,7 +301,7 @@ public sealed class SyntheticQuantificationJourneyTests
             new CheckpointStore(),
             envelope =>
             {
-                if (!interruptionRequested && envelope.CompletedRows.Length >= 265)
+                if (!interruptionRequested && envelope.CompletedRows.Length >= interruptAtCompletedRows)
                 {
                     interruptionRequested = true;
                     interruption.Cancel();
@@ -306,7 +320,7 @@ public sealed class SyntheticQuantificationJourneyTests
         Assert.True(interrupted.IsPartial);
         Assert.False(interrupted.WasResumed);
         Assert.Equal(2, interrupted.References.Length);
-        Assert.InRange(interrupted.CompletedRows.Length, 265, SyntheticWorkbookFactory.DataRowCount - 1);
+        Assert.InRange(interrupted.CompletedRows.Length, interruptAtCompletedRows, dataRowCount - 1);
         Assert.Null(interrupted.FinalPath);
         string partialPath = Assert.IsType<string>(interrupted.PartialPath);
         Assert.True(File.Exists(partialPath));
@@ -332,20 +346,20 @@ public sealed class SyntheticQuantificationJourneyTests
                 cancellationToken: cancellationToken);
 
         RunSummary baseline = await baselineTask;
-        AssertDurableSuccess(baseline, expectedEmptyCount, expectedResumed: false);
+        AssertDurableSuccess(baseline, expectedEmptyCount, expectedResumed: false, dataRowCount);
         Assert.Equal(expectedNormalCalls, baselineNormal.Calls.Length);
         Assert.Equal(2, baselineReferences.CallCount);
         Assert.Equal(expectedSpecialCalls, baselineSpecials.CallCount);
         Assert.Equal(1, baselineStore.CreateCount);
-        Assert.Equal(532, baselineStore.UpdateCount);
+        Assert.Equal(dataRowCount + 2, baselineStore.UpdateCount);
         Assert.Equal(0, baselineStore.LoadCount);
 
-        AssertDurableSuccess(resumed, expectedEmptyCount, expectedResumed: true);
+        AssertDurableSuccess(resumed, expectedEmptyCount, expectedResumed: true, dataRowCount);
         Assert.Equal(expectedNormalCalls - interruptedNormal.Calls.Length, resumedNormal.Calls.Length);
         Assert.Equal(0, resumedReferences.CallCount);
         Assert.Equal(expectedSpecialCalls - interruptedSpecials.CallCount, resumedSpecials.CallCount);
         Assert.Equal(0, resumedStore.CreateCount);
-        Assert.Equal(SyntheticWorkbookFactory.DataRowCount - interrupted.CompletedRows.Length, resumedStore.UpdateCount);
+        Assert.Equal(dataRowCount - interrupted.CompletedRows.Length, resumedStore.UpdateCount);
         Assert.Equal(1, resumedStore.LoadCount);
         Assert.False(File.Exists(partialPath));
 
@@ -353,8 +367,8 @@ public sealed class SyntheticQuantificationJourneyTests
         string baselineFinal = Assert.IsType<string>(baseline.FinalPath);
         string resumedFinal = Assert.IsType<string>(resumed.FinalPath);
         Assert.Equal(ResultFormulaHash(baselineFinal), ResultFormulaHash(resumedFinal));
-        AssertDurableOutput(baselineFinal, originalWorksheetXml, cancellationToken);
-        AssertDurableOutput(resumedFinal, originalWorksheetXml, cancellationToken);
+        AssertDurableOutput(baselineFinal, originalWorksheetXml, dataRowCount, cancellationToken);
+        AssertDurableOutput(resumedFinal, originalWorksheetXml, dataRowCount, cancellationToken);
         Assert.True(snapshots.Recheck(workbook.Path, inputBefore).IsMatch);
     }
 
@@ -430,7 +444,8 @@ public sealed class SyntheticQuantificationJourneyTests
     private static void AssertDurableSuccess(
         RunSummary summary,
         int expectedEmptyCount,
-        bool expectedResumed)
+        bool expectedResumed,
+        int dataRowCount)
     {
         Assert.Equal(QuantificationRunStatusCodes.Success, summary.StatusCode);
         Assert.True(summary.IsDurable);
@@ -438,14 +453,14 @@ public sealed class SyntheticQuantificationJourneyTests
         Assert.False(summary.IsPartial);
         Assert.False(summary.PartialCleanupFailed);
         Assert.Equal(AtomicOutputStatusCodes.Success, summary.FinalizationCode);
-        Assert.Equal(1_060, summary.PlannedEvaluationCount);
-        Assert.Equal(1_060, summary.CompletedEvaluationCount);
-        Assert.Equal(1_060 - expectedEmptyCount, summary.SucceededCount);
+        Assert.Equal(dataRowCount * 2, summary.PlannedEvaluationCount);
+        Assert.Equal(dataRowCount * 2, summary.CompletedEvaluationCount);
+        Assert.Equal((dataRowCount * 2) - expectedEmptyCount, summary.SucceededCount);
         Assert.Equal(expectedEmptyCount, summary.EmptyCount);
         Assert.Equal(0, summary.FailureCount);
         Assert.Equal(0, summary.CancelledCount);
         Assert.Equal(2, summary.References.Length);
-        Assert.Equal(530, summary.CompletedRows.Length);
+        Assert.Equal(dataRowCount, summary.CompletedRows.Length);
         Assert.Equal(summary.PlannedOperationCount, summary.CompletedOperationCount);
         Assert.Equal(0, summary.OperationFailureCount);
         Assert.Equal(0, summary.OperationCancelledCount);
@@ -490,6 +505,7 @@ public sealed class SyntheticQuantificationJourneyTests
     private static void AssertDurableOutput(
         string path,
         string originalWorksheetXml,
+        int dataRowCount,
         CancellationToken cancellationToken)
     {
         using SpreadsheetDocument document = SpreadsheetDocument.Open(path, false);
@@ -513,7 +529,7 @@ public sealed class SyntheticQuantificationJourneyTests
         Assert.Empty(GetWorksheet(document, AppOwnedSheetNameResolver.ReferencesBaseName)
             .Descendants<CellFormula>());
         Worksheet results = GetWorksheet(document, AppOwnedSheetNameResolver.ResultsBaseName);
-        Assert.Equal(530, results.Descendants<Row>().Count(row => row.RowIndex?.Value >= 2));
+        Assert.Equal(dataRowCount, results.Descendants<Row>().Count(row => row.RowIndex?.Value >= 2));
         Assert.NotEmpty(results.Descendants<CellFormula>());
         Assert.Empty(GetWorksheet(document, AppOwnedSheetNameResolver.RunBaseName)
             .Descendants<CellFormula>());
