@@ -35,7 +35,8 @@
   },
   "system_test": {
     "jobs": "auto",
-    "serial_patterns": ["default_port", "dotnet test"]
+    "serial_patterns": ["default_port"],
+      "prebuild": "dotnet build tests/system/ui -c Debug"
   },
   "gates": {
     "enabled": true,
