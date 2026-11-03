@@ -4,6 +4,8 @@ public static class BuiltInPromptTemplates
 {
     public const string KnowledgeTemplateVersion = "knowledge-v1";
 
+    public const string PromptAnalysisTemplateVersion = "prompt-analysis-v1";
+
     public const string KnowledgeSemanticTemplate = """
         次の設問への回答について、指定された各知識ポイントが回答内でどの程度説明されているかを評価してください。
         単語が存在するだけで満点にせず、内容上の説明、他の概念との関係、具体的な適用が確認できる程度を評価してください。
@@ -81,5 +83,17 @@ public static class BuiltInPromptTemplates
         }
 
         return KnowledgeSemanticTemplate;
+    }
+
+    public static string GetPromptAnalysisTemplate(string? version)
+    {
+        if (!string.Equals(version, PromptAnalysisTemplateVersion, StringComparison.Ordinal))
+        {
+            throw new PromptConfigurationException(
+                "UNSUPPORTED_PROMPT_ANALYSIS_TEMPLATE_VERSION",
+                "The configured Prompt template version is not supported.");
+        }
+
+        return CustomPromptPreset;
     }
 }

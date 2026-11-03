@@ -129,10 +129,10 @@ public sealed class QuantificationDesignViewTests
         Assert.Equal(originalPreview, knowledge.PromptPreview);
         Assert.Null(Assert.Single(viewModel.Draft.Questions).Evaluators[0].CustomPromptTemplate);
         Assert.Equal(
-            [EvaluatorType.KnowledgeCoverage, EvaluatorType.CustomPrompt],
+            [EvaluatorType.KnowledgeCoverage, EvaluatorType.PromptAnalysis, EvaluatorType.CustomPrompt],
             QuantificationDesignViewModel.EvaluatorTypes.Select(choice => choice.Type));
         Assert.Equal(
-            ["KNOWLEDGE_COVERAGE", "CUSTOM_PROMPT"],
+            ["KNOWLEDGE_COVERAGE", "PROMPT_ANALYSIS", "CUSTOM_PROMPT"],
             QuantificationDesignViewModel.EvaluatorTypes.Select(choice => choice.ContractName));
         Assert.Throws<ArgumentOutOfRangeException>(
             () => viewModel.AddEvaluator(Assert.Single(viewModel.Questions).Id, (EvaluatorType)99));
