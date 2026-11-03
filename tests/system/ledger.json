@@ -2,7 +2,7 @@
   "version": 1,
   "ac_digests": {
     "AC-054": "sha256:a3cd597d3525746c",
-    "AC-055": "sha256:aa4bffeb05a711e0",
+    "AC-055": "sha256:5ab400315c4dca47",
     "AC-057": "sha256:6e9e524f200fa485"
   },
   "cases": [
@@ -51,11 +51,11 @@
       "ac_ids": [
         "AC-055"
       ],
-      "title": "設定は共通のみ: 旧カテゴリのボタン不在・入口は存在するカテゴリだけ・共通設定は存続",
+      "title": "共通設定: 単一readonly次回出力欄・native選択取消異常系・保存null復元・既存run/checkpoint契約",
       "layer": "e2e",
-      "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR002_AC055\"",
-      "canary": false,
-      "status": "pass",
+      "command": "python -m pytest tests/system/test_fr002_output_folder.py -q",
+      "canary": true,
+      "status": "not_run",
       "last_commit": "3c560e1",
       "last_run_at": "2026-11-03T13:03:44+09:00",
       "evidence": "work/runs/202611031221/logs/system-test/E2E-002-202611031303.log",
@@ -77,6 +77,12 @@
           "by": "test-designer",
           "change": "command: 'dotnet test tests/system/ui --filter \"FullyQualifiedName~FR002_AC055\"' -> 'dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR002_AC055\"'",
           "reason": "前段 prebuild で 1 回ビルドし --no-build で並列実行（検証内容は不変）"
+        },
+        {
+          "at": "2026-11-03T21:04:41+09:00",
+          "by": "test-designer",
+          "change": "command: 'dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR002_AC055\"' -> 'python -m pytest tests/system/test_fr002_output_folder.py -q'; title: '設定は共通のみ: 旧カテゴリのボタン不在・入口は存在するカテゴリだけ・共通設定は存続' -> '共通設定: 単一readonly次回出力欄・native選択取消異常系・保存null復元・既存run/checkpoint契約'; canary: False -> True",
+          "reason": "2026-11-03 AC-055追補①〜⑤: 既存E2E-002をUI journeyと既存durable契約で拡張、実装前not_run。FR-001/003不変"
         }
       ]
     },
