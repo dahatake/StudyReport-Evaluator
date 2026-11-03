@@ -33,6 +33,10 @@
     "implementer-escalation": "",
     "reviewer": ""
   },
+  "system_test": {
+    "jobs": "auto",
+    "serial_patterns": ["default_port", "dotnet test"]
+  },
   "gates": {
     "enabled": true,
     "subagent_verify": {
