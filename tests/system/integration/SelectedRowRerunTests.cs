@@ -131,18 +131,30 @@ public sealed class SelectedRowRerunTests
         /// 選んだ行（元の行番号）だけを、元の run と同じ入力・採点定義・model で再実行する（FR-112）。
         /// 再実行 API は実装後に確定するため、実装役は本メソッドの 1 か所だけを実 API に合わせる（期待値は変えない）。
         /// </summary>
-        internal Task<RunSummary> RerunAsync(IEvaluationRunner runner, RunSummary original, IReadOnlyList<int> rows, CancellationToken ct)
+        internal async Task<RunSummary> RerunAsync(IEvaluationRunner runner, RunSummary original, IReadOnlyList<int> rows, CancellationToken ct)
         {
             DurableQuantificationOrchestrator orchestrator = new(
                 new OpenXmlEvaluationRowSource(InputPath), runner, new NoReference(), new NoSpecial());
-            return orchestrator.RerunRowsAsync(
-                BuildRequest(SyntheticRun.Definition() with { }), original, "model-test", rows, cancellationToken: ct);
+            try
+            {
+                return await orchestrator.RerunRowsAsync(
+                    BuildRequest(SyntheticRun.Definition() with { }), original, "model-test", rows, cancellationToken: ct);
+            }
+            catch (QuantificationRunException ex)
+            {
+                throw new InvalidOperationException("RerunRowsAsync failed: " + ex.Code, ex);
+            }
         }
 
         internal Dictionary<int, string> RowOutcomes(RunSummary summary) =>
             summary.CompletedRows.ToDictionary(
                 r => r.SourceRowNumber,
-                r => System.Text.Json.JsonSerializer.Serialize(r));
+                r => r.NormalResults.Any(n => n.AcceptedResult is null)
+                    ? "technical-error"
+                    : "success:" + string.Join(
+                        ";",
+                        r.NormalResults.SelectMany(n => n.AcceptedResult!.Criteria)
+                            .Select(c => c.CriterionId + "=" + c.RawScore.ToString(System.Globalization.CultureInfo.InvariantCulture))));
 
         public void Dispose()
         {
