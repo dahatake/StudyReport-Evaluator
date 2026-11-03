@@ -147,6 +147,15 @@ public sealed class IntegratedDesignAndSettingsTests
         {
             Assert.NotNull(Find<Control>(settings, id));
         }
+
+        // FR-002 AC-055 ①: next output is one copyable read-only field, not override/effective editors.
+        Assert.Null(Find<Control>(settings, "SettingsEffectiveOutputDirectory"));
+        TextBox output = Required<TextBox>(settings, "ExecutionOutputDirectory");
+        Assert.True(output.IsReadOnly);
+        Assert.True(output.Focusable);
+        Assert.Single(settings.GetVisualDescendants().OfType<TextBox>(), c =>
+            (AutomationProperties.GetAutomationId(c) ?? c.Name ?? "").Contains("OutputDirectory",
+                StringComparison.Ordinal));
     }
 
     // FR-003 AC-057: 入力詳細の編集UI・固有評価の編集UI・読込Promptの一覧/適用が、どの画面にも存在しない。

@@ -18,6 +18,7 @@ namespace StudyReportEvaluator.App.Tests.UI;
 
 public sealed class SettingsAccessibilityTests
 {
+    // FR-002 AC-055: preserve keyboard access, copy-only path and native selection entry.
     [AvaloniaFact]
     public async Task Common_editors_keep_their_ids_keyboard_order_and_bind_the_same_execution_owner()
     {
@@ -32,7 +33,8 @@ public sealed class SettingsAccessibilityTests
             Path.Combine(Path.GetTempPath(), "synthetic-T25-settings.xlsx"));
         await execution.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
         using SettingsViewModel settings = new(new InputViewModel(), new QuantificationDesignViewModel(definition), execution);
-        SettingsView view = new(settings);
+        string explicitOutput = Path.Combine(Path.GetTempPath(), "synthetic-T25-explicit-output");
+        SettingsView view = new(settings, new OutputPicker(explicitOutput));
         Window window = new() { Width = 950, Height = 450, Content = view };
         try
         {
@@ -45,18 +47,18 @@ public sealed class SettingsAccessibilityTests
             ComboBox model = ById<ComboBox>(view, "ExecutionModel");
             ComboBox concurrency = ById<ComboBox>(view, "ExecutionConcurrency");
             TextBox output = ById<TextBox>(view, "ExecutionOutputDirectory");
-            TextBox effective = ById<TextBox>(view, "SettingsEffectiveOutputDirectory");
+            Button select = ById<Button>(view, "SettingsSelectOutputFolder");
+            Button reset = ById<Button>(view, "SettingsResetOutputFolder");
             Assert.Same(execution.AvailableModelIds, model.ItemsSource);
             Assert.Same(execution.ConcurrencyOptions, concurrency.ItemsSource);
             Assert.Equal(Enumerable.Range(1, 16).ToArray(), concurrency.Items.Cast<int>());
             Assert.Equal(execution.SelectedModelId, model.SelectedItem);
             Assert.Equal(execution.MaxConcurrency, concurrency.SelectedItem);
-            Assert.False(output.IsReadOnly);
-            Assert.True(effective.IsReadOnly);
+            Assert.True(output.IsReadOnly);
+            Assert.DoesNotContain(UniqueIds(view), id => id == "SettingsEffectiveOutputDirectory");
             string defaultOutput = execution.OutputDirectory;
-            Assert.Equal(defaultOutput, effective.Text);
-            Assert.True(string.IsNullOrEmpty(output.Text));
-            Assert.All(new Control[] { model, concurrency, output, effective }, control =>
+            Assert.Equal(defaultOutput, output.Text);
+            Assert.All(new Control[] { model, concurrency, output, select, reset }, control =>
             {
                 Assert.True(control.Focusable);
                 Assert.True(control.IsTabStop);
@@ -78,21 +80,20 @@ public sealed class SettingsAccessibilityTests
 
             model.SetCurrentValue(ComboBox.SelectedItemProperty, "model-z-other");
             concurrency.SetCurrentValue(ComboBox.SelectedItemProperty, 3);
-            string explicitOutput = Path.Combine(Path.GetTempPath(), "synthetic-T25-explicit-output");
-            output.SetCurrentValue(TextBox.TextProperty, explicitOutput);
             Press(window, Key.Tab);
-            Assert.Same(effective, window.FocusManager?.GetFocusedElement());
+            Assert.Same(select, window.FocusManager?.GetFocusedElement());
+            Press(window, Key.Enter);
             Assert.Equal("model-z-other", execution.SelectedModelId);
             Assert.Equal("model-z-other", execution.PreferredModelId);
             Assert.Equal(3, execution.MaxConcurrency);
             Assert.Equal(explicitOutput, execution.OutputDirectoryOverride);
-            Assert.Equal(explicitOutput, effective.Text);
-            effective.SelectAll();
+            Assert.Equal(explicitOutput, output.Text);
+            Assert.True(output.Focus(NavigationMethod.Tab));
+            output.SelectAll();
             window.KeyTextInput("読取専用の表示は編集しない");
             Render();
-            Assert.Equal(explicitOutput, effective.Text);
-            Press(window, Key.Tab, RawInputModifiers.Shift);
-            Assert.Same(output, window.FocusManager?.GetFocusedElement());
+            Assert.Equal(explicitOutput, output.Text);
+            Assert.Equal(explicitOutput, execution.OutputDirectoryOverride);
 
             // Attach one real view at a time: moved IDs cannot be hidden duplicate editors.
             window.Content = null;
@@ -119,21 +120,29 @@ public sealed class SettingsAccessibilityTests
             Assert.Equal("model-z-other", model.SelectedItem);
             Assert.Equal(3, concurrency.SelectedItem);
             Assert.True(output.Focus(NavigationMethod.Tab));
-            output.SetCurrentValue(TextBox.TextProperty, string.Empty);
             Press(window, Key.Tab);
-            Assert.Same(effective, window.FocusManager?.GetFocusedElement());
+            Assert.Same(select, window.FocusManager?.GetFocusedElement());
+            Press(window, Key.Tab);
+            Assert.Same(reset, window.FocusManager?.GetFocusedElement());
+            Press(window, Key.Enter);
             Assert.Null(execution.OutputDirectoryOverride);
-            Assert.Equal(defaultOutput, effective.Text);
+            Assert.Equal(defaultOutput, output.Text);
             Assert.Equal(1, authentication.CallCount);
             Assert.Equal(0, runner.CallCount);
             Assert.Null(execution.LastLoginTask);
             Assert.Null(settings.LastLoadTask);
             Assert.Null(settings.LastSaveTask);
         }
-        finally
+
+            finally
         {
             window.Close();
         }
+    }
+
+    private sealed class OutputPicker(string path) : IOutputFolderPicker
+    {
+        public Task<string?> PickAsync(TopLevel topLevel) => Task.FromResult<string?>(path);
     }
 
     private static T ById<T>(Control root, string id) where T : Control =>
@@ -153,6 +162,7 @@ public sealed class SettingsAccessibilityTests
         PhysicalKey physical = key switch
         {
             Key.Tab => PhysicalKey.Tab,
+            Key.Enter => PhysicalKey.Enter,
             Key.Down => PhysicalKey.ArrowDown,
             _ => throw new ArgumentOutOfRangeException(nameof(key)),
         };

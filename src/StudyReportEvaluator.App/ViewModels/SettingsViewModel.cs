@@ -56,6 +56,49 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
     private string? persistenceMessage;
     private string applyStatusText = string.Empty;
     private CancellationTokenSource? applicationCancellation;
+    private bool isSelectingOutputFolder;
+    private string outputFolderStatus = string.Empty;
+
+    public bool IsSelectingOutputFolder
+    {
+        get => isSelectingOutputFolder;
+        set
+        {
+            if (SetProperty(ref isSelectingOutputFolder, value))
+            {
+                OnPropertyChanged(nameof(CanSelectOutputFolder));
+            }
+        }
+    }
+
+    public bool CanSelectOutputFolder => !disposed && !IsSelectingOutputFolder;
+
+    public string OutputFolderStatus
+    {
+        get => outputFolderStatus;
+        set
+        {
+            if (SetProperty(ref outputFolderStatus, value))
+            {
+                OnPropertyChanged(nameof(HasOutputFolderStatus));
+            }
+        }
+    }
+
+    public bool HasOutputFolderStatus => !string.IsNullOrEmpty(OutputFolderStatus);
+
+    // FR-002 AC-055: an explicit reset to null also supersedes a pending saved override.
+    public void SetOutputFolderOverride(string? path)
+    {
+        if (disposed)
+        {
+            return;
+        }
+
+        outputDirectoryEdited = true;
+        Execution.OutputDirectoryOverride = path;
+        RefreshDirtyState();
+    }
 
     public SettingsViewModel(
         InputViewModel input,
