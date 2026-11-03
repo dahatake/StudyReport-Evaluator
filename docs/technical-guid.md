@@ -216,7 +216,7 @@ previewだけ、またはExcel数式だけを変更してはいけません。
 
 AI resultのshapeを変えない最小変更です。
 
-1. Knowledge固定文なら`Core/Prompting/BuiltInPromptTemplates.cs`で新しいversionを追加します。既存versionの意味を黙って上書きしない方が、checkpointと監査上安全です。
+1. Knowledge／Prompt固定文なら`Core/Prompting/BuiltInPromptTemplates.cs`で新しいversion（`knowledge-v1`／`prompt-analysis-v1`など）を追加します。既存versionの意味を黙って上書きしない方が、checkpointと監査上安全です。
 2. Custom／Specialで使えるplaceholderを変えるなら`PromptTemplateRenderer`のallowlist、必須placeholder、validatorを更新します。
 3. `SafeEvaluationPayloadBuilder`で実際に渡すcontextとApp-owned output contractを確認します。
 4. `BuiltInPromptTemplatesTests`、`PromptTemplateRendererTests`、`SafeEvaluationPayloadBuilderTests`へ正常・未知placeholder・欠落・長さ・data境界を追加します。
@@ -226,7 +226,7 @@ App-owned structured output instructionを外す、通常assistant本文を採�
 
 ### 2. 新しいEvaluator種別を加える
 
-現行`EvaluatorType`は`KNOWLEDGE_COVERAGE`と`CUSTOM_PROMPT`のclosed enumです。
+現行`EvaluatorType`は`KNOWLEDGE_COVERAGE`（Knowledge）、`PROMPT_ANALYSIS`（Prompt。組込みテンプレート`prompt-analysis-v1`）、`CUSTOM_PROMPT`（Custom）の3値のclosed enumです。
 
 1. `Domain/EvaluatorDefinition.cs`へenum値とJSON名を追加
 2. `QuantificationDefinitionValidator.ValidatePromptConfiguration`へ種別固有条件を追加

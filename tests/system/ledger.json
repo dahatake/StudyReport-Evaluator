@@ -19,9 +19,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
       "status": "pass",
-      "last_commit": "f7ea60d",
-      "last_run_at": "2026-11-03T21:35:54+09:00",
-      "evidence": "work/runs/202611032047/logs/system-test/E2E-001-202611032135.log",
+      "last_commit": "f2a4c32",
+      "last_run_at": "2026-11-03T22:23:35+09:00",
+      "evidence": "work/runs/202611032204/logs/system-test/E2E-001-202611032223.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
@@ -56,9 +56,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR002_AC055\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "f7ea60d",
-      "last_run_at": "2026-11-03T21:35:54+09:00",
-      "evidence": "work/runs/202611032047/logs/system-test/E2E-002-202611032135.log",
+      "last_commit": "f2a4c32",
+      "last_run_at": "2026-11-03T22:23:35+09:00",
+      "evidence": "work/runs/202611032204/logs/system-test/E2E-002-202611032223.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
@@ -93,9 +93,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR003_AC057\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "f7ea60d",
-      "last_run_at": "2026-11-03T21:35:54+09:00",
-      "evidence": "work/runs/202611032047/logs/system-test/E2E-003-202611032135.log",
+      "last_commit": "f2a4c32",
+      "last_run_at": "2026-11-03T22:23:35+09:00",
+      "evidence": "work/runs/202611032204/logs/system-test/E2E-003-202611032223.log",
       "history": [
         {
           "at": "2026-11-02T15:00:42+09:00",
