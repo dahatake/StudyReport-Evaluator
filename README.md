@@ -88,6 +88,18 @@ EXE／ZIPそれぞれのsidecar公開と、CI・公開判定での最終配布by
 
 cacheはアプリ配置用で、入力／final／partial、利用者別設定、CLI credential storeとは別です。明示出力先が未指定の場合だけ、入力fileに隣接する`result`を使い、抽出cacheを結果保存先にはしません。配布・展開・起動のために利用者workbookを移動・削除しません。結果の扱いは[出力と再開](#出力と再開)を参照してください。
 
+## ソースから単一EXEをビルドして起動する
+
+Windows 11 x64の開発端末では、repository rootで次を実行します（x64 PowerShell 7以上、Git、`global.json`に適合する.NET SDKとpackage取得用networkが必要です）。
+
+```powershell
+pwsh -NoLogo -NoProfile -File .\build-singlefile.ps1 -SkipPull
+```
+
+現在の作業ツリーから同梱Copilot CLIを含む単一EXEとSHA-256 sidecarを生成し、`artifacts\package\StudyReportEvaluator-win-x64.exe`を起動します。ビルドのみの場合は`-SkipLaunch`を追加します。`-SkipPull`を省略すると、先に`git pull --ff-only`で最新化します（tracked fileに変更がある場合は停止）。各段階の失敗時は古いEXEを起動しません。
+
+詳細・検証方法は[開発手順](dev/README.md#単一exeをビルドして起動する)を参照してください。これはローカルのunsigned成果物であり、公開済み配布物やclean-host試験の完了を意味しません。
+
 ## ローカルビルドから起動するクイックスタート
 
 このrepositoryを取得した端末で、配布物を待たずに現在のソース（`0.8.6`候補）をWindowsアプリとして起動する手順です。**一般利用者向けの入手経路ではありません。** ここで作る実行物はunsignedで、SHA-256 sidecarもGitHub Releasesの公開物もありません。配布物の入手は前節を参照してください。
