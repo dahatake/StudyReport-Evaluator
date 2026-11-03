@@ -246,6 +246,9 @@ public sealed class RunSummary
 
     public bool PartialCleanupFailed { get; }
 
+    /// <summary>FR-108: closed code of the job text log save (null when no durable job log was attempted).</summary>
+    public string? RunLogStatusCode { get; internal set; }
+
     public ImmutableArray<RunPeerSimilarityResult> PeerSimilarities { get; }
 
     public int PlannedEvaluationCount => Units.Length;

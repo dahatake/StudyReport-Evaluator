@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using StudyReportEvaluator.App.Copilot;
+using StudyReportEvaluator.App.Logging;
 using StudyReportEvaluator.App.Workbooks.Checkpoint;
 using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.App.Workbooks.Mapping;
@@ -188,9 +189,43 @@ public sealed class DurableQuantificationOrchestrator
         AdaptiveEvaluationConcurrencyLimiter? concurrencyLimiter = null,
         Action<LivePreviewUpdate>? livePreview = null)
     {
+        // FR-108: job progress text log (closed codes and numbers only). Saving never alters the run.
+        RunTextLog textLog = new(timeProvider);
+        RunSummary summary;
+        try
+        {
+            summary = await RunCoreAsync(
+                request,
+                progress,
+                cancellationToken,
+                concurrencyLimiter,
+                livePreview,
+                textLog).ConfigureAwait(false);
+        }
+        catch
+        {
+            textLog.Add("JOB_ABORTED");
+            _ = textLog.Save();
+            throw;
+        }
+
+        textLog.Add("JOB_END status=" + summary.StatusCode);
+        summary.RunLogStatusCode = textLog.Save();
+        return summary;
+    }
+
+    private async Task<RunSummary> RunCoreAsync(
+        DurableQuantificationRunRequest request,
+        Action<DurableEvaluationProgress>? progress,
+        CancellationToken cancellationToken,
+        AdaptiveEvaluationConcurrencyLimiter? concurrencyLimiter,
+        Action<LivePreviewUpdate>? livePreview,
+        RunTextLog textLog)
+    {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Run);
         ArgumentNullException.ThrowIfNull(request.Runtime);
+        progress = textLog.Wrap(progress);
         QuantificationRunRequest run = request.Run;
         ArgumentNullException.ThrowIfNull(run.DraftDefinition);
         ArgumentNullException.ThrowIfNull(run.WorkbookMetadata);
@@ -309,6 +344,7 @@ public sealed class DurableQuantificationOrchestrator
             wasResumed = true;
         }
 
+        textLog.Directory = Path.GetDirectoryName(checkpoint.FinalPath);
         int referenceTotal = snapshot.Definition.Questions.Count(question => question.Enabled);
         int rowTotal = plan.Mapping.SelectedRowCount;
         int perRowOperations = OperationsPerRow(plan);

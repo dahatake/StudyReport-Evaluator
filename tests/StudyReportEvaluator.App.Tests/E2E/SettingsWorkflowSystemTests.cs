@@ -182,6 +182,9 @@ public sealed class SettingsWorkflowSystemTests
         RunSummary summary = await RunAsync(session);
         string originalFinal = AssertSuccessfulFinal(session, workbook, summary);
         InputSnapshot finalBefore = new InputSnapshotService().Capture(originalFinal);
+        // FR-107: the default alias name is unused, so it is exportable; an explicitly specified automatic final is rejected.
+        Assert.False(session.Results.OutputTargetExists);
+        session.Results.OutputPath = originalFinal;
         Assert.True(session.Results.OutputTargetExists);
         Assert.False(session.Results.CanExport); // An automatic final cannot be overwritten.
 

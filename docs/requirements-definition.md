@@ -487,6 +487,8 @@ $$
 
 既存fileを上書きしない。完成pathはrun開始時に予約し、画面とcheckpointへ保存する。
 
+結果画面の「別名 workbook 出力」欄の既定名は、同じ規則で出力先directoryの未使用名を作り直す（FR-107、§11.24）。ジョブのテキストログ`{yyyyMMddHHmm}-log.txt`も同じ出力先へ上書きなしで保存する（FR-108、§11.24）。
+
 ### 9.2 app-owned sheets
 
 | Sheet | 内容 |
@@ -715,6 +717,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 - 同一attemptの累計は置換で更新し、イベント合計とセッション累計、モデル別内訳とセッション総量を加算しない。内訳と総量が一致しない場合は不一致として示し、配賦・補正で一致させない。
 - 項目ごとに取得元（イベント／最終RPC／最後の呼び出しのみ）と部分取得を保持する。再試行は別attemptとして数え、試行番号・相関ID・終端結果を記録する。
 - ジョブ単位のUTF-8 JSON Linesログを利用者別のローカル領域へ作り、数値・生成ID・閉じたコードだけを記録する。回答・Prompt・reason・evidence・学生識別子・実path・credentialを記録せず、モデル名は匿名化した識別子だけを保存する。ジョブcontextとattemptごとに、アプリが指定したrun-level reasoning effort（例: `low`、未指定はnull）を記録する。
+- 同じ秘匿規則で、ジョブのテキストログを出力先のresult directoryへ`{yyyyMMddHHmm}-log.txt`としても保存する（FR-108、§11.24）。
 - ログの保存失敗・記録欠落・容量上限は採点と分けて表示し、観測済みの画面表示を消さない。コスト取得の失敗だけでAIを再送しない。
 - 本節は既存Excelの使用量出力とcheckpoint schemaを変更しない（checkpointへのContext Size tierの追加は、後続のFR-MO-07による）。過去ジョブの累計表示・再取込は本版の対象外とする。
 
@@ -1021,6 +1024,38 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 変更履歴: 2026-11-02 Q-001回答Bを反映。FR-DOC-01〜04・AC-044を廃止（廃止した3機能の操作説明のため。統合→AC-059）。A-MG-02を決定済みにし、C-1・C-4を解消。影響: 実装・テスト・利用者文書の更新が必要（上記AC、AC-037・AC-048のtest名の更新は実装側で必要）。
 変更履歴: 2026-11-02 利用者承認（「修正してよいです」）によりC-2・C-3を解決。FR-QT-05、AC-048 ⑥の初期focusを統合画面（FR-001）に、§11.5・§11.8・§11.22・AC-037・§18の「5カテゴリ」「カテゴリ」を「設定は共通のみ」「設定内の表示」に書き換えた（意味はFR-001〜003に合わせ、値・閾値は不変）。同日追記: 初期focusは実装・既存テスト（MainWindowSettingsTests・QuantificationDesignViewTests）と整合する最小変更として基礎配点入力（`BasePointsTextBox`）にした（設問タブ領域へのTab到達は維持）。過去の実測の記述（行1303付近）と履歴は過去事実のため変えない。影響: AC-037・AC-048の文言変更、台帳ケースの期待値の更新（test-designer）。
+
+### 11.24 別名workbook出力の既定名とジョブのテキストログ（2026-11-03追加）
+
+出典: 依頼原文（2026-11-03「別名 workbook 出力欄（結果画面 ResultsOutputViewModel の OutputPath）の既定値が、run完了後は自動出力済みのfinal pathになり『完成名が既に存在します。上書きせず、別の名前を指定してください。』と出てそのまま出力できない。ジョブを動かすたび・結果を開くたびに、出力先ファイル名が必ず既存と異なる（未使用の）名前になるようにしたい」「ジョブ実行時のログを `出力先のパス\{yyyymmddhhmm}-log.txt` に保存する。トラブルシューティング用」）、§9.1、§11.8、§11.9、`OutputPathPlanner`、`DurableQuantificationOrchestrator`、`JobCostLogger`。
+
+本節は§9.1の命名規則（`eval-yyyyMMdd-HHmm[-NN]`、既存fileを上書きしない）と§11.9のジョブログの秘匿規則を維持し、結果画面の別名出力欄の既定値と、ジョブログのテキスト保存を追加する。`OutputPathPlanner`の命名規則を共有し、別の命名規則を作らない。
+
+#### FR-107 別名workbook出力欄の既定名は未使用名
+- 要求: 結果画面の「別名 workbook 出力」欄（`ResultsOutputViewModel.OutputPath`）の既定値は、run完了後（`Summary.IsDurable`）や結果を開いたときも、自動出力済みのfinal／partialと一致せず、出力先directory（自動出力のresult directory）で未使用の名前とする。既定名は§9.1・`OutputPathPlanner`と同じ`eval-{yyyyMMdd-HHmm}[-NN].xlsx`（同一分の衝突は`-02`、`-03`…の次の未使用名）で、時刻は既定値を作る時点のOSローカル時刻・不変カルチャとする。ジョブを動かすたび・結果を開くたびに既定値を作り直し、利用者が編集した値は同じ結果の表示中は保つ。既存fileの上書き禁止（§9.1）と、利用者が明示指定した既存名への「完成名が既に存在します。上書きせず、別の名前を指定してください。」の検証は維持する。既定名の生成に失敗しても結果表示・採点・出力を止めず、欄を空にして利用者の指定を促す。
+- 決定状態: 承認済み（依頼 2026-11-03）　出自: 依頼　優先度: MUST（既定値のままでは出力できない不具合の解消）
+- 上位: 既定制約（ui_policy）　出典: 依頼原文 2026-11-03（§11.24）
+- 対象エンティティ: なし　関係する状態: なし　参照パラメータ: なし
+- 関連する既存資産: §9.1、§11.8、`OutputPathPlanner`、`ResultsOutputViewModel`
+- 受入基準 AC-060: 出力先directoryに`eval-20261103-2136.xlsx`（自動出力済みのfinal）がある合成run結果を開いた「別名 workbook 出力」欄の既定値は、既存のどのfileとも異なる`eval-yyyyMMdd-HHmm[-NN].xlsx`の名前で、検証して出力を選ぶと上書きなしでそのまま出力できる。同じ分の既存名（`eval-yyyyMMdd-HHmm.xlsx`、`-02`）があれば次の未使用の連番になる。
+  - 検証レベル: unit
+- 受入基準 AC-061: ジョブを実行してrunが完了（`IsDurable`）した直後の結果画面と、同じ結果を再度開いたときの両方で、既定値が自動出力済みのfinal pathと異なる未使用名になり、既存fileは変更されない。利用者が明示指定した既存名は従来どおり「完成名が既に存在します。上書きせず、別の名前を指定してください。」で拒否される。
+  - 検証レベル: integration
+
+#### FR-108 ジョブ実行ログのテキスト保存
+- 要求: ジョブ（「定量化を開始」または再開の1操作、§11.9）を実行するときの経過ログを、トラブルシューティング用に自動出力のresult directoryへ`{yyyyMMddHHmm}-log.txt`（UTF-8のplain text）として保存する。時刻はジョブ開始のOSローカル時刻・不変カルチャとする。同名のfileがあれば上書きせず、`{yyyyMMddHHmm}-02-log.txt`、`-03-log.txt`…の次の未使用名にする。出力先は§9.1の実効出力先（自動出力のresult directory）と同じである。記録できる内容は§11.9のJSONLログと同じ秘匿規則に従い、数値・生成ID・閉じたコード・匿名化したmodel識別子だけとする。回答・Prompt・reason・evidence・学生識別子・実path・credential・設問文を記録しない。ログの保存失敗（directory作成不可・書込不可・容量等）は採点・出力・§11.9の利用者別JSONLログ・画面表示を止めず、安全な理由（閉じたコードの文言。実pathや例外の本文を含めない）で表示する。
+- 決定状態: 承認済み（依頼 2026-11-03）　出自: 依頼　優先度: SHOULD（障害調査のための補助。採点の成否に影響しない）
+- 上位: 既定制約（ui_policy）　出典: 依頼原文 2026-11-03（§11.24）
+- 対象エンティティ: なし　関係する状態: なし　参照パラメータ: なし
+- 関連する既存資産: §9.1、§11.9、`JobCostLogger`、`DurableQuantificationOrchestrator`
+- 受入基準 AC-062: 合成run（fake AI・合成workbook）を実行すると、出力先の result directoryに`{yyyyMMddHHmm}-log.txt`（ジョブ開始のローカル時刻）が1件できる。同名が既にあるときは上書きせず`-02`の連番で別fileができ、既存fileの内容は変わらない。
+  - 検証レベル: integration
+- 受入基準 AC-063: 合成の回答・Prompt・reason・evidence・学生識別子・設問文・実path・credentialに見える固定文字列を入れたrunで、保存した`-log.txt`にそれらの文字列が一切含まれない。出力先を書込不可にした場合も、採点・自動出力・利用者別JSONLログは成功し、画面には実pathを含まない安全な理由が表示される。
+  - 検証レベル: integration
+
+仮定: ログ内容は§11.9のJSONLログで記録済みの項目の範囲とし、新しい記録項目は足さない。連番の書式は§9.1に合わせた`-02`とする（既存の`{yyyyMMddHHmm}-log.txt`を1番目とする）。再開ジョブは再開時刻で別のログfileを作る。ログの保持期間・自動削除は定めない。覆す条件: 要求所有者が別の書式・保持を指示した場合。
+
+変更履歴: 2026-11-03 依頼を反映。§9.1・§11.9に参照を追記（既存規則は変更せず）。FR-107・FR-108、AC-060〜063を追加（既存に同目的の要求なし。`rdcheck similar`で類似0件）。影響: `ResultsOutputViewModel`の既定名生成、`OutputPathPlanner`の再利用、`DurableQuantificationOrchestrator`／`JobCostLogger`のテキストログ出力、台帳のケース追加（test-designer）、利用者文書（troubleshooting）。
 
 ## 12. Promptファイルからの起動
 
