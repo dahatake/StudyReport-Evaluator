@@ -955,7 +955,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
   - 検証レベル: unit
 - 受入基準 AC-067: `EvaluatorType`が3値以外の未知の種類名のとき、例外を投げず検証エラー（未知の種類名を含む）として拒否し、既知の種類に暗黙に置き換えない。`CANONICAL_JSON`内の種類と`EvaluatorType`列が食い違うときも検証エラーとして拒否する。
   - 検証レベル: unit
-
+
 #### FR-113 結果workbookへの「採点結果」シート（評価点と総合点だけの一覧）
 - 要求: 完成した結果workbookに、設問の評価点と総合点だけを並べたシート`採点結果`を追加する。先頭列`ID`は`Quantification_Results`の`SourceRow`（元シートの行番号）、行は同シートの学生行と同じ。有効な設問ごとに、設問の順番N（1始まり）で`質問Nの評価`（その設問の`.Question_Normalized`）と、その設問に有効な`PROMPT_ANALYSIS`評価方法があるときだけ`質問NのPromptの評価`（その評価方法の`.Evaluator_Score`）を並べ、右端に`合計`（`Final_Score`）を置く。無効な設問、有効な`PROMPT_ANALYSIS`評価方法がない設問のPrompt列は作らない。値は`Quantification_Results`のセルを参照する数式とし、Override・配点の変更に追従する。参照元が空欄・失敗のときは空欄のまま表示し、0にしない。シート名は既存のapp-owned sheet名の衝突回避規則に従い、`.partial`には入れない。衝突回避でシート名が変わったときは、`採点結果`の数式の参照先に、実際にworkbookへ書かれた`Quantification_Results`のシート名を使う（名前を固定の文字列で書かない）。`docs/result-excel-description.md`の「4枚のシート」の説明（§1・§3・目次）を、本シートを含む形に更新する。FR-XD-01の「`Quantification_`で始まる4つのapp-owned sheet」に加えて完成workbookだけに入る5枚目の結果一覧であり、FR-XD-01・§9.4・AC-045②は本依頼でこの区別に整合させた（A-SR-01）。
 - 決定状態: 承認済み（包括承認 2026-11-04・approval_policy）　出自: AI提案　優先度: SHOULD（先生が点数だけを一覧で確認・転記しやすくする）
