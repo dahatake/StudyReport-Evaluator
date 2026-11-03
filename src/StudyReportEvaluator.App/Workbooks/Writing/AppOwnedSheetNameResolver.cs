@@ -29,6 +29,12 @@ public sealed class AppOwnedSheetNames
 
     public IReadOnlyList<string> AllSheetNames { get; }
 
+    /// <summary>FR-113: 完成workbookだけに入る `採点結果` の実シート名（未束縛なら null）。AllSheetNames には含めない。</summary>
+    public string? ScoreSummarySheetName { get; private init; }
+
+    internal AppOwnedSheetNames WithScoreSummarySheetName(string name) =>
+        new(ConfigSheetName, ReferencesSheetName, ResultsSheetName, RunSheetName) { ScoreSummarySheetName = name };
+
     public override string ToString() =>
         $"{nameof(AppOwnedSheetNames)} {{ Count = {AllSheetNames.Count}, Content = <redacted> }}";
 }

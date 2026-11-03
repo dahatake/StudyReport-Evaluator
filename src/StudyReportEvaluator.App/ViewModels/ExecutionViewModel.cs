@@ -966,6 +966,11 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         }
     }
 
+    // FR-111 AC-068: the run-side output line is shown only when it differs from the next-run output.
+    public bool HasDistinctCurrentRunOutput => currentRunRequest is { } request
+        && (request.ResumePartialPath is not null
+            || !string.Equals(request.OutputDirectory, OutputDirectory, StringComparison.OrdinalIgnoreCase));
+
     public bool HasTechnicalErrors => technicalErrorItems.Count > 0;
 
     public bool IsTechnicallyValid => !HasTechnicalErrors;

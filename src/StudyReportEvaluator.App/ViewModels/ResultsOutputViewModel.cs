@@ -326,7 +326,14 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
             ResultsSheetWriteResult results;
             using (SpreadsheetDocument document = package.OpenForEditing())
             {
-                sheetNames = new AppOwnedSheetNameResolver().Resolve(document);
+                AppOwnedSheetNameResolver resolver = new();
+                sheetNames = resolver.Resolve(document);
+                string[] originalNames = document.WorkbookPart!.Workbook!
+                    .Descendants<DocumentFormat.OpenXml.Spreadsheet.Sheet>()
+                    .Select(sheet => sheet.Name!.Value!)
+                    .ToArray();
+                sheetNames = sheetNames.WithScoreSummarySheetName(
+                    ScoreSummarySheetWriter.ResolveName(resolver, originalNames, sheetNames));
                 config = new ConfigSheetWriter().Write(
                     document,
                     preparation.Snapshot,
@@ -342,6 +349,7 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
                     sheetNames,
                     config,
                     preparation.Rows);
+                new ScoreSummarySheetWriter().Write(document, sheetNames, results);
                 new RunSheetWriter().Write(
                     document,
                     CreateRunMetadata(request.Context, sheetNames));

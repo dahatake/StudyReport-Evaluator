@@ -1093,6 +1093,53 @@ public sealed class ExecutionViewTests
         AssertNoAutomaticActivity(harness);
     }
 
+    // FR-111 AC-068: identical run/next output shows only the next-run field; differing output shows both.
+    [AvaloniaFact]
+    public async Task FR111_AC068_Current_run_output_is_hidden_when_same_as_next_output_and_shown_when_different()
+    {
+        QuantificationDefinition definition = U04TestSupport.Definition(2, 3);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RunSummary summary = await U04TestSupport.CreateSummaryAsync(definition, metadata, cancelAfterFirst: false);
+        TaskCompletionSource<RunSummary> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        string output = Path.Combine(Path.GetTempPath(), "AC068-output");
+        string other = Path.Combine(Path.GetTempPath(), "AC068-other");
+        RecordingRunBoundary runner = new((_, report, token) => completion.Task);
+        using LoginViewHarness harness = new(new ExecutionAuthenticationSnapshot(ExecutionAuthenticationState.Available,
+            [U04TestSupport.Model("model-a"), U04TestSupport.Model("auto")],
+            U04TestSupport.RuntimeIdentity()), runner);
+        harness.ViewModel.Configure(definition, metadata, Path.Combine(Path.GetTempPath(), "AC068-input.xlsx"));
+        harness.ViewModel.ApplySettings(new ApplicationSettings
+        {
+            PreferredModelId = "model-a", MaxConcurrency = 1, OutputDirectoryOverride = output,
+        });
+        await harness.ViewModel.CheckAuthenticationAsync(TestContext.Current.CancellationToken);
+        Render();
+        Button start = Required<Button>(harness.View, "StartRunButton");
+        try
+        {
+            Activate(harness.Window, start, useKeyboard: true);
+            Assert.True(harness.ViewModel.HasCurrentRun);
+            Render();
+            Assert.False(harness.ViewModel.HasDistinctCurrentRunOutput);
+            Assert.False(Required<TextBox>(harness.View, "CurrentRunOutputTextBox").IsEffectivelyVisible);
+            Assert.Equal(output, Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox").Text);
+            Assert.True(Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox").IsEffectivelyVisible);
+
+            harness.ViewModel.ApplySettings(new ApplicationSettings
+            {
+                PreferredModelId = "model-a", MaxConcurrency = 1, OutputDirectoryOverride = other,
+            });
+            Render();
+            Assert.True(harness.ViewModel.HasDistinctCurrentRunOutput);
+            Assert.True(Required<TextBox>(harness.View, "CurrentRunOutputTextBox").IsEffectivelyVisible);
+            Assert.True(Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox").IsEffectivelyVisible);
+        }
+        finally
+        {
+            completion.TrySetResult(summary);
+        }
+    }
+
     [AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]
