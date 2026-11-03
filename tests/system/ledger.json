@@ -7,7 +7,8 @@
     "AC-060": "sha256:8abc027ab57b29d1",
     "AC-061": "sha256:43dea9c66234d684",
     "AC-062": "sha256:ac1fa9d6a4ec956e",
-    "AC-063": "sha256:0c12d44db6950d87"
+    "AC-063": "sha256:0c12d44db6950d87",
+    "AC-074": "sha256:b2e9bba79b040925"
   },
   "cases": [
     {
@@ -182,6 +183,31 @@
           "by": "test-designer",
           "change": "blocked",
           "reason": "AC-062/063 は検証レベル=integration で System Test 対象外（CHK-10）。実装役が integration で担保。テスト tests/system/integration は参考として保持"
+        }
+      ]
+    },
+    {
+      "id": "E2E-006",
+      "requirement_ids": [
+        "FR-113"
+      ],
+      "ac_ids": [
+        "AC-074"
+      ],
+      "title": "FR-113 採点結果シートの見出し・行数・ID・.partial非収録・名前衝突",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/integration --filter \"FullyQualifiedName~FR113_AC074\"",
+      "canary": false,
+      "status": "not_run",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-04T00:15:51+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
         }
       ]
     }
