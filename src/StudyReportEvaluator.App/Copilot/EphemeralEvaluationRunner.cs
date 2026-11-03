@@ -654,7 +654,8 @@ internal sealed class SdkEphemeralCopilotTransport : IEphemeralCopilotTransport
         return TranslateAsync<IEphemeralCopilotSession>(async () =>
         {
             CopilotClient client = GetClient();
-            if (string.Equals(config.Model, "auto", StringComparison.Ordinal))
+            if (string.Equals(config.Model, "auto", StringComparison.Ordinal)
+                || ReasoningEffortRejections.IsRejected(config.Model))
             {
                 config.ReasoningEffort = null;
             }
@@ -810,6 +811,7 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
     private readonly string? _requestedModelKey;
     private readonly bool? _requestedModelIsAuto;
     private readonly string? _requestedReasoningEffort;
+    private readonly string? _requestedModelId;
     private ImmutableArray<ModelUsageSnapshot> _models = [];
     private bool _modelsTruncated;
     private Guid _attemptId;
@@ -846,6 +848,7 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
         _operation = operation;
         _onProcessFailure = onProcessFailure;
         _requestedReasoningEffort = requestedReasoningEffort;
+        _requestedModelId = requestedModel;
         _requestedModelKey = requestedModel is null ? null : ModelUsageSnapshot.CreateModelKey(requestedModel);
         _requestedModelIsAuto = requestedModel is null ? null : string.Equals(requestedModel, "auto", StringComparison.Ordinal);
         if (usageTracker is not null)
@@ -993,6 +996,14 @@ internal sealed class SdkEphemeralCopilotSession : IEphemeralCopilotSession
         if (IsTransportSessionError(exception))
         {
             failure = new EvaluationNetworkException();
+            return true;
+        }
+
+        if (_requestedReasoningEffort is not null
+            && ReasoningEffortRejections.IsRejectionMessage(message))
+        {
+            ReasoningEffortRejections.MarkRejected(_requestedModelId);
+            failure = new EvaluationReasoningEffortRejectedException();
             return true;
         }
 

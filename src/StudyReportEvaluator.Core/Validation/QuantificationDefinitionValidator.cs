@@ -268,11 +268,14 @@ public sealed class QuantificationDefinitionValidator
             "BuiltInTemplateVersion",
             evaluator.BuiltInTemplateVersion);
 
-        if (evaluator.Type == EvaluatorType.KnowledgeCoverage)
+        if (evaluator.Type is EvaluatorType.KnowledgeCoverage or EvaluatorType.PromptAnalysis)
         {
+            string expectedVersion = evaluator.Type == EvaluatorType.KnowledgeCoverage
+                ? BuiltInPromptTemplates.KnowledgeTemplateVersion
+                : BuiltInPromptTemplates.PromptAnalysisTemplateVersion;
             if (!string.Equals(
                 evaluator.BuiltInTemplateVersion,
-                BuiltInPromptTemplates.KnowledgeTemplateVersion,
+                expectedVersion,
                 StringComparison.Ordinal))
             {
                 Add(

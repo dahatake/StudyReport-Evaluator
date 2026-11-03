@@ -55,7 +55,7 @@ public sealed class InputViewTests
         Assert.Equal("K", Assert.Single(
             promptQuestion.SupportingColumns,
             item => item.IsSelected).ColumnName);
-        Assert.Equal(EvaluatorType.CustomPrompt, Assert.Single(
+        Assert.Equal(EvaluatorType.PromptAnalysis, Assert.Single(
             viewModel.DefinitionDraft.Questions,
             item => item.Id == promptQuestion.Id).Evaluators[0].Type);
         Assert.True(viewModel.IsUsingSuggestedMapping);

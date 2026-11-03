@@ -12,8 +12,20 @@ public static class DefaultCriterionDescriptions
         + "- xxx";
 
     public const string PromptAnalysis =
-        "学生が作成したPromptについて高度に分析・解析をして{論点}を導き出そうとしているかの評価を行ってください。\n"
-        + "論点:\n"
+        "学生が作成したPromptを、Anthropic・OpenAI・Microsoftなどが公開するPrompt作成のベストプラクティスと照合して、高度に分析・評価を行ってください。\n"
+        + "観点:\n"
+        + "- 明確な役割と目的が示されているか\n"
+        + "- 具体的で曖昧さのない指示になっているか\n"
+        + "- 必要な文脈・背景情報が与えられているか\n"
+        + "- 出力形式が指定されているか\n"
+        + "- 例示（入出力の例）が適切に用いられているか\n"
+        + "- 制約・禁止事項が明示されているか\n"
+        + "- 段階的な思考や手順が促されているか\n"
+        + "- 出力を検証できる基準が示されているか";
+
+    public const string Custom =
+        "（評価したい内容と判断の基準を、利用者が具体的に書き換えてください。）\n"
+        + "評価の観点:\n"
         + "- xxx\n"
         + "- xxx\n"
         + "- xxx";
@@ -21,7 +33,8 @@ public static class DefaultCriterionDescriptions
     public static string For(EvaluatorType type) => type switch
     {
         EvaluatorType.KnowledgeCoverage => Knowledge,
-        EvaluatorType.CustomPrompt => PromptAnalysis,
-        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Only Knowledge and Custom evaluator types are supported."),
+        EvaluatorType.PromptAnalysis => PromptAnalysis,
+        EvaluatorType.CustomPrompt => Custom,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported evaluator type."),
     };
 }

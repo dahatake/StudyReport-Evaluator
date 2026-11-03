@@ -10,6 +10,9 @@ public enum EvaluatorType
 
     [JsonStringEnumMemberName("CUSTOM_PROMPT")]
     CustomPrompt,
+
+    [JsonStringEnumMemberName("PROMPT_ANALYSIS")]
+    PromptAnalysis,
 }
 
 public sealed record EvaluatorDefinition

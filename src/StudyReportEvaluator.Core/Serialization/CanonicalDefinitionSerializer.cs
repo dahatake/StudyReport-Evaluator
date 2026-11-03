@@ -165,6 +165,7 @@ public sealed class CanonicalDefinitionSerializer
     {
         EvaluatorType.KnowledgeCoverage => "KNOWLEDGE_COVERAGE",
         EvaluatorType.CustomPrompt => "CUSTOM_PROMPT",
+        EvaluatorType.PromptAnalysis => "PROMPT_ANALYSIS",
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported evaluator type."),
     };
 }

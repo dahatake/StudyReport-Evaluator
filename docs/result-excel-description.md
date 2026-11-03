@@ -38,7 +38,7 @@ StudyReport Evaluatorが作る結果のExcelファイルに、どんなシート
 | 言葉 | 意味 |
 |---|---|
 | 設問 | 回答Excelの1つの質問（1つの列）。学生ごとに回答が入っています。 |
-| 評価方法 | 1つの設問をどんな観点で見るかのまとまり。アプリには「知識の網羅」と、先生が指示文を書く「独自」の2種類があります。 |
+| 評価方法 | 1つの設問をどんな観点で見るかのまとまり。アプリには「知識の網羅」（Knowledge）、学生が書いたPromptを分析する「Prompt」、先生が指示文を書く「独自」（Custom）の3種類があります。 |
 | 評価項目 | 評価方法の中の具体的な採点の観点。例: 「用語を正しく使っている」。 |
 | 固有評価 | 通常の回答とは別に、学生が書いた指示文（プロンプト）などを0〜1で見る追加の評価。使わない設定もできます。 |
 | AIの点（`AI_Raw`） | AIが返した素の点数。AIが返すのは、この点数と理由と根拠だけです。 |
@@ -310,7 +310,7 @@ Final_Score = 75
 | G | `ContentText` | 設問の文章、または評価項目の観点の説明。 |
 | H | `PromptTemplate` | AIへ渡した評価の指示文のひな形。 |
 | I | `BuiltInTemplateVersion` | 標準の指示文を使った場合、その版。 |
-| J | `EvaluatorType` | 評価方法の種類。`KNOWLEDGE_COVERAGE`は知識の網羅、`CUSTOM_PROMPT`は先生が指示文を書いた独自の評価。 |
+| J | `EvaluatorType` | 評価方法の種類。`KNOWLEDGE_COVERAGE`は知識の網羅、`PROMPT_ANALYSIS`は学生が書いたPromptの分析（Prompt）、`CUSTOM_PROMPT`は先生が指示文を書いた独自の評価。 |
 | K | `SourceSheet` | 回答が入っていた元のシート名。 |
 | L | `HeaderRow` | 設問の文章がある行番号（1または2）。 |
 | M | `FirstDataRow` | 学生の回答が始まる行番号。 |

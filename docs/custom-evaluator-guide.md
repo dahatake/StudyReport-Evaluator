@@ -9,10 +9,11 @@
 | 種別 | 用途 | AI出力 |
 |---|---|---|
 | Knowledge (`KNOWLEDGE_COVERAGE`) | 知識の説明、関係、具体的適用 | criterion別raw、reason、evidence、source |
+| Prompt (`PROMPT_ANALYSIS`) | 学生のPromptをベストプラクティスの観点で評価（組込みPrompt、編集不可） | criterion別raw、reason、evidence、source |
 | Custom (`CUSTOM_PROMPT`) | 論理性、具体性、調査、文章等の独自観点 | criterion別raw、reason、evidence、source |
 | 固有評価 | 学生Prompt等、通常回答とは別sourceの評価 | 0〜1、reason、evidence、source |
 
-Knowledgeのsemantic instructionとstructured result schemaはapp-ownedです。利用者はKnowledgeのcriterion、description、range、weightを編集できますが、app-owned instruction自体は編集しません。
+Knowledge・Promptのsemantic instructionとstructured result schemaはapp-ownedです。利用者はcriterion、description、range、weightを編集できますが、app-owned instruction自体は編集しません。評価項目のdescriptionの既定値は種類ごとに異なります。
 
 Customと固有評価では利用者がPrompt templateを編集します。AIへ配点、Question earned、Final score、合否を要求しないでください。
 
