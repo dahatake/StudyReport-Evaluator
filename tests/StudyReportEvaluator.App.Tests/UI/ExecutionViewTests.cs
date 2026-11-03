@@ -942,6 +942,7 @@ public sealed class ExecutionViewTests
         AssertNoAutomaticActivity(harness, authenticationChecks: 1);
     }
 
+    // FR-002 AC-055: settings exposes one read-only next-output display and picker/reset actions.
     [AvaloniaFact]
     public async Task Common_settings_owns_editors_and_runtime_while_execution_keeps_effective_values_and_commands()
     {
@@ -959,7 +960,8 @@ public sealed class ExecutionViewTests
         main.NextCommand.Execute(null);
         main.NextCommand.Execute(null);
         harness.Window.DataContext = main;
-        SettingsView settings = new(main.Settings);
+        var outputPicker = new TestOutputFolderPicker();
+        SettingsView settings = new(main.Settings, outputPicker);
         int fallbackRequests = 0;
         harness.View.CommonSettingsRequested += (_, _) => fallbackRequests++;
         main.PropertyChanged += (_, args) =>
@@ -995,17 +997,24 @@ public sealed class ExecutionViewTests
         Assert.Same(harness.ViewModel.AvailableModelIds, model.ItemsSource);
         Assert.Same(harness.ViewModel.ConcurrencyOptions, concurrency.ItemsSource);
         Assert.NotNull(BindingOperations.GetBindingExpressionBase(output, TextBox.TextProperty));
-        Assert.False(output.IsReadOnly);
+        Assert.True(output.IsReadOnly);
+        Assert.Equal(derivedOutput, output.Text);
         model.SetCurrentValue(ComboBox.SelectedItemProperty, "model-z-other");
         concurrency.SetCurrentValue(ComboBox.SelectedItemProperty, 3);
         string explicitOutput = Path.Combine(Path.GetTempPath(), "T20-explicit-output");
-        output.SetCurrentValue(TextBox.TextProperty, explicitOutput);
+        Assert.True(output.Focus(NavigationMethod.Tab));
+        harness.Window.KeyTextInput(explicitOutput);
         Render();
+        Assert.Equal(derivedOutput, output.Text);
+        Assert.Null(harness.ViewModel.OutputDirectoryOverride);
+        outputPicker.Path = explicitOutput;
+        Activate(harness.Window, ById<Button>(settings, "SettingsSelectOutputFolder"), useKeyboard: true);
+        Assert.Equal(1, outputPicker.Calls);
         Assert.Equal("model-z-other", harness.ViewModel.SelectedModelId);
         Assert.Equal("model-z-other", harness.ViewModel.PreferredModelId);
         Assert.Equal(3, harness.ViewModel.MaxConcurrency);
         Assert.Equal(explicitOutput, harness.ViewModel.OutputDirectoryOverride);
-        Assert.Equal(explicitOutput, ById<TextBox>(settings, "SettingsEffectiveOutputDirectory").Text);
+        Assert.Equal(explicitOutput, output.Text);
 
         ById<TabControl>(settings, "SettingsCommonTabs").SelectedIndex = 2;
         Render();
@@ -1032,10 +1041,11 @@ public sealed class ExecutionViewTests
         Activate(harness.Window, change, useKeyboard: false);
         ById<TabControl>(settings, "SettingsCommonTabs").SelectedIndex = 0;
         Render();
-        ById<TextBox>(settings, "ExecutionOutputDirectory").SetCurrentValue(TextBox.TextProperty, string.Empty);
+        Activate(harness.Window, ById<Button>(settings, "SettingsResetOutputFolder"), useKeyboard: false);
         Render();
         Activate(harness.Window, ById<Button>(settings, "SettingsRequestClose"), useKeyboard: false);
         Assert.Null(harness.ViewModel.OutputDirectoryOverride);
+        Assert.Equal(derivedOutput, ById<TextBox>(settings, "ExecutionOutputDirectory").Text);
         Assert.Equal(derivedOutput, Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox").Text);
         Assert.Contains("入力隣接", Required<TextBlock>(harness.View, "OutputDirectorySource").Text, StringComparison.Ordinal);
         Assert.Null(main.Settings.LastLoadTask);
@@ -1943,5 +1953,17 @@ internal sealed class ControlledRunBoundary(RunSummary summary) : IQuantificatio
             0,
             EvaluationProgressStatus.Cancelled));
         return summary;
+    }
+}
+
+internal sealed class TestOutputFolderPicker : IOutputFolderPicker
+{
+    public string? Path { get; set; }
+    public int Calls { get; private set; }
+
+    public Task<string?> PickAsync(TopLevel topLevel)
+    {
+        Calls++;
+        return Task.FromResult(Path);
     }
 }
