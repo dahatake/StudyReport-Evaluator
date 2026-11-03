@@ -21,6 +21,10 @@
 | FR-CD-03 | 名前・重み・rangeの不変と検証エラー0件 | 承認済み | src/StudyReportEvaluator.Core/Prompting/DefaultCriterionDescriptions.cs, src/StudyReportEvaluator.App/ViewModels/InputViewModel.cs | tests/StudyReportEvaluator.App.Tests/UI/DefaultCriterionDescriptionTests.cs | - |
 | FR-112 | 結果画面で選んだ行だけの再実行 | 承認済み | src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs, src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.Rerun.cs, src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.Rerun.cs, src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs, src/StudyReportEvaluator.App/ViewModels/MainWindowViewModel.cs, src/StudyReportEvaluator.App/Workflow/DurableQuantificationOrchestrator.cs, src/StudyReportEvaluator.App/Workflow/QuantificationOrchestrator.cs, src/StudyReportEvaluator.App/Views/ResultsOutputView.axaml, src/StudyReportEvaluator.App/Views/ExecutionView.axaml, docs/settings.md | tests/system/integration/SelectedRowRerunTests.cs, tests/StudyReportEvaluator.App.Tests/UI/SelectedRowRerunTests.cs | デザイン基盤, OutputPathPlanner |
 | FR-113 | 結果workbookへの「採点結果」シート（評価点と総合点だけの一覧） | 承認済み | src/StudyReportEvaluator.App/Workbooks/Writing/ScoreSummarySheetWriter.cs, src/StudyReportEvaluator.App/Workbooks/Writing/ResultsSheetWriter.cs, src/StudyReportEvaluator.App/Workbooks/Writing/AppOwnedSheetNameResolver.cs, src/StudyReportEvaluator.App/Workbooks/Validation/OutputPackageValidator.cs, src/StudyReportEvaluator.App/Workflow/DurableRunFinalizer.cs | tests/system/integration/ScoreSummarySheetTests.cs, tests/StudyReportEvaluator.App.Tests/Workbooks/Writing/ScoreSummarySheetWriterTests.cs | AppOwnedSheetNameResolver |
+| FR-114 | 未検証類似度の確認指標化と採点保護 | 承認済み | 未実装 | 未実装 | - |
+| FR-115 | 質問文字列による複数参照と条件・互換性の一貫性 | 承認済み | 未実装 | 未実装 | - |
+| FR-116 | ラベル付きローカル対照データによる再現評価 | 承認済み | 未実装 | 未実装 | - |
+
 ## API・イベント
 
 | 名前 | 定義ファイル | 関連する要求 ID |
