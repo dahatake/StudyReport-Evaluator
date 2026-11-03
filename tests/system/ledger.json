@@ -25,9 +25,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
       "status": "pass",
-      "last_commit": "0335534",
-      "last_run_at": "2026-11-04T01:17:28+09:00",
-      "evidence": "work/runs/202611032347/logs/system-test/E2E-001-202611040116.log",
+      "last_commit": "0b00037",
+      "last_run_at": "2026-11-04T05:12:00+09:00",
+      "evidence": "work/runs/202611040504/logs/system-test/E2E-001-202611040511.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
@@ -62,9 +62,9 @@
       "command": "python -m pytest tests/system/test_fr002_output_folder.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "0335534",
-      "last_run_at": "2026-11-04T01:17:28+09:00",
-      "evidence": "work/runs/202611032347/logs/system-test/E2E-002-202611040116.log",
+      "last_commit": "0b00037",
+      "last_run_at": "2026-11-04T05:12:00+09:00",
+      "evidence": "work/runs/202611040504/logs/system-test/E2E-002-202611040511.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
