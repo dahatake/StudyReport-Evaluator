@@ -253,7 +253,7 @@ $$
 
 literal braceは`{{`と`}}`でescapeする。未知placeholder、未閉鎖brace、不正escapeはAI送信前に拒否する。挿入値を再走査しない。
 
-この6 placeholder制約は、利用者が編集できる通常Custom evaluatorと固有評価のtemplateにだけ適用する。Knowledgeはapp-owned template、参照回答と類似度はapp-owned Promptであり、利用者は編集できない。参照回答は固定template内の`{設問}`だけをappが置換し、類似度は検証済みの設問、学生回答、参照回答を固定sectionへ直接組み立てる。`{参照回答}`を第7の利用者placeholderとして公開せず、app-owned Promptを利用者template validatorへ通さない。
+この6 placeholder制約は、利用者が編集できる通常Custom evaluatorと固有評価のtemplateにだけ適用する。KnowledgeとPromptはapp-owned template（Promptは組込みの`prompt-analysis-v1`）、参照回答と類似度はapp-owned Promptであり、利用者は編集できない。参照回答は固定template内の`{設問}`だけをappが置換し、類似度は検証済みの設問、学生回答、参照回答を固定sectionへ直接組み立てる。`{参照回答}`を第7の利用者placeholderとして公開せず、app-owned Promptを利用者template validatorへ通さない。
 
 ## 6. 配点
 
@@ -603,7 +603,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 2. **採点設計**
    - base、special、question points、similarity weight
    - 均等配分
-   - Knowledge / Custom evaluatorとcriteria、固有項目の有効設定概要と詳細設定への入口
+   - Knowledge / Prompt / Custom evaluatorとcriteria、固有項目の有効設定概要と詳細設定への入口
    - 読込Promptの件数と適用の入口（設定の「読込Prompt」は廃止、§11.23・A-MG-02）
    - formula／capacity preflight
 3. **実行**
@@ -913,7 +913,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 ### 11.20 評価項目の説明の初期値（2026-10-01追加）
 
-出典: 依頼原文（2026-10-01「[2.定量化設計]の画面の[通常評価]の中の、画面右側の[評価項目]の説明の初期値を、[評価方法]に対応して以下としてください。」。Knowledge Coverの場合・Prompt 分析の場合の2本文）。
+出典: 依頼原文（2026-10-01「[2.定量化設計]の画面の[通常評価]の中の、画面右側の[評価項目]の説明の初期値を、[評価方法]に対応して以下としてください。」。Knowledge Coverの場合・Prompt 分析の場合の2本文）、2026-11-03の依頼（評価方法の種類をKnowledge・Prompt・Customの3つにする変更。A-CD-01、A-CD-04、A-CD-05）。
 
 通常評価の評価項目の「説明」（`CriterionDefinition.Description`、画面右側の「説明」欄）の初期値を、その評価項目が属する評価方法（evaluator）の種類で決める。種類との対応は次の3つだけとし（2026-11-03に2つから3つへ拡張）、本文は`DefaultCriterionDescriptions`（Core）を唯一の定義とする。改行は`\n`（LF）、末尾に改行・空白を付けない。`{論点}`と`xxx`は利用者が書き換えるための文字どおりの記載であり、置換しない。評価方法の種類の表示名と追加ボタンも、Knowledge／Prompt／Customの3種類に対応する。
 
@@ -925,11 +925,20 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 | ID | 優先度 | 要求 |
 |---|---|---|
-| FR-CD-01 | MUST | 通常評価で評価項目を新規に作る次の経路は、評価方法の種類に対応する上表の本文を説明の初期値とする。①評価項目の「追加」（既存の評価方法へ追加。種類は追加先の評価方法の現在の種類）、②評価方法の追加時に自動で作る最初の評価項目、③採点定義を新規に作る既定（Knowledge Cover）、④入力画面で列の対応から提案する設問の最初の評価項目（学生のPrompt列の候補は種類Prompt、それ以外はKnowledge）。評価方法の種類の選択肢はKnowledge・Prompt・Customの3つで、種類を選ぶと右側の評価項目の説明の既定値がその種類の本文になる。既定の評価方法名は、入力画面の学生のPrompt列の提案では「Prompt 分析」（種類Prompt）とする。 |
+| FR-CD-01 | MUST | 通常評価で評価項目を新規に作る次の経路は、評価方法の種類に対応する上表の本文を説明の初期値とする。①評価項目の「追加」（既存の評価方法へ追加。種類は追加先の評価方法の現在の種類）、②評価方法の追加時に自動で作る最初の評価項目、③採点定義を新規に作る既定（Knowledge）、④入力画面で列の対応から提案する設問の最初の評価項目（学生のPrompt列の候補は種類Prompt、それ以外はKnowledge）。評価方法の種類の選択肢はKnowledge・Prompt・Customの3つで、種類を選ぶと右側の評価項目の説明の既定値がその種類の本文になる。既定の評価方法名は、入力画面の学生のPrompt列の提案では「Prompt 分析」（種類Prompt）とする。 |
 | FR-CD-02 | MUST | 初期値は新規作成時だけに設定する。既存の評価項目の説明、利用者が編集した説明、保存定義・読込定義の説明（既存の`CUSTOM_PROMPT`定義の説明を含む）、評価項目の複製、評価方法の種類の変更（Knowledge・Prompt・Custom間）は、説明を書き換えない。種類の変更後に追加する評価項目は、変更後の種類の本文を使う。 |
 | FR-CD-03 | MUST | 評価項目の名前・重み・range・個別の範囲の初期値は変えない。初期値の説明は必須入力検査（空白でない）と文字数上限を満たし、定義の検証エラーを増やさない。 |
 
 例: 評価方法の種類が`Prompt`の質問で評価項目の「追加」を押すと、新しい評価項目の説明は`学生が作成したPromptを、Anthropic・OpenAI・Microsoftなどが…`で始まる本文になる。同じ質問の評価方法を`Knowledge`へ変えても既存の説明は変わらず、その後に追加した評価項目だけ`学生が作成したレポートを…`で始まる本文になる。
+
+#### FR-109 Prompt種類の組込みテンプレート評価とEvaluatorTypeの3値
+- 要求: 評価方法の種類`PROMPT_ANALYSIS`（Prompt）は、組込みテンプレート`prompt-analysis-v1`（`BuiltInTemplateVersion`で固定、利用者は編集しない）でAIへ送る評価指示を組み立て、採点・出力・AI契約はKnowledgeと同じ構造とする。未知のテンプレートversionは拒否する。結果Excelと設定シートの`EvaluatorType`列は`KNOWLEDGE_COVERAGE`／`PROMPT_ANALYSIS`／`CUSTOM_PROMPT`の3値を書き、設定シートの読込で同じ種類へ往復できる。既存の`CUSTOM_PROMPT`はCustomのまま読む。
+- 決定状態: 承認済み（包括承認 2026-11-03・approval_policy）　出自: AI提案　優先度: MUST（A-CD-04の評価動作を検証可能にする。監査指摘X-01）
+- 上位: 既定制約（ui_policy）　出典: 依頼原文 2026-11-03（§11.20）、A-CD-04
+- 対象エンティティ: なし　関係する状態: なし　参照パラメータ: なし
+- 関連する既存資産: なし
+- 受入基準 AC-064: `SafeEvaluationPayloadBuilder`がPrompt種類で`prompt-analysis-v1`の組込みテンプレートを使い、未知のversionを拒否する。`ConfigSheetWriter`が3種類を`KNOWLEDGE_COVERAGE`／`PROMPT_ANALYSIS`／`CUSTOM_PROMPT`として書き、設定シートの読込で同じ種類に往復し、既存の`CUSTOM_PROMPT`がCustomとして読める。検証は`dotnet test`（Core.TestsのSafeEvaluationPayloadBuilder関連、App.TestsのConfigSheetWriter関連。実CLI・実AI・実資格情報は使わない）。
+  - 検証レベル: integration
 
 ### 11.21 結果画面の総実行時間とAIクレジット（2026-10-01追加）
 
@@ -1007,6 +1016,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 | ID | 重要度 | 質問 | 選択肢 | 推奨 | 状態 | 回答 |
 |---|---|---|---|---|---|---|
+| Q-002 | 中 | Prompt種類・Custom種類の評価項目の説明の既定本文（§11.20、A-CD-05）は、rd-authorが作文した案である。この文面で承認するか。 | a) 現状の本文で承認 b) 文面を指定する | a（回答まで現状の本文で継続） | 未回答 | - |
 | Q-001 | 高 | 設定から削除する入力詳細・固有評価・読込Promptの機能の置き場所は。 | a) 統合画面内へ移す b) 機能ごと廃止する c) 入力画面へ移す | a | 回答済み | B（機能ごと廃止する。2026-11-02） |
 
 変更履歴: 2026-11-02 Q-001回答Bを反映。FR-DOC-01〜04・AC-044を廃止（廃止した3機能の操作説明のため。統合→AC-059）。A-MG-02を決定済みにし、C-1・C-4を解消。影響: 実装・テスト・利用者文書の更新が必要（上記AC、AC-037・AC-048のtest名の更新は実装側で必要）。
@@ -1310,7 +1320,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 3. native picker cancel/select、path direct input、unsupported format test。
 4. base/special/question pointsの初期配分、最後の設問への端数、手動値保持、均等配分test。
 5. 配点合計、range、similarity weight、enabled special minimumのvalidation test。
-6. Knowledge/Custom evaluatorとspecial Prompt placeholder／closed schema test。
+6. Knowledge/Prompt/Custom evaluatorとspecial Prompt placeholder／closed schema test。
 7. reference answer exactly once/question/run、run modelとrun-level reasoning effortの共用、failure、resume reuse test。
 8. normal/special/similarityの0/1境界、range外、empty-zero、failure-blank test。
 9. QuestionEarned、SpecialEarned、SimilarityPenalty、FinalRaw、clampの独立手計算oracle。
@@ -1537,8 +1547,8 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | C-2 | 2026-11-02 | 矛盾 | 低 | AC-048 ⑥ | 初期focusの記述が統合画面（FR-001）の構成と合わない。利用者承認（2026-11-02）で本文を直した（FR-QT-05、AC-048 ⑥）。 | 解決済み |
 | C-3 | 2026-11-02 | 用語 | 低 | 行1184・行1281・§11.8・AC-037 | 「5 カテゴリ」「カテゴリ」の記述が統合後の画面構成と合わない。利用者承認（2026-11-02）で本文を直した（§11.5・§11.8・§11.22・AC-037・§18）。 | 解決済み |
 | C-4 | 2026-11-02 | 競合 | 高 | FR-003 | 置き場所が未決のまま入口だけが除去されていた。Q-001回答Bで機能の廃止を決定し解消。実装の編集UI・読込Prompt適用のコードの除去はAC-057・058で確かめる。 | 解決済み |
-| X-01 | 2026-11-03 | 不足 | 高 | §5.2, A-CD-04 | Prompt種類の評価動作（組込みテンプレート、BuiltInTemplateVersion、採点・出力はKnowledgeと同構造）と結果Excel`EvaluatorType`列の新値にACがない。AC-052は説明の既定値と種類名の往復だけを検証する。次のrunへの課題（評価動作・結果Excel出力のFR・ACを追加するか、スコープ外と明記する）。 | 要確認 |
-| X-02 | 2026-11-03 | 矛盾の疑い | 中 | §5.4 | 「Knowledgeはapp-owned template…利用者は編集できない」とあり、同じapp-ownedのPrompt種類が書かれていない。6 placeholder制約の適用範囲が曖昧。「KnowledgeとPrompt」へ直す。 | 要確認 |
-| X-03 | 2026-11-03 | 不足 | 中 | §6付近 | 「Knowledge / Custom evaluator」と2種類の記述が残り、3種類化と不整合の疑い。Promptを含めて更新する。 | 要確認 |
-| X-04 | 2026-11-03 | 記述の質 | 中 | A-CD-05, §11.20 | Prompt・Custom本文はrd-authorが作文したASSUMPTIONで、AC-052が完全一致で固定する。根拠が要求所有者の指定でない。所有者の承認を取る（Q化）。 | 要確認 |
-| X-05 | 2026-11-03 | 記述の質 | 低 | FR-CD-01③, §11.20出典 | 「Knowledge Cover」と「Knowledge」の表記が混在。§11.20出典は2本文のままで11-03の追加を含まない。表記統一し出典に11-03を追記する。 | 要確認 |
+| X-01 | 2026-11-03 | 不足 | 高 | §5.2, A-CD-04 | Prompt種類の評価動作（組込みテンプレート、BuiltInTemplateVersion、採点・出力はKnowledgeと同構造）と結果Excel`EvaluatorType`列の新値にACがない。AC-052は説明の既定値と種類名の往復だけを検証する。次のrunへの課題（評価動作・結果Excel出力のFR・ACを追加するか、スコープ外と明記する）。 | 解消（FR-109・AC-064を追加。2026-11-03） |
+| X-02 | 2026-11-03 | 矛盾の疑い | 中 | §5.4 | 「Knowledgeはapp-owned template…利用者は編集できない」とあり、同じapp-ownedのPrompt種類が書かれていない。6 placeholder制約の適用範囲が曖昧。「KnowledgeとPrompt」へ直す。 | 解消（2026-11-03） |
+| X-03 | 2026-11-03 | 不足 | 中 | §6付近 | 「Knowledge / Custom evaluator」と2種類の記述が残り、3種類化と不整合の疑い。Promptを含めて更新する。 | 解消（2026-11-03） |
+| X-04 | 2026-11-03 | 記述の質 | 中 | A-CD-05, §11.20 | Prompt・Custom本文はrd-authorが作文したASSUMPTIONで、AC-052が完全一致で固定する。根拠が要求所有者の指定でない。所有者の承認を取る（Q化）。 | 質問票Q-002へ（回答待ち。既定は現状の本文で継続） |
+| X-05 | 2026-11-03 | 記述の質 | 低 | FR-CD-01③, §11.20出典 | 「Knowledge Cover」と「Knowledge」の表記が混在。§11.20出典は2本文のままで11-03の追加を含まない。表記統一し出典に11-03を追記する。 | 解消（2026-11-03） |
