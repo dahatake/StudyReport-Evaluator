@@ -67,6 +67,7 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
     private readonly ViewModelCommand moveDownCommand;
     private readonly ViewModelCommand deleteCommand;
     private readonly ViewModelCommand addKnowledgeEvaluatorCommand;
+    private readonly ViewModelCommand addPromptEvaluatorCommand;
     private readonly ViewModelCommand addCustomEvaluatorCommand;
     private EvaluatorDesignItemViewModel? selectedEvaluator;
     private SpecialEvaluationDesignItemViewModel? selectedSpecialEvaluation;
@@ -84,6 +85,7 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
         moveDownCommand = new ViewModelCommand(_ => owner.MoveQuestionDown(Id), _ => owner.CanMoveQuestionDown(Id));
         deleteCommand = new ViewModelCommand(_ => owner.DeleteQuestion(Id));
         addKnowledgeEvaluatorCommand = new ViewModelCommand(_ => owner.AddEvaluator(Id, EvaluatorType.KnowledgeCoverage));
+        addPromptEvaluatorCommand = new ViewModelCommand(_ => owner.AddEvaluator(Id, EvaluatorType.PromptAnalysis));
         addCustomEvaluatorCommand = new ViewModelCommand(_ => owner.AddEvaluator(Id, EvaluatorType.CustomPrompt));
         SynchronizeEvaluators();
         SynchronizeSpecialEvaluations();
@@ -166,6 +168,8 @@ public sealed class QuestionDesignItemViewModel : UiObservableObject
     public ICommand DeleteCommand => deleteCommand;
 
     public ICommand AddKnowledgeEvaluatorCommand => addKnowledgeEvaluatorCommand;
+
+    public ICommand AddPromptEvaluatorCommand => addPromptEvaluatorCommand;
 
     public ICommand AddCustomEvaluatorCommand => addCustomEvaluatorCommand;
 
@@ -615,6 +619,7 @@ public sealed class EvaluatorDesignItemViewModel : UiObservableObject
     public string TypeDisplayName => Type switch
     {
         EvaluatorType.KnowledgeCoverage => "Knowledge",
+        EvaluatorType.PromptAnalysis => "Prompt",
         EvaluatorType.CustomPrompt => "Custom",
         _ => "Unknown",
     };
@@ -622,11 +627,14 @@ public sealed class EvaluatorDesignItemViewModel : UiObservableObject
     public string TypeContractName => Type switch
     {
         EvaluatorType.KnowledgeCoverage => "KNOWLEDGE_COVERAGE",
+        EvaluatorType.PromptAnalysis => "PROMPT_ANALYSIS",
         EvaluatorType.CustomPrompt => "CUSTOM_PROMPT",
         _ => "INVALID",
     };
 
     public bool IsKnowledge => Type == EvaluatorType.KnowledgeCoverage;
+
+    public bool IsPrompt => Type == EvaluatorType.PromptAnalysis;
 
     public bool IsCustom => Type == EvaluatorType.CustomPrompt;
 
@@ -679,17 +687,21 @@ public sealed class EvaluatorDesignItemViewModel : UiObservableObject
         }
     }
 
-    public bool IsPromptReadOnly => IsKnowledge;
+    public bool IsPromptReadOnly => !IsCustom;
 
     public string PromptPreview => owner.CreatePromptPreview(definition);
 
     public string PromptSurfaceLabel => IsKnowledge
-        ? "App-owned semantic Prompt preview（読取専用）"
-        : "Custom Prompt template（編集可能）";
+        ? "Knowledge Prompt（読取専用）"
+        : IsPrompt
+            ? "Prompt 分析 Prompt（読取専用）"
+            : "Custom Prompt template（編集可能）";
 
     public string PromptGuidance => IsKnowledge
         ? "単語一致ではなく、説明・関係・適用の程度を評価します。"
-        : "{回答} と {評価項目} が必須です。literal brace は {{ と }} で記述します。";
+        : IsPrompt
+            ? "学生のPromptを、ベストプラクティスの観点（評価項目の説明）に照らして評価します。"
+            : "{回答} と {評価項目} が必須です。literal brace は {{ と }} で記述します。";
 
     public ObservableCollection<CriterionDesignItemViewModel> Criteria { get; }
 
@@ -713,7 +725,7 @@ public sealed class EvaluatorDesignItemViewModel : UiObservableObject
 
     public string CustomPromptPreviewAutomationId => $"DesignEvaluator-{Id}-CustomPromptPreview";
 
-    public string PromptPreviewAutomationId => IsKnowledge
+    public string PromptPreviewAutomationId => !IsCustom
         ? KnowledgePromptPreviewAutomationId
         : CustomPromptPreviewAutomationId;
 
@@ -746,6 +758,7 @@ public sealed class EvaluatorDesignItemViewModel : UiObservableObject
             nameof(TypeDisplayName),
             nameof(TypeContractName),
             nameof(IsKnowledge),
+            nameof(IsPrompt),
             nameof(IsCustom),
             nameof(Weight),
             nameof(Minimum),
@@ -952,6 +965,7 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
     private static readonly IReadOnlyList<EvaluatorTypeChoice> ClosedEvaluatorTypes = Array.AsReadOnly(
     [
         new EvaluatorTypeChoice(EvaluatorType.KnowledgeCoverage, "Knowledge", "KNOWLEDGE_COVERAGE"),
+        new EvaluatorTypeChoice(EvaluatorType.PromptAnalysis, "Prompt", "PROMPT_ANALYSIS"),
         new EvaluatorTypeChoice(EvaluatorType.CustomPrompt, "Custom", "CUSTOM_PROMPT"),
     ]);
 
@@ -1565,6 +1579,12 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
                 BuiltInTemplateVersion = BuiltInPromptTemplates.KnowledgeTemplateVersion,
                 CustomPromptTemplate = null,
             },
+            EvaluatorType.PromptAnalysis => evaluator with
+            {
+                Type = type,
+                BuiltInTemplateVersion = BuiltInPromptTemplates.PromptAnalysisTemplateVersion,
+                CustomPromptTemplate = null,
+            },
             EvaluatorType.CustomPrompt => evaluator with
             {
                 Type = type,
@@ -1710,6 +1730,14 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         if (evaluator.Type == EvaluatorType.KnowledgeCoverage)
         {
             return BuiltInPromptTemplates.KnowledgeSemanticTemplate
+                + Environment.NewLine
+                + Environment.NewLine
+                + BuiltInPromptTemplates.StructuredOutputInstruction;
+        }
+
+        if (evaluator.Type == EvaluatorType.PromptAnalysis)
+        {
+            return BuiltInPromptTemplates.CustomPromptPreset
                 + Environment.NewLine
                 + Environment.NewLine
                 + BuiltInPromptTemplates.StructuredOutputInstruction;
@@ -1907,6 +1935,32 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
                     evaluator.Id,
                     "CustomPromptTemplate",
                     "Knowledge の semantic Prompt は編集できません。別の分析には Custom を使用してください。"));
+            }
+
+            return;
+        }
+
+        if (evaluator.Type == EvaluatorType.PromptAnalysis)
+        {
+            if (!string.Equals(
+                evaluator.BuiltInTemplateVersion,
+                BuiltInPromptTemplates.PromptAnalysisTemplateVersion,
+                StringComparison.Ordinal))
+            {
+                AddError(errors, PromptError(
+                    "PROMPT_TEMPLATE_VERSION_INVALID",
+                    evaluator.Id,
+                    "BuiltInTemplateVersion",
+                    "Prompt は app-owned template version を使用する必要があります。"));
+            }
+
+            if (!string.IsNullOrEmpty(evaluator.CustomPromptTemplate))
+            {
+                AddError(errors, PromptError(
+                    "PROMPT_CUSTOM_TEMPLATE_FORBIDDEN",
+                    evaluator.Id,
+                    "CustomPromptTemplate",
+                    "Prompt の組込み Prompt は編集できません。全文を編集するには Custom を使用してください。"));
             }
 
             return;
@@ -2157,9 +2211,9 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
 
     private static void EnsureEvaluatorType(EvaluatorType type)
     {
-        if (type is not EvaluatorType.KnowledgeCoverage and not EvaluatorType.CustomPrompt)
+        if (type is not EvaluatorType.KnowledgeCoverage and not EvaluatorType.PromptAnalysis and not EvaluatorType.CustomPrompt)
         {
-            throw new ArgumentOutOfRangeException(nameof(type), type, "Only Knowledge and Custom evaluator types are supported.");
+            throw new ArgumentOutOfRangeException(nameof(type), type, "Only Knowledge, Prompt and Custom evaluator types are supported.");
         }
     }
 
@@ -2204,16 +2258,22 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
         int ordinal) => new()
         {
             Id = evaluatorId,
-            DisplayName = type == EvaluatorType.KnowledgeCoverage
-                ? $"Knowledge {ordinal.ToString(CultureInfo.InvariantCulture)}"
-                : $"Custom {ordinal.ToString(CultureInfo.InvariantCulture)}",
+            DisplayName = type switch
+            {
+                EvaluatorType.KnowledgeCoverage => $"Knowledge {ordinal.ToString(CultureInfo.InvariantCulture)}",
+                EvaluatorType.PromptAnalysis => $"Prompt {ordinal.ToString(CultureInfo.InvariantCulture)}",
+                _ => $"Custom {ordinal.ToString(CultureInfo.InvariantCulture)}",
+            },
             Type = type,
             Weight = 1m,
             Range = new ScoreRange(0m, 10m),
             Criteria = [CreateDefaultCriterion(NewId("criterion"), 1, type)],
-            BuiltInTemplateVersion = type == EvaluatorType.KnowledgeCoverage
-                ? BuiltInPromptTemplates.KnowledgeTemplateVersion
-                : null,
+            BuiltInTemplateVersion = type switch
+            {
+                EvaluatorType.KnowledgeCoverage => BuiltInPromptTemplates.KnowledgeTemplateVersion,
+                EvaluatorType.PromptAnalysis => BuiltInPromptTemplates.PromptAnalysisTemplateVersion,
+                _ => null,
+            },
             CustomPromptTemplate = type == EvaluatorType.CustomPrompt
                 ? BuiltInPromptTemplates.CustomPromptPreset
                 : null,

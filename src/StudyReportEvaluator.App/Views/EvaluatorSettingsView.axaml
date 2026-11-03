@@ -125,7 +125,7 @@
             TabIndex="2"
             AutomationProperties.AutomationId="{Binding SelectedQuestion.Id, StringFormat='DesignQuestion-{0}-AddEvaluator'}"
             AutomationProperties.Name="通常評価の評価方法を追加"
-            ToolTip.Tip="追加する評価方法をKnowledgeまたはCustomから選びます。">
+            ToolTip.Tip="追加する評価方法をKnowledge・Prompt・Customから選びます。">
           <Button.Flyout>
             <Flyout>
               <StackPanel Spacing="6">
@@ -133,7 +133,11 @@
                         AutomationProperties.AutomationId="{Binding SelectedQuestion.Id, StringFormat='DesignQuestion-{0}-AddKnowledgeEvaluator'}"
                         AutomationProperties.Name="選択した設問へKnowledge評価方法を追加"
                         ToolTip.Tip="説明・関係・適用をアプリの固定Promptで評価する方法を追加します。AIは実行しません。" />
-                <Button Content="Customを追加" Command="{Binding SelectedQuestion.AddCustomEvaluatorCommand}" HorizontalAlignment="Stretch" TabIndex="1"
+                <Button Content="Promptを追加" Command="{Binding SelectedQuestion.AddPromptEvaluatorCommand}" HorizontalAlignment="Stretch" TabIndex="1"
+                        AutomationProperties.AutomationId="{Binding SelectedQuestion.Id, StringFormat='DesignQuestion-{0}-AddPromptEvaluator'}"
+                        AutomationProperties.Name="選択した設問へPrompt評価方法を追加"
+                        ToolTip.Tip="学生のPromptをベストプラクティスと照合する評価方法を、アプリの固定Promptで追加します。AIは実行しません。" />
+                <Button Content="Customを追加" Command="{Binding SelectedQuestion.AddCustomEvaluatorCommand}" HorizontalAlignment="Stretch" TabIndex="2"
                         AutomationProperties.AutomationId="{Binding SelectedQuestion.Id, StringFormat='DesignQuestion-{0}-AddCustomEvaluator'}"
                         AutomationProperties.Name="選択した設問へCustom評価方法を追加"
                         ToolTip.Tip="Promptを全文編集できる評価方法を追加します。AIは実行しません。" />
@@ -376,9 +380,9 @@
                        HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap"
                        AutomationProperties.AutomationId="EvaluatorSettingsPromptNoEvaluator"
                        AutomationProperties.Name="Promptを表示する評価方法が選択されていません" />
-            <Border Classes="settings-pane" IsVisible="{Binding SelectedQuestion.SelectedEvaluator.IsKnowledge, FallbackValue=False}">
+            <Border Classes="settings-pane"             IsVisible="{Binding SelectedQuestion.SelectedEvaluator.IsPromptReadOnly, FallbackValue=False}">
               <Grid RowDefinitions="Auto,Auto,*" RowSpacing="6">
-                <TextBlock Text="Knowledge Prompt（読取専用）" Classes="field-label" />
+                            <TextBlock Text="{Binding SelectedQuestion.SelectedEvaluator.PromptSurfaceLabel}" Classes="field-label" />
                 <TextBlock Grid.Row="1" Text="{Binding SelectedQuestion.SelectedEvaluator.PromptGuidance}" TextWrapping="Wrap" />
                 <TextBox Grid.Row="2" Text="{Binding SelectedQuestion.SelectedEvaluator.PromptPreview, Mode=OneWay}"
                          IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalAlignment="Stretch"
