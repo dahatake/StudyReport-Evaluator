@@ -943,7 +943,20 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 - 受入基準 AC-064: `SafeEvaluationPayloadBuilder`がPrompt種類で`prompt-analysis-v1`の組込みテンプレートを使い、未知のversionを拒否する。`ConfigSheetWriter`が3種類を`KNOWLEDGE_COVERAGE`／`PROMPT_ANALYSIS`／`CUSTOM_PROMPT`として書き、設定シートの読込で同じ種類に往復し、既存の`CUSTOM_PROMPT`がCustomとして読める。検証は`dotnet test`（Core.TestsのSafeEvaluationPayloadBuilder関連、App.TestsのConfigSheetWriter関連。実CLI・実AI・実資格情報は使わない）。
   - 検証レベル: integration
 
-### 11.21 結果画面の総実行時間とAIクレジット（2026-10-01追加）
+#### FR-110 設定シートからの採点定義の読み戻し（ConfigSheetReader）
+- 要求: 結果workbookおよび設定シートの設定シートに`ConfigSheetWriter`（FR-109）が書いた`CANONICAL_JSON`行から、採点定義（評価方法の種類`EvaluatorType`を含む）を復元する本番のライブラリ機能（`ConfigSheetReader`相当。CoreまたはAppの`Workbooks/Reading`配下）を設ける。種類は`KNOWLEDGE_COVERAGE`／`PROMPT_ANALYSIS`／`CUSTOM_PROMPT`の3値を同じ種類へ往復し、既存の`CUSTOM_PROMPT`はCustomのまま読む。壊れた・欠けた・未知の種類名の設定シートは、例外ではなく検証エラーを持つ結果として返し、採点定義を返さない。画面からの読込操作（ボタン等）への接続は本要求の範囲外とする（A-CD-06）。FR-109の書出し契約は変えない。
+- 決定状態: 承認済み（包括承認 2026-11-03・approval_policy）　出自: AI提案　優先度: MUST（FR-109の「設定シートの読込で同じ種類へ往復できる」を本番コードで検証可能にする）
+- 上位: 既定制約（ui_policy）　出典: 依頼原文 2026-11-03（設定シートの読み戻し）、FR-109、A-CD-04、A-CD-06
+- 対象エンティティ: なし　関係する状態: なし　参照パラメータ: なし
+- 関連する既存資産: なし
+- 受入基準 AC-065: `ConfigSheetWriter`が書いた設定シートを読み戻すと、`CANONICAL_JSON`から復元した採点定義が書出し前の定義と等価になり、`EvaluatorType`の3値（`KNOWLEDGE_COVERAGE`／`PROMPT_ANALYSIS`／`CUSTOM_PROMPT`）をそれぞれ同じ種類で往復し、既存の`CUSTOM_PROMPT`だけの設定シートはCustomとして読める。検証は`dotnet test`（実CLI・実AI・実資格情報は使わない）。
+  - 検証レベル: integration
+- 受入基準 AC-066: `CANONICAL_JSON`行がない・空・JSONとして壊れている・必須項目が欠けている設定シートを読むと、例外を投げず、失敗と検証エラー（原因の区別つき）を持つ結果を返し、採点定義は返さない。
+  - 検証レベル: unit
+- 受入基準 AC-067: `EvaluatorType`が3値以外の未知の種類名のとき、例外を投げず検証エラー（未知の種類名を含む）として拒否し、既知の種類に暗黙に置き換えない。`CANONICAL_JSON`内の種類と`EvaluatorType`列が食い違うときも検証エラーとして拒否する。
+  - 検証レベル: unit
+
+### 11.21  結果画面の総実行時間とAIクレジット（2026-10-01追加）
 
 出典: 依頼原文（2026-10-01「実行結果の画面に以下の情報を付与してください。定量化のジョブの総実行時間(HH:MM:SS)/AI Credit (これは金額のコストに関わるので大変重要)」と「4 結果・出力」の画面写真）、§11.9、`src/StudyReportEvaluator.App/Usage/JobUsageTracker.cs`、GitHub Docs [Usage and billing metrics（Copilot SDK）](https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/usage-and-billing)と固定SDK `1.0.11`の同文書[usage-and-billing.md](https://github.com/github/copilot-sdk/blob/v1.0.11/docs/features/usage-and-billing.md)（`totalNanoAiu`は「AI credit cost, in nano-AI units」、例は`÷ 1e9`）、GitHub Docs [Usage-based billing for individuals](https://docs.github.com/en/copilot/concepts/billing-and-usage/individuals/billing)（AIクレジットの定義）、SDK [nodejs/src/workflow.ts](https://github.com/github/copilot-sdk/blob/main/nodejs/src/workflow.ts)（`NANO_AIU_PER_AIU = 1_000_000_000`）。いずれも確認日2026-10-01。
 
@@ -1585,6 +1598,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | A-CD-01 | [ASSUMPTION] | 評価項目の説明の既定値は、評価方法の表示名ではなく種類で決める。根拠: 表示名は利用者が自由に変更できる。2026-11-03の依頼で種類は3つ（`KNOWLEDGE_COVERAGE`＝Knowledge、`PROMPT_ANALYSIS`＝Prompt、`CUSTOM_PROMPT`＝Custom）になり、旧版の「Prompt 分析＝`CUSTOM_PROMPT`」の対応は廃止した。影響: Custom評価方法の既定値は旧Prompt 分析本文ではなく短い雛形になる（既存の保存済みの説明は不変）。覆す条件: 表示名ごとに本文を変える指示があった場合。 |
 | A-CD-04 | [ASSUMPTION] | 新しい種類`PROMPT_ANALYSIS`（EvaluatorType.PromptAnalysis）を追加する。保存・読込・workbook設定シートの種類名は3値で、既存の`CUSTOM_PROMPT`はそのままCustomとして読む（後方互換、既存の説明は書き換えない）。Prompt種類は組込みの評価用Promptテンプレート（BuiltInTemplateVersionで固定）で評価し、採点・出力・AI契約はKnowledgeと同じ構造とする。利用者がテンプレートを編集する「Prompt」タブはCustomのときだけ使う。根拠: 2026-11-03の依頼と進行役の仮定。影響: §5.2・§11.20・AC-052を拡張。結果Excelの`EvaluatorType`列に新しい値が現れる。覆す条件: Prompt種類も利用者が編集できる指示があった場合。 |
 | A-CD-05 | 要求所有者承認済み（Q-002 2026-11-03） | Prompt種類の既定値本文（§11.20）は、ベストプラクティスの8観点（役割・目的、具体的な指示、文脈、出力形式、例示、制約、段階的な思考、検証可能な基準）を並べた文面とし、Custom種類の本文は利用者が書き換える前提の短い雛形とする。文面はrd-authorが定めた。根拠: 依頼が趣旨だけを示し本文を委ねたため。影響: 文面の変更は`DefaultCriterionDescriptions`とAC-052の完全一致の更新になる。覆す条件: 要求所有者が文面を指定した場合。 |
+| A-CD-06 | [ASSUMPTION] | 設定シートの読み戻し（FR-110）は本番のライブラリ機能（`ConfigSheetReader`相当）で、`CANONICAL_JSON`を正本として採点定義を復元する。壊れた・欠けた・未知の種類名は検証エラーの結果で返す（例外にしない）。UIへの接続（画面から読み込むボタン）は今回の範囲外とする。根拠: 書出し（FR-109）だけがあり往復を検証できないため、最小の変更で往復を成立させる。影響: 利用者の画面操作は変わらない。覆す条件: 画面からの読込を求められた場合（別依頼で§11.6を変更）。 |
 | A-CD-02 | [ASSUMPTION] | 依頼文のKnowledge Cover本文の「行ってださい」は誤字と判断し、「行ってください」で実装する。それ以外の文字（`{論点}`、`論点:`、`- xxx`）は依頼どおりとする。根拠: 同じ依頼のPrompt 分析本文が「行ってください」であり、意図が明らかな誤記。影響: 依頼原文と1文字（「だ」→「く」）異なる。覆す条件: 原文どおりの綴りを求められた場合は`DefaultCriterionDescriptions.Knowledge`を直す。 |
 | A-CD-03 | [ASSUMPTION] | 「初期値」は新規作成時の値であり、保存済み・読込済みの採点定義や既存の評価項目の説明は書き換えない。本文中の`{論点}`はAI Promptのplaceholderではなく説明文中の記載で、評価項目の説明はPromptへ値として挿入されるため再解釈されない（§5.4）。根拠: 既存データの暗黙の書換えは利用者の編集を失わせる。影響: 既存の定義の説明は従来のままである。覆す条件: 既存の説明の一括更新を求められた場合。 |
 

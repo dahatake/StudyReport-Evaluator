@@ -1,11 +1,12 @@
 using System.Globalization;
-using System.Text.Json;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using StudyReportEvaluator.App.Tests.Workbooks.Intake;
 using StudyReportEvaluator.App.Workbooks.Intake;
+using StudyReportEvaluator.App.Workbooks.Reading;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
+using StudyReportEvaluator.Core.Serialization;
 using Xunit;
 
 namespace StudyReportEvaluator.App.Tests.Workbooks.Writing;
@@ -104,26 +105,15 @@ public sealed class Fr109EvaluatorTypeConfigSheetTests
         Assert.Equal("PROMPT_ANALYSIS", written["E2"]);
         Assert.Equal("CUSTOM_PROMPT", written["E3"]);
 
-        // 設定シートに保存された定義(CANONICAL_JSON)の読込で、同じ種類に往復する
-        string canonicalJson = string.Concat(
-            rows.Where(row => Text(row, "A") == "CANONICAL_JSON")
-                .OrderBy(row => int.Parse(Text(row, "X"), CultureInfo.InvariantCulture))
-                .Select(row => Text(row, "Y")));
-        using JsonDocument json = JsonDocument.Parse(canonicalJson);
-        JsonSerializerOptions options = new() { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } };
-        Dictionary<string, EvaluatorType> readBack = json.RootElement.GetProperty("questions")[0].GetProperty("evaluators")
-            .EnumerateArray()
-            .ToDictionary(
-                e => e.GetProperty("id").GetString()!,
-                e => JsonSerializer.Deserialize<EvaluatorType>(e.GetProperty("type").GetRawText(), options));
-        Assert.Equal(EvaluatorType.KnowledgeCoverage, readBack["E1"]);
-        Assert.Equal(EvaluatorType.PromptAnalysis, readBack["E2"]);
-        Assert.Equal(EvaluatorType.CustomPrompt, readBack["E3"]);
-
-        // 既存の CUSTOM_PROMPT は Custom として読める
-        Assert.Equal(EvaluatorType.CustomPrompt, JsonSerializer.Deserialize<EvaluatorType>("\"CUSTOM_PROMPT\"", options));
+        // 設定シートに保存された定義(CANONICAL_JSON)を本番の ConfigSheetReader(FR-110)で読み、同じ種類に往復する
+        CanonicalDefinitionReadResult readBack = new ConfigSheetReader().Read(workbookPart, configName);
+        Assert.True(readBack.IsSuccess);
+        Dictionary<string, EvaluatorType> types = readBack.Definition!.Questions[0].Evaluators
+            .ToDictionary(e => e.Id, e => e.Type, StringComparer.Ordinal);
+        Assert.Equal(EvaluatorType.KnowledgeCoverage, types["E1"]);
+        Assert.Equal(EvaluatorType.PromptAnalysis, types["E2"]);
+        Assert.Equal(EvaluatorType.CustomPrompt, types["E3"]);
     }
-
     private static string Text(Row row, string column)
     {
         Cell? cell = row.Elements<Cell>().SingleOrDefault(c =>
