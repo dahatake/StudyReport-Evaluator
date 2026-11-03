@@ -533,6 +533,14 @@ public sealed class MainWindowSettingsTests
             Assert.False(stop.IsDefault);
             Assert.Same(fixture.Shell.NavigateCommand, progressLink.Command);
             Assert.Equal(WorkflowStep.Execution, progressLink.CommandParameter);
+            // FR-111 AC-069: the shell progress group is hidden only while the Execution body is shown.
+            bool executionBodyShown = step == WorkflowStep.Execution && !settingsOpen;
+            Assert.Equal(!executionBodyShown, Required<Grid>(fixture.Window, "ShellRunProgressGroup").IsEffectivelyVisible);
+            Assert.Equal(!executionBodyShown, Required<TextBlock>(fixture.Window, "ShellRunStage").IsEffectivelyVisible);
+            Assert.Equal(!executionBodyShown, Required<TextBlock>(fixture.Window, "ShellRunProgressText").IsEffectivelyVisible);
+            Assert.Equal(!executionBodyShown, Required<ProgressBar>(fixture.Window, "ShellRunProgressBar").IsEffectivelyVisible);
+            Assert.True(stop.IsEffectivelyVisible);
+            Assert.True(progressLink.IsEffectivelyVisible);
             Assert.Contains("今回run", Required<TextBlock>(fixture.Window, "ShellRunStage").Text!);
 
             Assert.NotNull(report);
