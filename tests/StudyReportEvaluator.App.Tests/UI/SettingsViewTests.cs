@@ -103,6 +103,7 @@ public sealed class SettingsViewTests
         AssertPassive(harness);
     }
 
+    // FR-002 AC-055: selected output participates in explicit save without a text editor.
     [AvaloniaFact]
     public async Task Repeated_common_edits_reach_the_latest_draft_before_explicit_save()
     {
@@ -114,7 +115,7 @@ public sealed class SettingsViewTests
         Edit(harness.View, "DesignRevision", "revision-T17");
         Edit(harness.View, "DesignRoundingDigits", "3");
         ById<ComboBox>(harness.View, "ExecutionConcurrency").SetCurrentValue(ComboBox.SelectedItemProperty, 3);
-        Edit(harness.View, "ExecutionOutputDirectory", harness.OutputPath);
+        SelectOutput(harness, harness.OutputPath);
 
         // FR-001/FR-002: 設問・通常評価・固有評価・読込Prompt の編集は設定にない（採点設計画面で行う）。
         // 設定を共通のまま繰り返し開き直しても、選択と最新の下書きは変わらない。
@@ -184,6 +185,7 @@ public sealed class SettingsViewTests
         AssertPassive(harness);
     }
 
+    // FR-002 AC-055: single displayed path; picker/reset preserve nullable persistence and model behavior.
     [AvaloniaFact]
     public async Task Common_binds_effective_model_but_persists_nullable_override_and_excludes_read_only_runtime()
     {
@@ -222,15 +224,16 @@ public sealed class SettingsViewTests
         Assert.Equal("model-other", harness.Execution.PreferredModelId);
         Assert.Null(harness.Execution.OutputDirectoryOverride);
         TextBox output = ById<TextBox>(harness.View, "ExecutionOutputDirectory");
-        TextBox effective = ById<TextBox>(harness.View, "SettingsEffectiveOutputDirectory");
-        Assert.True(string.IsNullOrEmpty(output.Text));
-        Assert.True(effective.IsReadOnly);
-        Assert.Equal(Path.Combine(harness.Root, "result"), effective.Text);
-        Edit(harness.View, "ExecutionOutputDirectory", harness.OutputPath);
-        Assert.Equal(harness.OutputPath, effective.Text);
-        Edit(harness.View, "ExecutionOutputDirectory", string.Empty);
+        // FR-002 AC-055: one read-only next-run path, selected/reset via UI only.
+        Assert.True(output.IsReadOnly);
+        Assert.DoesNotContain(AllControls(harness.View), c =>
+            AutomationProperties.GetAutomationId(c) == "SettingsEffectiveOutputDirectory");
+        Assert.Equal(Path.Combine(harness.Root, "result"), output.Text);
+        SelectOutput(harness, harness.OutputPath);
+        Assert.Equal(harness.OutputPath, output.Text);
+        Activate(ById<Button>(harness.View, "SettingsResetOutputFolder"));
         Assert.Null(harness.Execution.OutputDirectoryOverride);
-        Assert.Equal(Path.Combine(harness.Root, "result"), effective.Text);
+        Assert.Equal(Path.Combine(harness.Root, "result"), output.Text);
 
         ShowCommonTab(harness, 2);
         TextBox runtime = ById<TextBox>(harness.View, "SettingsRuntimeIdentity");
@@ -290,6 +293,7 @@ public sealed class SettingsViewTests
         AssertPassive(harness, authenticationChecks: 1);
     }
 
+    // FR-002 AC-055: output selection and navigation are not implicit settings saves.
     [AvaloniaFact]
     public async Task Missing_file_waits_for_explicit_read_and_only_Save_button_creates_it_not_navigation_or_Enter()
     {
@@ -309,7 +313,7 @@ public sealed class SettingsViewTests
         Assert.True(save.IsEffectivelyEnabled);
         Assert.Contains("まだありません", ById<TextBlock>(harness.View, "SettingsStatus").Text!);
         Assert.False(Directory.Exists(harness.Root));
-        Edit(harness.View, "ExecutionOutputDirectory", harness.OutputPath);
+        SelectOutput(harness, harness.OutputPath);
         Assert.True(ById<TextBox>(harness.View, "ExecutionOutputDirectory").Focus(NavigationMethod.Tab));
         Press(harness.Window, Key.Enter);
         Press(harness.Window, Key.Escape);
@@ -384,6 +388,7 @@ public sealed class SettingsViewTests
         AssertPassive(harness);
     }
 
+    // FR-002 AC-055: invalid underlying preferences remain rejected; reset recovers without hand entry.
     [AvaloniaFact]
     public async Task Failed_save_preserves_bytes_current_edits_and_safe_status_then_explicit_save_can_retry()
     {
@@ -395,7 +400,8 @@ public sealed class SettingsViewTests
         byte[] original = File.ReadAllBytes(harness.SettingsPath);
         QuantificationDefinition? stored = harness.Settings.StoredDefinition;
         Edit(harness.View, "DesignDefinitionName", "まだ保存していない定義名");
-        Edit(harness.View, "ExecutionOutputDirectory", "relative/" + PrivateCanary);
+        // Invalid persisted/API state remains validated; no UI path editor is exposed.
+        harness.Execution.OutputDirectoryOverride = "relative/" + PrivateCanary;
         QuantificationDefinition draft = harness.Design.Draft;
         await Save(harness);
 
@@ -406,7 +412,7 @@ public sealed class SettingsViewTests
         Assert.Equal(original, File.ReadAllBytes(harness.SettingsPath));
         Assert.Contains("保存失敗", ById<TextBlock>(harness.View, "SettingsStatus").Text!);
         AssertSafeStatus(harness);
-        Edit(harness.View, "ExecutionOutputDirectory", string.Empty);
+        Activate(ById<Button>(harness.View, "SettingsResetOutputFolder"));
         await Save(harness);
         Assert.Equal(SettingsSaveStatus.Saved, harness.Settings.SaveStatus);
         Assert.False(harness.Settings.HasUnsavedChanges);
@@ -664,6 +670,7 @@ public sealed class SettingsViewTests
         AssertPassive(harness);
     }
 
+    // FR-002 AC-055
     [AvaloniaFact]
     public async Task Long_output_path_remains_complete_without_growing_the_outer_body()
     {
@@ -671,9 +678,9 @@ public sealed class SettingsViewTests
         await harness.LoadInputAsync();
         harness.Show();
         string path = Path.Combine(harness.Root, new string('長', 220));
-        Edit(harness.View, "ExecutionOutputDirectory", path);
+        SelectOutput(harness, path);
         Assert.Equal(path, ById<TextBox>(harness.View, "ExecutionOutputDirectory").Text);
-        Assert.Equal(path, ById<TextBox>(harness.View, "SettingsEffectiveOutputDirectory").Text);
+        Assert.True(ById<TextBox>(harness.View, "ExecutionOutputDirectory").IsReadOnly);
         ScrollViewer outer = Required<ScrollViewer>(harness.View, "SettingsBodyScroll");
         Assert.True(outer.Extent.Height <= outer.Viewport.Height + 1d);
         Assert.True(outer.Extent.Width <= outer.Viewport.Width + 1d);
@@ -808,6 +815,158 @@ public sealed class SettingsViewTests
         Render();
     }
 
+    // FR-002 AC-055: cancelled/failed selection cannot mutate memory, saved bytes or output IO.
+    [AvaloniaFact]
+    public async Task FR002_AC055_Picker_cancel_and_failures_keep_override_and_saved_bytes_without_manual_fallback()
+    {
+        using SettingsHarness harness = new();
+        await harness.Settings.InitializeAsync(TestContext.Current.CancellationToken);
+        harness.Show();
+        SelectOutput(harness, harness.OutputPath);
+        await Save(harness);
+        byte[] before = File.ReadAllBytes(harness.SettingsPath);
+        string? display = ById<TextBox>(harness.View, "ExecutionOutputDirectory").Text;
+
+        harness.Picker.Path = null;
+        Activate(ById<Button>(harness.View, "SettingsSelectOutputFolder"));
+        Assert.Equal(display, ById<TextBox>(harness.View, "ExecutionOutputDirectory").Text);
+        Assert.Equal(harness.OutputPath, harness.Execution.OutputDirectoryOverride);
+        Assert.False(harness.Settings.HasUnsavedChanges);
+        Assert.Equal(before, File.ReadAllBytes(harness.SettingsPath));
+
+        foreach (Exception failure in new Exception[]
+        {
+            new NotSupportedException("OSの選択画面を利用できません"),
+            new IOException("選択画面の接続失敗"),
+            new InvalidOperationException("ローカルpathを取得できません"),
+        })
+        {
+            harness.Picker.Response = () => Task.FromException<string?>(failure);
+            Activate(ById<Button>(harness.View, "SettingsSelectOutputFolder"));
+            Assert.Contains(failure.Message, harness.Settings.OutputFolderStatus);
+            TextBlock status = ById<TextBlock>(harness.View, "SettingsOutputFolderStatus");
+            Assert.True(status.IsEffectivelyVisible);
+            Assert.Contains(failure.Message, status.Text!);
+            Assert.Equal(display, ById<TextBox>(harness.View, "ExecutionOutputDirectory").Text);
+            Assert.Equal(harness.OutputPath, harness.Execution.OutputDirectoryOverride);
+            Assert.True(harness.Settings.CanSelectOutputFolder);
+            Assert.False(harness.Settings.HasUnsavedChanges);
+            Assert.Equal(before, File.ReadAllBytes(harness.SettingsPath));
+            Assert.DoesNotContain(AllControls(harness.View).OfType<TextBox>(), c =>
+                !c.IsReadOnly && (AutomationProperties.GetAutomationId(c) ?? "").Contains("Output"));
+            Assert.False(Directory.Exists(harness.OutputPath));
+            AssertPassive(harness);
+        }
+    }
+
+    // FR-002 AC-055: a pending native dialog must not allow re-entry or alter a replacement owner.
+    [AvaloniaFact]
+    public async Task FR002_AC055_Pending_picker_disables_duplicate_selection_and_ignores_replaced_owner()
+    {
+        using SettingsHarness harness = new(withStore: false);
+        harness.Show();
+        TaskCompletionSource<string?> response = new();
+        harness.Picker.Response = () => response.Task;
+        Activate(ById<Button>(harness.View, "SettingsSelectOutputFolder"));
+        Assert.Equal(1, harness.Picker.Calls);
+        Assert.True(harness.Settings.IsSelectingOutputFolder);
+        Assert.False(ById<Button>(harness.View, "SettingsSelectOutputFolder").IsEffectivelyEnabled);
+        Assert.False(ById<Button>(harness.View, "SettingsResetOutputFolder").IsEffectivelyEnabled);
+        using SettingsViewModel replacement = new(new InputViewModel(), new QuantificationDesignViewModel(),
+            new ExecutionViewModel(harness.Authentication, harness.Runner));
+        harness.View.DataContext = replacement;
+        Render();
+        response.SetResult(harness.OutputPath);
+        Render();
+        Assert.Null(harness.Execution.OutputDirectoryOverride);
+        Assert.Null(replacement.Execution.OutputDirectoryOverride);
+        Assert.False(harness.Settings.IsSelectingOutputFolder);
+        Assert.False(Directory.Exists(harness.OutputPath));
+        Assert.False(File.Exists(harness.SettingsPath));
+        AssertPassive(harness);
+        replacement.Execution.Dispose();
+    }
+
+    // FR-002 AC-055: reuse Fluent controls at light/dark and wide/narrow sizes.
+    [AvaloniaTheory]
+    [InlineData(950d, 450d, false)]
+    [InlineData(950d, 450d, true)]
+    [InlineData(600d, 320d, false)]
+    [InlineData(600d, 320d, true)]
+    public async Task FR002_AC055_Output_picker_layout_keeps_full_path_and_fixed_actions_in_each_theme(
+        double width, double height, bool dark)
+    {
+        using SettingsHarness harness = new(withStore: false);
+        await harness.LoadInputAsync();
+        harness.Window.Width = width;
+        harness.Window.Height = height;
+        harness.Window.RequestedThemeVariant = dark
+            ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light;
+        harness.Show();
+        ScrollViewer outer = Required<ScrollViewer>(harness.View, "SettingsBodyScroll");
+        double originalExtentWidth = outer.Extent.Width;
+        string path = Path.Combine(harness.Root, new string('長', 180), "日本語 output");
+        SelectOutput(harness, path);
+        Assert.Equal(harness.Window.RequestedThemeVariant, harness.Window.ActualThemeVariant);
+        TextBox output = ById<TextBox>(harness.View, "ExecutionOutputDirectory");
+        Assert.True(output.IsReadOnly);
+        Assert.Equal(path, output.Text);
+        output.SelectAll();
+        Assert.Equal(path, output.SelectedText);
+        foreach (string id in new[] { "SettingsSelectOutputFolder", "SettingsResetOutputFolder" })
+        {
+            Button button = ById<Button>(harness.View, id);
+            Assert.True(button.Bounds.Height >= 44d);
+            Assert.True(button.Bounds.Width >= 44d);
+            Assert.True(button.IsEffectivelyEnabled);
+        }
+        ScrollViewer fields = ById<ScrollViewer>(harness.View, "SettingsCommonFieldsScroll");
+        // The existing outer container has a 720-DIP minimum on narrow windows.
+        // Selection must not add overflow beyond that unchanged baseline.
+        Assert.Equal(originalExtentWidth, outer.Extent.Width);
+        if (width >= 720)
+        {
+            Assert.True(outer.Extent.Width <= outer.Viewport.Width + 1d);
+        }
+        Assert.True(fields.Extent.Width <= fields.Viewport.Width + 1d);
+        AssertFullyInside(ById<Button>(harness.View, "SettingsSave"), harness.View);
+        AssertFullyInside(ById<Button>(harness.View, "SettingsRequestClose"), harness.View);
+        AssertPassive(harness);
+
+        Assert.True(ById<Button>(harness.View, "SettingsSelectOutputFolder").Focus(NavigationMethod.Tab));
+        Render();
+        using var frame = harness.Window.CaptureRenderedFrame();
+        Assert.NotNull(frame);
+        DirectoryInfo root = new(AppContext.BaseDirectory);
+        while (!File.Exists(Path.Combine(root.FullName, "StudyReportEvaluator.slnx")))
+        {
+            root = root.Parent ?? throw new InvalidOperationException("Repository root not found.");
+        }
+        string evidence = Path.Combine(root.FullName, "work", "evidence", "output-picker");
+        Directory.CreateDirectory(evidence);
+        using FileStream image = File.Create(Path.Combine(evidence, $"{width}-{height}-{(dark ? "dark" : "light")}.png"));
+        frame.Save(image, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    }
+
+    private static void SelectOutput(SettingsHarness harness, string path)
+    {
+        harness.Picker.Path = path;
+        Activate(ById<Button>(harness.View, "SettingsSelectOutputFolder"));
+        Assert.Equal(path, harness.Execution.OutputDirectoryOverride);
+    }
+
+    private sealed class OutputPicker : IOutputFolderPicker
+    {
+        public string? Path { get; set; }
+        public Func<Task<string?>>? Response { get; set; }
+        public int Calls { get; private set; }
+        public Task<string?> PickAsync(TopLevel topLevel)
+        {
+            Calls++;
+            return Response?.Invoke() ?? Task.FromResult(Path);
+        }
+    }
+
     private static T Required<T>(Control root, string name) where T : Control =>
         Assert.IsType<T>(root.FindControl<T>(name));
 
@@ -922,7 +1081,7 @@ public sealed class SettingsViewTests
             Design = new QuantificationDesignViewModel(CreateDefinition(), ["A", "B", "C"]);
             Execution = new ExecutionViewModel(Authentication, Runner);
             Settings = new SettingsViewModel(Input, Design, Execution, withStore ? Store : null);
-            View = new SettingsView(Settings);
+            View = new SettingsView(Settings, Picker);
             Window = new Window { Width = 950, Height = 450, Content = View };
         }
 
@@ -943,6 +1102,7 @@ public sealed class SettingsViewTests
         public ExecutionViewModel Execution { get; }
         public SettingsViewModel Settings { get; }
         public SettingsView View { get; }
+        public OutputPicker Picker { get; } = new();
         public Window Window { get; }
 
         public async Task LoadInputAsync()

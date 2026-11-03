@@ -20,6 +20,19 @@
       {
         "name": "toolkit-unit",
         "run": "python -m pytest -q tests/toolkit/test_clean_work.py"
+      },
+      {
+        "name": "app-build",
+        "run": "dotnet build src/StudyReportEvaluator.App -c Debug"
+      },
+      {
+        "name": "output-settings-unit",
+        "run": "dotnet test tests/StudyReportEvaluator.App.Tests -c Debug --filter \"FullyQualifiedName~SettingsViewTests|FullyQualifiedName~SettingsAccessibilityTests|FullyQualifiedName~SettingsViewModelTests|FullyQualifiedName~ExecutionSettingsTests\" --verbosity minimal"
+      },
+      {
+        "name": "app-unit",
+        "run": "dotnet test tests/StudyReportEvaluator.App.Tests -c Debug",
+        "slow": true
       }
     ]
   },
