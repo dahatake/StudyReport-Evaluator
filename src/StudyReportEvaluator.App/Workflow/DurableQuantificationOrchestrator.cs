@@ -761,7 +761,10 @@ public sealed class DurableQuantificationOrchestrator
             Runtime = request.Runtime,
             FinalPath = reservation.FinalPath,
             PartialPath = reservation.PartialPath,
-            StartedAtUtc = startedAtUtc,
+            // The inherited references were generated during the original run, so the
+            // checkpoint keeps the original run's start to satisfy the
+            // GeneratedAtUtc >= StartedAtUtc invariant of CheckpointPayloadCodec.
+            StartedAtUtc = original.StartedAtUtc <= startedAtUtc ? original.StartedAtUtc : startedAtUtc,
             SavedAtUtc = startedAtUtc,
             References = original.References,
             CompletedRows = original.CompletedRows,
