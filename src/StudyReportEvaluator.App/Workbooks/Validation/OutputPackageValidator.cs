@@ -98,13 +98,22 @@ public sealed class OutputPackageValidationPlan
         Sheets sheets = workbook.GetFirstChild<Sheets>()
             ?? throw new InvalidDataException("The original workbook sheet collection is missing.");
 
-        string[] boundNames =
-        [
-            sheetNames.ConfigSheetName,
-            sheetNames.ReferencesSheetName,
-            sheetNames.ResultsSheetName,
-            sheetNames.RunSheetName,
-        ];
+        string[] boundNames = sheetNames.ScoreSummarySheetName is null
+            ?
+            [
+                sheetNames.ConfigSheetName,
+                sheetNames.ReferencesSheetName,
+                sheetNames.ResultsSheetName,
+                sheetNames.RunSheetName,
+            ]
+            :
+            [
+                sheetNames.ConfigSheetName,
+                sheetNames.ReferencesSheetName,
+                sheetNames.ResultsSheetName,
+                sheetNames.RunSheetName,
+                sheetNames.ScoreSummarySheetName,
+            ];
         if (boundNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != boundNames.Length)
         {
             throw new ArgumentException("App-owned worksheet bindings must be unique.", nameof(sheetNames));
@@ -599,7 +608,7 @@ public sealed class OutputPackageValidator : IOutputPackageValidator
         CancellationToken cancellationToken)
     {
         Sheet[] actual = sheets.Elements<Sheet>().ToArray();
-        int expectedCount = plan.PreservedWorksheets.Length + 4;
+        int expectedCount = plan.PreservedWorksheets.Length + 4 + (plan.SheetNames.ScoreSummarySheetName is null ? 0 : 1);
         if (actual.Length != expectedCount)
         {
             Add(
@@ -659,8 +668,11 @@ public sealed class OutputPackageValidator : IOutputPackageValidator
             }
         }
 
+        string[] expectedAddedNames = plan.SheetNames.ScoreSummarySheetName is null
+            ? [.. plan.SheetNames.AllSheetNames]
+            : [.. plan.SheetNames.AllSheetNames, plan.SheetNames.ScoreSummarySheetName];
         HashSet<string> expectedAdded = new(
-            plan.SheetNames.AllSheetNames,
+            expectedAddedNames,
             StringComparer.Ordinal);
         string[] actualAdded = actual
             .Skip(plan.PreservedWorksheets.Length)
@@ -673,7 +685,7 @@ public sealed class OutputPackageValidator : IOutputPackageValidator
         }
 
         Dictionary<string, WorksheetPart> bound = new(StringComparer.Ordinal);
-        foreach (string expectedName in plan.SheetNames.AllSheetNames)
+        foreach (string expectedName in expectedAddedNames)
         {
             Sheet[] matches = actual
                 .Where(sheet => string.Equals(sheet.Name?.Value, expectedName, StringComparison.Ordinal))

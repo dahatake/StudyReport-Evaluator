@@ -197,6 +197,8 @@ public sealed class ResultsSheetWriteResult
 
     public ImmutableArray<WrittenFormulaCell> FormulaCells { get; }
 
+    internal ScoreSummarySource? ScoreSummary { get; init; }
+
     public override string ToString() =>
         $"{nameof(ResultsSheetWriteResult)} {{ DataRowCount = {DataRowCount}, ColumnCount = {ColumnCount}, FormulaCount = {FormulaCells.Length}, Content = <redacted> }}";
 }
@@ -310,7 +312,73 @@ public sealed class ResultsSheetWriter
             snapshot.Definition.HeaderRow,
             prepared.Rows.Length,
             prepared.Layout.ColumnCount,
-            prepared.FormulaCells);
+            prepared.FormulaCells)
+        {
+            ScoreSummary = BuildScoreSummarySource(snapshot.Definition, sheetNames, prepared),
+        };
+    }
+
+    // FR-113: 採点結果シート用に、Results の列位置と値（キャッシュ）を渡す。
+    private static ScoreSummarySource BuildScoreSummarySource(
+        QuantificationDefinition definition,
+        AppOwnedSheetNames sheetNames,
+        PreparedSheet prepared)
+    {
+        List<ScoreSummaryQuestion> questions = [];
+        for (int index = 0; index < prepared.Layout.Questions.Length; index++)
+        {
+            QuestionLayout question = prepared.Layout.Questions[index];
+            int number = 1;
+            for (int i = 0; i < definition.Questions.Length; i++)
+            {
+                if (ReferenceEquals(definition.Questions[i], question.Definition)
+                    || string.Equals(definition.Questions[i].Id, question.Definition.Id, StringComparison.Ordinal))
+                {
+                    number = i + 1;
+                    break;
+                }
+            }
+
+            int promptIndex = -1;
+            for (int e = 0; e < question.Evaluators.Length; e++)
+            {
+                if (question.Evaluators[e].Definition.Type == EvaluatorType.PromptAnalysis)
+                {
+                    promptIndex = e;
+                    break;
+                }
+            }
+
+            questions.Add(new ScoreSummaryQuestion(
+                number,
+                question.Normalized.Name,
+                promptIndex >= 0 ? question.Evaluators[promptIndex].Score.Name : null,
+                promptIndex));
+        }
+
+        List<ScoreSummaryRow> rows = [];
+        foreach (PreparedRow row in prepared.Rows)
+        {
+            decimal?[] evaluation = new decimal?[questions.Count];
+            decimal?[] prompt = new decimal?[questions.Count];
+            for (int q = 0; q < questions.Count; q++)
+            {
+                evaluation[q] = row.Questions[q].Normalized;
+                if (questions[q].PromptEvaluatorIndex >= 0)
+                {
+                    prompt[q] = row.Questions[q].Evaluators[questions[q].PromptEvaluatorIndex].Score;
+                }
+            }
+
+            rows.Add(new ScoreSummaryRow(row.SourceRowNumber, evaluation, prompt, row.FinalScore));
+        }
+
+        return new ScoreSummarySource(
+            sheetNames.ResultsSheetName,
+            prepared.Layout.SourceRow.Name,
+            prepared.Layout.FinalScore.Name,
+            questions,
+            rows);
     }
 
     public ResultsSheetPreflightResult Preflight(
