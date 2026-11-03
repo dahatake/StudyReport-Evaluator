@@ -955,6 +955,19 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
   - 検証レベル: unit
 - 受入基準 AC-067: `EvaluatorType`が3値以外の未知の種類名のとき、例外を投げず検証エラー（未知の種類名を含む）として拒否し、既知の種類に暗黙に置き換えない。`CANONICAL_JSON`内の種類と`EvaluatorType`列が食い違うときも検証エラーとして拒否する。
   - 検証レベル: unit
+
+#### FR-113 結果workbookへの「採点結果」シート（評価点と総合点だけの一覧）
+- 要求: 完成した結果workbookに、設問の評価点と総合点だけを並べたシート`採点結果`を追加する。先頭列`ID`は`Quantification_Results`の`SourceRow`（元シートの行番号）、行は同シートの学生行と同じ。有効な設問ごとに、設問の順番N（1始まり）で`質問Nの評価`（その設問の`.Question_Normalized`）と、その設問に有効な`PROMPT_ANALYSIS`評価方法があるときだけ`質問NのPromptの評価`（その評価方法の`.Evaluator_Score`）を並べ、右端に`合計`（`Final_Score`）を置く。無効な設問、有効な`PROMPT_ANALYSIS`評価方法がない設問のPrompt列は作らない。値は`Quantification_Results`のセルを参照する数式とし、Override・配点の変更に追従する。参照元が空欄・失敗のときは空欄のまま表示し、0にしない。シート名は既存のapp-owned sheet名の衝突回避規則に従い、`.partial`には入れない。`docs/result-excel-description.md`の「4枚のシート」の説明（§1・§3・目次）を、本シートを含む形に更新する。FR-XD-01の「4つのapp-owned sheet」とは数が変わる（CONFLICT、A-RS-01）。
+- 決定状態: 承認済み（包括承認 2026-11-04・approval_policy）　出自: AI提案　優先度: SHOULD（先生が点数だけを一覧で確認・転記しやすくする）
+- 上位: 既定制約（ui_policy）　出典: SRC-004
+- 対象エンティティ: なし　関係する状態: なし　参照パラメータ: なし
+- 関連する既存資産: なし
+- 受入基準 AC-074: 評価方法にKnowledge・Promptを持つ設問が複数ある実行の完成workbookを実際のExcelで開くと、`採点結果`シートの見出しが`ID`、設問順に`質問Nの評価`（Promptの有効な設問は直後に`質問NのPromptの評価`）、最後に`合計`の順に並び、無効な設問と有効なPrompt評価方法のない設問のPrompt列がない。データ行は`Quantification_Results`の学生行と同数で、`ID`は各行の`SourceRow`と一致する。シートは`.partial`にはなく、元シートに同名があれば既存規則で名前が変わる。
+  - 検証レベル: system
+- 受入基準 AC-075: `採点結果`の評価・Prompt評価・合計のセルは、`Quantification_Results`の`.Question_Normalized`・`.Evaluator_Score`・`Final_Score`を参照する数式で、固定値ではない。`Quantification_Results`のOverrideまたは配点を変えて再計算すると、`採点結果`の値が追従する。
+  - 検証レベル: integration
+- 受入基準 AC-076: 参照元が空欄または失敗（status）の学生・設問のセルは、`採点結果`でも空欄のままで、0にならない。参照元が0のセルは0として表示される。
+  - 検証レベル: integration
 
 ### 11.21  結果画面の総実行時間とAIクレジット（2026-10-01追加）
 
@@ -1437,6 +1450,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | ID | 資料名・位置 | 版・日付 | 確認日 | 取得・確認範囲 |
 |---|---|---|---|---|
 | SRC-002 | 要求所有者の依頼原文（conductorからの引継ぎ、run 202611032044） | 2026-11-03 | 2026-11-03 | 本文確認。「設定画面の指定出力先と実行出力先は、1つのファイルの出力先に」「フォルダーピッカーの画面コンポーネントを使って、入力じゃなくて、画面操作のみで選択」。添付画像そのものは未取得、指定出力先と読取専用の実効出力先の二欄という要旨を確認。既存の出力workbookのフォルダーを単一欄にする変更として扱い、設定保存fileやcheckpointを統合する意味にはしない。 |
+| SRC-004 | 要求所有者の依頼原文（conductorからの引継ぎ、run 202611040007）と結果workbookの既存構造（Workbooks/Writing、docs/result-excel-description.md §3・§5） | 2026-11-04 | 2026-11-04 | 依頼本文と背景の確認。シート`採点結果`の見出し例（ID・質問Nの評価・質問NのPromptの評価・合計）。 |
 | SRC-003 | リポジトリの既存出力先UI・保存契約 | HEAD 91fe973、2026-11-03 | 2026-11-03 | PowerShell／rgで本文確認。SettingsView.axaml:103–116は明示指定のTwoWay入力と実効pathのOneWay読取専用表示。ExecutionViewModel.cs:658–680は空白→nullと入力隣接resultの算出、同:1078以降は設定復元。docs/settings.md:56–64は指定保持・null解除・算出値非保存。InputView.axaml.cs:29–55にネイティブfile pickerの既存実装があるが、出力用folder pickerの実装は未確認（OpenFolderPickerAsync等の検索は該当なし）。§9.1・§11.8・AC-013の出力・snapshot契約は維持。 |
 
 外部確認: Context7のAvalonia公式資料検索を試みたが実行環境のhookが参照ツールを拒否したため、外部確認未実施。迂回せず既存契約と依頼原文を根拠とした。社内情報未確認。ネイティブfolder pickerの固定版での適合とOS画面での操作確認は後続担当が行い、既存file pickerの存在をfolder pickerの実機成功証拠とはしない。
@@ -1598,6 +1612,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | A-MG-02 | [決定済み] | 設定から削除した「入力詳細」「固有評価」「読み込みPrompt」の機能は、Q-001回答B（2026-11-02）により機能ごと廃止した（FR-003）。 |
 | A-MG-03 | [ASSUMPTION] | 廃止の範囲は「3機能の編集・一覧・適用のUIと、それを前提とする説明・操作」とし、採点の計算式（固有配点を含む）、既存定義・設定fileの読込・保存互換、command lineの`--prompt`の受理は維持する。根拠: 回答は機能の廃止を示すが、データの読込・保存・計算の廃止までは明示せず、最小の変更で既存の保存済みデータと配布済みの起動引数を壊さないため。影響: 固有評価・補助列を持つ既存定義は編集できないが計算は従来どおり。覆す条件: データ・計算・`--prompt`も廃止する指示があった場合（§6・§8・§12.1・§4の変更を伴う別依頼）。 |
 | A-CD-01 | [ASSUMPTION] | 評価項目の説明の既定値は、評価方法の表示名ではなく種類で決める。根拠: 表示名は利用者が自由に変更できる。2026-11-03の依頼で種類は3つ（`KNOWLEDGE_COVERAGE`＝Knowledge、`PROMPT_ANALYSIS`＝Prompt、`CUSTOM_PROMPT`＝Custom）になり、旧版の「Prompt 分析＝`CUSTOM_PROMPT`」の対応は廃止した。影響: Custom評価方法の既定値は旧Prompt 分析本文ではなく短い雛形になる（既存の保存済みの説明は不変）。覆す条件: 表示名ごとに本文を変える指示があった場合。 |
+| A-RS-01 | [ASSUMPTION] | `採点結果`シート（FR-113）は、完成workbookだけに入る5枚目のapp-owned sheetである。名前は`Quantification_`で始まらず、既存の「4枚」「Quantification_で始まる」の記述（FR-XD-01、result-excel-description.md）と食い違うため、後者を本依頼で更新する。ID=SourceRow、Prompt列は有効なPROMPT_ANALYSIS評価方法がある設問だけ、値は数式参照、空欄・失敗は空欄のまま、無効な設問は列を作らない。根拠: 依頼文と確認済みの背景。 |
 | A-CD-04 | [ASSUMPTION] | 新しい種類`PROMPT_ANALYSIS`（EvaluatorType.PromptAnalysis）を追加する。保存・読込・workbook設定シートの種類名は3値で、既存の`CUSTOM_PROMPT`はそのままCustomとして読む（後方互換、既存の説明は書き換えない）。Prompt種類は組込みの評価用Promptテンプレート（BuiltInTemplateVersionで固定）で評価し、採点・出力・AI契約はKnowledgeと同じ構造とする。利用者がテンプレートを編集する「Prompt」タブはCustomのときだけ使う。根拠: 2026-11-03の依頼と進行役の仮定。影響: §5.2・§11.20・AC-052を拡張。結果Excelの`EvaluatorType`列に新しい値が現れる。覆す条件: Prompt種類も利用者が編集できる指示があった場合。 |
 | A-CD-05 | 要求所有者承認済み（Q-002 2026-11-03） | Prompt種類の既定値本文（§11.20）は、ベストプラクティスの8観点（役割・目的、具体的な指示、文脈、出力形式、例示、制約、段階的な思考、検証可能な基準）を並べた文面とし、Custom種類の本文は利用者が書き換える前提の短い雛形とする。文面はrd-authorが定めた。根拠: 依頼が趣旨だけを示し本文を委ねたため。影響: 文面の変更は`DefaultCriterionDescriptions`とAC-052の完全一致の更新になる。覆す条件: 要求所有者が文面を指定した場合。 |
 | A-CD-06 | [ASSUMPTION] | 設定シートの読み戻し（FR-110）は本番のライブラリ機能（`ConfigSheetReader`相当）で、`CANONICAL_JSON`を正本として採点定義を復元する。壊れた・欠けた・未知の種類名は検証エラーの結果で返す（例外にしない）。UIへの接続（画面から読み込むボタン）は今回の範囲外とする。根拠: 書出し（FR-109）だけがあり往復を検証できないため、最小の変更で往復を成立させる。影響: 利用者の画面操作は変わらない。覆す条件: 画面からの読込を求められた場合（別依頼で§11.6を変更）。 |

@@ -18,6 +18,7 @@
 | FR-CD-01 | 評価項目の説明の初期値（種類別） | 承認済み | src/StudyReportEvaluator.Core/Prompting/DefaultCriterionDescriptions.cs, src/StudyReportEvaluator.Core/Domain/EvaluatorDefinition.cs, src/StudyReportEvaluator.Core/Prompting/BuiltInPromptTemplates.cs, src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs, src/StudyReportEvaluator.App/ViewModels/QuantificationDesignViewModel.cs, src/StudyReportEvaluator.App/ViewModels/InputViewModel.cs, src/StudyReportEvaluator.App/Views/EvaluatorSettingsView.axaml, src/StudyReportEvaluator.App/Workbooks/Writing/ConfigSheetWriter.cs | tests/StudyReportEvaluator.App.Tests/UI/DefaultCriterionDescriptionTests.cs | - |
 | FR-CD-02 | 初期値は新規作成時だけに設定 | 承認済み | src/StudyReportEvaluator.App/ViewModels/QuantificationDesignViewModel.cs, src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs | tests/StudyReportEvaluator.App.Tests/UI/DefaultCriterionDescriptionTests.cs | - |
 | FR-CD-03 | 名前・重み・rangeの不変と検証エラー0件 | 承認済み | src/StudyReportEvaluator.Core/Prompting/DefaultCriterionDescriptions.cs, src/StudyReportEvaluator.App/ViewModels/InputViewModel.cs | tests/StudyReportEvaluator.App.Tests/UI/DefaultCriterionDescriptionTests.cs | - |
+| FR-113 | 結果workbookへの「採点結果」シート（評価点と総合点だけの一覧） | 承認済み | 未実装 | 未実装 | - |
 ## API・イベント
 
 | 名前 | 定義ファイル | 関連する要求 ID |
