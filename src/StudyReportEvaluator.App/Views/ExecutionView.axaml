@@ -101,7 +101,7 @@
           <StackPanel Spacing="4">
             <TextBox x:Name="CurrentRunOutputTextBox" Classes="single-line"
                      Text="{Binding CurrentRunOutputSummary, Mode=OneWay}" IsReadOnly="True"
-                     IsVisible="{Binding HasCurrentRun, FallbackValue=False}" TabIndex="72"
+                     IsVisible="False" TabIndex="72"
                      AutomationProperties.AutomationId="ExecutionCurrentRunOutput"
                      AutomationProperties.Name="今回または前回runの固定した出力条件・読取専用"
                      ToolTip.Tip="実際のrequestに固定した新規出力先または再開元です。取消・完了後も保持します。予約パスやファイル作成完了を示す値ではありません。全文を選択・コピーできます。" />

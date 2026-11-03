@@ -217,7 +217,13 @@
         <Grid x:Name="ShellCurrentRun" IsVisible="{Binding ExecutionViewModel.IsRunning}"
               ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" KeyboardNavigation.TabNavigation="Local"
               AutomationProperties.AutomationId="ShellCurrentRun">
-          <Grid RowDefinitions="18,18,4" RowSpacing="2" VerticalAlignment="Center">
+          <Grid x:Name="ShellRunProgressGroup" RowDefinitions="18,18,4" RowSpacing="2" VerticalAlignment="Center">
+            <Grid.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                <Binding Path="!ExecutionStep.IsCurrent" />
+                <Binding Path="IsSettingsOpen" />
+              </MultiBinding>
+            </Grid.IsVisible>
             <TextBlock x:Name="ShellRunStage" Text="{Binding ExecutionViewModel.StageText, StringFormat='今回run: {0}'}"
                        IsVisible="{Binding !ExecutionViewModel.IsCancelling}" FontSize="14" LineHeight="18"
                        TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ExecutionViewModel.RunStatusText}" />
