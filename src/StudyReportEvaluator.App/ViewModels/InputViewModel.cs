@@ -1620,7 +1620,7 @@ public sealed class InputViewModel : UiObservableObject
             Id = NewId("criterion"),
             DisplayName = studentPrompt ? "具体性と実行可能性" : "知識ポイント 1",
             Description = DefaultCriterionDescriptions.For(
-                studentPrompt ? EvaluatorType.CustomPrompt : EvaluatorType.KnowledgeCoverage),
+                studentPrompt ? EvaluatorType.PromptAnalysis : EvaluatorType.KnowledgeCoverage),
             Weight = 1m,
             Range = null,
             Enabled = true,
@@ -1629,12 +1629,14 @@ public sealed class InputViewModel : UiObservableObject
         {
             Id = NewId("evaluator"),
             DisplayName = studentPrompt ? "Prompt 分析" : "Knowledge coverage",
-            Type = studentPrompt ? EvaluatorType.CustomPrompt : EvaluatorType.KnowledgeCoverage,
+            Type = studentPrompt ? EvaluatorType.PromptAnalysis : EvaluatorType.KnowledgeCoverage,
             Weight = 1m,
             Range = new ScoreRange(0m, 10m),
             Criteria = [criterion],
-            BuiltInTemplateVersion = studentPrompt ? null : BuiltInPromptTemplates.KnowledgeTemplateVersion,
-            CustomPromptTemplate = studentPrompt ? BuiltInPromptTemplates.CustomPromptPreset : null,
+            BuiltInTemplateVersion = studentPrompt
+                ? BuiltInPromptTemplates.PromptAnalysisTemplateVersion
+                : BuiltInPromptTemplates.KnowledgeTemplateVersion,
+            CustomPromptTemplate = null,
             Enabled = true,
         };
         return new QuestionDefinition

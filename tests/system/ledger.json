@@ -3,7 +3,11 @@
   "ac_digests": {
     "AC-054": "sha256:a3cd597d3525746c",
     "AC-055": "sha256:5ab400315c4dca47",
-    "AC-057": "sha256:6e9e524f200fa485"
+    "AC-057": "sha256:6e9e524f200fa485",
+    "AC-060": "sha256:8abc027ab57b29d1",
+    "AC-061": "sha256:43dea9c66234d684",
+    "AC-062": "sha256:ac1fa9d6a4ec956e",
+    "AC-063": "sha256:0c12d44db6950d87"
   },
   "cases": [
     {
@@ -114,6 +118,70 @@
           "by": "test-designer",
           "change": "command: 'dotnet test tests/system/ui --filter \"FullyQualifiedName~FR003_AC057\"' -> 'dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR003_AC057\"'",
           "reason": "前段 prebuild で 1 回ビルドし --no-build で並列実行（検証内容は不変）"
+        }
+      ]
+    },
+    {
+      "id": "E2E-004",
+      "requirement_ids": [
+        "FR-107"
+      ],
+      "ac_ids": [
+        "AC-060",
+        "AC-061"
+      ],
+      "title": "別名workbook出力の既定名は未使用名（run直後・再表示・明示既存名は拒否・既存fileは不変）",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/integration --filter \"FullyQualifiedName~FR107_AC060_AC061\"",
+      "canary": false,
+      "status": "blocked",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-03T22:06:54+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-03T22:07:19+09:00",
+          "by": "test-designer",
+          "change": "blocked",
+          "reason": "AC-060 は検証レベル=unit、AC-061 は integration で System Test 対象外（CHK-10）。実装役が unit/integration で担保。テスト tests/system/integration は参考として保持"
+        }
+      ]
+    },
+    {
+      "id": "E2E-005",
+      "requirement_ids": [
+        "FR-108"
+      ],
+      "ac_ids": [
+        "AC-062",
+        "AC-063"
+      ],
+      "title": "ジョブ実行ログ -log.txt の保存・連番・秘匿・保存失敗時も採点成功",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/integration --filter \"FullyQualifiedName~FR108_AC062_AC063\"",
+      "canary": false,
+      "status": "blocked",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-03T22:06:56+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-03T22:07:20+09:00",
+          "by": "test-designer",
+          "change": "blocked",
+          "reason": "AC-062/063 は検証レベル=integration で System Test 対象外（CHK-10）。実装役が integration で担保。テスト tests/system/integration は参考として保持"
         }
       ]
     }

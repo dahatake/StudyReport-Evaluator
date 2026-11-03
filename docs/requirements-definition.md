@@ -216,10 +216,11 @@ $$
 - 0件以上の固有評価項目
 - enabled flag
 
-通常evaluatorは現行の次の2種類を維持する。
+通常evaluatorは次の3種類とする（2026-11-03、画面の表示名はKnowledge／Prompt／Custom、§11.20）。
 
-- `KNOWLEDGE_COVERAGE`: app-owned semantic instructionで知識の説明、関係、適用を評価
-- `CUSTOM_PROMPT`: 利用者が入力したPromptで評価
+- `KNOWLEDGE_COVERAGE`（Knowledge）: app-owned semantic instructionで知識の説明、関係、適用を評価
+- `PROMPT_ANALYSIS`（Prompt）: app-ownedの組込み評価用Promptテンプレートで、学生が書いたPromptをPrompt作成のベストプラクティスと照合して評価（採点・出力・AI契約はKnowledgeと同じ構造。テンプレートはBuiltInTemplateVersionで固定し、利用者は編集しない）
+- `CUSTOM_PROMPT`（Custom）: 利用者が入力したPromptで評価（「Prompt」タブで編集できるのはこの種類だけ。既存の保存済み定義の`CUSTOM_PROMPT`はそのままCustomとして読める）
 
 各通常evaluatorは1件以上のcriterion、raw range、criterion内weightを持つ。AIのcriterion rawを0〜100へ正規化し、evaluatorおよび設問内の通常評価値をExcel数式で加重平均する。
 
@@ -252,7 +253,7 @@ $$
 
 literal braceは`{{`と`}}`でescapeする。未知placeholder、未閉鎖brace、不正escapeはAI送信前に拒否する。挿入値を再走査しない。
 
-この6 placeholder制約は、利用者が編集できる通常Custom evaluatorと固有評価のtemplateにだけ適用する。Knowledgeはapp-owned template、参照回答と類似度はapp-owned Promptであり、利用者は編集できない。参照回答は固定template内の`{設問}`だけをappが置換し、類似度は検証済みの設問、学生回答、参照回答を固定sectionへ直接組み立てる。`{参照回答}`を第7の利用者placeholderとして公開せず、app-owned Promptを利用者template validatorへ通さない。
+この6 placeholder制約は、利用者が編集できる通常Custom evaluatorと固有評価のtemplateにだけ適用する。KnowledgeとPromptはapp-owned template（Promptは組込みの`prompt-analysis-v1`）、参照回答と類似度はapp-owned Promptであり、利用者は編集できない。参照回答は固定template内の`{設問}`だけをappが置換し、類似度は検証済みの設問、学生回答、参照回答を固定sectionへ直接組み立てる。`{参照回答}`を第7の利用者placeholderとして公開せず、app-owned Promptを利用者template validatorへ通さない。
 
 ## 6. 配点
 
@@ -486,6 +487,8 @@ $$
 
 既存fileを上書きしない。完成pathはrun開始時に予約し、画面とcheckpointへ保存する。
 
+結果画面の「別名 workbook 出力」欄の既定名は、同じ規則で出力先directoryの未使用名を作り直す（FR-107、§11.24）。ジョブのテキストログ`{yyyyMMddHHmm}-log.txt`も同じ出力先へ上書きなしで保存する（FR-108、§11.24）。
+
 ### 9.2 app-owned sheets
 
 | Sheet | 内容 |
@@ -602,7 +605,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 2. **採点設計**
    - base、special、question points、similarity weight
    - 均等配分
-   - Knowledge / Custom evaluatorとcriteria、固有項目の有効設定概要と詳細設定への入口
+   - Knowledge / Prompt / Custom evaluatorとcriteria、固有項目の有効設定概要と詳細設定への入口
    - 読込Promptの件数と適用の入口（設定の「読込Prompt」は廃止、§11.23・A-MG-02）
    - formula／capacity preflight
 3. **実行**
@@ -714,6 +717,7 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 - 同一attemptの累計は置換で更新し、イベント合計とセッション累計、モデル別内訳とセッション総量を加算しない。内訳と総量が一致しない場合は不一致として示し、配賦・補正で一致させない。
 - 項目ごとに取得元（イベント／最終RPC／最後の呼び出しのみ）と部分取得を保持する。再試行は別attemptとして数え、試行番号・相関ID・終端結果を記録する。
 - ジョブ単位のUTF-8 JSON Linesログを利用者別のローカル領域へ作り、数値・生成ID・閉じたコードだけを記録する。回答・Prompt・reason・evidence・学生識別子・実path・credentialを記録せず、モデル名は匿名化した識別子だけを保存する。ジョブcontextとattemptごとに、アプリが指定したrun-level reasoning effort（例: `low`、未指定はnull）を記録する。
+- 同じ秘匿規則で、ジョブのテキストログを出力先のresult directoryへ`{yyyyMMddHHmm}-log.txt`としても保存する（FR-108、§11.24）。
 - ログの保存失敗・記録欠落・容量上限は採点と分けて表示し、観測済みの画面表示を消さない。コスト取得の失敗だけでAIを再送しない。
 - 本節は既存Excelの使用量出力とcheckpoint schemaを変更しない（checkpointへのContext Size tierの追加は、後続のFR-MO-07による）。過去ジョブの累計表示・再取込は本版の対象外とする。
 
@@ -912,22 +916,32 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 ### 11.20 評価項目の説明の初期値（2026-10-01追加）
 
-出典: 依頼原文（2026-10-01「[2.定量化設計]の画面の[通常評価]の中の、画面右側の[評価項目]の説明の初期値を、[評価方法]に対応して以下としてください。」。Knowledge Coverの場合・Prompt 分析の場合の2本文）。
+出典: 依頼原文（2026-10-01「[2.定量化設計]の画面の[通常評価]の中の、画面右側の[評価項目]の説明の初期値を、[評価方法]に対応して以下としてください。」。Knowledge Coverの場合・Prompt 分析の場合の2本文）、2026-11-03の依頼（評価方法の種類をKnowledge・Prompt・Customの3つにする変更。A-CD-01、A-CD-04、A-CD-05）。
 
-通常評価の評価項目の「説明」（`CriterionDefinition.Description`、画面右側の「説明」欄）の初期値を、その評価項目が属する評価方法（evaluator）の種類で決める。種類との対応は次の2つだけとし、本文は`DefaultCriterionDescriptions`（Core）を唯一の定義とする。改行は`\n`（LF）、末尾に改行・空白を付けない。`{論点}`と`xxx`は利用者が書き換えるための文字どおりの記載であり、置換しない。
+通常評価の評価項目の「説明」（`CriterionDefinition.Description`、画面右側の「説明」欄）の初期値を、その評価項目が属する評価方法（evaluator）の種類で決める。種類との対応は次の3つだけとし（2026-11-03に2つから3つへ拡張）、本文は`DefaultCriterionDescriptions`（Core）を唯一の定義とする。改行は`\n`（LF）、末尾に改行・空白を付けない。`{論点}`と`xxx`は利用者が書き換えるための文字どおりの記載であり、置換しない。評価方法の種類の表示名と追加ボタンも、Knowledge／Prompt／Customの3種類に対応する。
 
 | 評価方法の種類 | 初期値の本文 |
 |---|---|
-| `KNOWLEDGE_COVERAGE`（Knowledge Cover） | `学生が作成したレポートを高度に分析・解析をしてそれぞれの{論点}について説明がされているかどうかの評価を行ってください。`＋改行＋`論点:`＋改行＋`- xxx`＋改行＋`- xxx`＋改行＋`- xxx` |
-| `CUSTOM_PROMPT`（Prompt 分析） | `学生が作成したPromptについて高度に分析・解析をして{論点}を導き出そうとしているかの評価を行ってください。`＋改行＋`論点:`＋改行＋`- xxx`＋改行＋`- xxx`＋改行＋`- xxx` |
+| `KNOWLEDGE_COVERAGE`（Knowledge） | `学生が作成したレポートを高度に分析・解析をしてそれぞれの{論点}について説明がされているかどうかの評価を行ってください。`＋改行＋`論点:`＋改行＋`- xxx`＋改行＋`- xxx`＋改行＋`- xxx` |
+| `PROMPT_ANALYSIS`（Prompt） | `学生が作成したPromptを、Anthropic・OpenAI・Microsoftなどが公開するPrompt作成のベストプラクティスと照合して、高度に分析・評価を行ってください。`＋改行＋`観点:`＋改行＋`- 明確な役割と目的が示されているか`＋改行＋`- 具体的で曖昧さのない指示になっているか`＋改行＋`- 必要な文脈・背景情報が与えられているか`＋改行＋`- 出力形式が指定されているか`＋改行＋`- 例示（入出力の例）が適切に用いられているか`＋改行＋`- 制約・禁止事項が明示されているか`＋改行＋`- 段階的な思考や手順が促されているか`＋改行＋`- 出力を検証できる基準が示されているか` |
+| `CUSTOM_PROMPT`（Custom） | `（評価したい内容と判断の基準を、利用者が具体的に書き換えてください。）`＋改行＋`評価の観点:`＋改行＋`- xxx`＋改行＋`- xxx`＋改行＋`- xxx` |
 
 | ID | 優先度 | 要求 |
 |---|---|---|
-| FR-CD-01 | MUST | 通常評価で評価項目を新規に作る次の経路は、評価方法の種類に対応する上表の本文を説明の初期値とする。①評価項目の「追加」（既存の評価方法へ追加。種類は追加先の評価方法の現在の種類）、②評価方法の追加時に自動で作る最初の評価項目、③採点定義を新規に作る既定（Knowledge Cover）、④入力画面で列の対応から提案する設問の最初の評価項目（学生のPrompt列の候補はCustom＝Prompt 分析、それ以外はKnowledge Cover）。 |
-| FR-CD-02 | MUST | 初期値は新規作成時だけに設定する。既存の評価項目の説明、利用者が編集した説明、保存定義・読込定義の説明、評価項目の複製、評価方法の種類の変更（Knowledge Cover↔Prompt 分析）は、説明を書き換えない。種類の変更後に追加する評価項目は、変更後の種類の本文を使う。 |
+| FR-CD-01 | MUST | 通常評価で評価項目を新規に作る次の経路は、評価方法の種類に対応する上表の本文を説明の初期値とする。①評価項目の「追加」（既存の評価方法へ追加。種類は追加先の評価方法の現在の種類）、②評価方法の追加時に自動で作る最初の評価項目、③採点定義を新規に作る既定（Knowledge）、④入力画面で列の対応から提案する設問の最初の評価項目（学生のPrompt列の候補は種類Prompt、それ以外はKnowledge）。評価方法の種類の選択肢はKnowledge・Prompt・Customの3つで、種類を選ぶと右側の評価項目の説明の既定値がその種類の本文になる。既定の評価方法名は、入力画面の学生のPrompt列の提案では「Prompt 分析」（種類Prompt）とする。 |
+| FR-CD-02 | MUST | 初期値は新規作成時だけに設定する。既存の評価項目の説明、利用者が編集した説明、保存定義・読込定義の説明（既存の`CUSTOM_PROMPT`定義の説明を含む）、評価項目の複製、評価方法の種類の変更（Knowledge・Prompt・Custom間）は、説明を書き換えない。種類の変更後に追加する評価項目は、変更後の種類の本文を使う。 |
 | FR-CD-03 | MUST | 評価項目の名前・重み・range・個別の範囲の初期値は変えない。初期値の説明は必須入力検査（空白でない）と文字数上限を満たし、定義の検証エラーを増やさない。 |
 
-例: 評価方法が`Prompt 分析`の質問で評価項目の「追加」を押すと、新しい評価項目の説明は`学生が作成したPromptについて…評価を行ってください。`で始まる4行の本文になる。同じ質問の評価方法を`Knowledge Cover`へ変えても既存の説明は変わらず、その後に追加した評価項目だけ`学生が作成したレポートを…`で始まる本文になる。
+例: 評価方法の種類が`Prompt`の質問で評価項目の「追加」を押すと、新しい評価項目の説明は`学生が作成したPromptを、Anthropic・OpenAI・Microsoftなどが…`で始まる本文になる。同じ質問の評価方法を`Knowledge`へ変えても既存の説明は変わらず、その後に追加した評価項目だけ`学生が作成したレポートを…`で始まる本文になる。
+
+#### FR-109 Prompt種類の組込みテンプレート評価とEvaluatorTypeの3値
+- 要求: 評価方法の種類`PROMPT_ANALYSIS`（Prompt）は、組込みテンプレート`prompt-analysis-v1`（`BuiltInTemplateVersion`で固定、利用者は編集しない）でAIへ送る評価指示を組み立て、採点・出力・AI契約はKnowledgeと同じ構造とする。未知のテンプレートversionは拒否する。結果Excelと設定シートの`EvaluatorType`列は`KNOWLEDGE_COVERAGE`／`PROMPT_ANALYSIS`／`CUSTOM_PROMPT`の3値を書き、設定シートの読込で同じ種類へ往復できる。既存の`CUSTOM_PROMPT`はCustomのまま読む。
+- 決定状態: 承認済み（包括承認 2026-11-03・approval_policy）　出自: AI提案　優先度: MUST（A-CD-04の評価動作を検証可能にする。監査指摘X-01）
+- 上位: 既定制約（ui_policy）　出典: 依頼原文 2026-11-03（§11.20）、A-CD-04
+- 対象エンティティ: なし　関係する状態: なし　参照パラメータ: なし
+- 関連する既存資産: なし
+- 受入基準 AC-064: `SafeEvaluationPayloadBuilder`がPrompt種類で`prompt-analysis-v1`の組込みテンプレートを使い、未知のversionを拒否する。`ConfigSheetWriter`が3種類を`KNOWLEDGE_COVERAGE`／`PROMPT_ANALYSIS`／`CUSTOM_PROMPT`として書き、設定シートの読込で同じ種類に往復し、既存の`CUSTOM_PROMPT`がCustomとして読める。検証は`dotnet test`（Core.TestsのSafeEvaluationPayloadBuilder関連、App.TestsのConfigSheetWriter関連。実CLI・実AI・実資格情報は使わない）。
+  - 検証レベル: integration
 
 ### 11.21 結果画面の総実行時間とAIクレジット（2026-10-01追加）
 
@@ -1006,12 +1020,45 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 | ID | 重要度 | 質問 | 選択肢 | 推奨 | 状態 | 回答 |
 |---|---|---|---|---|---|---|
+| Q-002 | 中 | Prompt種類・Custom種類の評価項目の説明の既定本文（§11.20、A-CD-05）は、rd-authorが作文した案である。この文面で承認するか。 | a) 現状の本文で承認 b) 文面を指定する | a（回答まで現状の本文で継続） | 回答済み | a（現状の本文で承認。2026-11-03） |
 | Q-001 | 高 | 設定から削除する入力詳細・固有評価・読込Promptの機能の置き場所は。 | a) 統合画面内へ移す b) 機能ごと廃止する c) 入力画面へ移す | a | 回答済み | B（機能ごと廃止する。2026-11-02） |
 
 変更履歴: 2026-11-02 Q-001回答Bを反映。FR-DOC-01〜04・AC-044を廃止（廃止した3機能の操作説明のため。統合→AC-059）。A-MG-02を決定済みにし、C-1・C-4を解消。影響: 実装・テスト・利用者文書の更新が必要（上記AC、AC-037・AC-048のtest名の更新は実装側で必要）。
 変更履歴: 2026-11-03（run 202611032044）FR-002を改題・変更、AC-055を変更し、§9.1の解除手段を画面操作へ整合。出力フォルダーの表示・変更という同じ目的の既存項目を再利用し、要求・ACの新規採番・廃止・統合はなし。similar／similar --pairsは候補なしだったが、カタログとtraceでFR-002・AC-055の対象一致を確認した。影響: AC-055のE2E-002（既存PASSは変更前の証跡、test-designerが期待値とnative選択・取消・保存・既定・実行のシナリオを更新）、SettingsView、SettingsViewModel、ExecutionViewModel、MainWindowViewModel、SettingsViewTests、MainWindowSettingsTests、IntegratedDesignAndSettingsTests、docs/settings.mdの二重欄・手入力説明。AC-013・AC-037は既存契約として参照し本文変更・再queueはしない。実装・System Test・台帳・利用者文書はこの工程では変更しない。
 変更履歴: 2026-11-03（run 202611032044 最終監査転記）最終集計で採用されたP-01（3/3、MEDIUM）はFR-001〜003にG-ID対応がない既存の追跡性課題として監査指摘へ記録し、要求を再設計しない。C-01（2/3、暫定LOW）は実ファイル・台帳コマンドを確認し、`tests/system/ui/OutputFolderSelectionTests.cs` は既に記載済み、E2E-002の実行対象 `tests/system/test_fr002_output_folder.py` が未記載と確認してカタログへ追記し解消。E2E-002はheadless harnessによる検証であり、実OSダイアログの実操作・見た目・focusは未確認の限界として扱い、実機確認済みとはしない。非採用のQ-01（数値直書き）・Q-02（旧UI記述）は各1/3で、新たな修正指摘として追加しない。
 変更履歴: 2026-11-02 利用者承認（「修正してよいです」）によりC-2・C-3を解決。FR-QT-05、AC-048 ⑥の初期focusを統合画面（FR-001）に、§11.5・§11.8・§11.22・AC-037・§18の「5カテゴリ」「カテゴリ」を「設定は共通のみ」「設定内の表示」に書き換えた（意味はFR-001〜003に合わせ、値・閾値は不変）。同日追記: 初期focusは実装・既存テスト（MainWindowSettingsTests・QuantificationDesignViewTests）と整合する最小変更として基礎配点入力（`BasePointsTextBox`）にした（設問タブ領域へのTab到達は維持）。過去の実測の記述（行1303付近）と履歴は過去事実のため変えない。影響: AC-037・AC-048の文言変更、台帳ケースの期待値の更新（test-designer）。
+
+### 11.24 別名workbook出力の既定名とジョブのテキストログ（2026-11-03追加）
+
+出典: 依頼原文（2026-11-03「別名 workbook 出力欄（結果画面 ResultsOutputViewModel の OutputPath）の既定値が、run完了後は自動出力済みのfinal pathになり『完成名が既に存在します。上書きせず、別の名前を指定してください。』と出てそのまま出力できない。ジョブを動かすたび・結果を開くたびに、出力先ファイル名が必ず既存と異なる（未使用の）名前になるようにしたい」「ジョブ実行時のログを `出力先のパス\{yyyymmddhhmm}-log.txt` に保存する。トラブルシューティング用」）、§9.1、§11.8、§11.9、`OutputPathPlanner`、`DurableQuantificationOrchestrator`、`JobCostLogger`。
+
+本節は§9.1の命名規則（`eval-yyyyMMdd-HHmm[-NN]`、既存fileを上書きしない）と§11.9のジョブログの秘匿規則を維持し、結果画面の別名出力欄の既定値と、ジョブログのテキスト保存を追加する。`OutputPathPlanner`の命名規則を共有し、別の命名規則を作らない。
+
+#### FR-107 別名workbook出力欄の既定名は未使用名
+- 要求: 結果画面の「別名 workbook 出力」欄（`ResultsOutputViewModel.OutputPath`）の既定値は、run完了後（`Summary.IsDurable`）や結果を開いたときも、自動出力済みのfinal／partialと一致せず、出力先directory（自動出力のresult directory）で未使用の名前とする。既定名は§9.1・`OutputPathPlanner`と同じ`eval-{yyyyMMdd-HHmm}[-NN].xlsx`（同一分の衝突は`-02`、`-03`…の次の未使用名）で、時刻は既定値を作る時点のOSローカル時刻・不変カルチャとする。ジョブを動かすたび・結果を開くたびに既定値を作り直し、利用者が編集した値は同じ結果の表示中は保つ。既存fileの上書き禁止（§9.1）と、利用者が明示指定した既存名への「完成名が既に存在します。上書きせず、別の名前を指定してください。」の検証は維持する。既定名の生成に失敗しても結果表示・採点・出力を止めず、欄を空にして利用者の指定を促す。
+- 決定状態: 承認済み（依頼 2026-11-03）　出自: 依頼　優先度: MUST（既定値のままでは出力できない不具合の解消）
+- 上位: 既定制約（ui_policy）　出典: 依頼原文 2026-11-03（§11.24）
+- 対象エンティティ: なし　関係する状態: なし　参照パラメータ: なし
+- 関連する既存資産: §9.1、§11.8、`OutputPathPlanner`、`ResultsOutputViewModel`
+- 受入基準 AC-060: 出力先directoryに`eval-20261103-2136.xlsx`（自動出力済みのfinal）がある合成run結果を開いた「別名 workbook 出力」欄の既定値は、既存のどのfileとも異なる`eval-yyyyMMdd-HHmm[-NN].xlsx`の名前で、検証して出力を選ぶと上書きなしでそのまま出力できる。同じ分の既存名（`eval-yyyyMMdd-HHmm.xlsx`、`-02`）があれば次の未使用の連番になる。
+  - 検証レベル: unit
+- 受入基準 AC-061: ジョブを実行してrunが完了（`IsDurable`）した直後の結果画面と、同じ結果を再度開いたときの両方で、既定値が自動出力済みのfinal pathと異なる未使用名になり、既存fileは変更されない。利用者が明示指定した既存名は従来どおり「完成名が既に存在します。上書きせず、別の名前を指定してください。」で拒否される。
+  - 検証レベル: integration
+
+#### FR-108 ジョブ実行ログのテキスト保存
+- 要求: ジョブ（「定量化を開始」または再開の1操作、§11.9）を実行するときの経過ログを、トラブルシューティング用に自動出力のresult directoryへ`{yyyyMMddHHmm}-log.txt`（UTF-8のplain text）として保存する。時刻はジョブ開始のOSローカル時刻・不変カルチャとする。同名のfileがあれば上書きせず、`{yyyyMMddHHmm}-02-log.txt`、`-03-log.txt`…の次の未使用名にする。出力先は§9.1の実効出力先（自動出力のresult directory）と同じである。記録できる内容は§11.9のJSONLログと同じ秘匿規則に従い、数値・生成ID・閉じたコード・匿名化したmodel識別子だけとする。回答・Prompt・reason・evidence・学生識別子・実path・credential・設問文を記録しない。ログの保存失敗（directory作成不可・書込不可・容量等）は採点・出力・§11.9の利用者別JSONLログ・画面表示を止めず、安全な理由（閉じたコードの文言。実pathや例外の本文を含めない）で表示する。
+- 決定状態: 承認済み（依頼 2026-11-03）　出自: 依頼　優先度: SHOULD（障害調査のための補助。採点の成否に影響しない）
+- 上位: 既定制約（ui_policy）　出典: 依頼原文 2026-11-03（§11.24）
+- 対象エンティティ: なし　関係する状態: なし　参照パラメータ: なし
+- 関連する既存資産: §9.1、§11.9、`JobCostLogger`、`DurableQuantificationOrchestrator`
+- 受入基準 AC-062: 合成run（fake AI・合成workbook）を実行すると、出力先の result directoryに`{yyyyMMddHHmm}-log.txt`（ジョブ開始のローカル時刻）が1件できる。同名が既にあるときは上書きせず`-02`の連番で別fileができ、既存fileの内容は変わらない。
+  - 検証レベル: integration
+- 受入基準 AC-063: 合成の回答・Prompt・reason・evidence・学生識別子・設問文・実path・credentialに見える固定文字列を入れたrunで、保存した`-log.txt`にそれらの文字列が一切含まれない。出力先を書込不可にした場合も、採点・自動出力・利用者別JSONLログは成功し、画面には実pathを含まない安全な理由が表示される。
+  - 検証レベル: integration
+
+仮定: ログ内容は§11.9のJSONLログで記録済みの項目の範囲とし、新しい記録項目は足さない。連番の書式は§9.1に合わせた`-02`とする（既存の`{yyyyMMddHHmm}-log.txt`を1番目とする）。再開ジョブは再開時刻で別のログfileを作る。ログの保持期間・自動削除は定めない。覆す条件: 要求所有者が別の書式・保持を指示した場合。
+
+変更履歴: 2026-11-03 依頼を反映。§9.1・§11.9に参照を追記（既存規則は変更せず）。FR-107・FR-108、AC-060〜063を追加（既存に同目的の要求なし。`rdcheck similar`で類似0件）。影響: `ResultsOutputViewModel`の既定名生成、`OutputPathPlanner`の再利用、`DurableQuantificationOrchestrator`／`JobCostLogger`のテキストログ出力、台帳のケース追加（test-designer）、利用者文書（troubleshooting）。
 
 ## 12. Promptファイルからの起動
 
@@ -1295,7 +1342,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | AC-049 | 対応要求: FR-MO-01〜05、NFR-MO-01。事前条件: fake認証・Avalonia headless、実通信なし。リポジトリルートで`dotnet test tests\StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ModelOptionsTests|FullyQualifiedName~CopilotModelEnumerationTests|FullyQualifiedName~ModelCatalogTests|FullyQualifiedName~SettingsViewTests|FullyQualifiedName~SettingsAccessibilityTests" --logger trx`を実行。期待: exit 0、SDK順の全model（4097件目も選択可）、重複・disabled・不正ID境界、空一覧、認証失敗からの復旧、思考の順序・defaultラベル・未知値・非対応・auto、272K/1Mと未知容量・int境界、model切替と再取得での無効選択block、設定の旧形式・保存復元・不正値・保存失敗・自動cache保存の非混入・読込競合を検証。選択欄を実画面へbindし、44 DIP・Accessible Name・keyboard到達・局所scrollを検証。証跡: TRXとassertした選択値・型・順序・不変file bytes。 |
 | AC-050 | 対応要求: FR-MO-06〜07。事前条件: fake transportと合成workbook、実通信なし。`dotnet test tests\StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ModelOptionsTests|FullyQualifiedName~EphemeralEvaluationRunnerTests|FullyQualifiedName~AuxiliaryEvaluationRunnerTests|FullyQualifiedName~Resume|FullyQualifiedName~Checkpoint|FullyQualifiedName~ResultExcelDescriptionTests|FullyQualifiedName~ExecutionSettingsTests|FullyQualifiedName~ConfigAndRunSheetWriterTests|FullyQualifiedName~ResultsOutputViewTests" --logger trx`。期待: exit 0、全3種sessionとretryが選択effort/tierを保持、既定tierはnull、拡張prompt budgetへ容量検査が追従、実行中変更は次回だけ、checkpoint round-tripと追記のtier一致・不正tier拒否、旧schema2は既定tier、tier不一致は送信0で`CHECKPOINT_MODEL_MISMATCH`、復元操作でeffort/tierを復旧、Runの26項目と`ContextTier`出力・説明の一致、override出力へのtier継承、入力bytes不変。証跡: TRX、fake sessionのconfig、checkpointと出力assert。 |
 | AC-051 | 対応要求: FR-RV-01〜06、SEC-RV-01、NFR-RV-01、FR-RS-04。事前条件: リポジトリのsource、Avalonia headless、合成definition（主回答列`A`・補助列`B`）と合成run、fakeの入力identity境界・行source、および一時directoryに作った合成`.xlsx`（実CLI・実AI・実資格情報・`sample/`は使わない）。操作: リポジトリルートで`dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultsAnswerReviewTests|FullyQualifiedName~ResultsQuestionTextTests|FullyQualifiedName~ResultsOutputViewTests|FullyQualifiedName~ResponsiveLayoutTests|FullyQualifiedName~PrimaryJourneyAccessibilityTests"`。期待結果（exit code 0）: ①詳細を開くと選択行の基準の`StudentAnswerText`がFR-RV-02の形式（`[列 A · 主回答]\n{値}\n\n[列 B · 補助]\n{値}`、空セルは`（空欄）`、改行保持）と完全一致し、実viewの`ResultsCriterionStudentAnswer`に同じ文字列が出る（FR-RV-01、FR-RV-02）。②一覧表示中は読込0回、詳細表示で選択行の1行だけを読み、同じ行の再表示で読み直さない。入力identityの確認が読込の前後2回行われる（FR-RV-03）。③identity不一致・読込例外で、FR-RV-04の各文言になり、値を出さない。失敗後の再選択で再読込する（FR-RV-04）。④理由・引用・根拠の場所・説明が、成功・引用なし・`NONE`・`SUPPORTING_COLUMN`・空回答・取消・技術失敗の各場合にFR-RV-05の文字列と完全一致し、`ResultsCriterionReason`／`ResultsCriterionEvidence`／`ResultsCriterionEvidenceSource`／`ResultsCriterionDescription`に表示される（FR-RV-05）。⑤表示によって未保存overrideが生じず、出力境界の呼出し0回・`Results`の採点値不変、合成`.xlsx`のバイト列と更新日時が不変で、実ファイルから読んだ回答が表示される（FR-RV-06、FR-RV-03）。⑥読込中に別の行を選んだ・別の実行結果を読み込んだ場合、古い結果が反映されない（NFR-RV-01）。⑦回答・理由・根拠のcanary文字列とファイルパスが、`ToString()`、状態文言、Automation の Name に現れない（SEC-RV-01）。⑧1024×720 DIPの詳細で、override入力欄がviewport内、回答欄・評価欄が高さ44 DIP以上で横にはみ出さず、Automation IDが一意である（NFR-RV-01、FR-RV-01）。⑨設問文は回答欄の先頭に原文で出る（FR-RS-04）。既存のResults系UI試験が引き続き成功する。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
-| AC-052 | 対応要求: FR-CD-01〜03。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）、合成workbook。操作: リポジトリルートで`dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~DefaultCriterionDescriptionTests"`。期待結果（exit code 0）: ①`DefaultCriterionDescriptions.For`が§11.20の2本文と完全一致し、未対応の種類は`ArgumentOutOfRangeException`（FR-CD-01）。②新規の採点定義の最初の評価項目と、Knowledge Coverの評価項目の「追加」・評価方法の追加で作る評価項目がKnowledge Cover本文、Prompt 分析（Custom）の評価方法への追加・その評価方法の最初の評価項目がPrompt 分析本文である（FR-CD-01）。③評価方法の種類を変えても既存の説明は不変で、その後の追加だけ変更後の種類の本文になり、利用者が編集した説明は評価項目の追加で上書きされない（FR-CD-02）。④入力画面の提案設問は、学生のPrompt列がPrompt 分析本文、それ以外がKnowledge Cover本文で、検証エラーが0件である（FR-CD-01、FR-CD-03）。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
+| AC-052 | 対応要求: FR-CD-01〜03。事前条件: リポジトリのsource（実CLI・実AI・実資格情報は使わない）、合成workbook。操作: リポジトリルートで`dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~DefaultCriterionDescriptionTests"`。期待結果（exit code 0）: ①`DefaultCriterionDescriptions.For`が§11.20の3本文（Knowledge・Prompt・Custom）と完全一致し、未対応の種類は`ArgumentOutOfRangeException`（FR-CD-01）。②新規の採点定義の最初の評価項目と、Knowledgeの評価項目の「追加」・評価方法の追加で作る評価項目がKnowledge本文、Prompt種類・Custom種類の評価方法への追加・その評価方法の最初の評価項目がそれぞれPrompt本文・Custom本文である（FR-CD-01）。③評価方法の種類のドロップダウンの選択肢が`Knowledge`・`Prompt`・`Custom`の3つで、保存・読込の種類名`KNOWLEDGE_COVERAGE`／`PROMPT_ANALYSIS`／`CUSTOM_PROMPT`が往復でき、既存の`CUSTOM_PROMPT`定義がCustomとして読める（FR-CD-01）。④評価方法の種類を変えても既存の説明は不変で、その後の追加だけ変更後の種類の本文になり、利用者が編集した説明は評価項目の追加で上書きされない（FR-CD-02）。⑤入力画面の提案設問は、学生のPrompt列が種類Promptの本文、それ以外がKnowledge本文で、検証エラーが0件である（FR-CD-01、FR-CD-03）。証跡: テスト結果（.trx）。native Windowsの実画面確認は§18外とする。 |
 | AC-053 | 対応要求: FR-RT-01〜02、FR-CR-01〜04、NFR-CR-01。事前条件: リポジトリのsource、Avalonia headless、合成run結果と、`JobUsageTracker`へfakeの観測値を与えて作ったコスト記録（実CLI・実AI・実資格情報・実課金API・`sample/`は使わない）。操作: リポジトリルートで`dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultsRunMetricsTests|FullyQualifiedName~JobUsageTrackerTests|FullyQualifiedName~JobCostBackendTests|FullyQualifiedName~ResultsOutputViewTests|FullyQualifiedName~ResponsiveLayoutTests|FullyQualifiedName~MainWindowSettingsTests"`。期待結果（exit code 0）: ①時間の書式が0秒→`00:00:00`、129.8秒→`00:02:09`、3599.999秒→`00:59:59`、3600秒→`01:00:00`、360000秒→`100:00:00`、記録なし・終了時刻なし・負の差→`—（未計測）`と完全一致（FR-RT-02）。②AIクレジットの書式が0→`0.0000`、49999→`<0.0001`、50000→`0.0001`、12345678901→`12.3457`、1234567890000000→`1,234,567.8900`と完全一致し、型はstring（FR-CR-01）。③`ResultsRunMetrics`の本文がFR-CR-02の5分岐（記録なし・AI送信なし・未取得・一部取得・観測完了）で`総実行時間 {時間} · AIクレジット {クレジット}`と完全一致し、未読込で空・非表示、ToolTipとAccessible NameがFR-CR-04の注記を含み、別の実行結果の読込で更新される（FR-RT-01、FR-CR-02、FR-CR-04）。④コスト要約2行目・コスト詳細・ジョブログ表示のAIクレジットがFR-CR-03の文字列と一致し、旧文言`課金単位未確認`を含まない。通貨記号・`円`・`USD`・`ドル`を含まない（FR-CR-03、FR-CR-04）。⑤JSONLの各行がAIクレジットの項目を持たず、nano-AI unitsの記録値が変わらない（NFR-CR-01）。⑥1024×720・1180×800 DIPのメインwindow（`MainWindowSettingsTests`）と結果の内容領域950 DIP幅で最長例`総実行時間 100:00:00 · AIクレジット 1,234,567.8900（一部取得）`を含め、`ResultsRunMetrics`が省略記号なしに全文見える（FR-RT-01）。既存のResults・コスト系UI試験が引き続き成功する。証跡: テスト結果（.trx）。実account・実請求額との照合は§18外とする。 |
 
 ## 19. Test requirements
@@ -1311,7 +1358,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 3. native picker cancel/select、path direct input、unsupported format test。
 4. base/special/question pointsの初期配分、最後の設問への端数、手動値保持、均等配分test。
 5. 配点合計、range、similarity weight、enabled special minimumのvalidation test。
-6. Knowledge/Custom evaluatorとspecial Prompt placeholder／closed schema test。
+6. Knowledge/Prompt/Custom evaluatorとspecial Prompt placeholder／closed schema test。
 7. reference answer exactly once/question/run、run modelとrun-level reasoning effortの共用、failure、resume reuse test。
 8. normal/special/similarityの0/1境界、range外、empty-zero、failure-blank test。
 9. QuestionEarned、SpecialEarned、SimilarityPenalty、FinalRaw、clampの独立手計算oracle。
@@ -1475,7 +1522,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | Preparation relocation source | 2026-10-01の要求所有者依頼「[3.実行]画面の中の、左型の[GitHub Copilot CLIへのログイン]などの全ての画面コンポーネントを、「1.入力」の画面の中に移動させてください。」「画面上部の[訪問済み]の表現を[設定済み]に変更してください。」。§11.15（FR-PREP-01〜07）、§11.16（FR-STEP-01〜03）、AC-046、TR-44を追加し、§3.2・§11・§11.4の該当記述を更新した。削除した要求IDはない（「訪問済み」の表示文言をFR-STEP-01へ置換）。ViewModelの振る舞い、認証・再開の契約、永続化は変更しない。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Question tabs source | 2026-10-01の要求所有者依頼「画面の[2.定量化設定]の[通常評価]で、各設問がコンボボックスで切り替えられるようになっています。これをタブで切り替えられるようにしてください。タブには設問名を表示してください。」。§11.18（FR-QT-01〜05。2026-10-05に番号重複のため§11.22へ改番）、AC-048、TR-45を追加した。削除した要求IDはない。選択状態・編集内容・保存の契約は変更しない。不明点は利用者不在のため§23のA-QTを採用した。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Results answer review source | 2026-10-01: 機能変更・追加。依頼原文「添付の実行後の画面での評価状況で表示される文字や情報を以下にしてください。設問に対して、学生の回答と、その回答をどう評価したのか?これは作成するExcelで作成されている情報です。…自分の設定の確認をするという目的で表示させたいです。」。追加: §11.19（FR-RV-01〜06、SEC-RV-01、NFR-RV-01）、AC-051、TR-46、§21の追跡行、§23のA-RV-01〜05。変更: FR-RS-04（設問文の表示位置を回答欄の先頭へ）、§11.11の境界・例外、§11の結果の記述、§14（結果画面の1行再読込）、A-RS-01（回答本文を表示しない仮定を覆した）。削除した要求IDはない。採点・出力workbook・checkpoint・設定・AI送信の契約は変更しない。不明点は利用者不在のため§23のA-RVを採用した。要求版はv4.6のままで、製品版・公開版とは独立 |
-| Criterion description defaults source | 2026-10-01の要求所有者依頼「[2.定量化設計]の画面の[通常評価]の中の、画面右側の[評価項目]の説明の初期値を、[評価方法]に対応して以下としてください。」（Knowledge Cover／Prompt 分析の各本文）。機能変更。追加: §11.20（FR-CD-01〜03）、AC-052、TR-47、§21の追跡行、§23のA-CD-01〜03。変更: 評価項目の説明の従来の初期値（「評価する知識ポイントまたは観点を記述してください。」、入力画面の提案設問の「回答内で説明・関係・適用を確認する知識ポイント」「必要な視点を引き出す具体性、論理性、実行可能性」）を§11.20の本文へ置換した。削除した要求IDはない。評価項目の名前・重み・range、AI Prompt、採点・出力・checkpoint・保存の契約は変更しない。不明点は利用者不在のため§23のA-CDを採用した。要求版はv4.6のままで、製品版・公開版とは独立 |
+| Criterion description defaults source | 2026-10-01の要求所有者依頼「[2.定量化設計]の画面の[通常評価]の中の、画面右側の[評価項目]の説明の初期値を、[評価方法]に対応して以下としてください。」（Knowledge Cover／Prompt 分析の各本文）。機能変更。追加: §11.20（FR-CD-01〜03）、AC-052、TR-47、§21の追跡行、§23のA-CD-01〜03。変更: 評価項目の説明の従来の初期値（「評価する知識ポイントまたは観点を記述してください。」、入力画面の提案設問の「回答内で説明・関係・適用を確認する知識ポイント」「必要な視点を引き出す具体性、論理性、実行可能性」）を§11.20の本文へ置換した。削除した要求IDはない。評価項目の名前・重み・range、AI Prompt、採点・出力・checkpoint・保存の契約は変更しない。不明点は利用者不在のため§23のA-CDを採用した。要求版はv4.6のままで、製品版・公開版とは独立。2026-11-03の依頼で、評価方法の種類を3つ（Knowledge・Prompt・Custom）へ拡張した。変更: §5.2、§11.20、FR-CD-01〜03、AC-052、A-CD-01。追加: A-CD-04、A-CD-05。包括承認（approval_policy）: 説明の既定値の文面と種類の追加。削除した要求IDはない。決定記録: FR-CD-01〜03の3種類（Knowledge・Prompt・Custom）への拡張を「包括承認 2026-11-03・202611032047」で承認済みにした（A-CD-04・A-CD-05は仮定のまま。監査指摘X-01〜X-05は§25へ転記）。2026-11-03の利用者回答 Q-002: a（Prompt・Custom既定本文を現状のまま承認）を反映した（承認済み（Q-002 2026-11-03））。A-CD-05を要求所有者承認済みに、X-04を解消にした。本文・ACは変更していない。 |
 | Results list question score removal source | 2026-10-01: 機能削除・変更。依頼原文「[4.結果・出力]画面の、[設問別得点]は、削除してください。プレビューで表示するには情報量が多すぎるためです。」と、「4 結果・出力」の一覧の画面写真。追加: FR-RS-06（一覧は5列だけで設問別得点を表示しない）、§23のA-RS-04。変更: FR-RS-01（表示先を詳細だけに）、FR-RS-02（一覧の省略表示の記述を削除）、§11.11の例、§11の結果の記述、AC-041（操作のfilterと④⑥）、TR-40、§21の追跡行、A-RS-03（前提の一覧表示が無くなったため適用外と記録）。削除した要求IDはない（一覧の「設問別得点」列はFR-RS-01の表示先の一部だったため、IDを削除せず表示先を変更した）。`QuestionEarned`の計算、詳細の設問別得点、出力workbook、checkpoint、override、設定、AI送信の契約は変更しない。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Run metrics source | 2026-10-01: 機能追加・変更。依頼原文「実行結果の画面に以下の情報を付与してください。定量化のジョブの総実行時間(HH:MM:SS)/AI Credit (これは金額のコストに関わるので大変重要)」と「4 結果・出力」の画面写真。追加: §11.21（FR-RT-01〜02、FR-CR-01〜04、NFR-CR-01）、AC-053、TR-48、§21の追跡行、§23のA-RT-01〜02・A-CR-01〜03。変更: §11.9の単位の規定（旧「換算根拠を確認できるまでAIクレジットの数値を表示しない」を、SDK資料で換算根拠を確認したため§11.21の表示時換算へ置換）、§11の結果の記述、§17.1、AC-039、TR-38、§21のコスト行。削除した要求IDはない。JSONLログschema・Excel出力・checkpoint・設定・AI送信の契約は変更しない。要求版はv4.6のままで、製品版・公開版とは独立 |
 | Merged design screen source | 2026-11-02の要求所有者依頼（採点配分と通常評価を1画面へ統合、設定は共通のみ、入力詳細・固有評価・読込Promptを設定から削除）。追加: §11.23（FR-001〜003、AC-054〜055）、A-MG-01〜02。変更（統合・読替え）: §11.4の5カテゴリ→共通のみ、§11の主画面一覧と§12.2の読込Prompt、§11.22の通常評価の置き場所（FR-QT-01〜05は統合画面で維持）。廃止した要求IDはない（この時点では機能は維持、画面だけ削除）。その後Q-001回答B（2026-11-02、run 202611021453）で3機能を廃止（FR-003、AC-057〜059、A-MG-02決定済み・A-MG-03、FR-DOC-01〜04・AC-044を廃止）。競合の記録: FR-DOC-01と§11.14・A-DOC-01の「設問の詳細→入力詳細の設定画面」、AC-048のtest名（EvaluatorSettingsViewTests等）、AC-037の「5カテゴリ」の記述は新しい画面構成と食い違うため、実装時に更新が必要（承認済み要求の文面は本依頼の範囲外のため変えず、競合として記録）。要求版はv4.6のままで、製品版・公開版とは独立 |
@@ -1535,7 +1582,9 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | A-MG-01 | [ASSUMPTION] | 「マージした1つの画面」は、既存の主画面「2 採点設計」（採点配分）へ、設定の「通常評価」の内容を取り込む形とし、step名・Automation IDは変えない。添付画像を参照できないため、既存の要求とsourceの画面から解釈した（2026-11-02、FR-001〜002）。覆す条件: 画像の配置・見た目が異なる場合は別依頼で修正する。 |
 | A-MG-02 | [決定済み] | 設定から削除した「入力詳細」「固有評価」「読み込みPrompt」の機能は、Q-001回答B（2026-11-02）により機能ごと廃止した（FR-003）。 |
 | A-MG-03 | [ASSUMPTION] | 廃止の範囲は「3機能の編集・一覧・適用のUIと、それを前提とする説明・操作」とし、採点の計算式（固有配点を含む）、既存定義・設定fileの読込・保存互換、command lineの`--prompt`の受理は維持する。根拠: 回答は機能の廃止を示すが、データの読込・保存・計算の廃止までは明示せず、最小の変更で既存の保存済みデータと配布済みの起動引数を壊さないため。影響: 固有評価・補助列を持つ既存定義は編集できないが計算は従来どおり。覆す条件: データ・計算・`--prompt`も廃止する指示があった場合（§6・§8・§12.1・§4の変更を伴う別依頼）。 |
-| A-CD-01 | [ASSUMPTION] | 依頼の「評価方法: `Knowledge Cover`」は評価方法の種類`KNOWLEDGE_COVERAGE`、「`Prompt 分析`」は種類`CUSTOM_PROMPT`と解釈し、評価方法の表示名ではなく種類で本文を決める。根拠: 評価方法の表示名は利用者が自由に変更でき（既定名は「Knowledge coverage」「Knowledge 1」「Custom 1」「Prompt 分析」など複数）、種類は2つに固定されている。影響: 利用者が追加したCustom評価方法の評価項目もPrompt 分析本文になる。覆す条件: 表示名ごとに本文を変える指示があった場合。 |
+| A-CD-01 | [ASSUMPTION] | 評価項目の説明の既定値は、評価方法の表示名ではなく種類で決める。根拠: 表示名は利用者が自由に変更できる。2026-11-03の依頼で種類は3つ（`KNOWLEDGE_COVERAGE`＝Knowledge、`PROMPT_ANALYSIS`＝Prompt、`CUSTOM_PROMPT`＝Custom）になり、旧版の「Prompt 分析＝`CUSTOM_PROMPT`」の対応は廃止した。影響: Custom評価方法の既定値は旧Prompt 分析本文ではなく短い雛形になる（既存の保存済みの説明は不変）。覆す条件: 表示名ごとに本文を変える指示があった場合。 |
+| A-CD-04 | [ASSUMPTION] | 新しい種類`PROMPT_ANALYSIS`（EvaluatorType.PromptAnalysis）を追加する。保存・読込・workbook設定シートの種類名は3値で、既存の`CUSTOM_PROMPT`はそのままCustomとして読む（後方互換、既存の説明は書き換えない）。Prompt種類は組込みの評価用Promptテンプレート（BuiltInTemplateVersionで固定）で評価し、採点・出力・AI契約はKnowledgeと同じ構造とする。利用者がテンプレートを編集する「Prompt」タブはCustomのときだけ使う。根拠: 2026-11-03の依頼と進行役の仮定。影響: §5.2・§11.20・AC-052を拡張。結果Excelの`EvaluatorType`列に新しい値が現れる。覆す条件: Prompt種類も利用者が編集できる指示があった場合。 |
+| A-CD-05 | 要求所有者承認済み（Q-002 2026-11-03） | Prompt種類の既定値本文（§11.20）は、ベストプラクティスの8観点（役割・目的、具体的な指示、文脈、出力形式、例示、制約、段階的な思考、検証可能な基準）を並べた文面とし、Custom種類の本文は利用者が書き換える前提の短い雛形とする。文面はrd-authorが定めた。根拠: 依頼が趣旨だけを示し本文を委ねたため。影響: 文面の変更は`DefaultCriterionDescriptions`とAC-052の完全一致の更新になる。覆す条件: 要求所有者が文面を指定した場合。 |
 | A-CD-02 | [ASSUMPTION] | 依頼文のKnowledge Cover本文の「行ってださい」は誤字と判断し、「行ってください」で実装する。それ以外の文字（`{論点}`、`論点:`、`- xxx`）は依頼どおりとする。根拠: 同じ依頼のPrompt 分析本文が「行ってください」であり、意図が明らかな誤記。影響: 依頼原文と1文字（「だ」→「く」）異なる。覆す条件: 原文どおりの綴りを求められた場合は`DefaultCriterionDescriptions.Knowledge`を直す。 |
 | A-CD-03 | [ASSUMPTION] | 「初期値」は新規作成時の値であり、保存済み・読込済みの採点定義や既存の評価項目の説明は書き換えない。本文中の`{論点}`はAI Promptのplaceholderではなく説明文中の記載で、評価項目の説明はPromptへ値として挿入されるため再解釈されない（§5.4）。根拠: 既存データの暗黙の書換えは利用者の編集を失わせる。影響: 既存の定義の説明は従来のままである。覆す条件: 既存の説明の一括更新を求められた場合。 |
 
@@ -1550,3 +1599,8 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | C-5 | 2026-11-03 | 不足 | 中 | §2.3、ペルソナ表 | 既存ui_policyの記述には利用者によるレイアウト変更・保存と、ペルソナごとの既定表現・キャンバス採否・代替手段の構造化記録が揃っていない。今回の出力先選択では従来の共通設定の読取専用テキストとキーボード選択操作を使い、承認済み全画面の設計変更は行わない。別途要求所有者の判断を要する既存の不足として記録し、今回の他要求再queueはしない。 | 未解決（依頼範囲外） |
 | P-01 | 2026-11-03 | 目的整合・追跡性 | 中 | §1 / FR-001〜003 | 最終監査集計3/3。FR-001〜003のG-ID対応がなく目的ごとの追跡性が不足している。目的逸脱そのものの認定ではない。今回の依頼範囲外の既存課題として記録し、要求本文の再設計は行わない。 | 未解決（既存・依頼範囲外） |
 | C-01 | 2026-11-03 | カタログ／台帳の追跡性 | 低 | docs/catalog.md FR-002 / E2E-002 | 最終監査集計2/3。E2E-002の実行コマンド `python -m pytest tests/system/test_fr002_output_folder.py -q` の対象パスがカタログ未記載だったため追記し解消。`tests/system/ui/OutputFolderSelectionTests.cs` は既に記載済み。 | 解決済み |
+| X-01 | 2026-11-03 | 不足 | 高 | §5.2, A-CD-04 | Prompt種類の評価動作（組込みテンプレート、BuiltInTemplateVersion、採点・出力はKnowledgeと同構造）と結果Excel`EvaluatorType`列の新値にACがない。AC-052は説明の既定値と種類名の往復だけを検証する。次のrunへの課題（評価動作・結果Excel出力のFR・ACを追加するか、スコープ外と明記する）。 | 解消（FR-109・AC-064を追加。2026-11-03） |
+| X-02 | 2026-11-03 | 矛盾の疑い | 中 | §5.4 | 「Knowledgeはapp-owned template…利用者は編集できない」とあり、同じapp-ownedのPrompt種類が書かれていない。6 placeholder制約の適用範囲が曖昧。「KnowledgeとPrompt」へ直す。 | 解消（2026-11-03） |
+| X-03 | 2026-11-03 | 不足 | 中 | §6付近 | 「Knowledge / Custom evaluator」と2種類の記述が残り、3種類化と不整合の疑い。Promptを含めて更新する。 | 解消（2026-11-03） |
+| X-04 | 2026-11-03 | 記述の質 | 中 | A-CD-05, §11.20 | Prompt・Custom本文はrd-authorが作文したASSUMPTIONで、AC-052が完全一致で固定する。根拠が要求所有者の指定でない。所有者の承認を取る（Q化）。 | 解消（Q-002回答 a、2026-11-03） |
+| X-05 | 2026-11-03 | 記述の質 | 低 | FR-CD-01③, §11.20出典 | 「Knowledge Cover」と「Knowledge」の表記が混在。§11.20出典は2本文のままで11-03の追加を含まない。表記統一し出典に11-03を追記する。 | 解消（2026-11-03） |
