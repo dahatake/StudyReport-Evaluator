@@ -52,6 +52,23 @@ public sealed class ResultExcelDescriptionTests
         Assert.DoesNotContain("TBD", description, StringComparison.Ordinal);
     }
 
+    // FR-XD-03 / AC-045②: 採点結果シートの説明と列見出しが、実際の書き込み規則と一致する。
+    [Fact]
+    public void Description_explains_the_score_summary_sheet_and_its_actual_headers()
+    {
+        string description = Read(DescriptionPath);
+
+        Assert.Contains($"`{ScoreSummarySheetWriter.BaseName}`", description, StringComparison.Ordinal);
+        Assert.Contains($"`{ScoreSummarySheetWriter.IdHeader}`", description, StringComparison.Ordinal);
+        Assert.Contains($"`{ScoreSummarySheetWriter.TotalHeader}`", description, StringComparison.Ordinal);
+
+        // 実際の見出しの生成規則（質問{n}の評価 / 質問{n}のPromptの評価）の n を N に置き換えた形。
+        string evaluation = $"`質問{'N'}の評価`";
+        string promptEvaluation = $"`質問{'N'}のPromptの評価`";
+        Assert.Contains(evaluation, description, StringComparison.Ordinal);
+        Assert.Contains(promptEvaluation, description, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Description_covers_every_results_column_kind_status_code_and_total_column_of_the_writer()
     {
