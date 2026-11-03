@@ -1,6 +1,33 @@
 using GitHub.Copilot;
 
+using System.Collections.Concurrent;
+
 namespace StudyReportEvaluator.App.Copilot;
+
+/// <summary>
+/// Models whose API rejected an explicit reasoning effort even though the model catalog advertises support
+/// (for example, "thinking.type.enabled" is not supported). Sessions for these models run without an effort.
+/// </summary>
+internal static class ReasoningEffortRejections
+{
+    private static readonly ConcurrentDictionary<string, byte> RejectedModels = new(StringComparer.Ordinal);
+
+    internal static bool IsRejected(string? modelId) =>
+        modelId is not null && RejectedModels.ContainsKey(modelId);
+
+    internal static void MarkRejected(string? modelId)
+    {
+        if (!string.IsNullOrWhiteSpace(modelId))
+        {
+            RejectedModels[modelId] = 0;
+        }
+    }
+
+    internal static bool IsRejectionMessage(string? message) =>
+        message is not null
+        && (message.Contains("thinking.type", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("output_config.effort", StringComparison.OrdinalIgnoreCase));
+}
 
 public static class ReasoningEffortPolicy
 {

@@ -41,6 +41,15 @@ public sealed class EvaluationSchemaException : EvaluationAttemptException
     }
 }
 
+// Retried through the bounded schema-retry path; the next attempt omits the rejected reasoning effort.
+public sealed class EvaluationReasoningEffortRejectedException : EvaluationAttemptException
+{
+    public EvaluationReasoningEffortRejectedException()
+        : base(EvaluationAttemptFailureKind.SchemaInvalid, "The model rejected the requested reasoning effort.")
+    {
+    }
+}
+
 public sealed class EvaluationNetworkException : EvaluationAttemptException
 {
     public EvaluationNetworkException()

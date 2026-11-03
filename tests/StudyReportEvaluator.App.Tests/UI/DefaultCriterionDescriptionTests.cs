@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
-using StudyReportEvaluator.Core.Serialization;
 using StudyReportEvaluator.App.ViewModels;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Prompting;
