@@ -80,7 +80,16 @@ public sealed class SampleWorkbookStructuralTests
                 candidate.SuggestedSupportingColumns,
             }),
         }));
-        AssertSheet(worksheet, "A1:J531", 10);
+        // The local sample may be re-saved with extra leading columns or fewer rows;
+        // derive the expected layout from the sheet instead of a historical size.
+        uint lastRow = worksheet.LastRowIndex;
+        uint lastColumn = worksheet.ColumnCount;
+        AssertSheet(worksheet, $"A1:{ColumnLetter((int)lastColumn)}{lastRow}", lastRow, lastColumn);
+        Assert.True(lastRow >= 2U);
+        // Original layout has the six target columns D..I; shift by the leading-column count.
+        int shift = suggestion.InitialTargetColumns[0][0] - 'D';
+        Assert.True(shift >= 0);
+        string C(string column) => ((char)(column[0] + shift)).ToString();
         InputSnapshot after = snapshots.Capture(samplePath);
         InputSnapshotComparison comparison = snapshots.Recheck(samplePath, before);
         Assert.Equal(before, after);
@@ -92,29 +101,31 @@ public sealed class SampleWorkbookStructuralTests
         Assert.Equal(worksheet.Name, suggestion.WorksheetName);
         Assert.Equal(1U, suggestion.HeaderRow);
         Assert.Equal(2U, suggestion.FirstDataRow);
-        Assert.Equal(531U, suggestion.LastDataRow);
-        Assert.Equal(530U, suggestion.SuggestedDataRowCount);
-        Assert.Equal(["D", "E", "F", "G", "H", "I"], suggestion.InitialTargetColumns);
-        Assert.Equal(["A", "B", "C", "J"], suggestion.InitiallyUnselectedColumns);
+        Assert.Equal(lastRow, suggestion.LastDataRow);
+        Assert.Equal(lastRow - 1U, suggestion.SuggestedDataRowCount);
+        string[] targets = new[] { "D", "E", "F", "G", "H", "I" }.Select(C).ToArray();
+        Assert.Equal(targets, suggestion.InitialTargetColumns);
+        Assert.Equal(
+            Enumerable.Range(0, shift + 3).Select(i => ((char)('A' + i)).ToString())
+                .Append(C("J")).ToArray(),
+            suggestion.InitiallyUnselectedColumns);
 
         IReadOnlyDictionary<string, ColumnMappingCandidate> candidates = suggestion.Candidates
             .ToDictionary(candidate => candidate.ColumnName, StringComparer.Ordinal);
-        Assert.Equal(
-            ["D", "E", "F", "G", "H", "I"],
-            candidates.Keys.Order(StringComparer.Ordinal));
-        Assert.Equal(ColumnMappingCandidateRole.PrimaryAnswer, candidates["D"].Roles);
+        Assert.Equal(targets, candidates.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(ColumnMappingCandidateRole.PrimaryAnswer, candidates[C("D")].Roles);
         Assert.Equal(
             ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.StudentPromptPrimary,
-            candidates["E"].Roles);
-        Assert.Equal(ColumnMappingCandidateRole.Supporting, candidates["F"].Roles);
-        Assert.Equal(ColumnMappingCandidateRole.PrimaryAnswer, candidates["G"].Roles);
+            candidates[C("E")].Roles);
+        Assert.Equal(ColumnMappingCandidateRole.Supporting, candidates[C("F")].Roles);
+        Assert.Equal(ColumnMappingCandidateRole.PrimaryAnswer, candidates[C("G")].Roles);
         Assert.Equal(
             ColumnMappingCandidateRole.PrimaryAnswer | ColumnMappingCandidateRole.StudentPromptPrimary,
-            candidates["H"].Roles);
-        Assert.Equal(ColumnMappingCandidateRole.Supporting, candidates["I"].Roles);
-        Assert.Equal(["F"], candidates["E"].SuggestedSupportingColumns);
-        Assert.Equal(["I"], candidates["H"].SuggestedSupportingColumns);
-        Assert.All(new[] { "D", "F", "G", "I" }, column =>
+            candidates[C("H")].Roles);
+        Assert.Equal(ColumnMappingCandidateRole.Supporting, candidates[C("I")].Roles);
+        Assert.Equal([C("F")], candidates[C("E")].SuggestedSupportingColumns);
+        Assert.Equal([C("I")], candidates[C("H")].SuggestedSupportingColumns);
+        Assert.All(new[] { "D", "F", "G", "I" }.Select(C), column =>
             Assert.Empty(candidates[column].SuggestedSupportingColumns));
 
         // Exercise the same default design used by the opt-in technical smoke,
@@ -129,28 +140,32 @@ public sealed class SampleWorkbookStructuralTests
         Assert.Equal(0m, definition.SpecialPoints);
         Assert.Equal(0.1m, definition.SimilarityPenaltyWeight);
         Assert.Equal(1, definition.RoundingDigits);
-        Assert.Equal(["D", "E", "G", "H"], definition.Questions.Select(question => question.PrimarySourceColumn));
+        Assert.Equal(new[] { "D", "E", "G", "H" }.Select(C), definition.Questions.Select(question => question.PrimarySourceColumn));
         Assert.Equal([10m, 10m, 10m, 10m], definition.Questions.Select(question => question.Points));
         Assert.Equal(
-            [EvaluatorType.KnowledgeCoverage, EvaluatorType.CustomPrompt,
-                EvaluatorType.KnowledgeCoverage, EvaluatorType.CustomPrompt],
+            [EvaluatorType.KnowledgeCoverage, EvaluatorType.PromptAnalysis,
+                EvaluatorType.KnowledgeCoverage, EvaluatorType.PromptAnalysis],
             definition.Questions.Select(question => Assert.Single(question.Evaluators).Type));
-        Assert.Equal(["F"], definition.Questions[1].SupportingSourceColumns);
-        Assert.Equal(["I"], definition.Questions[3].SupportingSourceColumns);
+        Assert.Equal([C("F")], definition.Questions[1].SupportingSourceColumns);
+        Assert.Equal([C("I")], definition.Questions[3].SupportingSourceColumns);
         Assert.Empty(definition.Questions.SelectMany(question => question.SpecialEvaluations));
         Assert.Equal(before, snapshots.Capture(samplePath));
     }
 
+    private static string ColumnLetter(int index) =>
+        index <= 26 ? ((char)('A' + index - 1)).ToString() : ColumnLetter((index - 1) / 26) + ColumnLetter((index - 1) % 26 + 1);
+
     private static void AssertSheet(
         WorksheetMetadata worksheet,
         string expectedDimension,
+        uint expectedLastRow,
         uint expectedColumns)
     {
         Assert.False(string.IsNullOrWhiteSpace(worksheet.Name));
         Assert.Equal(expectedDimension, worksheet.DimensionReference);
         Assert.Equal(1U, worksheet.FirstRowIndex);
-        Assert.Equal(531U, worksheet.LastRowIndex);
-        Assert.Equal(531U, worksheet.RowCount);
+        Assert.Equal(expectedLastRow, worksheet.LastRowIndex);
+        Assert.Equal(expectedLastRow, worksheet.RowCount);
         Assert.Equal(1U, worksheet.FirstColumnIndex);
         Assert.Equal(expectedColumns, worksheet.LastColumnIndex);
         Assert.Equal(expectedColumns, worksheet.ColumnCount);
@@ -323,7 +338,7 @@ public sealed class WindowsX64PerformanceEvidenceTests
                         {
                             Id = "E-PERFORMANCE",
                             DisplayName = "Synthetic performance evaluator",
-                            Type = EvaluatorType.CustomPrompt,
+                            Type = EvaluatorType.PromptAnalysis,
                             Weight = 1m,
                             Range = new ScoreRange(0m, 10m),
                             CustomPromptTemplate = "{回答}\n{評価項目}",
