@@ -280,6 +280,30 @@ public sealed class CheckpointStoreTests
         Assert.DoesNotContain(privateCanary, result.ToString(), StringComparison.Ordinal);
     }
 
+    // checkpoint-delta: a schema-invalid package must be rejected even after the same store
+    // validated an earlier (different-bytes) package; validation verdicts are keyed by exact bytes.
+    [Fact]
+    public void Load_rejects_a_schema_invalid_package_after_an_earlier_valid_load()
+    {
+        using TemporaryWorkbook input = X01SyntheticWorkbookFactory.Create();
+        CheckpointEnvelope envelope = CreateEnvelope(input);
+        CheckpointStore store = new();
+        Assert.True(store.Create(envelope, TestContext.Current.CancellationToken).IsSuccess);
+        Assert.True(store.Load(envelope.PartialPath, TestContext.Current.CancellationToken).IsSuccess);
+        using (SpreadsheetDocument document = SpreadsheetDocument.Open(envelope.PartialPath, true))
+        {
+            Workbook workbook = document.WorkbookPart?.Workbook
+                ?? throw new InvalidDataException("Synthetic workbook root is missing.");
+            workbook.AppendChild(new BookViews(new WorkbookView()));
+            workbook.Save();
+        }
+
+        CheckpointLoadResult result = store.Load(envelope.PartialPath, TestContext.Current.CancellationToken);
+
+        Assert.Equal(CheckpointStatusCodes.Invalid, result.Code);
+        Assert.Null(result.Envelope);
+    }
+
     [Theory]
     [InlineData("unknown-property")]
     [InlineData("missing-required-property")]
