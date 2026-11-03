@@ -766,6 +766,19 @@ def cmd_run(args, root, cfg) -> int:
         for c, prev in repeat_fail:
             print(f"skip {c['id']}: 同じ commit {head[:7]} で fail 済み（{prev.get('at', '')}, {prev.get('log', '')}）。直して commit してから、または --rerun-failed で再実行")
     done: dict = {}
+    prebuild = ((cfg.get("system_test") or {}).get("prebuild") or "").strip()
+    if prebuild and todo:
+        print(f"prebuild: {prebuild}")
+        t0 = time.time()
+        prc, pout = run_shell(prebuild, str(root), args.case_timeout)
+        plog = logs_dir / f"prebuild-{h.new_run_id()}.log"
+        plog.write_text(pout, encoding="utf-8")
+        print(f"prebuild: rc={prc} {round(time.time() - t0, 1)}s log={plog}")
+        if prc != 0:
+            tail = "\n".join((pout or "").splitlines()[-20:])
+            print(tail)
+            print("prebuild 失敗のため中断")
+            return 2
     pats = [p for p in ((cfg.get("system_test") or {}).get("serial_patterns") or []) if p]
     dur_path = h.work_dir(cerr, cfg) / ".ebak" / "durations.json"
     try:

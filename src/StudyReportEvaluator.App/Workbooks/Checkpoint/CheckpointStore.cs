@@ -665,7 +665,12 @@ public sealed class CheckpointStore : ICheckpointStore
         string? expectedPayloadSha256,
         CancellationToken cancellationToken)
     {
-        using SpreadsheetDocument document = SpreadsheetDocument.Open(packagePath, false);
+        // Parse and hash the same in-memory bytes, so a cached validation verdict always
+        // describes exactly the bytes that were parsed (no file-swap window).
+        byte[] packageBytes = File.ReadAllBytes(packagePath);
+        string packageSha256 = Convert.ToHexString(SHA256.HashData(packageBytes));
+        using MemoryStream packageStream = new(packageBytes, writable: false);
+        using SpreadsheetDocument document = SpreadsheetDocument.Open(packageStream, false);
         WorkbookPart workbookPart = document.WorkbookPart
             ?? throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
         Workbook workbook = workbookPart.Workbook
@@ -706,15 +711,52 @@ public sealed class CheckpointStore : ICheckpointStore
             throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
         }
 
-        if (new OpenXmlValidator().Validate(document, cancellationToken).Any())
+        // Schema validation of the whole package (the dominant cost) depends only on the bytes.
+        // Only a passing verdict for identical bytes is reused; failures are never cached.
+        if (!WasValidated(packageSha256))
         {
-            throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
+            if (new OpenXmlValidator().Validate(document, cancellationToken).Any())
+            {
+                throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
+            }
+
+            RememberValidated(packageSha256);
         }
 
         return new CheckpointLoadResult(
             CheckpointStatusCodes.Success,
             envelope,
             payloadSha256);
+    }
+
+    private const int ValidatedCacheCapacity = 16;
+    private static readonly object ValidatedLock = new();
+    private static readonly Queue<string> ValidatedOrder = new();
+    private static readonly HashSet<string> ValidatedHashes = new(StringComparer.Ordinal);
+
+    private static bool WasValidated(string packageSha256)
+    {
+        lock (ValidatedLock)
+        {
+            return ValidatedHashes.Contains(packageSha256);
+        }
+    }
+
+    private static void RememberValidated(string packageSha256)
+    {
+        lock (ValidatedLock)
+        {
+            if (!ValidatedHashes.Add(packageSha256))
+            {
+                return;
+            }
+
+            ValidatedOrder.Enqueue(packageSha256);
+            while (ValidatedOrder.Count > ValidatedCacheCapacity)
+            {
+                ValidatedHashes.Remove(ValidatedOrder.Dequeue());
+            }
+        }
     }
 
     private static void ValidatePreservedSheets(

@@ -45,7 +45,7 @@ DEFAULT_CONFIG: dict = {
     # worktree の依存ディレクトリの共有（主の作業ツリーの実体への junction / symlink）
     "worktree_share": {"enabled": True, "dirs": ["node_modules"]},
     "verify": {"commands": [], "timeout_sec": 1800},
-    "system_test": {"jobs": "auto", "serial_patterns": ["default_port"]},
+    "system_test": {"jobs": "auto", "serial_patterns": ["default_port"], "prebuild": ""},  # prebuild: ケース実行前に 1 回だけ走らせるコマンド（空なら実行しない）
     "checks": {
         "ambiguous_words": [
             "適切", "適宜", "なるべく", "できるだけ", "可能な限り", "十分な", "迅速", "高速に", "簡単",

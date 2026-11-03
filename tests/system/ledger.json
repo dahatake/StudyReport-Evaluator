@@ -16,12 +16,12 @@
       ],
       "title": "採点設計の統合画面: 配点・計算式と通常評価が同一画面にあり最小windowで外側スクロール不要",
       "layer": "e2e",
-      "command": "dotnet test tests/system/ui --filter \"FullyQualifiedName~FR001_AC054\"",
+      "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
       "status": "pass",
-      "last_commit": "b0148f0",
-      "last_run_at": "2026-11-02T18:47:25+09:00",
-      "evidence": "work/runs/202611021649/logs/system-test/E2E-001-202611021846.log",
+      "last_commit": "3c560e1",
+      "last_run_at": "2026-11-03T13:03:44+09:00",
+      "evidence": "work/runs/202611031221/logs/system-test/E2E-001-202611031303.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
@@ -34,6 +34,12 @@
           "by": "test-designer",
           "change": "command: 'dotnet test tests/system/ui --filter-method *FR001_AC054*' -> 'dotnet test tests/system/ui --filter \"FullyQualifiedName~FR001_AC054\"'",
           "reason": "filter 構文の修正"
+        },
+        {
+          "at": "2026-11-03T13:01:20+09:00",
+          "by": "test-designer",
+          "change": "command: 'dotnet test tests/system/ui --filter \"FullyQualifiedName~FR001_AC054\"' -> 'dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR001_AC054\"'",
+          "reason": "前段 prebuild で 1 回ビルドし --no-build で並列実行（検証内容は不変）"
         }
       ]
     },
@@ -47,12 +53,12 @@
       ],
       "title": "設定は共通のみ: 旧カテゴリのボタン不在・入口は存在するカテゴリだけ・共通設定は存続",
       "layer": "e2e",
-      "command": "dotnet test tests/system/ui --filter \"FullyQualifiedName~FR002_AC055\"",
+      "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR002_AC055\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "b0148f0",
-      "last_run_at": "2026-11-02T18:47:25+09:00",
-      "evidence": "work/runs/202611021649/logs/system-test/E2E-002-202611021847.log",
+      "last_commit": "3c560e1",
+      "last_run_at": "2026-11-03T13:03:44+09:00",
+      "evidence": "work/runs/202611031221/logs/system-test/E2E-002-202611031303.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
@@ -65,6 +71,12 @@
           "by": "test-designer",
           "change": "command: 'dotnet test tests/system/ui --filter-method *FR002_AC055*' -> 'dotnet test tests/system/ui --filter \"FullyQualifiedName~FR002_AC055\"'",
           "reason": "filter 構文の修正"
+        },
+        {
+          "at": "2026-11-03T13:01:21+09:00",
+          "by": "test-designer",
+          "change": "command: 'dotnet test tests/system/ui --filter \"FullyQualifiedName~FR002_AC055\"' -> 'dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR002_AC055\"'",
+          "reason": "前段 prebuild で 1 回ビルドし --no-build で並列実行（検証内容は不変）"
         }
       ]
     },
@@ -78,18 +90,24 @@
       ],
       "title": "削除3機能の不在: 入力詳細・固有評価・読込Promptの編集UIが全画面に存在せず、通常評価の編集は残る",
       "layer": "e2e",
-      "command": "dotnet test tests/system/ui --filter \"FullyQualifiedName~FR003_AC057\"",
+      "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR003_AC057\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "b0148f0",
-      "last_run_at": "2026-11-02T18:47:25+09:00",
-      "evidence": "work/runs/202611021649/logs/system-test/E2E-003-202611021847.log",
+      "last_commit": "3c560e1",
+      "last_run_at": "2026-11-03T13:03:44+09:00",
+      "evidence": "work/runs/202611031221/logs/system-test/E2E-003-202611031303.log",
       "history": [
         {
           "at": "2026-11-02T15:00:42+09:00",
           "by": "test-designer",
           "change": "追加",
           "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-03T13:01:22+09:00",
+          "by": "test-designer",
+          "change": "command: 'dotnet test tests/system/ui --filter \"FullyQualifiedName~FR003_AC057\"' -> 'dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR003_AC057\"'",
+          "reason": "前段 prebuild で 1 回ビルドし --no-build で並列実行（検証内容は不変）"
         }
       ]
     }
