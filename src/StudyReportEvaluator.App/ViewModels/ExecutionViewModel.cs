@@ -245,6 +245,29 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
             new SpecialEvaluationOperationRunnerAdapter(new SpecialEvaluationRunner(
                 new SdkEphemeralCopilotTransportFactory(sharedClient, usage, UsageOperation.Special),
                 runnerOptions)));
+        if (request.RerunBase is not null)
+        {
+            return await durable.RerunRowsAsync(
+                new DurableQuantificationRunRequest
+                {
+                    Run = request,
+                    Runtime = new CheckpointRuntimeIdentity
+                    {
+                        ApplicationIdentity = ApplicationIdentity(),
+                        CliVersion = identity.CliVersion,
+                        CliSha256 = identity.CliSha256,
+                        SdkInformationalVersion = identity.SdkInformationalVersion,
+                    },
+                    OutputDirectory = request.OutputDirectory,
+                },
+                request.RerunBase,
+                request.RerunBaseModelId ?? string.Empty,
+                request.RerunRows,
+                value => progress?.Invoke(ToLegacyProgress(value)),
+                cancellationToken,
+                concurrencyLimiter).ConfigureAwait(false);
+        }
+
         return await durable.RunAsync(
             new DurableQuantificationRunRequest
             {
@@ -1039,6 +1062,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         && !runStarting
         && !IsPreparingResume
         && (!IsResumeMode || HasMatchingResumePreflight)
+        && !isValidatingRerun
         && IsConfigured
         && nextDraftSummary is null
         && !IsCheckingAuthentication
@@ -1551,6 +1575,12 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         }
 
         QuantificationDefinition runDefinition = InputViewModel.CloneDefinition(definition);
+        ExecutionRunContext? rerun = rerunBase;
+        if (rerun is not null && !await ValidateRerunAsync(rerun, cancellationToken))
+        {
+            return;
+        }
+
         string runInputPath = inputPath;
         string runModelId = selectedModelId;
         CopilotModelAvailability runModel = modelsById[runModelId];
@@ -1570,9 +1600,12 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 : runModel.MaximumContextWindowTokens ?? runModel.EffectivePromptTokenLimit,
             MaxConcurrency = MaxConcurrency,
             RuntimeIdentity = runRuntimeIdentity,
-            OutputDirectory = IsResumeMode ? null : OutputDirectory,
-            ResumePartialPath = IsResumeMode ? ResumePartialPath : null,
+            OutputDirectory = IsResumeMode && rerun is null ? null : OutputDirectory,
+            ResumePartialPath = IsResumeMode && rerun is null ? ResumePartialPath : null,
             UseDurableWorkflow = true,
+            RerunBase = rerun?.Summary,
+            RerunBaseModelId = rerun?.ModelId,
+            RerunRows = rerun is null ? [] : rerunRows,
         };
 
         runCancellation?.Cancel();
@@ -1649,6 +1682,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 request.ReasoningEffort,
                 request.ContextTier);
             LastRunContext = context;
+            if (rerun is not null && summary.StatusCode == QuantificationRunStatusCodes.Success) ClearRerunTarget();
             RaiseRunCompleted(context);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)

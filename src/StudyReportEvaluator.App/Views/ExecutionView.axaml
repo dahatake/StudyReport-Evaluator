@@ -109,6 +109,12 @@
             <TextBlock x:Name="PlanSummaryText" Text="{Binding PlanSummary}" TextWrapping="Wrap"
                        AutomationProperties.AutomationId="ExecutionPlanSummary"
                        ToolTip.Tip="設計から求める予定単位数とretry込み上限です。実測の送信回数ではありません。実行開始後のdraft編集は次回だけに反映されます。" />
+            <TextBlock x:Name="RerunTargetSummary" Text="{Binding RerunTargetText}" TextWrapping="Wrap" FontWeight="SemiBold"
+                       IsVisible="{Binding HasRerunTarget}"
+                       AutomationProperties.AutomationId="ExecutionRerunTarget" />
+            <TextBlock x:Name="RerunMismatchSummary" Text="{Binding RerunMismatchText}" TextWrapping="Wrap"
+                       IsVisible="{Binding HasRerunMismatch}"
+                       AutomationProperties.AutomationId="ExecutionRerunMismatch" />
             <TextBlock x:Name="RunStatusSummary" Text="{Binding RunStatusText}" TextWrapping="Wrap"
                        AutomationProperties.AutomationId="ExecutionRunStatus" />
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">

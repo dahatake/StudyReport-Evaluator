@@ -8,6 +8,7 @@
     "AC-061": "sha256:43dea9c66234d684",
     "AC-062": "sha256:ac1fa9d6a4ec956e",
     "AC-063": "sha256:0c12d44db6950d87",
+    "AC-072": "sha256:e8c4744ccb45a08b",
     "AC-074": "sha256:b2e9bba79b040925"
   },
   "cases": [
@@ -24,9 +25,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
       "status": "pass",
-      "last_commit": "52c19e4",
-      "last_run_at": "2026-11-04T01:05:58+09:00",
-      "evidence": "work/runs/202611040007/logs/system-test/E2E-001-202611040105.log",
+      "last_commit": "0335534",
+      "last_run_at": "2026-11-04T01:17:28+09:00",
+      "evidence": "work/runs/202611032347/logs/system-test/E2E-001-202611040116.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
@@ -61,9 +62,9 @@
       "command": "python -m pytest tests/system/test_fr002_output_folder.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "52c19e4",
-      "last_run_at": "2026-11-04T01:05:58+09:00",
-      "evidence": "work/runs/202611040007/logs/system-test/E2E-002-202611040105.log",
+      "last_commit": "0335534",
+      "last_run_at": "2026-11-04T01:17:28+09:00",
+      "evidence": "work/runs/202611032347/logs/system-test/E2E-002-202611040116.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
@@ -104,9 +105,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR003_AC057\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "74afe89",
-      "last_run_at": "2026-11-04T00:43:46+09:00",
-      "evidence": "work/runs/202611040007/logs/system-test/E2E-003-202611040043.log",
+      "last_commit": "0335534",
+      "last_run_at": "2026-11-04T01:17:28+09:00",
+      "evidence": "work/runs/202611032347/logs/system-test/E2E-003-202611040117.log",
       "history": [
         {
           "at": "2026-11-02T15:00:42+09:00",
@@ -183,6 +184,31 @@
           "by": "test-designer",
           "change": "blocked",
           "reason": "AC-062/063 は検証レベル=integration で System Test 対象外（CHK-10）。実装役が integration で担保。テスト tests/system/integration は参考として保持"
+        }
+      ]
+    },
+    {
+      "id": "IT-001",
+      "requirement_ids": [
+        "FR-112"
+      ],
+      "ac_ids": [
+        "AC-072"
+      ],
+      "title": "選択行の再実行: fake AI呼出しは選んだ行分のみ・未選択行の結果/採点値は不変・選んだ行だけ置換(成功/再度技術エラー)",
+      "layer": "contract",
+      "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR112_AC072\"",
+      "canary": false,
+      "status": "pass",
+      "last_commit": "0335534",
+      "last_run_at": "2026-11-04T01:17:28+09:00",
+      "evidence": "work/runs/202611032347/logs/system-test/IT-001-202611040117.log",
+      "history": [
+        {
+          "at": "2026-11-03T23:59:54+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
         }
       ]
     },

@@ -109,6 +109,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         this.designViewModel.PropertyChanged += HandleDesignViewModelPropertyChanged;
         this.executionViewModel.PropertyChanged += HandleExecutionViewModelPropertyChanged;
         this.executionViewModel.RunCompleted += HandleRunCompleted;
+        this.resultsOutputViewModel.RerunRequested += HandleRerunRequested;
         this.executionViewModel.CheckpointInputRequested += HandleCheckpointInputRequestedAsync;
         settingsViewModel.PropertyChanged += HandleSettingsViewModelPropertyChanged;
         settingsViewModel.CloseRequested += HandleSettingsCloseRequested;
@@ -209,6 +210,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         designViewModel.PropertyChanged -= HandleDesignViewModelPropertyChanged;
         executionViewModel.PropertyChanged -= HandleExecutionViewModelPropertyChanged;
         executionViewModel.RunCompleted -= HandleRunCompleted;
+        resultsOutputViewModel.RerunRequested -= HandleRerunRequested;
         executionViewModel.CheckpointInputRequested -= HandleCheckpointInputRequestedAsync;
         settingsViewModel.PropertyChanged -= HandleSettingsViewModelPropertyChanged;
         settingsViewModel.CloseRequested -= HandleSettingsCloseRequested;
@@ -386,6 +388,23 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         nextCommand.RaiseCanExecuteChanged();
         previousCommand.RaiseCanExecuteChanged();
         openSettingsCommand.RaiseCanExecuteChanged();
+    }
+
+    private void HandleRerunRequested(object? sender, ResultsRerunRequestedEventArgs e)
+    {
+        if (disposed || executionViewModel.IsRunning)
+        {
+            return;
+        }
+
+        // FR-112: 対象行を渡して実行画面へ切り替えるだけ。AI 処理は利用者が「実行開始」を押すまで始めない。
+        executionViewModel.SetRerunTarget(e.Context, e.Rows);
+        if (IsSettingsOpen)
+        {
+            CloseSettings(synchronizeDrafts: false);
+        }
+
+        navigator.NavigateTo(WorkflowStep.Execution);
     }
 
     private void HandleRunCompleted(object? sender, ExecutionRunCompletedEventArgs e)
