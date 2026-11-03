@@ -931,6 +931,15 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 例: 評価方法の種類が`Prompt`の質問で評価項目の「追加」を押すと、新しい評価項目の説明は`学生が作成したPromptを、Anthropic・OpenAI・Microsoftなどが…`で始まる本文になる。同じ質問の評価方法を`Knowledge`へ変えても既存の説明は変わらず、その後に追加した評価項目だけ`学生が作成したレポートを…`で始まる本文になる。
 
+#### FR-109 Prompt種類の組込みテンプレート評価とEvaluatorTypeの3値
+- 要求: 評価方法の種類`PROMPT_ANALYSIS`（Prompt）は、組込みテンプレート`prompt-analysis-v1`（`BuiltInTemplateVersion`で固定、利用者は編集しない）でAIへ送る評価指示を組み立て、採点・出力・AI契約はKnowledgeと同じ構造とする。未知のテンプレートversionは拒否する。結果Excelと設定シートの`EvaluatorType`列は`KNOWLEDGE_COVERAGE`／`PROMPT_ANALYSIS`／`CUSTOM_PROMPT`の3値を書き、設定シートの読込で同じ種類へ往復できる。既存の`CUSTOM_PROMPT`はCustomのまま読む。
+- 決定状態: 承認済み（包括承認 2026-11-03・approval_policy）　出自: AI提案　優先度: MUST（A-CD-04の評価動作を検証可能にする。監査指摘X-01）
+- 上位: 既定制約（ui_policy）　出典: 依頼原文 2026-11-03（§11.20）、A-CD-04
+- 対象エンティティ: なし　関係する状態: なし　参照パラメータ: なし
+- 関連する既存資産: なし
+- 受入基準 AC-064: `SafeEvaluationPayloadBuilder`がPrompt種類で`prompt-analysis-v1`の組込みテンプレートを使い、未知のversionを拒否する。`ConfigSheetWriter`が3種類を`KNOWLEDGE_COVERAGE`／`PROMPT_ANALYSIS`／`CUSTOM_PROMPT`として書き、設定シートの読込で同じ種類に往復し、既存の`CUSTOM_PROMPT`がCustomとして読める。検証は`dotnet test`（Core.TestsのSafeEvaluationPayloadBuilder関連、App.TestsのConfigSheetWriter関連。実CLI・実AI・実資格情報は使わない）。
+  - 検証レベル: integration
+
 ### 11.21 結果画面の総実行時間とAIクレジット（2026-10-01追加）
 
 出典: 依頼原文（2026-10-01「実行結果の画面に以下の情報を付与してください。定量化のジョブの総実行時間(HH:MM:SS)/AI Credit (これは金額のコストに関わるので大変重要)」と「4 結果・出力」の画面写真）、§11.9、`src/StudyReportEvaluator.App/Usage/JobUsageTracker.cs`、GitHub Docs [Usage and billing metrics（Copilot SDK）](https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/usage-and-billing)と固定SDK `1.0.11`の同文書[usage-and-billing.md](https://github.com/github/copilot-sdk/blob/v1.0.11/docs/features/usage-and-billing.md)（`totalNanoAiu`は「AI credit cost, in nano-AI units」、例は`÷ 1e9`）、GitHub Docs [Usage-based billing for individuals](https://docs.github.com/en/copilot/concepts/billing-and-usage/individuals/billing)（AIクレジットの定義）、SDK [nodejs/src/workflow.ts](https://github.com/github/copilot-sdk/blob/main/nodejs/src/workflow.ts)（`NANO_AIU_PER_AIU = 1_000_000_000`）。いずれも確認日2026-10-01。
