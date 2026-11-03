@@ -37,6 +37,7 @@ public sealed class WorkflowStateTests
     private static readonly CachedCopilotModel[] ExpectedCatalog =
         [new("model-test", 64_000, 128_000), new("auto", null, null)];
 
+    // FR-002 AC-055: output persistence is set as workflow state; picker interaction is covered by SettingsViewTests.
     [AvaloniaTheory]
     [InlineData(WorkflowStep.Input)]
     [InlineData(WorkflowStep.Design)]
@@ -69,7 +70,7 @@ public sealed class WorkflowStateTests
         Edit(ById<TextBox>(settings, "DesignRevision"), "t24");
         Select(ById<ComboBox>(settings, "ExecutionConcurrency"), 2);
         string outputDirectory = Path.Combine(fixture.Workbook.Directory, "明示出力先");
-        Edit(ById<TextBox>(settings, "ExecutionOutputDirectory"), outputDirectory);
+        fixture.Execution.OutputDirectoryOverride = outputDirectory;
         Assert.IsType<TabControl>(CategoryContent(settings));
 
         // Save directly from either final editing surface, not after a manual SynchronizeDrafts call.
@@ -217,6 +218,7 @@ public sealed class WorkflowStateTests
         AssertPassive(fixture, authenticationChecks: 1, runs: 1);
     }
 
+    // FR-002 AC-055: round-trip assertions preserve explicit output independently of the read-only editor.
     [AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]
@@ -231,7 +233,7 @@ public sealed class WorkflowStateTests
         Select(ById<ComboBox>(settings, "ExecutionModel"), "auto");
         Select(ById<ComboBox>(settings, "ExecutionConcurrency"), 2);
         string outputDirectory = Path.Combine(fixture.Workbook.Directory, "chosen-output");
-        Edit(ById<TextBox>(settings, "ExecutionOutputDirectory"), outputDirectory);
+        fixture.Execution.OutputDirectoryOverride = outputDirectory;
         Close(fixture);
         ExecutionRunContext completed = await RunAsync(fixture);
         QuantificationRunRequest request = fixture.Runner.LastRequest!;
@@ -294,6 +296,7 @@ public sealed class WorkflowStateTests
         AssertPassive(fixture, authenticationChecks: 1, runs: 1);
     }
 
+    // FR-002 AC-055: path persistence/input-relative default are workflow state, not text-entry behavior.
     [AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]
@@ -306,7 +309,7 @@ public sealed class WorkflowStateTests
         Next(fixture);
         SettingsView settings = Open(fixture);
         string chosenOutput = Path.Combine(fixture.Workbook.Directory, "persisted-output");
-        if (explicitOutput) Edit(ById<TextBox>(settings, "ExecutionOutputDirectory"), chosenOutput);
+        if (explicitOutput) fixture.Execution.OutputDirectoryOverride = chosenOutput;
         QuantificationDefinition original = fixture.Input.DefinitionDraft;
         ApplicationSettings saved = await SaveAsync(fixture, original);
         Assert.Equal(explicitOutput ? chosenOutput : null, saved.OutputDirectoryOverride);
@@ -359,6 +362,7 @@ public sealed class WorkflowStateTests
         AssertPassive(fixture, authenticationChecks: 1, runs: 2);
     }
 
+    // FR-002 AC-055: output changes while running affect only the next-run draft, never the active snapshot.
     [AvaloniaFact]
     public async Task Deferred_run_uses_captured_request_and_delivers_results_without_closing_edited_settings()
     {
@@ -393,7 +397,7 @@ public sealed class WorkflowStateTests
             Select(ById<ComboBox>(settings, "ExecutionModel"), "auto");
             Select(ById<ComboBox>(settings, "ExecutionConcurrency"), 3);
             string nextOutput = Path.Combine(fixture.Workbook.Directory, "next-output");
-            Edit(ById<TextBox>(settings, "ExecutionOutputDirectory"), nextOutput);
+            fixture.Execution.OutputDirectoryOverride = nextOutput;
             QuantificationDefinition next = fixture.Design.Draft;
             await SaveAsync(fixture, next);
             Assert.NotEqual(Canonical.ComputeSha256(original), Canonical.ComputeSha256(next));

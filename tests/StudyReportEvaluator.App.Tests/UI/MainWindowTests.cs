@@ -181,6 +181,7 @@ public sealed class MainWindowTests
         AssertNoAutomaticActivity(harness);
     }
 
+    // FR-002 AC-055: the next output path is previewed in the single read-only field.
     [AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]
@@ -223,7 +224,7 @@ public sealed class MainWindowTests
 
             SettingsView settings = Assert.Single(window.GetVisualDescendants().OfType<SettingsView>());
             Assert.Equal(expectedOutput, outputAtOpen);
-            Assert.Equal(expectedOutput, ByAutomationId<TextBox>(settings, "SettingsEffectiveOutputDirectory").Text);
+            Assert.Equal(expectedOutput, ByAutomationId<TextBox>(settings, "ExecutionOutputDirectory").Text);
             Assert.Equal(expectedOutput, execution.OutputDirectory);
             Assert.Null(execution.OutputDirectoryOverride);
             Assert.Equal(7, execution.PlannedEvaluationCount);
@@ -247,6 +248,7 @@ public sealed class MainWindowTests
         }
     }
 
+    // FR-002 AC-055: explicit output selection remains visible across input replacement.
     [AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]
@@ -294,7 +296,7 @@ public sealed class MainWindowTests
 
             SettingsView settings = Assert.Single(window.GetVisualDescendants().OfType<SettingsView>());
             Assert.Equal(expectedOutput, outputAtOpen);
-            Assert.Equal(expectedOutput, ByAutomationId<TextBox>(settings, "SettingsEffectiveOutputDirectory").Text);
+            Assert.Equal(expectedOutput, ByAutomationId<TextBox>(settings, "ExecutionOutputDirectory").Text);
             Assert.Equal(explicitDirectory, execution.OutputDirectoryOverride);
             Assert.Equal(21, execution.WorstCaseAttemptCount);
             Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
@@ -328,6 +330,7 @@ public sealed class MainWindowTests
         }
     }
 
+    // FR-002 AC-055: unloading input updates the one next-output display without mutating an explicit choice.
     [AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]
@@ -356,7 +359,7 @@ public sealed class MainWindowTests
             shell.OpenSettings(SettingsCategory.Common);
             Render();
             SettingsView settings = Assert.Single(window.GetVisualDescendants().OfType<SettingsView>());
-            TextBox output = ByAutomationId<TextBox>(settings, "SettingsEffectiveOutputDirectory");
+            TextBox output = ByAutomationId<TextBox>(settings, "ExecutionOutputDirectory");
             Assert.Equal(explicitDirectory ?? Path.Combine(workbook.Directory, "result"), output.Text);
 
             harness.Input.SetFilePath(string.Empty);
@@ -957,6 +960,7 @@ public sealed class MainWindowTests
         }
     }
 
+    // FR-002 AC-055: current-run output stays fixed while the unified field previews next-run output.
     [AvaloniaFact]
     public async Task Active_run_A_then_input_B_then_execution_shows_current_A_and_next_B_without_revalidation()
     {
@@ -1017,7 +1021,7 @@ public sealed class MainWindowTests
 
             SettingsView settings = Assert.Single(window.GetVisualDescendants().OfType<SettingsView>());
             Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
-            Assert.Equal(outputB, ByAutomationId<TextBox>(settings, "SettingsEffectiveOutputDirectory").Text);
+            Assert.Equal(outputB, ByAutomationId<TextBox>(settings, "ExecutionOutputDirectory").Text);
             Assert.Equal(new (string, long)[] { (string.Empty, 0), (outputB, 7) }, previews.ToArray());
             Assert.Equal("今回run 新規出力先: " + outputA, execution.CurrentRunOutputSummary);
             Assert.True(execution.IsRunning);

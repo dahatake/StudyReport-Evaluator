@@ -682,6 +682,7 @@ public sealed class DocumentationContractTests
             "**設定を保存**では結果・overrideを保存しません");
     }
 
+    // FR-002 AC-055: documentation contracts describe one read-only output path and picker/reset actions.
     [Fact]
     public void test_settings_contract_model_output_reset_and_run_isolation()
     {
@@ -697,15 +698,15 @@ public sealed class DocumentationContractTests
             "確認失敗だけでは希望IDを消しません",
             "それだけで暗黙の希望IDを保存しません",
             "参照回答・通常評価・固有評価はrunで選んだ同じmodelとreasoning effortを使います",
-            "再起動後や別Excelへ変更した後もその絶対pathを保持",
-            "指定出力先を空欄にする操作は未指定（`null`）への明示変更",
+            "再起動や別Excelへの変更でも保持します",
+            "出力先の**既定に戻す**は未指定（`null`）への明示変更",
             "以前の保存指定へ勝手に戻りません",
             "`null`の場合だけ、現在の入力fileに隣接する`result`を都度算出",
             "入力Aから入力Bへ変えればBの隣接先",
             "入力未選択なら**入力後に決定**",
             "自動算出したpathは指定値として保存しません",
             "指定先が利用不可でも別pathへfallbackしません",
-            "設定の復元だけでは出力directoryを作りません",
+            "選択・取消・設定復元だけではアプリは出力directory/fileを作りません",
             "checkpoint再開では保存済みの予約pathを使い、この新規run用指定で置き換えません",
             "実行中に編集・保存する設定は**次回用draft**",
             "現在runは開始時のrequest／immutable snapshot、model・並列度・出力条件、予約済みpathを保持",
@@ -719,9 +720,10 @@ public sealed class DocumentationContractTests
             "**変更 → 設定の共通**",
             "保存希望model・選択値が利用不可なら自動fallbackせず、選び直しを求めます",
             "希望IDの復元は認証済み・利用可能という判定ではありません",
-            "空欄（`outputDirectoryOverride: null`）",
+            "**既定に戻す**で明示指定を解除（`outputDirectoryOverride: null`）",
             "保存した明示指定は再起動・入力変更後も保持",
-            "`null`の場合だけ現在の入力に隣接する`result`を算出し、算出path自体は保存しません",
+            "未指定（`null`）なら現在の入力に隣接する`result`を算出",
+            "算出pathは指定値として保存せず",
             "利用できない指定先から別pathへfallbackしません",
             "開始済みrunの入力・採点定義・モデル・並列度・出力条件と予約済みpathは固定",
             "設定表示中に完了しても強制移動せず",
@@ -1121,6 +1123,7 @@ public sealed class DocumentationContractTests
             "同一Questionの主回答列と補助列に同じ列を重複指定することはできません");
     }
 
+    // FR-002 AC-055: baseline requirements evidence describes picker/reset semantics.
     [Fact]
     public void Ui_settings_baseline_preserves_explicit_boundaries_and_pending_evidence()
     {
@@ -1135,7 +1138,7 @@ public sealed class DocumentationContractTests
             "全タスク完了後だけUnreleased追記",
             "T01では製品版・CHANGELOGを変更しない",
             "明示指定はabsolute pathとして再起動・入力Excel変更後も保持する",
-            "空欄への明示編集は`null`への変更として扱い",
+            "「既定に戻す」の画面操作で明示指定を`null`にでき",
             "明示指定が`null`の場合だけ",
             "自動算出したresult pathを明示指定として保存しない",
             "指定先が利用不可でも別pathへfallbackせず",
