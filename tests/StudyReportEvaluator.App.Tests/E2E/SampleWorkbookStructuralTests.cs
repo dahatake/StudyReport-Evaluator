@@ -338,7 +338,7 @@ public sealed class WindowsX64PerformanceEvidenceTests
                         {
                             Id = "E-PERFORMANCE",
                             DisplayName = "Synthetic performance evaluator",
-                            Type = EvaluatorType.PromptAnalysis,
+                            Type = EvaluatorType.CustomPrompt,
                             Weight = 1m,
                             Range = new ScoreRange(0m, 10m),
                             CustomPromptTemplate = "{回答}\n{評価項目}",

@@ -1956,7 +1956,7 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
             string? directory = string.IsNullOrWhiteSpace(anchor) ? null : Path.GetDirectoryName(Path.GetFullPath(anchor));
             return string.IsNullOrEmpty(directory)
                 ? string.Empty
-                : OutputPathPlanner.FindUnusedFinalPath(directory, DateTimeOffset.Now);
+                : OutputPathPlanner.FindUnusedFinalPath(directory, summary.EndedAtUtc.ToLocalTime());
         }
         catch
         {
