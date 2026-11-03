@@ -5,6 +5,12 @@
 - 通常の速い実行: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "Category!=SlowDurable"`（durable 新規→中断→再開は 60 行版が走る）。
 - フル検証: フィルターなし、または `--filter "Category=SlowDurable"`（531 行版。fsync 付き CheckpointStore 更新約 1,330 回で約 8〜9 分）。
 
+## 2026-11-03 — 残件の整理（leftovers）
+
+- `WindowsLocalApplicationTests.Normal_release_framework_dependent_app_starts_without_office_or_com_runtime`は、先に`dotnet build src/StudyReportEvaluator.App -c Release`で`src/StudyReportEvaluator.App/bin/Release/net10.0`を作ると通る（Release成果物が前提。worktreeごとに必要）。
+- `tests/toolkit`は`conftest.py`（EABK toolkitの標準のもの）と`tools/templates`を追加して全24件成功。
+- 既知の失敗は`SampleWorkbookStructuralTests.Repository_sample_…`の1件のみ継続中: 主作業ツリーのgit管理外`sample/SampleReport.xlsx`が`A1:L6`で、要求定義書の現行契約`A1:J531`（2026-09-16測定）と一致しない。テスト期待は契約どおりなので変更せず、現行契約のsample（A1:J531）の再配置が必要。
+
 ## 2026-10-01 — v0.8.6公開状態
 
 - **公開状態**: StudyReport Evaluator `v0.8.6`は2026-10-01 21:42 JSTにGitHub Releasesへ公開済み。release candidate run 36860591724は成功し、公開assetは`StudyReportEvaluator-win-x64.exe`、`.exe.sha256`、`.zip`、`.zip.sha256`の4件。
