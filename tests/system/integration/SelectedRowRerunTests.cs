@@ -94,7 +94,7 @@ public sealed class SelectedRowRerunTests
                     CriterionId = c.CriterionId,
                     RawScore = 5m + (row % 5),
                     Reason = "synthetic",
-                    Evidence = "synthetic",
+                    Evidence = payload.PrimarySource.Value, // 元セル（answer {row}）の正確な部分文字列
                     EvidenceSource = EvidenceSourceKind.PrimaryAnswer,
                     EvidenceSourceColumnId = "A",
                 }).ToImmutableArray(),
