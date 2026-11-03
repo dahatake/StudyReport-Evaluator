@@ -131,8 +131,13 @@ public sealed class SelectedRowRerunTests
         /// 選んだ行（元の行番号）だけを、元の run と同じ入力・採点定義・model で再実行する（FR-112）。
         /// 再実行 API は実装後に確定するため、実装役は本メソッドの 1 か所だけを実 API に合わせる（期待値は変えない）。
         /// </summary>
-        internal Task<RunSummary> RerunAsync(IEvaluationRunner runner, RunSummary original, IReadOnlyList<int> rows, CancellationToken ct) =>
-            throw new NotImplementedException("FR-112: 選択行の再実行の入口が未実装（AC-072 の実行入口を実装後に接続する）");
+        internal Task<RunSummary> RerunAsync(IEvaluationRunner runner, RunSummary original, IReadOnlyList<int> rows, CancellationToken ct)
+        {
+            DurableQuantificationOrchestrator orchestrator = new(
+                new OpenXmlEvaluationRowSource(InputPath), runner, new NoReference(), new NoSpecial());
+            return orchestrator.RerunRowsAsync(
+                BuildRequest(SyntheticRun.Definition() with { }), original, "model-test", rows, cancellationToken: ct);
+        }
 
         internal Dictionary<int, string> RowOutcomes(RunSummary summary) =>
             summary.CompletedRows.ToDictionary(
@@ -148,10 +153,15 @@ public sealed class SelectedRowRerunTests
 
         private async Task<RunSummary> RunCoreAsync(IEvaluationRunner runner, QuantificationDefinition definition, CancellationToken ct)
         {
-            WorkbookMetadata metadata = new WorkbookMetadataReader().Read(InputPath);
             DurableQuantificationOrchestrator orchestrator = new(
                 new OpenXmlEvaluationRowSource(InputPath), runner, new NoReference(), new NoSpecial());
-            return await orchestrator.RunAsync(
+            return await orchestrator.RunAsync(BuildRequest(definition), cancellationToken: ct);
+        }
+
+        private DurableQuantificationRunRequest BuildRequest(QuantificationDefinition definition)
+        {
+            WorkbookMetadata metadata = new WorkbookMetadataReader().Read(InputPath);
+            return
                 new DurableQuantificationRunRequest
                 {
                     Run = new QuantificationRunRequest
@@ -173,8 +183,7 @@ public sealed class SelectedRowRerunTests
                         SdkInformationalVersion = "1.0.11",
                     },
                     OutputDirectory = OutputDirectory,
-                },
-                cancellationToken: ct);
+                };
         }
 
         private static void Create(string path)
