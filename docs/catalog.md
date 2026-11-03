@@ -18,11 +18,13 @@
 | FR-CD-01 | 評価項目の説明の初期値（種類別） | 承認済み | src/StudyReportEvaluator.Core/Prompting/DefaultCriterionDescriptions.cs, src/StudyReportEvaluator.Core/Domain/EvaluatorDefinition.cs, src/StudyReportEvaluator.Core/Prompting/BuiltInPromptTemplates.cs, src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs, src/StudyReportEvaluator.App/ViewModels/QuantificationDesignViewModel.cs, src/StudyReportEvaluator.App/ViewModels/InputViewModel.cs, src/StudyReportEvaluator.App/Views/EvaluatorSettingsView.axaml, src/StudyReportEvaluator.App/Workbooks/Writing/ConfigSheetWriter.cs | tests/StudyReportEvaluator.App.Tests/UI/DefaultCriterionDescriptionTests.cs | - |
 | FR-CD-02 | 初期値は新規作成時だけに設定 | 承認済み | src/StudyReportEvaluator.App/ViewModels/QuantificationDesignViewModel.cs, src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs | tests/StudyReportEvaluator.App.Tests/UI/DefaultCriterionDescriptionTests.cs | - |
 | FR-CD-03 | 名前・重み・rangeの不変と検証エラー0件 | 承認済み | src/StudyReportEvaluator.Core/Prompting/DefaultCriterionDescriptions.cs, src/StudyReportEvaluator.App/ViewModels/InputViewModel.cs | tests/StudyReportEvaluator.App.Tests/UI/DefaultCriterionDescriptionTests.cs | - |
-| FR-112 | 結果画面で選んだ行だけの再実行 | 承認済み | 未実装 | 未実装 | - |
+| FR-112 | 結果画面で選んだ行だけの再実行 | 承認済み | src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs, src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.Rerun.cs, src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.Rerun.cs, src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs, src/StudyReportEvaluator.App/ViewModels/MainWindowViewModel.cs, src/StudyReportEvaluator.App/Workflow/DurableQuantificationOrchestrator.cs, src/StudyReportEvaluator.App/Workflow/QuantificationOrchestrator.cs, src/StudyReportEvaluator.App/Views/ResultsOutputView.axaml, src/StudyReportEvaluator.App/Views/ExecutionView.axaml, docs/settings.md | tests/system/integration/SelectedRowRerunTests.cs, tests/StudyReportEvaluator.App.Tests/UI/SelectedRowRerunTests.cs | デザイン基盤, OutputPathPlanner |
 ## API・イベント
 
 | 名前 | 定義ファイル | 関連する要求 ID |
 |---|---|---|
+| DurableQuantificationOrchestrator.RerunRowsAsync（選んだ行だけの再実行） | src/StudyReportEvaluator.App/Workflow/DurableQuantificationOrchestrator.cs | FR-112 |
+| ResultsOutputViewModel.RerunRequested（対象行の確定イベント） | src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.Rerun.cs | FR-112 |
 
 ## テーブル
 
@@ -33,8 +35,8 @@
 
 | 部品名 | ファイル | 用途 | 使っている要求 ID |
 |---|---|---|---|
-| デザイン基盤 | src/StudyReportEvaluator.App/App.axaml, src/StudyReportEvaluator.App/Styles/Accessibility.axaml, src/StudyReportEvaluator.App/Resources/WorkflowIcons.axaml | 既存Avalonia FluentTheme、共通brush・フォーカス・44 DIP操作対象・アイコンを再利用。今回独自テーマは追加しない | FR-002 |
+| デザイン基盤 | src/StudyReportEvaluator.App/App.axaml, src/StudyReportEvaluator.App/Styles/Accessibility.axaml, src/StudyReportEvaluator.App/Resources/WorkflowIcons.axaml | 既存Avalonia FluentTheme、共通brush・フォーカス・44 DIP操作対象・アイコンを再利用。今回独自テーマは追加しない | FR-002, FR-112 |
 | 設定保存 | src/StudyReportEvaluator.App/Settings/SettingsFileStore.cs, src/StudyReportEvaluator.App/Settings/ApplicationSettings.cs | 既存schemaの絶対出力先/nullと次回設定を明示保存・復元。run snapshotとモデルcache自動保存契約は維持 | FR-002 |
 | ネイティブ出力フォルダー選択 | src/StudyReportEvaluator.App/Views/NativeOutputFolderPicker.cs | 入力選択と同じTopLevel.StorageProviderで単一フォルダーを選択。取消はnull、非local/利用不可は理由つき失敗。IO作成なし | FR-002 |
-| OutputPathPlanner | src/StudyReportEvaluator.App/Workbooks/Writing/OutputPathPlanner.cs | `eval-yyyyMMdd-HHmm[-NN]` の未使用名の採番（出力予約と別名既定名） | FR-107 |
+| OutputPathPlanner | src/StudyReportEvaluator.App/Workbooks/Writing/OutputPathPlanner.cs | `eval-yyyyMMdd-HHmm[-NN]` の未使用名の採番（出力予約と別名既定名） | FR-107, FR-112 |
 | RunTextLog | src/StudyReportEvaluator.App/Logging/RunTextLog.cs | ジョブ実行ログの `{yyyyMMddHHmm}-log.txt` 保存（閉じたコードと数値のみ） | FR-108 |

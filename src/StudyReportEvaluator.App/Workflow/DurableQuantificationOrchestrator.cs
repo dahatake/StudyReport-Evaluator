@@ -652,6 +652,285 @@ public sealed class DurableQuantificationOrchestrator
         return completed;
     }
 
+    /// <summary>
+    /// FR-112: re-runs only the selected source rows of a finished durable run. The other rows keep their
+    /// completed results unchanged, the selected rows are replaced, and the merged output is written to a
+    /// newly reserved name (the original output is never overwritten). The admission is the same as a
+    /// resume (input, definition, model); a mismatch throws before any AI call.
+    /// </summary>
+    public async Task<RunSummary> RerunRowsAsync(
+        DurableQuantificationRunRequest request,
+        RunSummary original,
+        string originalModelId,
+        IReadOnlyList<int> rows,
+        Action<DurableEvaluationProgress>? progress = null,
+        CancellationToken cancellationToken = default,
+        AdaptiveEvaluationConcurrencyLimiter? concurrencyLimiter = null)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(request.Run);
+        ArgumentNullException.ThrowIfNull(request.Runtime);
+        ArgumentNullException.ThrowIfNull(original);
+        ArgumentNullException.ThrowIfNull(rows);
+        QuantificationRunRequest run = request.Run;
+        ArgumentNullException.ThrowIfNull(run.DraftDefinition);
+        ArgumentNullException.ThrowIfNull(run.WorkbookMetadata);
+        ArgumentException.ThrowIfNullOrWhiteSpace(run.InputPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(run.ModelId);
+        EphemeralEvaluationRunner.ValidateReasoningEffort(run.ReasoningEffort);
+        _ = ModelOptionPolicy.ToSdkContextTier(run.ContextTier);
+        _ = new EvaluationSchedulerOptions(run.MaxConcurrency);
+        if (!original.IsDurable
+            || !string.Equals(original.StatusCode, QuantificationRunStatusCodes.Success, StringComparison.Ordinal))
+        {
+            throw new QuantificationRunException("RERUN_BASE_INVALID");
+        }
+
+        int[] targets = rows.Distinct().OrderBy(row => row).ToArray();
+        HashSet<int> completedNumbers = original.CompletedRows.Select(row => row.SourceRowNumber).ToHashSet();
+        if (targets.Length == 0 || targets.Any(row => !completedNumbers.Contains(row)))
+        {
+            throw new QuantificationRunException("RERUN_ROWS_INVALID");
+        }
+
+        progress = progress is null ? null : value => { try { progress(value); } catch { /* observers cannot alter the run */ } };
+        Report(progress, DurableEvaluationStage.Preparing, 0, 0, 0, 0, 0, 0, 0, "PREPARING");
+        QuantificationSnapshot snapshot = QuantificationSnapshot.Create(run.DraftDefinition);
+        ColumnMappingValidationResult mappingValidation = mappingValidator.Validate(
+            run.WorkbookMetadata,
+            snapshot.Definition);
+        if (!mappingValidation.IsValid || mappingValidation.Mapping is null)
+        {
+            throw new QuantificationMappingValidationException(mappingValidation.Errors);
+        }
+
+        WorkbookExecutionPreflightResult capacity = workbookPreflight.Validate(snapshot, run.WorkbookMetadata);
+        if (!capacity.IsValid)
+        {
+            throw new QuantificationRunPreflightException(capacity.Errors);
+        }
+
+        EvaluationPlan plan = planBuilder.Build(snapshot, mappingValidation.Mapping);
+        ValidateStaticCapacity(run, plan);
+        InputSnapshot currentInput;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            currentInput = inputSnapshots.Capture(run.InputPath)
+                ?? throw new InvalidOperationException("The input snapshot boundary returned no snapshot.");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            throw new QuantificationRunException("INPUT_SNAPSHOT_FAILED");
+        }
+
+        if (!original.InputSnapshot.Equals(currentInput))
+        {
+            throw new QuantificationRunException(CheckpointAdmissionStatusCodes.InputMismatch);
+        }
+
+        if (!string.Equals(original.DefinitionSha256, snapshot.Sha256, StringComparison.Ordinal))
+        {
+            throw new QuantificationRunException(CheckpointAdmissionStatusCodes.DefinitionMismatch);
+        }
+
+        if (!string.Equals(originalModelId, run.ModelId, StringComparison.Ordinal))
+        {
+            throw new QuantificationRunException(CheckpointAdmissionStatusCodes.ModelMismatch);
+        }
+
+        DateTimeOffset startedAtUtc = UtcNow(default);
+        OutputPathReservation reservation = outputPathPlanner.Reserve(
+            run.InputPath,
+            timeProvider.GetLocalNow(),
+            request.OutputDirectory);
+        CheckpointEnvelope checkpoint = new()
+        {
+            InputPath = Path.GetFullPath(run.InputPath),
+            Input = currentInput,
+            DefinitionCanonicalJson = snapshot.CanonicalJson,
+            DefinitionSha256 = snapshot.Sha256,
+            NormalModelId = run.ModelId,
+            ReferenceModelId = run.ModelId,
+            ReasoningEffort = run.ReasoningEffort,
+            ContextTier = run.ContextTier,
+            Runtime = request.Runtime,
+            FinalPath = reservation.FinalPath,
+            PartialPath = reservation.PartialPath,
+            StartedAtUtc = startedAtUtc,
+            SavedAtUtc = startedAtUtc,
+            References = original.References,
+            CompletedRows = original.CompletedRows,
+        };
+        CheckpointSaveResult created = checkpointStore.Create(checkpoint, cancellationToken);
+        if (!created.IsSuccess)
+        {
+            throw new QuantificationRunException(created.Code);
+        }
+
+        int referenceTotal = original.References.Length;
+        int rowTotal = targets.Length;
+        int perRowOperations = OperationsPerRow(plan);
+        int operationTotal = checked(rowTotal * perRowOperations);
+        Dictionary<string, CheckpointReference> referencesByQuestion = original.References.ToDictionary(
+            reference => reference.QuestionId,
+            StringComparer.Ordinal);
+        concurrencyLimiter ??= new AdaptiveEvaluationConcurrencyLimiter(run.MaxConcurrency);
+        using CancellationTokenSource rowCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using SemaphoreSlim gate = new(Math.Max(1, run.MaxConcurrency));
+        Dictionary<int, CheckpointCompletedRow> replaced = [];
+        object replacedGate = new();
+
+        async Task EvaluateOneAsync(int sourceRow)
+        {
+            try
+            {
+                await gate.WaitAsync(rowCancellation.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            try
+            {
+                if (rowCancellation.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                DurableRowEvaluationResult result;
+                try
+                {
+                    result = await rowScheduler.EvaluateRowAsync(
+                        plan,
+                        sourceRow,
+                        referencesByQuestion,
+                        run.ModelId,
+                        run.ReasoningEffort,
+                        run.MaxConcurrency,
+                        run.MaximumPromptTokens,
+                        run.MaximumContextWindowTokens,
+                        _ => { },
+                        rowCancellation.Token,
+                        concurrencyLimiter,
+                        null).ConfigureAwait(false);
+                }
+                catch
+                {
+                    rowCancellation.Cancel();
+                    return;
+                }
+
+                if (!result.IsComplete || result.CompletedRow is null || HasQuotaExhausted(result.CompletedRow))
+                {
+                    rowCancellation.Cancel();
+                    return;
+                }
+
+                int done;
+                lock (replacedGate)
+                {
+                    replaced[sourceRow] = result.CompletedRow;
+                    done = replaced.Count;
+                }
+
+                Report(progress, DurableEvaluationStage.EvaluatingRows, referenceTotal, referenceTotal, done, rowTotal, done * perRowOperations, operationTotal, 0, "EVALUATING_ROW");
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        Report(progress, DurableEvaluationStage.EvaluatingRows, referenceTotal, referenceTotal, 0, rowTotal, 0, operationTotal, 0, "EVALUATING_ROW");
+        await Task.WhenAll(targets.Select(EvaluateOneAsync)).ConfigureAwait(false);
+
+        bool allReplaced = replaced.Count == targets.Length;
+        ImmutableArray<CheckpointCompletedRow> mergedRows = allReplaced
+            ? original.CompletedRows
+                .Select(row => replaced.TryGetValue(row.SourceRowNumber, out CheckpointCompletedRow? next) ? next : row)
+                .ToImmutableArray()
+            : original.CompletedRows;
+        checkpoint = checkpoint with { CompletedRows = mergedRows, SavedAtUtc = UtcNow(checkpoint.SavedAtUtc) };
+        EvaluationScheduleResult schedule = BuildSchedule(plan, mergedRows);
+        string runStatus = !allReplaced
+            ? QuantificationRunStatusCodes.Cancelled
+            : !SafeInputRecheck(run.InputPath, currentInput)
+                ? QuantificationRunStatusCodes.InputChanged
+                : QuantificationRunStatusCodes.Success;
+        ImmutableArray<RunPeerSimilarityResult> peerSimilarities =
+            string.Equals(runStatus, QuantificationRunStatusCodes.Success, StringComparison.Ordinal)
+                ? await CalculatePeerSimilaritiesAsync(snapshot, plan, cancellationToken).ConfigureAwait(false)
+                : [];
+        DateTimeOffset endedAtUtc = UtcNow(checkpoint.StartedAtUtc);
+        RunSummary summary = CreateSummary(
+            schedule,
+            currentInput,
+            runStatus,
+            checkpoint,
+            original.References,
+            mergedRows,
+            endedAtUtc,
+            wasResumed: false,
+            finalPath: null,
+            finalizationCode: null,
+            partialCleanupFailed: false,
+            peerSimilarities);
+        if (!string.Equals(runStatus, QuantificationRunStatusCodes.Success, StringComparison.Ordinal))
+        {
+            // The merged checkpoint is not a resume source: remove the partial file, keep the original untouched.
+            try { _ = partialCleaner.TryDelete(checkpoint.PartialPath); } catch { /* best effort */ }
+            Report(progress, DurableEvaluationStage.Completed, referenceTotal, referenceTotal, replaced.Count, rowTotal, summary.CompletedOperationCount, operationTotal, 0, runStatus);
+            return summary;
+        }
+
+        Report(progress, DurableEvaluationStage.FinalizingWorkbook, referenceTotal, referenceTotal, rowTotal, rowTotal, operationTotal, operationTotal, 0, "FINALIZING_WORKBOOK");
+        DurableFinalizationResult finalized = finalizer.Finalize(summary, checkpoint, cancellationToken);
+        bool finalPathMatches = finalized.IsSuccess
+            && finalized.FinalPath is not null
+            && ResumeAdmissionEvaluator.PathsEqual(finalized.FinalPath, checkpoint.FinalPath);
+        bool cleanupFailed = false;
+        string finalStatus;
+        string? finalPath;
+        if (finalPathMatches)
+        {
+            try { cleanupFailed = !partialCleaner.TryDelete(checkpoint.PartialPath); }
+            catch { cleanupFailed = true; }
+            finalStatus = QuantificationRunStatusCodes.Success;
+            finalPath = finalized.FinalPath;
+        }
+        else
+        {
+            finalStatus = string.Equals(finalized.Code, AtomicOutputStatusCodes.Cancelled, StringComparison.Ordinal)
+                ? QuantificationRunStatusCodes.Cancelled
+                : string.Equals(finalized.Code, AtomicOutputStatusCodes.InputChanged, StringComparison.Ordinal)
+                    ? QuantificationRunStatusCodes.InputChanged
+                    : QuantificationRunStatusCodes.OutputInvalid;
+            finalPath = null;
+        }
+
+        RunSummary completed = CreateSummary(
+            schedule,
+            currentInput,
+            finalStatus,
+            checkpoint,
+            original.References,
+            mergedRows,
+            endedAtUtc,
+            wasResumed: false,
+            finalPath,
+            finalized.Code,
+            cleanupFailed,
+            peerSimilarities);
+        Report(progress, DurableEvaluationStage.Completed, referenceTotal, referenceTotal, rowTotal, rowTotal, completed.CompletedOperationCount, operationTotal, 0, finalStatus);
+        return completed;
+    }
+
     public override string ToString() =>
         $"{nameof(DurableQuantificationOrchestrator)} {{ Content = <redacted> }}";
 

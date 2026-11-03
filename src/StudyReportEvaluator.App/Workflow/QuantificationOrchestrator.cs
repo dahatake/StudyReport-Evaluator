@@ -122,6 +122,15 @@ public sealed record QuantificationRunRequest
 
     public bool UseDurableWorkflow { get; init; }
 
+    /// FR-112: 選んだ行だけを再実行するときの元の run（null なら通常の run）。
+    public RunSummary? RerunBase { get; init; }
+
+    /// FR-112: 元の run の model（再実行の前提検証に使う）。
+    public string? RerunBaseModelId { get; init; }
+
+    /// FR-112: 再実行する元の行番号。
+    public IReadOnlyList<int> RerunRows { get; init; } = [];
+
     public override string ToString() =>
         $"{nameof(QuantificationRunRequest)} {{ MaxConcurrency = {MaxConcurrency.ToString(CultureInfo.InvariantCulture)}, Content = <redacted> }}";
 }
