@@ -294,7 +294,7 @@ public sealed class ResultsOutputViewTests
         Workbook outputWorkbook = outputPart.Workbook
             ?? throw new InvalidDataException("The output workbook root is missing.");
         Sheet[] sheets = outputWorkbook.Descendants<Sheet>().ToArray();
-        Assert.Equal(5, sheets.Length);
+        Assert.Equal(6, sheets.Length); // FR-113: source + 5 (採点結果 included)
         Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.ConfigBaseName);
         Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.ReferencesBaseName);
         Assert.Contains(sheets, sheet => sheet.Name?.Value == AppOwnedSheetNameResolver.ResultsBaseName);
