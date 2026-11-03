@@ -742,7 +742,11 @@ public sealed class SettingsWorkflowSystemTests
         memory.Write(File.ReadAllBytes(inputPath));
         memory.Position = 0;
         using SpreadsheetDocument document = SpreadsheetDocument.Open(memory, true);
-        AppOwnedSheetNames names = new AppOwnedSheetNameResolver().Resolve(document);
+        AppOwnedSheetNameResolver resolver = new();
+        AppOwnedSheetNames names = resolver.Resolve(document);
+        string[] originalNames = document.WorkbookPart!.Workbook!.Descendants<Sheet>()
+            .Select(sheet => sheet.Name!.Value!).ToArray();
+        names = names.WithScoreSummarySheetName(ScoreSummarySheetWriter.ResolveName(resolver, originalNames, names));
         ConfigCellAddressMap config = new ConfigSheetWriter().Write(document, summary.Snapshot, names);
         ResultsSheetWriteResult results = new ResultsSheetWriter().Write(
             document, summary.Snapshot, names, config, preparation.Rows);
@@ -765,7 +769,10 @@ public sealed class SettingsWorkflowSystemTests
         using SpreadsheetDocument document = SpreadsheetDocument.Open(path, false);
         Assert.Empty(new OpenXmlValidator().Validate(document, TestToken));
         Workbook workbook = document.WorkbookPart!.Workbook!;
-        Assert.Equal([SourceSheet, .. plan.SheetNames.AllSheetNames], workbook.Descendants<Sheet>().Select(sheet => sheet.Name?.Value));
+        Assert.Equal(
+            [SourceSheet, plan.SheetNames.ConfigSheetName, plan.SheetNames.ReferencesSheetName,
+                plan.SheetNames.ResultsSheetName, plan.SheetNames.ScoreSummarySheetName, plan.SheetNames.RunSheetName],
+            workbook.Descendants<Sheet>().Select(sheet => sheet.Name?.Value));
         Assert.DoesNotContain(workbook.Descendants<Sheet>(), sheet => sheet.Name?.Value == CheckpointStore.CheckpointSheetName);
         Assert.Equal(ReadWorksheetXml(input.Path, SourceSheet), Worksheet(document, SourceSheet).OuterXml);
         Worksheet config = Worksheet(document, plan.SheetNames.ConfigSheetName);
