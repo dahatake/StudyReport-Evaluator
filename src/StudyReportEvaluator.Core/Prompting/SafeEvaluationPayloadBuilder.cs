@@ -70,6 +70,7 @@ public sealed class SafeEvaluationPayloadBuilder
         string template = evaluator.Type switch
         {
             EvaluatorType.KnowledgeCoverage => BuiltInPromptTemplates.GetKnowledgeTemplate(evaluator.BuiltInTemplateVersion),
+            EvaluatorType.PromptAnalysis => BuiltInPromptTemplates.GetPromptAnalysisTemplate(evaluator.BuiltInTemplateVersion),
             EvaluatorType.CustomPrompt => evaluator.CustomPromptTemplate
                 ?? throw new PromptConfigurationException("TEMPLATE_REQUIRED", "A Custom Prompt template must not be blank."),
             _ => throw new PromptConfigurationException("INVALID_EVALUATOR_TYPE", "The evaluator type is not supported."),
