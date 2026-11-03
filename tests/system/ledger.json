@@ -23,9 +23,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
       "status": "pass",
-      "last_commit": "caad6d5",
-      "last_run_at": "2026-11-03T22:53:21+09:00",
-      "evidence": "work/runs/202611032247/logs/system-test/E2E-001-202611032253.log",
+      "last_commit": "abdb3b7",
+      "last_run_at": "2026-11-03T23:05:09+09:00",
+      "evidence": "work/runs/202611032255/logs/system-test/E2E-001-202611032304.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
