@@ -227,8 +227,8 @@ internal sealed class SyntheticWorkbook : IDisposable
         return value;
     }
 
-    internal int CountBlankRows(string column) => Enumerable
-        .Range(SyntheticWorkbookFactory.FirstDataRow, SyntheticWorkbookFactory.DataRowCount)
+    internal int CountBlankRows(string column, int dataRowCount = SyntheticWorkbookFactory.DataRowCount) => Enumerable
+        .Range(SyntheticWorkbookFactory.FirstDataRow, dataRowCount)
         .Count(rowNumber => string.IsNullOrWhiteSpace(GetCell(rowNumber, column)));
 
     internal int FindUniqueSourceRow(string primaryColumn, string primaryValue)
