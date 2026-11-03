@@ -262,25 +262,21 @@ public sealed class SyntheticQuantificationJourneyTests
         DurableReferenceRunner baselineReferences = new();
         DurableSpecialRunner baselineSpecials = new(workbook);
         DurableCountingCheckpointStore baselineStore = new(new CheckpointStore());
-        RunSummary baseline = await DurableOrchestrator(
+        // The uninterrupted baseline and the interrupt->resume chain use separate
+        // directories, fakes and stores, so they run concurrently (each checkpoint
+        // save is a real durable file write; this halves wall-clock time).
+        Task<RunSummary> baselineTask = Task.Run(() => DurableOrchestrator(
             workbook,
             baselineNormal,
             baselineReferences,
             baselineSpecials,
             baselineStore).RunAsync(
                 DurableRequest(definition, metadata, workbook.Path, baselineDirectory),
-                cancellationToken: cancellationToken);
+                cancellationToken: cancellationToken));
 
         int expectedEmptyCount = workbook.CountBlankRows("F") + workbook.CountBlankRows("J");
         int expectedNormalCalls = (SyntheticWorkbookFactory.DataRowCount * 2) - expectedEmptyCount;
         int expectedSpecialCalls = SyntheticWorkbookFactory.DataRowCount - workbook.CountBlankRows("J");
-        AssertDurableSuccess(baseline, expectedEmptyCount, expectedResumed: false);
-        Assert.Equal(expectedNormalCalls, baselineNormal.Calls.Length);
-        Assert.Equal(2, baselineReferences.CallCount);
-        Assert.Equal(expectedSpecialCalls, baselineSpecials.CallCount);
-        Assert.Equal(1, baselineStore.CreateCount);
-        Assert.Equal(532, baselineStore.UpdateCount);
-        Assert.Equal(0, baselineStore.LoadCount);
 
         using CancellationTokenSource interruption = new();
         FakeCopilotTransport interruptedNormal = new(workbook);
@@ -334,6 +330,15 @@ public sealed class SyntheticQuantificationJourneyTests
                     ResumePartialPath = partialPath,
                 },
                 cancellationToken: cancellationToken);
+
+        RunSummary baseline = await baselineTask;
+        AssertDurableSuccess(baseline, expectedEmptyCount, expectedResumed: false);
+        Assert.Equal(expectedNormalCalls, baselineNormal.Calls.Length);
+        Assert.Equal(2, baselineReferences.CallCount);
+        Assert.Equal(expectedSpecialCalls, baselineSpecials.CallCount);
+        Assert.Equal(1, baselineStore.CreateCount);
+        Assert.Equal(532, baselineStore.UpdateCount);
+        Assert.Equal(0, baselineStore.LoadCount);
 
         AssertDurableSuccess(resumed, expectedEmptyCount, expectedResumed: true);
         Assert.Equal(expectedNormalCalls - interruptedNormal.Calls.Length, resumedNormal.Calls.Length);
