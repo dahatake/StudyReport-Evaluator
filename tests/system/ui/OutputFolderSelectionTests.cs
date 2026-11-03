@@ -84,6 +84,7 @@ public sealed class OutputFolderSelectionTests
             string canonical = new CanonicalDefinitionSerializer().Serialize(request.DraftDefinition);
             string currentOutput = execution.CurrentRunOutputSummary;
             string[] before = files.Inventory();
+            byte[]? settingsBefore = File.Exists(files.Settings) ? await File.ReadAllBytesAsync(files.Settings) : null;
 
             storage.Select(new Uri(next));
             Activate(session.Window, Picker(session), keyboard: true);
@@ -104,7 +105,7 @@ public sealed class OutputFolderSelectionTests
             Assert.Equal(runner.Partial, execution.PartialPath);
             Assert.True(execution.IsRunning);
             Assert.Equal(before, files.Inventory());
-            Assert.False(File.Exists(files.Settings));
+            Assert.Equal(settingsBefore, File.Exists(files.Settings) ? await File.ReadAllBytesAsync(files.Settings) : null);
         }
         finally
         {
