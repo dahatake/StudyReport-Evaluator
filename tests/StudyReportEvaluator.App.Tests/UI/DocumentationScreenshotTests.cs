@@ -57,6 +57,7 @@ public sealed class DocumentationScreenshotTests
         "08-settings.png",             // Settings / Common: no store; no file load/save or success claim.
     ];
 
+    // FR-002 AC-055: documentation captures use the unified, read-only output-folder field.
     [AvaloniaFact]
     public async Task Documentation_screenshots_use_only_synthetic_state_and_have_expected_dimensions()
     {
@@ -90,6 +91,7 @@ public sealed class DocumentationScreenshotTests
         }
     }
 
+    // FR-002 AC-055: synthetic screenshots render the current single read-only output field.
     [AvaloniaFact]
     public async Task Synthetic_screenshot_renders_are_repeatable()
     {
@@ -115,6 +117,7 @@ public sealed class DocumentationScreenshotTests
         }
     }
 
+    // FR-002 AC-055: screenshot geometry is checked against the unified output-folder UI.
     [AvaloniaFact]
     public async Task Minimum_client_screenshots_verify_all_eight_actual_pixel_frames_without_publishing()
     {
@@ -488,10 +491,15 @@ public sealed class DocumentationScreenshotTests
             Assert.False(Required<Button>(settingsView, "SettingsLoadRetry").IsEffectivelyEnabled);
             Assert.Equal("保存先が構成されていません。ファイルへの読込・保存は行いません。",
                 Required<TextBlock>(settingsView, "SettingsStatus").Text);
-            TextBox commonOutput = ById<TextBox>(settingsView, "SettingsEffectiveOutputDirectory");
+            TextBox commonOutput = ById<TextBox>(settingsView, "ExecutionOutputDirectory");
             Assert.True(commonOutput.IsReadOnly);
             Assert.Equal(SafeOutputDirectory, commonOutput.Text);
-            Assert.True(string.IsNullOrEmpty(ById<TextBox>(settingsView, "ExecutionOutputDirectory").Text));
+            Assert.Equal(1, settingsView.GetVisualDescendants().OfType<TextBox>().Count(
+                control => AutomationProperties.GetAutomationId(control) == "ExecutionOutputDirectory"));
+            Assert.DoesNotContain(settingsView.GetVisualDescendants().OfType<Control>(),
+                control => AutomationProperties.GetAutomationId(control) == "SettingsEffectiveOutputDirectory");
+            Assert.True(ById<Button>(settingsView, "SettingsSelectOutputFolder").IsEffectivelyEnabled);
+            Assert.True(ById<Button>(settingsView, "SettingsResetOutputFolder").IsEffectivelyEnabled);
             Assert.Equal(design.DefinitionName, ById<TextBox>(settingsView, "DesignDefinitionName").Text);
             Assert.Equal(design.Revision, ById<TextBox>(settingsView, "DesignRevision").Text);
             AssertContainedInViewport(ById<TextBox>(settingsView, "DesignRoundingDigits"), window);
