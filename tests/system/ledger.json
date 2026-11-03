@@ -225,9 +225,9 @@
       "command": "dotnet test tests/system/integration --filter \"FullyQualifiedName~FR113_AC074\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "52c19e4",
-      "last_run_at": "2026-11-04T01:05:58+09:00",
-      "evidence": "work/runs/202611040007/logs/system-test/E2E-006-202611040105.log",
+      "last_commit": "3e0f56a",
+      "last_run_at": "2026-11-04T05:13:24+09:00",
+      "evidence": "work/runs/202611040504/logs/system-test/E2E-006-202611040512.log",
       "history": [
         {
           "at": "2026-11-04T00:15:51+09:00",
