@@ -138,7 +138,7 @@
         RowDefinitions="*,44" RowSpacing="4">
         <Grid x:Name="ResultsListPanel" IsVisible="{Binding !IsDetailVisible}"
               RowDefinitions="24,*" RowSpacing="4">
-          <Grid Margin="8,0" ColumnDefinitions="68,82,96,96,*" ColumnSpacing="8">
+          <Grid Margin="8,0" ColumnDefinitions="96,82,96,96,*" ColumnSpacing="8">
             <TextBlock Text="元の行" Classes="label" />
             <TextBlock Grid.Column="1" Text="最終点" Classes="label" />
             <TextBlock Grid.Column="2" Text="固有点" Classes="label" />
@@ -154,10 +154,16 @@
             <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="viewModels:ResultsRowScoreViewModel">
-                <Grid ColumnDefinitions="68,82,96,96,*" ColumnSpacing="8"
+                <Grid ColumnDefinitions="96,82,96,96,*" ColumnSpacing="8"
                       AutomationProperties.AutomationId="{Binding SourceRowNumber, StringFormat='ResultsRow-{0}'}"
                       AutomationProperties.Name="{Binding SourceRowNumber, StringFormat='元のExcel {0} 行の採点結果'}">
-                  <TextBlock Text="{Binding SourceRowNumber}" TextTrimming="CharacterEllipsis" />
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <CheckBox IsChecked="{Binding IsSelectedForRerun, Mode=TwoWay}" IsEnabled="{Binding CanSelectForRerun}"
+                              MinWidth="44" MinHeight="44" Padding="0"
+                              AutomationProperties.AutomationId="{Binding SourceRowNumber, StringFormat='ResultsRerunCheck-{0}'}"
+                              AutomationProperties.Name="{Binding SourceRowNumber, StringFormat='元のExcel {0} 行を再実行の対象にする'}" />
+                    <TextBlock Text="{Binding SourceRowNumber}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
                   <TextBlock Grid.Column="1" Text="{Binding FinalScoreText}" Classes="value" TextTrimming="CharacterEllipsis" />
                   <TextBlock Grid.Column="2" Text="{Binding SpecialEarnedText}" TextTrimming="CharacterEllipsis" />
                   <TextBlock Grid.Column="3" Text="{Binding SimilarityPenaltyText}" TextTrimming="CharacterEllipsis" />
@@ -297,7 +303,7 @@
           </Grid>
         </Grid>
 
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto,112,Auto,Auto" ColumnSpacing="8">
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto,112,Auto,Auto,Auto" ColumnSpacing="8">
           <Button x:Name="PreviousPageButton" Content="前" Command="{Binding PreviousPageCommand}"
                   AutomationProperties.AutomationId="ResultsPreviousPage" AutomationProperties.Name="前の学生ページ" />
           <Button x:Name="NextPageButton" Grid.Column="1" Content="次" Command="{Binding NextPageCommand}"
@@ -316,6 +322,26 @@
                   IsVisible="{Binding !IsDetailVisible}" AutomationProperties.AutomationId="ResultsShowDetail" AutomationProperties.Name="選択学生の詳細とoverrideを表示" />
           <Button x:Name="ShowListButton" Grid.Column="6" Content="一覧に戻る" Command="{Binding ShowListCommand}"
                   IsVisible="{Binding IsDetailVisible}" AutomationProperties.AutomationId="ResultsShowList" AutomationProperties.Name="選択とoverrideを保持して学生一覧に戻る" />
+          <Button x:Name="RerunMenuButton" Grid.Column="7" Content="再実行…" IsVisible="{Binding !IsDetailVisible}"
+                  AutomationProperties.AutomationId="ResultsRerunMenu"
+                  AutomationProperties.Name="選んだ行だけを再実行する操作を開く">
+            <Button.Flyout>
+              <Flyout Placement="TopEdgeAlignedRight">
+                <StackPanel Spacing="8" MinWidth="220">
+                  <Button x:Name="SelectTechnicalErrorRowsButton" Content="技術エラーの行を選ぶ"
+                          Command="{Binding SelectTechnicalErrorRowsCommand}"
+                          AutomationProperties.AutomationId="ResultsSelectTechnicalErrorRows"
+                          AutomationProperties.Name="状態が技術エラーの行だけにチェックを付けます" />
+                  <TextBlock x:Name="RerunSelectedCountText" Text="{Binding SelectedRerunCountText}"
+                             AutomationProperties.AutomationId="ResultsRerunSelectedCount" />
+                  <Button x:Name="RerunSelectedRowsButton" Content="選んだ行を再実行"
+                          Command="{Binding RerunSelectedRowsCommand}"
+                          AutomationProperties.AutomationId="ResultsRerunSelectedRows"
+                          AutomationProperties.Name="チェックを付けた行だけを実行画面で再実行します。選択が0件のときは使えません" />
+                </StackPanel>
+              </Flyout>
+            </Button.Flyout>
+          </Button>
         </Grid>
       </Grid>
       <views:JobCostView x:Name="ResultsCostView" DataContext="{Binding Cost}"

@@ -124,7 +124,7 @@ public enum ResultsRowStatus
     TechnicalError,
 }
 
-public sealed class ResultsRowScoreViewModel
+public sealed class ResultsRowScoreViewModel : UiObservableObject
 {
     internal ResultsRowScoreViewModel(
         int sourceRowNumber,
@@ -145,6 +145,25 @@ public sealed class ResultsRowScoreViewModel
     }
 
     public int SourceRowNumber { get; }
+
+    // FR-112: 再実行のために行へ付けるチェック。再実行できない行（完了済みでない行・durable でない run）には付かない。
+    private bool isSelectedForRerun;
+
+    internal Action<ResultsRowScoreViewModel, bool>? RerunSelectionChanged { get; set; }
+
+    public bool CanSelectForRerun { get; internal set; }
+
+    public bool IsSelectedForRerun
+    {
+        get => isSelectedForRerun;
+        set
+        {
+            if (value && !CanSelectForRerun) return;
+            if (SetProperty(ref isSelectedForRerun, value)) RerunSelectionChanged?.Invoke(this, value);
+        }
+    }
+
+    internal void SetRerunSelectionSilently(bool value) => SetProperty(ref isSelectedForRerun, value, nameof(IsSelectedForRerun));
 
     public ResultsRowStatus Status { get; }
 
@@ -681,7 +700,7 @@ public sealed class ResultsCriterionViewModel : UiObservableObject
         : "—";
 }
 
-public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
+public sealed partial class ResultsOutputViewModel : UiObservableObject, IDisposable
 {
     public JobCostViewModel Cost { get; } = new();
 
@@ -1166,6 +1185,7 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         CancelAnswerRead();
         answerCache.Clear();
         context = runContext;
+        ResetRerunSelection();
         Cost.Reset();
         if (runContext.Cost is { } cost) Cost.Apply(cost);
         exportCancellation?.Cancel();
@@ -1523,7 +1543,7 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
             decimal? totalPenalty = similarityPenalties.Any(value => value is null)
                 ? null
                 : similarityPenalties.Sum(value => value!.Value);
-            rowScoreItems.Add(new ResultsRowScoreViewModel(
+            ResultsRowScoreViewModel createdRow = new ResultsRowScoreViewModel(
                 sourceRow.Key,
                 rowStatus,
                 string.Join(
@@ -1533,7 +1553,9 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
                 specialEarned,
                 totalPenalty,
                 finalRaw,
-                finalScore));
+                finalScore);
+            AttachRerunSelection(createdRow, summary, completedRow is not null);
+            rowScoreItems.Add(createdRow);
 
             decimal? overall = summary.IsDurable ? finalScore : legacyOverall;
             foreach (ResultsCriterionViewModel item in sourceRow)
