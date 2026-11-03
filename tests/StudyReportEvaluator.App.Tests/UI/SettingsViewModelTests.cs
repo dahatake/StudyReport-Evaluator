@@ -240,6 +240,52 @@ public sealed class SettingsViewModelTests
         AssertNoBackgroundActivity(harness);
     }
 
+    // FR-002 AC-055: explicit null before/during load must not restore the old override.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FR002_AC055_Reset_to_null_supersedes_saved_override_even_before_it_is_loaded(bool duringLoad)
+    {
+        using SettingsHarness harness = new();
+        await harness.SeedSettingsAsync(SavedSettings(harness));
+        byte[] before = File.ReadAllBytes(harness.SettingsPath);
+        Assert.Null(harness.Execution.OutputDirectoryOverride);
+        void ResetDuringLoad(object? sender, PropertyChangedEventArgs args)
+        {
+            if (args.PropertyName == nameof(SettingsViewModel.IsLoading) && harness.Settings.IsLoading)
+            {
+                harness.Settings.SetOutputFolderOverride(null);
+            }
+        }
+
+        if (duringLoad)
+        {
+            harness.Settings.PropertyChanged += ResetDuringLoad;
+        }
+        else
+        {
+            harness.Settings.SetOutputFolderOverride(null);
+        }
+
+        try
+        {
+            await harness.Settings.InitializeAsync(TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            harness.Settings.PropertyChanged -= ResetDuringLoad;
+        }
+
+        Assert.Null(harness.Execution.OutputDirectoryOverride);
+        Assert.True(harness.Settings.HasUnsavedChanges);
+        Assert.Equal(before, File.ReadAllBytes(harness.SettingsPath));
+        Assert.False(Directory.Exists(harness.OutputPath));
+        AssertNoBackgroundActivity(harness);
+        await harness.Settings.SaveAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(SettingsSaveStatus.Saved, harness.Settings.SaveStatus);
+        Assert.Null((await harness.Store.LoadAsync(TestContext.Current.CancellationToken)).Settings!.OutputDirectoryOverride);
+    }
+
     [Fact]
     public async Task Cancelled_initial_read_keeps_save_pending_and_existing_file_until_explicit_retry()
     {

@@ -22,9 +22,16 @@ public sealed partial class SettingsView : UserControl
     private readonly Dictionary<SettingsCategory, Control> categoryViews = [];
     private SettingsViewModel? owner;
     private bool attached;
+    private readonly IOutputFolderPicker outputFolderPicker;
 
     public SettingsView()
+        : this(new NativeOutputFolderPicker())
     {
+    }
+
+    private SettingsView(IOutputFolderPicker outputFolderPicker)
+    {
+        this.outputFolderPicker = outputFolderPicker;
         InitializeComponent();
         DataContextChanged += HandleDataContextChanged;
     }
@@ -34,6 +41,12 @@ public sealed partial class SettingsView : UserControl
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         DataContext = viewModel;
+    }
+
+    public SettingsView(SettingsViewModel viewModel, IOutputFolderPicker outputFolderPicker)
+        : this(outputFolderPicker ?? throw new ArgumentNullException(nameof(outputFolderPicker)))
+    {
+        DataContext = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
     }
 
     public SettingsViewModel ViewModel => DataContext as SettingsViewModel
@@ -152,7 +165,51 @@ public sealed partial class SettingsView : UserControl
         Control view = ((IDataTemplate)Resources["CommonSettingsTemplate"]!).Build(settings)
             ?? throw new InvalidOperationException("The common settings template must produce a control.");
         view.DataContext = settings;
+        Button select = view.GetLogicalDescendants().OfType<Button>().Single(
+            b => AutomationProperties.GetAutomationId(b) == "SettingsSelectOutputFolder");
+        Button reset = view.GetLogicalDescendants().OfType<Button>().Single(
+            b => AutomationProperties.GetAutomationId(b) == "SettingsResetOutputFolder");
+        select.Click += async (_, _) => await SelectOutputFolderAsync(settings);
+        reset.Click += (_, _) =>
+        {
+            settings.SetOutputFolderOverride(null);
+            settings.OutputFolderStatus = string.Empty;
+        };
         return view;
+    }
+
+    private async Task SelectOutputFolderAsync(SettingsViewModel settings)
+    {
+        if (!settings.CanSelectOutputFolder)
+        {
+            return;
+        }
+
+        settings.IsSelectingOutputFolder = true;
+        settings.OutputFolderStatus = string.Empty;
+        try
+        {
+            TopLevel topLevel = TopLevel.GetTopLevel(this)
+                ?? throw new InvalidOperationException("選択画面を開くウィンドウがありません。");
+            string? selected = await outputFolderPicker.PickAsync(topLevel);
+            if (selected is not null && ReferenceEquals(owner, settings))
+            {
+                if (!Path.IsPathFullyQualified(selected))
+                {
+                    throw new InvalidOperationException("ローカル絶対パスを取得できません。");
+                }
+
+                settings.SetOutputFolderOverride(Path.GetFullPath(selected));
+            }
+        }
+        catch (Exception ex)
+        {
+            settings.OutputFolderStatus = $"出力フォルダーを選択できません: {ex.Message} 指定は変更していません。";
+        }
+        finally
+        {
+            settings.IsSelectingOutputFolder = false;
+        }
     }
 
     private static void CompactEvaluatorHeader(EvaluatorSettingsView view)

@@ -47,6 +47,11 @@
       <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
       <Setter Property="Foreground" Value="White" />
     </Style>
+    <Style Selector="Button.output-folder-action, TextBox.output-folder-path">
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+    </Style>
     <Style Selector="TextBox:focus-visible, ComboBox:focus-visible, TabItem:focus-visible, Button:focus-visible">
       <Setter Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
       <Setter Property="BorderThickness" Value="3" />
@@ -82,7 +87,7 @@
                         AutomationProperties.AutomationId="SettingsCommonFieldsScroll"
                         AutomationProperties.Name="共通設定の本文"
                         ToolTip.Tip="通常サイズでは全項目を表示します。長い説明や狭い表示では本文をスクロールできます。">
-            <Grid Margin="8,4" RowDefinitions="44,44,44,Auto,Auto,Auto,Auto" RowSpacing="4">
+            <Grid Margin="8,4" RowDefinitions="44,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
               <Grid ColumnDefinitions="90,*,56,88" ColumnSpacing="8">
                 <TextBlock Text="通常モデル" Classes="settings-label" />
                 <ComboBox Grid.Column="1" ItemsSource="{Binding Execution.AvailableModelIds}"
@@ -100,20 +105,31 @@
                           ToolTip.Tip="次回実行の最大並列度を1～16から選択します。実行中の条件は変わりません。" />
               </Grid>
               <Grid Grid.Row="1" ColumnDefinitions="90,*" ColumnSpacing="8">
-                <TextBlock Text="指定出力先" Classes="settings-label" />
-                <TextBox Grid.Column="1" Text="{Binding Execution.OutputDirectoryOverride, Mode=TwoWay}"
-                         PlaceholderText="空欄なら入力ファイル隣接の result" TabIndex="12"
+                <TextBlock Text="出力先" Classes="settings-label" />
+                <TextBox Grid.Column="1" Classes="output-folder-path" Text="{Binding Execution.OutputDirectory, Mode=OneWay}"
+                         IsReadOnly="True" PlaceholderText="入力後に決定" TabIndex="12"
                          AutomationProperties.AutomationId="ExecutionOutputDirectory"
-                         AutomationProperties.Name="明示出力先（空欄で既定に戻す）"
-                         ToolTip.Tip="絶対パスを指定します。空欄は未指定として保存し、自動算出した出力先は保存しません。" />
+                         AutomationProperties.Name="次回の出力フォルダー・読取専用"
+                         ToolTip.Tip="次回実行先の全文を選択・コピーできます。変更はフォルダー選択で行います。永続化には設定を保存が必要です。" />
               </Grid>
               <Grid Grid.Row="2" ColumnDefinitions="90,*" ColumnSpacing="8">
-                <TextBlock Text="実効出力先" Classes="settings-label" />
-                <TextBox Grid.Column="1" Text="{Binding Execution.OutputDirectory, Mode=OneWay}"
-                         IsReadOnly="True" PlaceholderText="入力後に決定" TabIndex="13"
-                         AutomationProperties.AutomationId="SettingsEffectiveOutputDirectory"
-                         AutomationProperties.Name="次回の実効出力先・読取専用"
-                         ToolTip.Tip="現在の指定と入力から決まる出力先です。全文を選択・コピーできます。この表示を指定値として保存しません。" />
+                <StackPanel Grid.Column="1" Spacing="4">
+                  <WrapPanel>
+                    <Button Content="フォルダーを選択" Classes="output-folder-action" TabIndex="13"
+                            IsEnabled="{Binding CanSelectOutputFolder}"
+                            AutomationProperties.AutomationId="SettingsSelectOutputFolder"
+                            AutomationProperties.Name="次回の出力フォルダーを選択"
+                            ToolTip.Tip="OSのフォルダーピッカーで選択します。取消では指定を変えません。" />
+                    <Button Content="既定に戻す" Classes="output-folder-action" TabIndex="14"
+                            IsEnabled="{Binding CanSelectOutputFolder}"
+                            AutomationProperties.AutomationId="SettingsResetOutputFolder"
+                            AutomationProperties.Name="出力先を既定に戻す"
+                            ToolTip.Tip="明示指定を解除し、入力隣接のresultを使います。永続化には設定を保存が必要です。" />
+                  </WrapPanel>
+                  <TextBlock Text="{Binding OutputFolderStatus}" TextWrapping="Wrap"
+                             IsVisible="{Binding HasOutputFolderStatus}"
+                             AutomationProperties.AutomationId="SettingsOutputFolderStatus" />
+                </StackPanel>
               </Grid>
               <StackPanel Grid.Row="6" Spacing="4">
                 <Grid ColumnDefinitions="90,*,100,*,104" ColumnSpacing="8">
