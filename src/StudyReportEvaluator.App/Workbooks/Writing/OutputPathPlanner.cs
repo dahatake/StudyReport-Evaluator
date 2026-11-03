@@ -99,6 +99,31 @@ public sealed class OutputPathPlanner : IOutputPathPlanner
     public override string ToString() =>
         $"{nameof(OutputPathPlanner)} {{ Content = <redacted> }}";
 
+    /// <summary>
+    /// FR-107: the next unused <c>eval-{yyyyMMdd-HHmm}[-NN].xlsx</c> in an existing directory, without creating anything.
+    /// Same naming as <see cref="Reserve"/>; the final and partial names must both be unused.
+    /// </summary>
+    public static string FindUnusedFinalPath(string directory, DateTimeOffset localTime)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+        string minute = localTime.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
+        for (int sequence = 1; sequence < int.MaxValue; sequence++)
+        {
+            string suffix = sequence == 1
+                ? string.Empty
+                : "-" + sequence.ToString("D2", CultureInfo.InvariantCulture);
+            string stem = FileNamePrefix + minute + suffix;
+            string finalPath = Path.Combine(directory, stem + ".xlsx");
+            string partialPath = Path.Combine(directory, stem + ".partial.xlsx");
+            if (PathIsUnused(finalPath) && PathIsUnused(partialPath))
+            {
+                return finalPath;
+            }
+        }
+
+        throw new IOException("An unused output path suffix could not be allocated.");
+    }
+
     private static bool PathIsUnused(string path) =>
         !File.Exists(path) && !Directory.Exists(path);
 

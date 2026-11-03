@@ -939,7 +939,16 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
 
     public bool PartialCleanupFailed => context?.Summary.PartialCleanupFailed == true;
 
-    public string DurableOutputText => context?.Summary switch
+    public string DurableOutputText => DurableOutputBaseText + RunLogWarningText;
+
+    // FR-108: closed-code reason only (no path, no exception text).
+    private string RunLogWarningText => context?.Summary.RunLogStatusCode switch
+    {
+        "RUN_LOG_WRITE_FAILED" => Environment.NewLine + "実行ログ(txt)を保存できませんでした（書込不可）。採点・出力には影響しません。",
+        _ => string.Empty,
+    };
+
+    private string DurableOutputBaseText => context?.Summary switch
     {
         null => "run結果はありません。",
         { IsDurable: false } => "legacy manual export modeです。",
@@ -1175,7 +1184,7 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         rowScoreItems.Clear();
         BuildResultItems(runContext.Summary);
         outputPath = runContext.Summary.IsDurable
-            ? runContext.Summary.FinalPath ?? runContext.Summary.PartialPath ?? string.Empty
+            ? CreateDurableDefaultOutputPath(runContext.Summary)
             : CreateDefaultOutputPath(runContext);
         OnPropertiesChanged(
             nameof(IsLoaded),
@@ -1936,6 +1945,24 @@ public sealed class ResultsOutputViewModel : UiObservableObject, IDisposable
         "OVERRIDE_NOT_ALLOWED" => "主回答が空欄または未完了のため override できません。",
         _ => "この override は技術検証を通過できません。",
     };
+
+    // FR-107: default alias name is an unused eval-yyyyMMdd-HHmm[-NN].xlsx in the automatic-output directory.
+    // Failure to derive it leaves the field empty so the user must specify a name; it never stops the screen.
+    private static string CreateDurableDefaultOutputPath(RunSummary summary)
+    {
+        try
+        {
+            string? anchor = summary.FinalPath ?? summary.PartialPath;
+            string? directory = string.IsNullOrWhiteSpace(anchor) ? null : Path.GetDirectoryName(Path.GetFullPath(anchor));
+            return string.IsNullOrEmpty(directory)
+                ? string.Empty
+                : OutputPathPlanner.FindUnusedFinalPath(directory, DateTimeOffset.Now);
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
 
     private static string CreateDefaultOutputPath(ExecutionRunContext runContext)
     {

@@ -11,8 +11,8 @@
 | FR-001 | 採点配分と通常評価の統合画面 | 承認済み | src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml, src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml.cs | tests/system/ui/IntegratedDesignAndSettingsTests.cs | - |
 | FR-002 | 設定は共通のみ | 承認済み | src/StudyReportEvaluator.App/Views/SettingsView.axaml, src/StudyReportEvaluator.App/Views/SettingsView.axaml.cs, src/StudyReportEvaluator.App/ViewModels/MainWindowViewModel.cs | tests/system/ui/IntegratedDesignAndSettingsTests.cs | - |
 | FR-003 | 削除した3タブの機能の廃止 | 承認済み | src/StudyReportEvaluator.App/Composition/ServiceRegistration.cs, src/StudyReportEvaluator.App/ViewModels/MainWindowViewModel.cs, src/StudyReportEvaluator.App/Views/SettingsView.axaml, src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml, docs/settings.md, docs/getting-started.md | tests/system/ui/IntegratedDesignAndSettingsTests.cs, tests/StudyReportEvaluator.App.Tests/Settings/RetiredEditingUiRetentionTests.cs, tests/StudyReportEvaluator.App.Tests/Launch/LaunchOptionsTests.cs, tests/StudyReportEvaluator.App.Tests/Content/DocumentationContractTests.cs | - |
-| FR-107 | 別名workbook出力欄の既定名は未使用名 | 承認済み | 未実装 | 未実装 | - |
-| FR-108 | ジョブ実行ログのテキスト保存 | 承認済み | 未実装 | 未実装 | - |
+| FR-107 | 別名workbook出力欄の既定名は未使用名 | 承認済み | src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs, src/StudyReportEvaluator.App/Workbooks/Writing/OutputPathPlanner.cs | tests/system/integration/OutputNamingAndRunLogTests.cs, tests/StudyReportEvaluator.App.Tests/Logging/RunTextLogTests.cs, tests/StudyReportEvaluator.App.Tests/E2E/SettingsWorkflowSystemTests.cs | OutputPathPlanner |
+| FR-108 | ジョブ実行ログのテキスト保存 | 承認済み | src/StudyReportEvaluator.App/Logging/RunTextLog.cs, src/StudyReportEvaluator.App/Workflow/DurableQuantificationOrchestrator.cs, src/StudyReportEvaluator.App/Workflow/RunSummary.cs, src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.cs | tests/system/integration/OutputNamingAndRunLogTests.cs, tests/StudyReportEvaluator.App.Tests/Logging/RunTextLogTests.cs | RunTextLog |
 
 ## API・イベント
 
@@ -28,3 +28,5 @@
 
 | 部品名 | ファイル | 用途 | 使っている要求 ID |
 |---|---|---|---|
+| OutputPathPlanner | src/StudyReportEvaluator.App/Workbooks/Writing/OutputPathPlanner.cs | `eval-yyyyMMdd-HHmm[-NN]` の未使用名の採番（出力予約と別名既定名） | FR-107 |
+| RunTextLog | src/StudyReportEvaluator.App/Logging/RunTextLog.cs | ジョブ実行ログの `{yyyyMMddHHmm}-log.txt` 保存（閉じたコードと数値のみ） | FR-108 |
