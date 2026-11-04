@@ -46,9 +46,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
       "status": "pass",
-      "last_commit": "12c213c",
-      "last_run_at": "2026-11-04T23:01:21+09:00",
-      "evidence": "work/runs/202611042230/logs/system-test/E2E-001-202611042300.log",
+      "last_commit": "845e9a3",
+      "last_run_at": "2026-11-05T01:27:01+09:00",
+      "evidence": "work/runs/202611050055/logs/system-test/E2E-001-202611050126.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
@@ -83,9 +83,9 @@
       "command": "python -m pytest tests/system/test_fr002_output_folder.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "12c213c",
-      "last_run_at": "2026-11-04T23:01:21+09:00",
-      "evidence": "work/runs/202611042230/logs/system-test/E2E-002-202611042300.log",
+      "last_commit": "845e9a3",
+      "last_run_at": "2026-11-05T01:27:01+09:00",
+      "evidence": "work/runs/202611050055/logs/system-test/E2E-002-202611050126.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
@@ -376,9 +376,9 @@
       "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC011_AC012",
       "canary": true,
       "status": "pass",
-      "last_commit": "12c213c",
-      "last_run_at": "2026-11-04T23:01:21+09:00",
-      "evidence": "work/runs/202611042230/logs/system-test/E2E-008-202611042300.log",
+      "last_commit": "845e9a3",
+      "last_run_at": "2026-11-05T01:27:01+09:00",
+      "evidence": "work/runs/202611050055/logs/system-test/E2E-008-202611050126.log",
       "history": [
         {
           "at": "2026-11-04T09:06:39+09:00",
@@ -542,10 +542,10 @@
       "layer": "e2e",
       "command": "dotnet test tests/system/ui --filter \"FullyQualifiedName~FR118_\"",
       "canary": false,
-      "status": "not_run",
-      "last_commit": null,
-      "last_run_at": null,
-      "evidence": null,
+      "status": "pass",
+      "last_commit": "845e9a3",
+      "last_run_at": "2026-11-05T01:27:01+09:00",
+      "evidence": "work/runs/202611050055/logs/system-test/E2E-014-202611050126.log",
       "history": [
         {
           "at": "2026-11-05T01:06:40+09:00",
