@@ -97,6 +97,10 @@
         <TextBlock Grid.Row="1" Text="{Binding RunIdentityText}" IsVisible="{Binding IsLoaded}"
                    FontSize="12" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding RunIdentityText}"
                    AutomationProperties.AutomationId="ResultsRunIdentity" />
+        <TextBlock Grid.Row="1" Text="{Binding RowStatusCountsText}" IsVisible="{Binding IsLoaded}"
+                   Margin="0,20,0,0" FontSize="12" TextTrimming="None" TextWrapping="Wrap"
+                   AutomationProperties.AutomationId="ResultsRowStatusCounts"
+                   AutomationProperties.Name="{Binding RowStatusCountsText}" />
         <TextBlock Grid.Row="2" Text="この結果は表示時の採点draftから自動再評価しない"
                    IsVisible="{Binding IsLoaded}" FontSize="12" Classes="label"
                    TextTrimming="None" ToolTip.Tip="この結果は表示時の採点draftから自動再評価しない"
