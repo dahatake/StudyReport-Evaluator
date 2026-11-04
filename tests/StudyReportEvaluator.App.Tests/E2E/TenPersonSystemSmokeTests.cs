@@ -173,10 +173,10 @@ public sealed class TenPersonSystemSmokeTests
 
             AssertSuccessfulRun(baseline, expectedResumed: false);
             Assert.Equal(45, baselineNormal.CallCount);
-            Assert.Equal(5, baselineReferences.CallCount);
+            Assert.Equal(25, baselineReferences.CallCount);
             Assert.Equal(0, baselineSpecials.CallCount);
             Assert.Equal(1, baselineStore.CreateCount);
-            Assert.Equal(15, baselineStore.UpdateCount);
+            Assert.Equal(35, baselineStore.UpdateCount); // 25 参照 slot + 10 行
             Assert.Equal(0, baselineStore.LoadCount);
 
             using CancellationTokenSource interruption = new();
@@ -205,15 +205,15 @@ public sealed class TenPersonSystemSmokeTests
             Assert.True(interrupted.IsPartial);
             Assert.False(interrupted.WasResumed);
             Assert.Null(interrupted.FinalPath);
-            Assert.Equal(5, interrupted.References.Length);
+            Assert.Equal(25, interrupted.References.Length);
             Assert.Equal(5, interrupted.CompletedRows.Length);
             string partialPath = Assert.IsType<string>(interrupted.PartialPath);
             Assert.True(File.Exists(partialPath));
             Assert.Equal(22, firstNormal.CallCount);
-            Assert.Equal(5, firstReferences.CallCount);
+            Assert.Equal(25, firstReferences.CallCount);
             Assert.Equal(0, firstSpecials.CallCount);
             Assert.Equal(1, firstStore.CreateCount);
-            Assert.Equal(10, firstStore.UpdateCount);
+            Assert.Equal(30, firstStore.UpdateCount); // 25 参照 slot + 5 行
 
             DeterministicNormalRunner resumedNormal = new();
             DeterministicReferenceRunner resumedReferences = new(throwOnCall: true);
@@ -321,7 +321,7 @@ public sealed class TenPersonSystemSmokeTests
         Assert.Equal(5, summary.EmptyCount);
         Assert.Equal(0, summary.FailureCount);
         Assert.Equal(0, summary.CancelledCount);
-        Assert.Equal(5, summary.References.Length);
+        Assert.Equal(25, summary.References.Length); // 5 設問 × PARAM-003 の 5 slot
         Assert.Equal(10, summary.CompletedRows.Length);
         Assert.True(File.Exists(summary.FinalPath));
         Assert.False(File.Exists(summary.PartialPath));

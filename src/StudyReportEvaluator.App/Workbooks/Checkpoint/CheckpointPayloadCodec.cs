@@ -134,10 +134,16 @@ internal static class CheckpointPayloadCodec
             throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
         }
 
-        HashSet<string> referenceIds = new(StringComparer.Ordinal);
+        ValidateReferenceSet(envelope);
+        HashSet<(string QuestionId, int Slot)> referenceIds = [];
         foreach (CheckpointReference? reference in envelope.References)
         {
-            if (reference is null || !referenceIds.Add(reference.QuestionId))
+            // FR-115 AC-083: 旧形式は設問ごとに 1 件（slot 0）、新形式は 1..予定数の slot で重複しない。
+            if (reference is null
+                || !referenceIds.Add((reference.QuestionId, reference.SlotIndex))
+                || (envelope.ReferenceSlotCount == 0
+                    ? reference.SlotIndex != 0
+                    : reference.SlotIndex < 1 || reference.SlotIndex > envelope.ReferenceSlotCount))
             {
                 throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
             }
@@ -175,6 +181,28 @@ internal static class CheckpointPayloadCodec
             ValidateNormalResults(row.NormalResults);
             ValidateSpecialResults(row.SpecialResults);
             ValidateSimilarityResults(row.SimilarityResults);
+        }
+    }
+
+    // FR-115 AC-083: 不正な新形式は safe error。旧形式は予定数・条件の版を持たない。
+    private static void ValidateReferenceSet(CheckpointEnvelope envelope)
+    {
+        if (envelope.ReferenceSlotCount is < 0 or > ReferenceSetPolicy.SlotCount)
+        {
+            throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
+        }
+
+        bool legacy = envelope.ReferenceSlotCount == 0;
+        string?[] versions =
+        [
+            envelope.ReferenceTemplateVersion,
+            envelope.ReferenceComparisonVersion,
+            envelope.ReferenceNormalizationVersion,
+        ];
+        if ((legacy ? versions.Any(version => version is not null) : versions.Any(version => version is null))
+            || versions.Any(version => version is not null && (version.Length is 0 or > 64 || version.Any(char.IsControl))))
+        {
+            throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
         }
     }
 
@@ -347,6 +375,7 @@ internal static class CheckpointPayloadCodec
                 throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
             }
 
+            ValidateReferenceSetInfo(result);
             if (result.AcceptedResult is SimilarityQuantificationResult accepted)
             {
                 if (!string.Equals(accepted.QuestionId, result.QuestionId, StringComparison.Ordinal)
@@ -363,7 +392,40 @@ internal static class CheckpointPayloadCodec
         }
     }
 
-    // FR-114 AC-010 / AC-077: 詳細は成功した結果にだけあり、値は範囲内で、最大値が採点値と一致する。
+    // FR-115 AC-081: 参照集合の成功数は予定数以下で、採点値のある結果は完全な集合に限る。重複は予定 slot の範囲内。
+    private static void ValidateReferenceSetInfo(CheckpointSimilarityResult result)
+    {
+        if (result.ReferenceSet is not SimilarityReferenceSetInfo set)
+        {
+            return;
+        }
+
+        if (set.Planned is < 1 or > ReferenceSetPolicy.SlotCount
+            || set.Succeeded < 0
+            || set.Succeeded > set.Planned
+            || set.Duplicates.IsDefault
+            || string.Equals(result.StatusCode, ResultsStatusCodes.Empty, StringComparison.Ordinal)
+            || (result.AcceptedResult is not null && set.Succeeded != set.Planned)
+            || (result.AcceptedResult is null && IsSuccess(result.StatusCode)))
+        {
+            throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
+        }
+
+        foreach (SimilarityDuplicateReference? duplicate in set.Duplicates)
+        {
+            if (duplicate is null
+                || duplicate.Slot < 2
+                || duplicate.Slot > set.Planned
+                || duplicate.DuplicateOfSlot < 1
+                || duplicate.DuplicateOfSlot >= duplicate.Slot)
+            {
+                throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
+            }
+        }
+    }
+
+    // FR-114 AC-010 / AC-077 / FR-115 AC-081: 詳細の値は範囲内で、最大値が採点値と一致する。
+    // 一部失敗の暫定集計は成功参照だけの詳細を持ち、採点値は持たない。
     private static void ValidateSimilarityDiagnostics(CheckpointSimilarityResult result)
     {
         if (result.ReferenceDiagnostics is not ImmutableArray<SimilarityReferenceDiagnostic> diagnostics)
@@ -371,7 +433,20 @@ internal static class CheckpointPayloadCodec
             return;
         }
 
-        if (diagnostics.IsDefaultOrEmpty || result.AcceptedResult is not SimilarityQuantificationResult accepted)
+        SimilarityQuantificationResult? accepted = result.AcceptedResult;
+        bool provisional = accepted is null
+            && result.ReferenceSet is SimilarityReferenceSetInfo set
+            && set.Succeeded > 0
+            && set.Succeeded < set.Planned
+            && diagnostics.Length == set.Succeeded;
+        if (diagnostics.IsDefaultOrEmpty || (accepted is null && !provisional))
+        {
+            throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
+        }
+
+        if (result.ReferenceSet is SimilarityReferenceSetInfo full
+            && accepted is not null
+            && diagnostics.Length != full.Planned)
         {
             throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
         }
@@ -395,7 +470,7 @@ internal static class CheckpointPayloadCodec
             }
         }
 
-        if (SimilarityDiagnostics.SelectMaximum(diagnostics)!.Score != accepted.Similarity)
+        if (accepted is not null && SimilarityDiagnostics.SelectMaximum(diagnostics)!.Score != accepted.Similarity)
         {
             throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
         }

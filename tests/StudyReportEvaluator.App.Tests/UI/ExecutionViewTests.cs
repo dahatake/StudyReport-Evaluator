@@ -67,9 +67,9 @@ public sealed class ExecutionViewTests
         string inputPath = Path.Combine(Path.GetTempPath(), "PRIVATE-U04-INPUT-CANARY.xlsx");
         viewModel.Configure(definition, metadata, inputPath);
 
-        Assert.Equal(5, viewModel.PlannedEvaluationCount);
-        Assert.Equal(15, viewModel.WorstCaseAttemptCount);
-        Assert.Contains("最大 15 attempts", viewModel.PlanSummary, StringComparison.Ordinal);
+        Assert.Equal(9, viewModel.PlannedEvaluationCount);
+        Assert.Equal(27, viewModel.WorstCaseAttemptCount);
+        Assert.Contains("最大 27 attempts", viewModel.PlanSummary, StringComparison.Ordinal);
         Assert.False(viewModel.CanStart);
         Assert.Contains(viewModel.TechnicalErrors, error => error.Code == "AUTH_CHECK_REQUIRED");
 
@@ -431,7 +431,7 @@ public sealed class ExecutionViewTests
     [Fact]
     public void Worst_case_retry_budget_over_twenty_thousand_blocks_start()
     {
-        QuantificationDefinition definition = U04TestSupport.Definition(2, 3_334);
+        QuantificationDefinition definition = U04TestSupport.Definition(2, 3_332);
         WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
         RecordingRunBoundary runner = new((_, _, _) => throw new InvalidOperationException("must not run"));
         ExecutionViewModel viewModel = new(

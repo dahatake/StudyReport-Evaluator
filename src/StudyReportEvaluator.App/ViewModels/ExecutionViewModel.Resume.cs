@@ -257,7 +257,8 @@ public sealed partial class ExecutionViewModel
         interruptedPartialPath = summary.PartialPath;
         interruptedRunSummaryText = string.Format(CultureInfo.InvariantCulture,
             "中断しました。参照 {0}/{1}・行 {2}/{3} を保存済みです。途中の行は再開時に最初から評価します。",
-            summary.References.Length, summary.Snapshot.Definition.Questions.Count(question => question.Enabled),
+            summary.References.Length,
+            summary.Snapshot.Definition.Questions.Count(question => question.Enabled) * summary.ReferenceSlotsPerQuestion,
             summary.CompletedRows.Length, summary.Mapping.SelectedRowCount);
         RaiseResumeStates();
     }

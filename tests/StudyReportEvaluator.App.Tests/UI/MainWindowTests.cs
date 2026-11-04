@@ -227,9 +227,9 @@ public sealed class MainWindowTests
             Assert.Equal(expectedOutput, ByAutomationId<TextBox>(settings, "ExecutionOutputDirectory").Text);
             Assert.Equal(expectedOutput, execution.OutputDirectory);
             Assert.Null(execution.OutputDirectoryOverride);
-            Assert.Equal(7, execution.PlannedEvaluationCount);
-            Assert.Equal(21, execution.WorstCaseAttemptCount);
-            Assert.Contains("7 evaluation units", execution.PlanSummary, StringComparison.Ordinal);
+            Assert.Equal(11, execution.PlannedEvaluationCount);
+            Assert.Equal(33, execution.WorstCaseAttemptCount);
+            Assert.Contains("11 evaluation units", execution.PlanSummary, StringComparison.Ordinal);
             Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
             AssertDefinition(input.DefinitionDraft, harness.Design.Draft);
             Assert.False(execution.IsConfigured);
@@ -265,7 +265,7 @@ public sealed class MainWindowTests
         shell.NextCommand.Execute(null);
         ExecutionViewModel execution = harness.Execution;
         Assert.True(execution.IsConfigured);
-        Assert.Equal(5, execution.PlannedEvaluationCount);
+        Assert.Equal(9, execution.PlannedEvaluationCount);
         string? explicitDirectory = explicitOutput ? Path.Combine(workbookA.Directory, "chosen-output") : null;
         execution.OutputDirectoryOverride = explicitDirectory;
         string resumeA = Path.Combine(workbookA.Directory, "retained.partial.xlsx");
@@ -290,7 +290,7 @@ public sealed class MainWindowTests
             shell.NavigateCommand.Execute(WorkflowStep.Input);
             await harness.Input.SetFilePathAsync(workbookB.Path, TestContext.Current.CancellationToken);
             Assert.Equal(expectedOutput, execution.OutputDirectory);
-            Assert.Equal(7, execution.PlannedEvaluationCount);
+            Assert.Equal(11, execution.PlannedEvaluationCount);
             shell.OpenSettingsCommand.Execute(SettingsCategory.Common);
             Render();
 
@@ -298,7 +298,7 @@ public sealed class MainWindowTests
             Assert.Equal(expectedOutput, outputAtOpen);
             Assert.Equal(expectedOutput, ByAutomationId<TextBox>(settings, "ExecutionOutputDirectory").Text);
             Assert.Equal(explicitDirectory, execution.OutputDirectoryOverride);
-            Assert.Equal(21, execution.WorstCaseAttemptCount);
+            Assert.Equal(33, execution.WorstCaseAttemptCount);
             Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
             Assert.True(execution.IsConfigured); // Still A: preview does not Configure or ClearConfiguration.
             Assert.True(execution.IsResumeMode);
@@ -318,7 +318,7 @@ public sealed class MainWindowTests
             Assert.NotEmpty(execution.ResumeResetReason);
             Assert.Equal(expectedOutput, execution.OutputDirectory);
             Assert.Equal(explicitDirectory, execution.OutputDirectoryOverride);
-            Assert.Equal(7, execution.PlannedEvaluationCount);
+            Assert.Equal(11, execution.PlannedEvaluationCount);
             Assert.False(Directory.Exists(Path.Combine(workbookA.Directory, "result")));
             Assert.False(Directory.Exists(Path.Combine(workbookB.Directory, "result")));
             Assert.False(Directory.Exists(expectedOutput));
@@ -411,25 +411,25 @@ public sealed class MainWindowTests
         ExecutionTechnicalError[] errors = execution.TechnicalErrors.ToArray();
         List<string?> notifications = [];
         execution.PropertyChanged += (_, args) => notifications.Add(args.PropertyName);
-        Assert.Equal(7, execution.PlannedEvaluationCount);
+        Assert.Equal(11, execution.PlannedEvaluationCount);
 
         harness.Input.FirstDataRow = 3;
-        Assert.Equal(5, execution.PlannedEvaluationCount);
+        Assert.Equal(9, execution.PlannedEvaluationCount);
         Assert.Equal(2, harness.Design.Draft.FirstDataRow);
         harness.Design.Questions[0].Evaluators[0].Enabled = false;
-        Assert.Equal(4, execution.PlannedEvaluationCount);
-        Assert.Equal(12, execution.WorstCaseAttemptCount);
+        Assert.Equal(8, execution.PlannedEvaluationCount);
+        Assert.Equal(24, execution.WorstCaseAttemptCount);
         Assert.True(harness.Input.DefinitionDraft.Questions[0].Evaluators[0].Enabled);
         Assert.Equal(3, harness.Input.DefinitionDraft.FirstDataRow);
 
         shell.OpenSettings(SettingsCategory.Common);
         AssertDefinition(harness.Design.Draft, harness.Input.DefinitionDraft);
-        Assert.Equal(4, execution.PlannedEvaluationCount);
+        Assert.Equal(8, execution.PlannedEvaluationCount);
         shell.CloseSettings();
         shell.NextCommand.Execute(null);
         Assert.Equal(WorkflowStep.Design, shell.CurrentStep);
         harness.Design.Questions[0].Evaluators[0].Enabled = true;
-        Assert.Equal(7, execution.PlannedEvaluationCount);
+        Assert.Equal(11, execution.PlannedEvaluationCount);
         Assert.False(harness.Input.DefinitionDraft.Questions[0].Evaluators[0].Enabled);
 
         shell.OpenSettings(SettingsCategory.Common);
@@ -480,7 +480,7 @@ public sealed class MainWindowTests
         AssertDefinition(loadedInput, harness.Design.Draft);
         Assert.Equal(explicitDirectory, harness.Execution.OutputDirectory);
         Assert.Equal(explicitDirectory, harness.Execution.OutputDirectoryOverride);
-        Assert.Equal(3, harness.Execution.PlannedEvaluationCount);
+        Assert.Equal(7, harness.Execution.PlannedEvaluationCount);
         Assert.False(harness.Execution.IsConfigured);
         Assert.Equal(0, harness.Authentication.CallCount);
         Assert.Equal(0, harness.Runner.CallCount);
@@ -975,7 +975,7 @@ public sealed class MainWindowTests
         shell.NextCommand.Execute(null);
         ExecutionViewModel execution = harness.Execution;
         Assert.Null(execution.OutputDirectoryOverride);
-        Assert.Equal(5, execution.PlannedEvaluationCount);
+        Assert.Equal(9, execution.PlannedEvaluationCount);
         string outputA = Path.Combine(workbookA.Directory, "result");
         string outputB = Path.Combine(workbookB.Directory, "result");
         string finalA = Path.Combine(outputA, "reserved.xlsx");
@@ -1022,7 +1022,7 @@ public sealed class MainWindowTests
             SettingsView settings = Assert.Single(window.GetVisualDescendants().OfType<SettingsView>());
             Assert.Equal(WorkflowStep.Input, shell.CurrentStep);
             Assert.Equal(outputB, ByAutomationId<TextBox>(settings, "ExecutionOutputDirectory").Text);
-            Assert.Equal(new (string, long)[] { (string.Empty, 0), (outputB, 7) }, previews.ToArray());
+            Assert.Equal(new (string, long)[] { (string.Empty, 0), (outputB, 11) }, previews.ToArray());
             Assert.Equal("今回run 新規出力先: " + outputA, execution.CurrentRunOutputSummary);
             Assert.True(execution.IsRunning);
             Assert.Equal(5, execution.ProgressTotal);
@@ -1046,16 +1046,16 @@ public sealed class MainWindowTests
             Assert.True(execution.CanCancel);
             Assert.False(execution.CanStart);
             Assert.Null(execution.OutputDirectoryOverride);
-            Assert.Equal(7, execution.PlannedEvaluationCount);
-            Assert.Equal(21, execution.WorstCaseAttemptCount);
+            Assert.Equal(11, execution.PlannedEvaluationCount);
+            Assert.Equal(33, execution.WorstCaseAttemptCount);
             Assert.Equal(outputB, execution.OutputDirectory);
             Assert.Equal(outputB, Required<TextBox>(view, "EffectiveOutputDirectoryTextBox").Text);
             Assert.Equal("今回run 新規出力先: " + outputA, Required<TextBox>(view, "CurrentRunOutputTextBox").Text);
             Assert.Contains("実行中 model-test 並列8", Required<TextBox>(view, "EffectiveModelTextBox").Text, StringComparison.Ordinal);
             Assert.Contains("次回", Required<TextBlock>(view, "PlanSummaryLabel").Text, StringComparison.Ordinal);
             Assert.Equal(execution.PlanSummary, Required<TextBlock>(view, "PlanSummaryText").Text);
-            Assert.Contains("7 evaluation units", execution.PlanSummary, StringComparison.Ordinal);
-            Assert.Contains("最大 21 attempts", execution.PlanSummary, StringComparison.Ordinal);
+            Assert.Contains("11 evaluation units", execution.PlanSummary, StringComparison.Ordinal);
+            Assert.Contains("最大 33 attempts", execution.PlanSummary, StringComparison.Ordinal);
             Assert.Equal(5, execution.ProgressTotal);
             Assert.Equal(3, execution.ProgressCompleted);
             Assert.Equal(1, execution.ProgressInFlight);
@@ -1090,7 +1090,7 @@ public sealed class MainWindowTests
             Assert.Equal(workbookA.Path, execution.LastRunContext?.InputPath);
             Assert.Equal("前回run 新規出力先: " + outputA, execution.CurrentRunOutputSummary);
             Assert.Equal(outputB, execution.OutputDirectory);
-            Assert.Equal(7, execution.PlannedEvaluationCount);
+            Assert.Equal(11, execution.PlannedEvaluationCount);
             Assert.False(execution.CanStart); // Presentation alone has not configured B for dispatch.
 
             shell.PreviousCommand.Execute(null);
@@ -1231,7 +1231,7 @@ public sealed class MainWindowTests
         QuantificationDefinition designDraft = harness.Design.Draft;
         Assert.NotEqual(inputDraft.Name, designDraft.Name);
         Assert.True(inputDraft.Questions[0].Evaluators[0].Enabled);
-        Assert.Equal(4, harness.Execution.PlannedEvaluationCount);
+        Assert.Equal(8, harness.Execution.PlannedEvaluationCount);
         int inputDraftChanges = 0;
         int designDraftChanges = 0;
         int configurationChanges = 0;
@@ -1310,8 +1310,8 @@ public sealed class MainWindowTests
             Assert.Equal(showExecution, harness.Execution.IsConfigured);
             Assert.Equal(!showExecution, shell.IsSettingsOpen);
             Assert.Equal(showExecution ? WorkflowStep.Execution : WorkflowStep.Input, shell.CurrentStep);
-            Assert.Equal(4, harness.Execution.PlannedEvaluationCount); // Not the unchanged Input's 7 units.
-            Assert.Equal(12, harness.Execution.WorstCaseAttemptCount);
+            Assert.Equal(8, harness.Execution.PlannedEvaluationCount); // Not the unchanged Input's 7 units.
+            Assert.Equal(24, harness.Execution.WorstCaseAttemptCount);
             Assert.Equal(Path.Combine(workbook.Directory, "result"), harness.Execution.OutputDirectory);
             Assert.Same(stored, shell.Settings.StoredDefinition);
             AssertDefinition(saved, stored);
@@ -1556,7 +1556,7 @@ public sealed class MainWindowTests
             AssertDefinition(harness.Input.DefinitionDraft, harness.Design.Draft);
             Assert.Equal(keepSettingsOpen ? 0 : 1, readyConfigurations);
             Assert.Equal(Path.Combine(workbook.Directory, "result"), harness.Execution.OutputDirectory);
-            Assert.Equal(3, harness.Execution.PlannedEvaluationCount);
+            Assert.Equal(7, harness.Execution.PlannedEvaluationCount);
             if (keepSettingsOpen)
             {
                 Assert.Equal(SettingsCategory.Common, harness.ViewModel.Settings.SelectedCategory);
@@ -1600,7 +1600,7 @@ public sealed class MainWindowTests
         harness.ViewModel.NextCommand.Execute(null);
         Assert.Same(execution, harness.ViewModel.CurrentEditorViewModel);
         Assert.True(execution.IsConfigured);
-        Assert.Equal(5, execution.PlannedEvaluationCount);
+        Assert.Equal(9, execution.PlannedEvaluationCount);
         int busyConfigurations = 0;
         int validations = 0;
         List<bool> configurations = [];
@@ -1677,12 +1677,12 @@ public sealed class MainWindowTests
                 Assert.Equal("Replacement", input.DefinitionDraft.SourceSheet);
                 AssertDefinition(input.DefinitionDraft, harness.Design.Draft);
                 Assert.True(execution.IsConfigured);
-                Assert.Equal(7, execution.PlannedEvaluationCount);
-                Assert.Equal(21, execution.WorstCaseAttemptCount);
+                Assert.Equal(11, execution.PlannedEvaluationCount);
+                Assert.Equal(33, execution.WorstCaseAttemptCount);
                 Assert.Equal(Path.Combine(workbookB.Directory, "result"), execution.OutputDirectory);
                 Assert.Equal(new[] { false, true }, configurations);
                 Assert.Equal(2, previews.Count);
-                Assert.Equal((execution.OutputDirectory, 7L, (WorkbookMetadata?)loadedB.Metadata), previews[1]);
+                Assert.Equal((execution.OutputDirectory, 11L, (WorkbookMetadata?)loadedB.Metadata), previews[1]);
                 Assert.Equal(2, completions.Count);
                 Assert.Equal((workbookB.Path, (WorkbookMetadata?)loadedB.Metadata, input.DefinitionDraft), completions[1]);
             }

@@ -293,7 +293,7 @@ public sealed class ExecutionSettingsTests
         Assert.Equal(string.Empty, viewModel.CurrentRunOutputSummary);
 
         harness.Configure();
-        Assert.Equal(5, viewModel.PlannedEvaluationCount);
+        Assert.Equal(9, viewModel.PlannedEvaluationCount);
         Assert.Equal(concurrency, viewModel.MaxConcurrency);
         Assert.Equal("model-b", viewModel.PreferredModelId);
         Assert.False(viewModel.CanStart);

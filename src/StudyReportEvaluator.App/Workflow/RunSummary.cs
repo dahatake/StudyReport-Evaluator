@@ -6,6 +6,7 @@ using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.App.Workbooks.Mapping;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
+using StudyReportEvaluator.Core.Similarity;
 
 namespace StudyReportEvaluator.App.Workflow;
 
@@ -251,6 +252,18 @@ public sealed class RunSummary
 
     public ImmutableArray<RunPeerSimilarityResult> PeerSimilarities { get; }
 
+    // FR-115 AC-080 / AC-083 / AC-084: 参照集合の予定 slot 数と比較条件の版（checkpoint と同じ snapshot）。0 / null は旧単独参照の集合。
+    internal int ReferenceSlotCount { get; init; }
+
+    internal string? ReferenceTemplateVersion { get; init; }
+
+    internal string? ReferenceComparisonVersion { get; init; }
+
+    internal string? ReferenceNormalizationVersion { get; init; }
+
+    /// <summary>設問ごとの予定参照 slot 数（新規 run は PARAM-003、旧形式は 1）。</summary>
+    public int ReferenceSlotsPerQuestion => ReferenceSetPolicy.PlannedSlots(ReferenceSlotCount);
+
     public int PlannedEvaluationCount => Units.Length;
 
     public int CompletedEvaluationCount => Units.Count(unit => !IsStatus(
@@ -283,7 +296,7 @@ public sealed class RunSummary
     public int PlannedOperationCount => !IsDurable
         ? PlannedEvaluationCount
         : checked(
-            Snapshot.Definition.Questions.Count(question => question.Enabled)
+            Snapshot.Definition.Questions.Count(question => question.Enabled) * ReferenceSlotsPerQuestion
             + Plan.Mapping.SelectedRowCount * (
                 Plan.Items.Count(item => item.SourceRowNumber == Plan.Mapping.FirstDataRow)
                 + Snapshot.Definition.Questions.Where(question => question.Enabled)
@@ -618,7 +631,11 @@ public sealed class RunSummary
             PeerMax = peer?.PeerMax,
             PeerRow = peer?.PeerRow,
             // FR-114 AC-010 / AC-079: 成功した結果の参照別詳細（旧形式の checkpoint では null）。
-            ReferenceDiagnostics = result?.AcceptedResult is null ? null : result.ReferenceDiagnostics,
+            // FR-115 AC-081: 一部失敗の集合は成功参照に限った暫定の診断を持つが、採点値は持たない。
+            ReferenceDiagnostics = result?.AcceptedResult is null && result?.ReferenceSet is null
+                ? null
+                : result.ReferenceDiagnostics,
+            ReferenceSet = result?.ReferenceSet,
         };
 
     private static string EvidenceSourceName(EvidenceSourceKind source) => source switch
