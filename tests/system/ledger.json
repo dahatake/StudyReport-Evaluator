@@ -29,7 +29,8 @@
     "AC-088": "sha256:95a2b2e7cb47fd62",
     "AC-089": "sha256:1d096f79819b1ea9",
     "AC-090": "sha256:f6ab18f4f90b2b62",
-    "AC-092": "sha256:0d8ada5e34e80265"
+    "AC-092": "sha256:0d8ada5e34e80265",
+    "AC-096": "sha256:a3a4363b2f743abe"
   },
   "cases": [
     {
@@ -526,6 +527,37 @@
           "by": "test-designer",
           "change": "blocked",
           "reason": "AC-092 の検証レベルは integration で System Test の対象外（CHK-10）。implementer が App.Tests に書く"
+        }
+      ]
+    },
+    {
+      "id": "E2E-014",
+      "requirement_ids": [
+        "FR-118"
+      ],
+      "ac_ids": [
+        "AC-096"
+      ],
+      "title": "エラー表示の赤系配色: コントラスト比・赤系ブラシ（キャンセルは青）・色以外の併用・最小windowで文字が重ならない",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/ui --filter \"FullyQualifiedName~FR118_\"",
+      "canary": false,
+      "status": "not_run",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-05T01:06:40+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-05T01:07:10+09:00",
+          "by": "test-designer",
+          "change": "ac_ids: ['AC-093', 'AC-094', 'AC-095', 'AC-096'] -> ['AC-096']",
+          "reason": "AC-093〜095 は検証レベルが unit/integration のため System Test 台帳の対象外。同ファイルのテストは残すが台帳の AC は AC-096 のみ"
         }
       ]
     }
