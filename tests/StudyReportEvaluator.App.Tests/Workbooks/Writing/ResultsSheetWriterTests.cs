@@ -52,7 +52,8 @@ public sealed class ResultsSheetWriterTests
         Assert.Equal(names.ResultsSheetName, writeResult.SheetName);
         Assert.Equal(1, writeResult.HeaderRow);
         Assert.Equal(1, writeResult.DataRowCount);
-        Assert.Equal(36, writeResult.ColumnCount);
+        // FR-114 AC-010: 設問ごとに類似度の確認指標の 11 列を加える。
+        Assert.Equal(47, writeResult.ColumnCount);
         Assert.Equal(13, writeResult.FormulaCells.Length);
         Assert.Equal(
             writeResult.FormulaCells.Length,
@@ -97,6 +98,17 @@ public sealed class ResultsSheetWriterTests
             "Q1.Similarity_Reason",
             "Q1.Similarity_Status",
             "Q1.Similarity_Penalty",
+            "Q1.Similarity_Indicator",
+            "Q1.Similarity_Max_Reference",
+            "Q1.Similarity_Raw_Exact",
+            "Q1.Similarity_Normalized_Exact",
+            "Q1.Similarity_LCS_Length",
+            "Q1.Similarity_Student_Coverage",
+            "Q1.Similarity_Reference_Coverage",
+            "Q1.Similarity_Student_Match_Start",
+            "Q1.Similarity_Reference_Match_Start",
+            "Q1.Similarity_Short_Text_Caution",
+            "Q1.Similarity_Detail_Status",
             "Q1.Similarity_Peer_Max",
             "Q1.Similarity_Peer_Row",
             "Base_Points",
@@ -112,6 +124,8 @@ public sealed class ResultsSheetWriterTests
         Assert.DoesNotContain("Q-DISABLED", header.InnerText, StringComparison.Ordinal);
 
         AssertNumber(CellByHeader(worksheet, "SourceRow", 2), "2");
+        // FR-114 AC-010: 類似度は「確認指標・未検証」と明示する。
+        AssertInline(CellByHeader(worksheet, "Q1.Similarity_Indicator", 2), "確認指標・未検証");
         AssertNumber(CellByHeader(worksheet, "Q1.E1.C-A.Scorable", 2), "1");
         AssertNumber(CellByHeader(worksheet, "Q1.E1.C-A.AI_Raw", 2), "25");
         AssertTrulyBlank(CellByHeader(worksheet, "Q1.E1.C-A.Override", 2));
@@ -316,7 +330,8 @@ public sealed class ResultsSheetWriterTests
 
         using SpreadsheetDocument reopened = SpreadsheetDocument.Open(input.Path, false);
         Worksheet worksheet = GetWorksheet(reopened, names.ResultsSheetName);
-        Assert.Equal(39, result.ColumnCount);
+        // FR-114 AC-010: 類似度の確認指標の 11 列を含む。
+        Assert.Equal(50, result.ColumnCount);
         AssertNumber(CellByHeader(worksheet, "Q1.S1.Special_AI_Raw", 2), "0.8");
         AssertNumber(CellByHeader(worksheet, "Q1.S2.Special_AI_Raw", 2), "0.6");
         AssertFormulaCache(CellByHeader(worksheet, "Q1.Special_Question_Rate", 2), "0.7");

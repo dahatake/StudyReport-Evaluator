@@ -142,7 +142,8 @@
             <TextBlock Text="元の行" Classes="label" />
             <TextBlock Grid.Column="1" Text="最終点" Classes="label" />
             <TextBlock Grid.Column="2" Text="固有点" Classes="label" />
-            <TextBlock Grid.Column="3" Text="類似減点" Classes="label" />
+            <TextBlock Grid.Column="3" Text="類似減点" Classes="label"
+                       ToolTip.Tip="{Binding SimilarityIndicatorNotice}" />
             <TextBlock Grid.Column="4" Text="状態" Classes="label" />
           </Grid>
           <ListBox x:Name="RowScoreList" Grid.Row="1" Padding="0" BorderThickness="0"
@@ -189,9 +190,15 @@
                   <StackPanel Grid.Column="4"><TextBlock Text="Final raw" Classes="label" /><TextBlock Text="{Binding FinalRawText}" AutomationProperties.AutomationId="ResultsSelectedFinalRaw" /></StackPanel>
                   <StackPanel Grid.Column="5"><TextBlock Text="状態" Classes="label" /><TextBlock Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" AutomationProperties.AutomationId="ResultsSelectedRowStatus" /></StackPanel>
                   <ScrollViewer Grid.Column="6" Focusable="True" HorizontalScrollBarVisibility="Disabled"
-                                VerticalScrollBarVisibility="Auto" AutomationProperties.Name="選択学生の全設問得点の全文">
-                    <TextBlock Text="{Binding QuestionEarnedText}" TextWrapping="Wrap"
-                               AutomationProperties.AutomationId="ResultsQuestionEarnedFull" />
+                                VerticalScrollBarVisibility="Auto" AutomationProperties.Name="選択学生の全設問得点と類似度の確認指標の全文">
+                    <StackPanel Spacing="4">
+                      <TextBlock Text="{Binding QuestionEarnedText}" TextWrapping="Wrap"
+                                 AutomationProperties.AutomationId="ResultsQuestionEarnedFull" />
+                      <!-- FR-114 AC-078: 類似度は通常評価と別の確認指標・未検証として表示する。 -->
+                      <TextBlock Text="{Binding SimilarityDiagnosticsText}" TextWrapping="Wrap" Classes="label"
+                                 AutomationProperties.AutomationId="ResultsSimilarityDiagnostics"
+                                 AutomationProperties.Name="{Binding SimilarityDiagnosticsText}" />
+                    </StackPanel>
                   </ScrollViewer>
                 </Grid>
               </DataTemplate>

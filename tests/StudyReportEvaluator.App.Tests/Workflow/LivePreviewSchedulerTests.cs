@@ -13,6 +13,31 @@ public sealed class LivePreviewSchedulerTests
 {
     private const string Reference = "reference answer";
 
+    // FR-114 / AC-078: 実行速報でも類似度は通常評価と別の「確認指標・未検証」として示す。
+    [Fact]
+    public async Task FR114_AC078_Live_preview_labels_similarity_as_unverified_indicator()
+    {
+        EvaluationPlan plan = Plan(specialPoints: 10m);
+        List<LivePreviewRow> snapshots = [];
+        ScriptedRunner normal = new((payload, _, _) =>
+            Task.FromResult(EvaluationRunnerResult.Succeeded(U01TestSupport.ValidResult(payload, _ => 7m))));
+
+        DurableRowEvaluationResult result = await Evaluate(
+            plan, Rows("student answer", "special answer"), normal, SpecialSuccess(), snapshots, TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsComplete);
+        LivePreviewRow last = snapshots[^1];
+        LivePreviewItem similarity = Assert.Single(last.Items, item => item.Kind == LivePreviewItemKind.Similarity);
+        Assert.Contains(StudyReportEvaluator.Core.Similarity.SimilarityDiagnostics.IndicatorLabel, similarity.Title, StringComparison.Ordinal);
+        Assert.All(
+            last.Items.Where(item => item.Kind != LivePreviewItemKind.Similarity),
+            item => Assert.DoesNotContain(StudyReportEvaluator.Core.Similarity.SimilarityDiagnostics.IndicatorLabel, item.Title, StringComparison.Ordinal));
+        Assert.Contains(
+            StudyReportEvaluator.Core.Similarity.SimilarityDiagnostics.IndicatorLabel,
+            LivePreviewFormatter.DetailText(last),
+            StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Row_reports_source_text_prompt_and_raw_values_per_item_in_stable_order()
     {

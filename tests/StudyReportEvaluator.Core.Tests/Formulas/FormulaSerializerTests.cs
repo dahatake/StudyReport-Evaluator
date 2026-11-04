@@ -134,8 +134,9 @@ public sealed class FormulaSerializerTests
         string finalScore = _serializer.Serialize(FormulaExpressions.FinalScore(
             Ref("Results", "L", 2)));
 
+        // FR-114 AC-011: 係数ゼロなら診断の失敗・欠損でも減点 0。係数が正なら完全な診断だけ減点し、不完全なら blank。
         Assert.Equal(
-            "=IF(ISNUMBER('Results'!B2),ROUND((('Config'!$A$2*'Results'!B2)*'Config'!$C$1),'Config'!$D$1),\"\")",
+            "=IF(('Config'!$C$1=0),0,IF(ISNUMBER('Results'!B2),ROUND((('Config'!$A$2*'Results'!B2)*'Config'!$C$1),'Config'!$D$1),\"\"))",
             penalty);
         Assert.Contains("('Config'!$E$1<>1)", finalRaw, StringComparison.Ordinal);
         Assert.Contains("COUNT('Results'!G2,'Results'!H2,'Results'!I2,'Results'!J2,'Results'!K2)=5", finalRaw, StringComparison.Ordinal);

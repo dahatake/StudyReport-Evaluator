@@ -624,10 +624,11 @@ public sealed class OutputPackageValidatorTests
             FormulaCellAddress questionEarned = Address(names.ResultsSheetName, "P", 2);
             FormulaCellAddress similarity = Address(names.ResultsSheetName, "Q", 2);
             FormulaCellAddress similarityPenalty = Address(names.ResultsSheetName, "T", 2);
-            FormulaCellAddress basePoints = Address(names.ResultsSheetName, "W", 2);
-            FormulaCellAddress specialEarned = Address(names.ResultsSheetName, "X", 2);
-            FormulaCellAddress finalRaw = Address(names.ResultsSheetName, "Y", 2);
-            FormulaCellAddress finalScore = Address(names.ResultsSheetName, "Z", 2);
+            // FR-114 AC-010: 類似度の確認指標の 11 列（U〜AE）が Penalty と Peer_Max の間に入る。
+            FormulaCellAddress basePoints = Address(names.ResultsSheetName, "AH", 2);
+            FormulaCellAddress specialEarned = Address(names.ResultsSheetName, "AI", 2);
+            FormulaCellAddress finalRaw = Address(names.ResultsSheetName, "AJ", 2);
+            FormulaCellAddress finalScore = Address(names.ResultsSheetName, "AK", 2);
             FormulaCellReference minimum = Ref(config.CriterionMinimumCells["C1"], absolute: true);
             FormulaCellReference maximum = Ref(config.CriterionMaximumCells["C1"], absolute: true);
             FormulaCellReference rounding = Ref(config.RoundingDigitsCell, absolute: true);

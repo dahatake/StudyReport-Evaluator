@@ -22,7 +22,14 @@ public sealed record QuantificationDefinition
 
     public decimal SpecialPoints { get; init; }
 
-    public decimal SimilarityPenaltyWeight { get; init; } = 0.1m;
+    // FR-114 AC-004: record の既定値は旧既定値（互換性のため据え置き）。新規定義の既定値は NewDefaultSimilarityPenaltyWeight。
+    public decimal SimilarityPenaltyWeight { get; init; } = LegacyDefaultSimilarityPenaltyWeight;
+
+    /// <summary>PARAM-002: 新規定義の類似度減点係数の既定値（確認指標・未検証のため減点しない）。</summary>
+    public const decimal NewDefaultSimilarityPenaltyWeight = 0m;
+
+    /// <summary>FR-114 AC-004: 係数が記録されていない旧形式の定義に補う旧既定値。</summary>
+    public const decimal LegacyDefaultSimilarityPenaltyWeight = 0.1m;
 
     public int RoundingDigits { get; init; } = 1;
 

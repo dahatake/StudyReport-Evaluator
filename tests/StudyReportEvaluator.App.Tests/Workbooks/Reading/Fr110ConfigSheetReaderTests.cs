@@ -247,4 +247,47 @@ public sealed class Fr110ConfigSheetReaderTests
         Assert.Null(result.Definition);
         Assert.Contains(result.Errors, e => e.Kind == DefinitionReadErrorKind.EvaluatorTypeMismatch);
     }
+
+    // FR-114 / AC-004: 明示した係数 0 は設定シートから 0 のまま読み戻り、補完の通知は出さない。
+    [Theory]
+    [InlineData("0")]
+    [InlineData("0.1")]
+    [InlineData("0.25")]
+    public void FR114_AC004_Explicit_similarity_weight_round_trips_through_config_without_notice(string weight)
+    {
+        decimal expected = decimal.Parse(weight, System.Globalization.CultureInfo.InvariantCulture);
+        QuantificationSnapshot snapshot = QuantificationSnapshot.Create(
+            Definition(AllThree) with { BasePoints = 70m, SimilarityPenaltyWeight = expected });
+
+        CanonicalDefinitionReadResult result = WriteMutateRead(snapshot);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(expected, result.Definition!.SimilarityPenaltyWeight);
+        Assert.Empty(result.Notices);
+        Assert.Equal(snapshot.CanonicalJson, new CanonicalDefinitionSerializer().Serialize(result.Definition));
+    }
+
+    // FR-114 / AC-004: 係数を持たない旧形式の設定シートは旧既定値 0.1 を補い、そのことを通知する。
+    [Fact]
+    public void FR114_AC004_Legacy_config_without_similarity_weight_supplies_0_1_with_notice()
+    {
+        QuantificationSnapshot snapshot = QuantificationSnapshot.Create(Definition(AllThree));
+
+        CanonicalDefinitionReadResult result = WriteMutateRead(snapshot, data =>
+        {
+            Row[] chunks = RowsOf(data, "CANONICAL_JSON").OrderBy(r => int.Parse(Text(r, "X"), System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+            string json = string.Concat(chunks.Select(r => Text(r, "Y")));
+            string legacy = System.Text.RegularExpressions.Regex.Replace(json, "\"similarityPenaltyWeight\":[^,]*,", string.Empty);
+            Assert.NotEqual(json, legacy);
+            SetText(chunks[0], "Y", legacy);
+            foreach (Row other in chunks.Skip(1))
+            {
+                SetText(other, "Y", string.Empty);
+            }
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(QuantificationDefinition.LegacyDefaultSimilarityPenaltyWeight, result.Definition!.SimilarityPenaltyWeight);
+        Assert.Equal([CanonicalDefinitionDeserializer.LegacySimilarityPenaltyWeightNotice], result.Notices);
+    }
 }

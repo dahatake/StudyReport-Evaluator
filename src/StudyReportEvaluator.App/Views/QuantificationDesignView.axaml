@@ -194,8 +194,9 @@
                       </Grid>
                       <Grid Grid.Row="1" Grid.Column="2" ColumnDefinitions="Auto,*" ColumnSpacing="4">
                         <TextBlock Text="係数" />
-                        <TextBlock x:Name="FormulaSimilarityValue" Grid.Column="1" Text="{Binding SimilarityPenaltyWeight, StringFormat='{}{0:G29}'}" TextTrimming="CharacterEllipsis"
-                                   AutomationProperties.AutomationId="FormulaSimilarityValue" AutomationProperties.Name="{Binding SimilarityPenaltyWeight, StringFormat='類似度減点係数 {0:G29}'}" />
+                        <TextBlock x:Name="FormulaSimilarityValue" Grid.Column="1" Text="{Binding SimilarityPenaltyWeightDisplay}" TextTrimming="CharacterEllipsis"
+                                   AutomationProperties.AutomationId="FormulaSimilarityValue" AutomationProperties.Name="{Binding SimilarityPenaltyWeightDisplay, StringFormat='類似度減点係数 {0}'}"
+                                   ToolTip.Tip="{Binding DefinitionNoticeText}" />
                       </Grid>
                     </Grid>
                     <Button x:Name="FormulaDetailsButton" Grid.Column="1" Content="計算式" TabIndex="3"

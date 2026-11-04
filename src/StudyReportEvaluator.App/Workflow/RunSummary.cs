@@ -617,6 +617,8 @@ public sealed class RunSummary
             Status = result?.StatusCode ?? ResultsStatusCodes.Cancelled,
             PeerMax = peer?.PeerMax,
             PeerRow = peer?.PeerRow,
+            // FR-114 AC-010 / AC-079: 成功した結果の参照別詳細（旧形式の checkpoint では null）。
+            ReferenceDiagnostics = result?.AcceptedResult is null ? null : result.ReferenceDiagnostics,
         };
 
     private static string EvidenceSourceName(EvidenceSourceKind source) => source switch

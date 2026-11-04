@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json.Serialization;
 using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.Core.Domain;
+using StudyReportEvaluator.Core.Similarity;
 
 namespace StudyReportEvaluator.App.Workbooks.Checkpoint;
 
@@ -107,6 +108,11 @@ public sealed record CheckpointSimilarityResult
     public SimilarityQuantificationResult? AcceptedResult { get; init; }
 
     public CheckpointTokenUsage TokenUsage { get; init; } = new();
+
+    // FR-114 AC-010 / AC-077 / AC-079: 参照別の確認指標（未検証）の詳細。学生本文は持たない。
+    // 旧形式の checkpoint にはない（null）。null のときは書かないため、旧 checkpoint の往復を保つ。
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableArray<SimilarityReferenceDiagnostic>? ReferenceDiagnostics { get; init; }
 
     public override string ToString() =>
         $"{nameof(CheckpointSimilarityResult)} {{ StatusCode = {StatusCode}, Content = <redacted> }}";

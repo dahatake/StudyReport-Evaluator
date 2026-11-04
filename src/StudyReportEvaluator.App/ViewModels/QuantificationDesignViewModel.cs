@@ -990,6 +990,7 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
     private readonly ViewModelCommand previousPageCommand;
     private readonly ViewModelCommand nextPageCommand;
     private QuantificationDefinition draft;
+    private string? definitionNoticeText;
     private QuestionDesignItemViewModel? selectedQuestion;
     private int pageSize = 4;
     private int pageIndex;
@@ -1152,8 +1153,46 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
     public decimal SimilarityPenaltyWeight
     {
         get => draft.SimilarityPenaltyWeight;
-        set => Commit(draft with { SimilarityPenaltyWeight = value });
+        set
+        {
+            if (value != draft.SimilarityPenaltyWeight)
+            {
+                // FR-114 AC-004: 利用者が係数を明示したら、旧既定値の補完の通知は役目を終える。
+                ClearDefinitionNotices();
+            }
+
+            Commit(draft with { SimilarityPenaltyWeight = value });
+        }
     }
+
+    /// <summary>FR-114 AC-004: 読込時に補った値の通知（旧形式で欠けた減点係数へ 0.1 を補ったなど）。なければ null。</summary>
+    public string? DefinitionNoticeText => definitionNoticeText;
+
+    public bool HasDefinitionNotice => definitionNoticeText is not null;
+
+    /// <summary>計算式欄の係数表示。補った値なら「（旧形式・補完）」を添えて、黙って補わない。</summary>
+    public string SimilarityPenaltyWeightDisplay => definitionNoticeText is null
+        ? draft.SimilarityPenaltyWeight.ToString("G29", CultureInfo.InvariantCulture)
+        : draft.SimilarityPenaltyWeight.ToString("G29", CultureInfo.InvariantCulture) + LegacyWeightMarker;
+
+    public const string LegacyWeightMarker = "（旧形式・補完）";
+
+    /// <summary>FR-114 AC-004: 読込経路が返した通知を設計画面に表示する（空なら消す）。</summary>
+    public void ShowDefinitionNotices(IEnumerable<string> notices)
+    {
+        ArgumentNullException.ThrowIfNull(notices);
+        string[] items = notices.Where(notice => !string.IsNullOrWhiteSpace(notice)).Distinct(StringComparer.Ordinal).ToArray();
+        string? next = items.Length == 0 ? null : string.Join(Environment.NewLine, items);
+        if (string.Equals(next, definitionNoticeText, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        definitionNoticeText = next;
+        OnPropertiesChanged(nameof(DefinitionNoticeText), nameof(HasDefinitionNotice), nameof(SimilarityPenaltyWeightDisplay));
+    }
+
+    public void ClearDefinitionNotices() => ShowDefinitionNotices([]);
 
     public decimal? AllocationTotal => allocationCalculator.Validate(
         draft.BasePoints,
@@ -1226,6 +1265,9 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
 
             if (definitionChanged)
             {
+                // FR-114 AC-004: 別の定義に置き換わったら、前の定義の補完の通知は残さない。
+                // 補った定義を適用する経路（保存定義の適用）は同期の後で通知を出し直す。
+                ClearDefinitionNotices();
                 Commit(definition);
             }
             else
@@ -1781,6 +1823,7 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             nameof(BasePoints),
             nameof(SpecialPoints),
             nameof(SimilarityPenaltyWeight),
+            nameof(SimilarityPenaltyWeightDisplay),
             nameof(AllocationTotal),
             nameof(AllocationRemaining),
             nameof(IsAllocationValid),
@@ -2231,7 +2274,8 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             LastDataRow = 2,
             BasePoints = 60m,
             SpecialPoints = 0m,
-            SimilarityPenaltyWeight = 0.1m,
+            // FR-114 AC-004: 新規定義は PARAM-002（類似度は確認指標・未検証のため既定では減点しない）。
+            SimilarityPenaltyWeight = QuantificationDefinition.NewDefaultSimilarityPenaltyWeight,
             RoundingDigits = 1,
             Questions = [CreateDefaultQuestion(questionId, 1, "A") with { Points = 40m }],
         };
