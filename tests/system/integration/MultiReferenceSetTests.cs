@@ -698,12 +698,14 @@ public sealed class MultiReferenceSetTests
                     },
                 ],
             };
-            CheckpointSaveResult created = new CheckpointStore().Create(envelope, CancellationToken.None);
-            if (!created.IsSuccess && !File.Exists(reservation.PartialPath))
+            if (schemaVersion == 2)
             {
-                // 不正な形式を store が書けない場合は、旧 schema で書いてから schema 値だけを壊す
-                CheckpointSaveResult fallback = new CheckpointStore().Create(envelope with { SchemaVersion = 2 }, CancellationToken.None);
-                Assert.True(fallback.IsSuccess);
+                Assert.True(new CheckpointStore().Create(envelope, CancellationToken.None).IsSuccess);
+            }
+            else
+            {
+                // store は未知の schema を書けないため、現行 schema で書いてから META 行・payload の schema 値だけを確実に壊す
+                Assert.True(new CheckpointStore().Create(envelope with { SchemaVersion = 2 }, CancellationToken.None).IsSuccess);
                 CorruptSchemaVersion(reservation.PartialPath, schemaVersion);
             }
 
@@ -726,22 +728,66 @@ public sealed class MultiReferenceSetTests
 
         private static void CorruptSchemaVersion(string partialPath, int schemaVersion)
         {
-            using SpreadsheetDocument doc = SpreadsheetDocument.Open(partialPath, true);
-            foreach (SharedStringItem item in doc.WorkbookPart!.SharedStringTablePart?.SharedStringTable?.Elements<SharedStringItem>() ?? [])
+            int changed = 0;
+            string value = schemaVersion.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            using (SpreadsheetDocument doc = SpreadsheetDocument.Open(partialPath, true))
             {
-                foreach (Text t in item.Descendants<Text>())
+                SharedStringTable? shared = doc.WorkbookPart!.SharedStringTablePart?.SharedStringTable;
+                string CellText(Cell c)
                 {
-                    t.Text = Regex.Replace(t.Text, "\"SchemaVersion\"\\s*:\\s*2", $"\"SchemaVersion\":{schemaVersion}");
+                    if (c.DataType?.Value == CellValues.SharedString && int.TryParse(c.CellValue?.Text, out int i) && shared is not null)
+                    {
+                        return shared.Elements<SharedStringItem>().ElementAt(i).InnerText;
+                    }
+
+                    return c.InlineString?.InnerText ?? c.CellValue?.Text ?? string.Empty;
                 }
+
+                foreach (WorksheetPart ws in doc.WorkbookPart.WorksheetParts)
+                {
+                    foreach (Row row in ws.Worksheet!.Descendants<Row>())
+                    {
+                        List<Cell> cells = row.Elements<Cell>().ToList();
+                        if (cells.Count >= 3
+                            && string.Equals(CellText(cells[0]), "META", StringComparison.OrdinalIgnoreCase)
+                            && string.Equals(CellText(cells[1]), "SchemaVersion", StringComparison.OrdinalIgnoreCase))
+                        {
+                            cells[2].RemoveAllChildren();
+                            cells[2].DataType = CellValues.InlineString;
+                            cells[2].InlineString = new InlineString(new Text(value));
+                            changed++;
+                        }
+                    }
+
+                    foreach (Text t in ws.Worksheet.Descendants<Text>())
+                    {
+                        string replaced = Regex.Replace(t.Text, "\"schemaVersion\"\\s*:\\s*2", $"\"schemaVersion\":{value}", RegexOptions.IgnoreCase);
+                        if (replaced != t.Text)
+                        {
+                            t.Text = replaced;
+                            changed++;
+                        }
+                    }
+                }
+
+                if (shared is not null)
+                {
+                    foreach (Text t in shared.Descendants<Text>())
+                    {
+                        string replaced = Regex.Replace(t.Text, "\"schemaVersion\"\\s*:\\s*2", $"\"schemaVersion\":{value}", RegexOptions.IgnoreCase);
+                        if (replaced != t.Text)
+                        {
+                            t.Text = replaced;
+                            changed++;
+                        }
+                    }
+                }
+
+                doc.Save();
             }
 
-            foreach (WorksheetPart ws in doc.WorkbookPart.WorksheetParts)
-            {
-                foreach (Text t in ws.Worksheet!.Descendants<Text>())
-                {
-                    t.Text = Regex.Replace(t.Text, "\"SchemaVersion\"\\s*:\\s*2", $"\"SchemaVersion\":{schemaVersion}");
-                }
-            }
+            // 壊れていなければテスト自体が失敗する（旧 checkpoint として再開されてしまうのを防ぐ）
+            Assert.True(changed > 0, "checkpoint の schema 値を壊せていない");
         }
 
         private static string Column(int index) => ((char)('A' + index - 1)).ToString();
