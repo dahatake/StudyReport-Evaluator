@@ -369,7 +369,7 @@
         "AC-011",
         "AC-012"
       ],
-      "title": "FR-114 係数0で診断失敗を総合点から隔離・係数>0で診断失敗は減点と総合点をblank・通常評価失敗はblank",
+      "title": "FR-114 係数0で診断失敗を総合点から隔離・係数>0で一部失敗/全失敗は減点と総合点と合計をblank・減点Similarityは完全な参照集合の最大値・空回答は参照状態によらず減点0・通常評価失敗はblank",
       "layer": "e2e",
       "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC011_AC012",
       "canary": true,
@@ -383,6 +383,12 @@
           "by": "test-designer",
           "change": "追加",
           "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-04T09:19:31+09:00",
+          "by": "test-designer",
+          "change": "title: 'FR-114 係数0で診断失敗を総合点から隔離・係数>0で診断失敗は減点と総合点をblank・通常評価失敗はblank' -> 'FR-114 係数0で診断失敗を総合点から隔離・係数>0で一部失敗/全失敗は減点と総合点と合計をblank・減点Similarityは完全な参照集合の最大値・空回答は参照状態によらず減点0・通常評価失敗はblank'",
+          "reason": "ff31b8d（監査C1/C2/M1）: AC-011/AC-012 改訂に合わせ、1 slot だけ全文一致の参照集合で最大値を使う確認、W=0.5 の一部 slot 失敗で blank、空回答の参照状態によらない減点0 を追加"
         }
       ]
     },

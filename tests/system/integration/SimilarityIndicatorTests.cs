@@ -95,7 +95,7 @@ public sealed partial class SimilarityIndicatorTests
 
         // 明示係数ゼロの run の Config 読戻しはゼロのまま（再起動後の読込に相当）。
         using TempDir dir = new();
-        string final0 = await RunAsync(dir, weight: 0m, failReferences: false, label: "cfg0");
+        string final0 = await RunAsync(dir, weight: 0m, RefMode.Ok, label: "cfg0");
         using (SpreadsheetDocument doc = SpreadsheetDocument.Open(final0, false))
         {
             CanonicalDefinitionReadResult cfg = new ConfigSheetReader().Read(doc.WorkbookPart!, ConfigSheet);
@@ -143,7 +143,7 @@ public sealed partial class SimilarityIndicatorTests
     }
 
     // ------------------------------------------------------------------
-    // FR-114 AC-011 AC-012: 係数ゼロなら診断の失敗・欠損でも減点ゼロで総合点は通常評価から。係数が正なら
+    // FR-114 AC-010 AC-011 AC-012: 係数ゼロなら診断の失敗・欠損でも減点ゼロで総合点は通常評価から。係数が正なら
     // 完全な診断だけ Points×Similarity×Weight、不完全なら減点と総合点は blank。通常評価の失敗による blank は係数ゼロでも残す。
     // 空回答は AI へ送らずゼロ。技術的失敗をゼロや一致なしにしない。Config 参照の数式と UI の cached preview・採点結果シートが一致。
     // ------------------------------------------------------------------
@@ -155,7 +155,7 @@ public sealed partial class SimilarityIndicatorTests
         const decimal earned = 7m; // P=10, raw 7/10 → R=0.7 → QuestionEarned=7（§8.1）
 
         // A: W=0・診断正常
-        RunOutcome a = await RunWithOutcomeAsync(dir, 0m, failReferences: false, "A");
+        RunOutcome a = await RunWithOutcomeAsync(dir, 0m, RefMode.Ok, "A");
         Assert.Equal(0, a.NormalCallsForEmpty); // 空回答は AI へ送らない（AC-012）
         AssertRow(a, 2, penalty: 0m, finalScore: basePoints + earned);
         AssertRow(a, 4, penalty: 0m, finalScore: basePoints, questionEarned: 0m);
@@ -163,7 +163,7 @@ public sealed partial class SimilarityIndicatorTests
         AssertNormalFailureRow(a, 5);
 
         // B: W=0・診断（参照生成）失敗 → 診断値は blank と失敗 status。減点 0、総合点は通常評価から。
-        RunOutcome b = await RunWithOutcomeAsync(dir, 0m, failReferences: true, "B");
+        RunOutcome b = await RunWithOutcomeAsync(dir, 0m, RefMode.AllFail, "B");
         foreach (int row in new[] { 2, 3 })
         {
             Assert.True(string.IsNullOrEmpty(b.Cell(row, "Q1.Similarity_AI_Raw")), "診断失敗を一致なし（0）に変換してはならない");
@@ -175,22 +175,42 @@ public sealed partial class SimilarityIndicatorTests
         AssertNormalFailureRow(b, 5);
 
         // C: W=0.5・完全な診断 → 減点 = Points × Similarity × Weight。参照と同一の回答は Similarity=1（§7.5）。
-        RunOutcome c = await RunWithOutcomeAsync(dir, 0.5m, failReferences: false, "C");
+        RunOutcome c = await RunWithOutcomeAsync(dir, 0.5m, RefMode.Ok, "C");
         decimal similarity = ParseDec(c.Cell(2, "Q1.Similarity_AI_Raw"));
         Assert.Equal(1m, similarity);
         AssertRow(c, 2, penalty: 10m * similarity * 0.5m, finalScore: basePoints + earned - (10m * similarity * 0.5m));
         decimal sim3 = ParseDec(c.Cell(3, "Q1.Similarity_AI_Raw"));
         AssertRow(c, 3, penalty: Math.Round(10m * sim3 * 0.5m, 4), finalScore: null, tolerance: 0.1m);
 
-        // D: W=0.5・診断失敗 → 減点・総合点 blank（採点結果シートの合計も同じ条件）。
-        RunOutcome d = await RunWithOutcomeAsync(dir, 0.5m, failReferences: true, "D");
-        Assert.True(string.IsNullOrEmpty(d.Cell(2, "Q1.Similarity_Penalty")), "W>0 で診断不完全なら減点は blank");
-        Assert.True(string.IsNullOrEmpty(d.Cell(2, "Final_Raw")));
-        Assert.True(string.IsNullOrEmpty(d.Cell(2, "Final_Score")));
-        Assert.Null(d.UiFinalScore(2));
+        // D: W=0.5・診断失敗（成功 0）→ 減点・総合点 blank（採点結果シートの合計も同じ条件）。
+        RunOutcome d = await RunWithOutcomeAsync(dir, 0.5m, RefMode.AllFail, "D");
+        AssertIncompleteDiagnosticRow(d, 2);
+        AssertIncompleteDiagnosticRow(d, 3);
+
+        // E: W=0.5・一部の slot だけ失敗（不完全な診断）→ 成功 slot に全文一致があっても減点・総合点・採点結果の合計は blank（AC-011）。
+        RunOutcome e = await RunWithOutcomeAsync(dir, 0.5m, RefMode.PartialFail, "E");
+        AssertIncompleteDiagnosticRow(e, 2);
+        AssertIncompleteDiagnosticRow(e, 3);
+        AssertNormalFailureRow(e, 5);
+
+        // 空回答（行 4）は参照集合の状態（全成功・一部失敗・全失敗）にかかわらず Similarity 0・減点 0、
+        // 総合点は基礎点から（AC-012 は AC-011 の blank 伝播より優先）。
+        foreach (RunOutcome o in new[] { c, d, e })
+        {
+            Assert.Equal(0, o.NormalCallsForEmpty);
+            Assert.Equal(0m, ParseDec(o.Cell(4, "Q1.Similarity_AI_Raw")));
+            AssertRow(o, 4, penalty: 0m, finalScore: basePoints, questionEarned: 0m);
+        }
+
+        // F: W=0.5・完全な参照集合で、行 2 と全文一致するのは 1 slot だけ（AC-010・AC-011）。
+        // 減点の Similarity は参照別合成値の最大値（=1）であり、中央値・最小値は使わない → 減点 = 10×1×0.5 = 5。
+        RunOutcome f = await RunWithOutcomeAsync(dir, 0.5m, RefMode.OneSlotMatch, "F");
+        Assert.Equal(1m, ParseDec(f.Cell(2, "Q1.Similarity_AI_Raw")));
+        AssertRow(f, 2, penalty: 5m, finalScore: basePoints + earned - 5m);
+        Assert.False(string.IsNullOrEmpty(f.Cell(3, "Q1.Similarity_Penalty")), "完全な診断では減点を算出する");
 
         // どの run でも、減点は Config の係数セルを参照する数式で、学生間最大類似度（情報列）を使わない（AC-078 の一部）。
-        foreach (RunOutcome o in new[] { a, b, c, d })
+        foreach (RunOutcome o in new[] { a, b, c, d, e, f })
         {
             string formula = o.Formula(2, "Q1.Similarity_Penalty");
             Assert.Contains(ConfigSheet, formula, StringComparison.Ordinal);
@@ -274,7 +294,7 @@ public sealed partial class SimilarityIndicatorTests
 
         // 位置情報だけを新規診断へ保存し、学生本文を診断の列へ複写しない（AC-077）。
         using TempDir dir = new();
-        RunOutcome run = await RunWithOutcomeAsync(dir, 0m, failReferences: false, "pos");
+        RunOutcome run = await RunWithOutcomeAsync(dir, 0m, RefMode.Ok, "pos");
         foreach ((string header, string column) in run.Headers.Where(h => h.Key.StartsWith("Q1.Similarity", StringComparison.Ordinal)).Select(h => (h.Key, h.Value)))
         {
             Assert.DoesNotContain(StudentBodyCanary, run.Cell(3, header) ?? string.Empty, StringComparison.Ordinal);
@@ -290,9 +310,9 @@ public sealed partial class SimilarityIndicatorTests
     public async Task FR114_AC078_AC079_indicator_is_labelled_unverified_and_legacy_results_are_preserved()
     {
         using TempDir dir = new();
-        foreach (bool failReferences in new[] { false, true })
+        foreach (RefMode refMode in new[] { RefMode.Ok, RefMode.AllFail })
         {
-            RunOutcome run = await RunWithOutcomeAsync(dir, 0m, failReferences, failReferences ? "lbl-fail" : "lbl-ok");
+            RunOutcome run = await RunWithOutcomeAsync(dir, 0m, refMode, refMode == RefMode.AllFail ? "lbl-fail" : "lbl-ok");
             List<string> texts = AllCellTexts(run.FinalPath);
             Assert.Contains(texts, t => t.Contains(IndicatorLabel, StringComparison.Ordinal));
             AssertNoDeterminationClaims(texts);
@@ -321,6 +341,10 @@ public sealed partial class SimilarityIndicatorTests
             Assert.DoesNotContain(headers.Keys, h => h.Contains("Coverage", StringComparison.OrdinalIgnoreCase)); // fixture は旧形式
             string? legacySim = CellByHeader(doc, ResultsSheet, headers, 2, "Q1.Similarity_AI_Raw");
             Assert.Equal(1m, ParseDec(legacySim));
+            // 旧予定数 1 の参照が成功した旧形式の診断は完全な診断（AC-011・AC-079）: 旧採点値（減点 10×1×0.1=1、総合点 90+7-1=96）を保持する。
+            Assert.Equal(1m, ParseDec(CellByHeader(doc, ResultsSheet, headers, 2, "Q1.Similarity_Penalty")));
+            Assert.Equal(96m, ParseDec(CellByHeader(doc, ResultsSheet, headers, 2, "Final_Raw")));
+            Assert.Equal(96m, ParseDec(CellByHeader(doc, ResultsSheet, headers, 2, "Final_Score")));
         }
 
         Assert.Equal(before, Sha(copy)); // 開くだけで再生成・再採点・上書きしない
@@ -380,6 +404,19 @@ public sealed partial class SimilarityIndicatorTests
         }
     }
 
+    // FR-114 AC-011: W>0 で不完全な診断（一部失敗・成功 0）の行は、減点・総合点・UI preview・採点結果の合計が blank。
+    private static void AssertIncompleteDiagnosticRow(RunOutcome o, int row)
+    {
+        Assert.True(string.IsNullOrEmpty(o.Cell(row, "Q1.Similarity_Penalty")), $"行 {row}: W>0 で診断不完全なら減点は blank");
+        Assert.True(string.IsNullOrEmpty(o.Cell(row, "Final_Raw")), $"行 {row}: Final_Raw は blank");
+        Assert.True(string.IsNullOrEmpty(o.Cell(row, "Final_Score")), $"行 {row}: Final_Score は blank");
+        Assert.Null(o.UiFinalScore(row));
+        if (o.ScoreTotals.TryGetValue(row, out var total))
+        {
+            Assert.True(string.IsNullOrEmpty(total.Value), $"行 {row}: 採点結果の合計も blank");
+        }
+    }
+
     private static void AssertNormalFailureRow(RunOutcome o, int row)
     {
         string? normalized = o.Cell(row, "Q1.Question_Normalized");
@@ -415,10 +452,10 @@ public sealed partial class SimilarityIndicatorTests
         }
     }
 
-    private static async Task<string> RunAsync(TempDir dir, decimal weight, bool failReferences, string label) =>
-        (await RunWithOutcomeAsync(dir, weight, failReferences, label)).FinalPath;
+    private static async Task<string> RunAsync(TempDir dir, decimal weight, RefMode refMode, string label) =>
+        (await RunWithOutcomeAsync(dir, weight, refMode, label)).FinalPath;
 
-    private static async Task<RunOutcome> RunWithOutcomeAsync(TempDir dir, decimal weight, bool failReferences, string label)
+    private static async Task<RunOutcome> RunWithOutcomeAsync(TempDir dir, decimal weight, RefMode refMode, string label)
     {
         string root = Path.Combine(dir.Path, label);
         Directory.CreateDirectory(root);
@@ -431,7 +468,7 @@ public sealed partial class SimilarityIndicatorTests
         DurableQuantificationOrchestrator orchestrator = new(
             new OpenXmlEvaluationRowSource(input),
             normal,
-            new ReferenceRunner(failReferences),
+            new ReferenceRunner(refMode),
             new SpecialRunner());
         RunSummary summary = await orchestrator.RunAsync(
             new DurableQuantificationRunRequest
@@ -637,12 +674,36 @@ public sealed partial class SimilarityIndicatorTests
         }
     }
 
-    private sealed class ReferenceRunner(bool fail) : IReferenceAnswerOperationRunner
+    // 参照集合の状態（FR-114 AC-011・AC-012。slot は設問ごとの生成順 1..PARAM-003）。
+    private enum RefMode
     {
-        public Task<AuxiliaryOperationResult<ReferenceAnswerResult>> EvaluateAsync(SafeReferenceAnswerPayload payload, CancellationToken cancellationToken) =>
-            Task.FromResult(fail
+        Ok,           // 全 slot 成功・全 slot が ReferenceText（行 2 と全文一致）
+        AllFail,      // 全 slot 失敗（成功 0）
+        PartialFail,  // slot 1 だけ失敗、残りは ReferenceText（一部失敗）
+        OneSlotMatch, // 全 slot 成功。slot 1 だけ ReferenceText、残りは行 2 と無関係な本文
+    }
+
+    private sealed class ReferenceRunner(RefMode mode) : IReferenceAnswerOperationRunner
+    {
+        private readonly object gate = new();
+        private readonly Dictionary<string, int> perQuestion = new(StringComparer.Ordinal);
+
+        public Task<AuxiliaryOperationResult<ReferenceAnswerResult>> EvaluateAsync(SafeReferenceAnswerPayload payload, CancellationToken cancellationToken)
+        {
+            int slot;
+            lock (gate)
+            {
+                slot = perQuestion[payload.QuestionId] = perQuestion.GetValueOrDefault(payload.QuestionId) + 1;
+            }
+
+            bool fail = mode == RefMode.AllFail || (mode == RefMode.PartialFail && slot == 1);
+            string body = mode == RefMode.OneSlotMatch && slot != 1
+                ? $"omicron{slot} rho sigma tau upsilon phi chi psi omega kappa{slot}"
+                : ReferenceText;
+            return Task.FromResult(fail
                 ? AuxiliaryOperationResult<ReferenceAnswerResult>.Failed(ResultsStatusCodes.AiTimeout, attemptCount: 3)
-                : AuxiliaryOperationResult<ReferenceAnswerResult>.Succeeded(new ReferenceAnswerResult { QuestionId = payload.QuestionId, Answer = ReferenceText }));
+                : AuxiliaryOperationResult<ReferenceAnswerResult>.Succeeded(new ReferenceAnswerResult { QuestionId = payload.QuestionId, Answer = body }));
+        }
     }
 
     private sealed class SpecialRunner : ISpecialEvaluationOperationRunner
