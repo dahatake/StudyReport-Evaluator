@@ -14,6 +14,7 @@ using StudyReportEvaluator.App.Workbooks.Reading;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Serialization;
+using StudyReportEvaluator.Core.Similarity;
 using StudyReportEvaluator.Core.Validation;
 
 namespace StudyReportEvaluator.App.ViewModels;
@@ -1828,6 +1829,8 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
             0L,
             ((long)definition.LastDataRow - definition.FirstDataRow) + 1L);
         long referenceOperations = definition.Questions.Count(question => question.Enabled);
+        // FR-115 AC-085: 予定生成数は設問数 × PARAM-003 の参照 slot 数。
+        long referenceGenerations = referenceOperations * ReferenceSetPolicy.SlotCount;
         long normalOperations = definition.Questions
             .Where(question => question.Enabled)
             .Sum(question => (long)question.Evaluators.Count(evaluator => evaluator.Enabled));
@@ -1836,7 +1839,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
             .Sum(question => (long)question.SpecialEvaluations.Count(special => special.Enabled));
         try
         {
-            return checked(referenceOperations
+            return checked(referenceGenerations
                 + selectedRows * (normalOperations + specialOperations + referenceOperations));
         }
         catch (OverflowException)
@@ -2133,7 +2136,8 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         progressStage = DurableEvaluationStage.Completed;
         if (summary.IsDurable)
         {
-            referenceTotal = summary.Snapshot.Definition.Questions.Count(question => question.Enabled);
+            referenceTotal = summary.Snapshot.Definition.Questions.Count(question => question.Enabled)
+                * summary.ReferenceSlotsPerQuestion;
             referenceCompleted = summary.References.Length;
             rowTotal = summary.Plan.Mapping.SelectedRowCount;
             rowCompleted = summary.CompletedRows.Length;

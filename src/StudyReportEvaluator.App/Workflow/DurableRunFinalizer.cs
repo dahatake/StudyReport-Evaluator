@@ -3,6 +3,7 @@ using DocumentFormat.OpenXml.Packaging;
 using StudyReportEvaluator.App.Workbooks.Checkpoint;
 using StudyReportEvaluator.App.Workbooks.Validation;
 using StudyReportEvaluator.App.Workbooks.Writing;
+using StudyReportEvaluator.Core.Similarity;
 
 namespace StudyReportEvaluator.App.Workflow;
 
@@ -115,6 +116,12 @@ public sealed class WorkbookDurableRunFinalizer : IDurableRunFinalizer
                         Answer = reference.Answer,
                         StatusCode = reference.StatusCode,
                         GeneratedAtUtc = reference.GeneratedAtUtc,
+                        SlotIndex = reference.SlotIndex,
+                        SlotCount = checkpoint.ReferenceSlotCount,
+                        ContextTier = checkpoint.ContextTier,
+                        TemplateVersion = checkpoint.ReferenceTemplateVersion,
+                        ComparisonVersion = checkpoint.ReferenceComparisonVersion,
+                        NormalizationVersion = checkpoint.ReferenceNormalizationVersion,
                     }));
                 results = new ResultsSheetWriter().Write(
                     document,
@@ -174,6 +181,17 @@ public sealed class WorkbookDurableRunFinalizer : IDurableRunFinalizer
             ModelIdentity = checkpoint.NormalModelId,
             ReasoningEffort = checkpoint.ReasoningEffort,
             ContextTier = checkpoint.ContextTier,
+            ReferenceSlotsPerQuestion = ReferenceSetPolicy.PlannedSlots(checkpoint.ReferenceSlotCount),
+            ReferenceConditionSummary = string.Join(
+                "; ",
+                "input=質問文字列のみ",
+                "model=" + checkpoint.ReferenceModelId,
+                "effort=" + (checkpoint.ReasoningEffort ?? "未指定"),
+                "tier=" + (checkpoint.ContextTier ?? "未指定"),
+                "systemTemplate=" + (checkpoint.ReferenceTemplateVersion ?? ReferenceSetPolicy.Unobserved),
+                "comparison=" + (checkpoint.ReferenceComparisonVersion ?? ReferenceSetPolicy.Unobserved),
+                "normalization=" + (checkpoint.ReferenceNormalizationVersion ?? ReferenceSetPolicy.Unobserved),
+                "observedModel/temperature/seed=" + ReferenceSetPolicy.Unobserved),
             StartedAtUtc = summary.StartedAtUtc,
             EndedAtUtc = summary.EndedAtUtc,
             PlannedEvaluationCount = summary.PlannedOperationCount,

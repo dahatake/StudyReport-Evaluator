@@ -53,7 +53,8 @@ public sealed class ResultsSheetWriterTests
         Assert.Equal(1, writeResult.HeaderRow);
         Assert.Equal(1, writeResult.DataRowCount);
         // FR-114 AC-010: 設問ごとに類似度の確認指標の 11 列を加える。
-        Assert.Equal(47, writeResult.ColumnCount);
+        // FR-115: 設問ごとに参照集合の表示列を全列の末尾へ加える。
+        Assert.Equal(48, writeResult.ColumnCount);
         Assert.Equal(13, writeResult.FormulaCells.Length);
         Assert.Equal(
             writeResult.FormulaCells.Length,
@@ -115,6 +116,8 @@ public sealed class ResultsSheetWriterTests
             "Special_Earned",
             "Final_Raw",
             "Final_Score",
+            // FR-115: 参照集合の表示列は既存の列位置を動かさないよう全列の末尾に置く。
+            "Q1.Similarity_Reference_Set",
         ];
         Row header = worksheet.Descendants<Row>().Single(row => row.RowIndex?.Value == 1);
         Assert.Equal(expectedHeaders, header.Elements<Cell>().Select(cell => cell.InnerText));
@@ -331,7 +334,7 @@ public sealed class ResultsSheetWriterTests
         using SpreadsheetDocument reopened = SpreadsheetDocument.Open(input.Path, false);
         Worksheet worksheet = GetWorksheet(reopened, names.ResultsSheetName);
         // FR-114 AC-010: 類似度の確認指標の 11 列を含む。
-        Assert.Equal(50, result.ColumnCount);
+        Assert.Equal(51, result.ColumnCount);
         AssertNumber(CellByHeader(worksheet, "Q1.S1.Special_AI_Raw", 2), "0.8");
         AssertNumber(CellByHeader(worksheet, "Q1.S2.Special_AI_Raw", 2), "0.6");
         AssertFormulaCache(CellByHeader(worksheet, "Q1.Special_Question_Rate", 2), "0.7");

@@ -201,7 +201,8 @@ public sealed class SyntheticQuantificationJourneyTests
 
             Assert.Equal(530, resultsWrite.DataRowCount);
             // FR-114 AC-010: 2 設問それぞれに類似度の確認指標の 11 列を含む。
-            Assert.Equal(79, resultsWrite.ColumnCount);
+            // FR-115: 設問ごとに参照集合の表示列を全列の末尾へ加える。
+            Assert.Equal(81, resultsWrite.ColumnCount);
             Assert.Equal(10_600, resultsWrite.FormulaCells.Length);
             ImmutableArray<ExpectedFormulaCell> expectedFormulas = configCells.FormulaCells
                 .Concat(resultsWrite.FormulaCells)
@@ -320,14 +321,14 @@ public sealed class SyntheticQuantificationJourneyTests
         Assert.Equal(QuantificationRunStatusCodes.Cancelled, interrupted.StatusCode);
         Assert.True(interrupted.IsPartial);
         Assert.False(interrupted.WasResumed);
-        Assert.Equal(2, interrupted.References.Length);
+        Assert.Equal(10, interrupted.References.Length); // 2 設問 × PARAM-003 の 5 slot
         Assert.InRange(interrupted.CompletedRows.Length, interruptAtCompletedRows, dataRowCount - 1);
         Assert.Null(interrupted.FinalPath);
         string partialPath = Assert.IsType<string>(interrupted.PartialPath);
         Assert.True(File.Exists(partialPath));
-        Assert.Equal(2, interruptedReferences.CallCount);
+        Assert.Equal(10, interruptedReferences.CallCount);
         Assert.Equal(1, interruptedStore.CreateCount);
-        Assert.Equal(2 + interrupted.CompletedRows.Length, interruptedStore.UpdateCount);
+        Assert.Equal(10 + interrupted.CompletedRows.Length, interruptedStore.UpdateCount);
         Assert.Equal(0, interruptedStore.LoadCount);
 
         FakeCopilotTransport resumedNormal = new(workbook);
@@ -349,10 +350,10 @@ public sealed class SyntheticQuantificationJourneyTests
         RunSummary baseline = await baselineTask;
         AssertDurableSuccess(baseline, expectedEmptyCount, expectedResumed: false, dataRowCount);
         Assert.Equal(expectedNormalCalls, baselineNormal.Calls.Length);
-        Assert.Equal(2, baselineReferences.CallCount);
+        Assert.Equal(10, baselineReferences.CallCount);
         Assert.Equal(expectedSpecialCalls, baselineSpecials.CallCount);
         Assert.Equal(1, baselineStore.CreateCount);
-        Assert.Equal(dataRowCount + 2, baselineStore.UpdateCount);
+        Assert.Equal(dataRowCount + 10, baselineStore.UpdateCount);
         Assert.Equal(0, baselineStore.LoadCount);
 
         AssertDurableSuccess(resumed, expectedEmptyCount, expectedResumed: true, dataRowCount);
@@ -460,7 +461,7 @@ public sealed class SyntheticQuantificationJourneyTests
         Assert.Equal(expectedEmptyCount, summary.EmptyCount);
         Assert.Equal(0, summary.FailureCount);
         Assert.Equal(0, summary.CancelledCount);
-        Assert.Equal(2, summary.References.Length);
+        Assert.Equal(10, summary.References.Length);
         Assert.Equal(dataRowCount, summary.CompletedRows.Length);
         Assert.Equal(summary.PlannedOperationCount, summary.CompletedOperationCount);
         Assert.Equal(0, summary.OperationFailureCount);
@@ -763,7 +764,7 @@ public sealed class SyntheticQuantificationJourneyTests
         Worksheet results = GetWorksheet(document, sheetNames.ResultsSheetName);
         Dictionary<string, string> headers = ReadHeaders(results);
         // FR-114 AC-010: 2 設問それぞれに類似度の確認指標の 11 列を含む。
-        Assert.Equal(79, headers.Count);
+        Assert.Equal(81, headers.Count);
         Assert.Equal(531, results.Descendants<Row>().Count());
         Assert.Equal(10_600, results.Descendants<CellFormula>().Count());
         Assert.DoesNotContain(headers.Keys, header =>

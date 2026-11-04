@@ -919,7 +919,8 @@ public sealed class ResultsPresentationTests
         RunSummary summary = context.Summary;
         Assert.True(summary.IsDurable);
         Assert.Equal(QuantificationRunStatusCodes.Cancelled, summary.StatusCode);
-        Assert.Equal(ResultsStatusCodes.Success, Assert.Single(summary.References).StatusCode);
+        Assert.Equal(5, summary.References.Length); // FR-115 PARAM-003: 設問ごとに 5 slot
+            Assert.All(summary.References, reference => Assert.Equal(ResultsStatusCodes.Success, reference.StatusCode));
         Assert.Single(summary.CompletedRows);
         Assert.Equal([10], fixture.ReadRows);
         Assert.Equal(0, fixture.FinalizerCalls);

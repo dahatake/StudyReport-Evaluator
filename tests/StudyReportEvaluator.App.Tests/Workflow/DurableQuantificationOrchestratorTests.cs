@@ -51,7 +51,7 @@ public sealed class DurableQuantificationOrchestratorTests
         {
             events.Add("finalize");
             Assert.Equal(2, summary.CompletedRows.Length);
-            Assert.Single(summary.References);
+            Assert.Equal(5, summary.References.Length); // FR-115 PARAM-003: 設問ごとに 5 slot
             return DurableFinalizationResult.Succeeded(envelope.FinalPath);
         });
         RecordingCleaner cleaner = new(events);
@@ -78,16 +78,16 @@ public sealed class DurableQuantificationOrchestratorTests
         Assert.False(summary.IsPartial);
         Assert.Equal(paths.Reservation.FinalPath, summary.FinalPath);
         Assert.Equal(paths.Reservation.PartialPath, summary.PartialPath);
-        Assert.Equal(7, summary.PlannedOperationCount);
-        Assert.Equal(7, summary.CompletedOperationCount);
+        Assert.Equal(11, summary.PlannedOperationCount);
+        Assert.Equal(11, summary.CompletedOperationCount);
         Assert.Equal(0, summary.OperationFailureCount);
         Assert.Equal(2, summary.CompletedRows.Length);
         Assert.Equal([2, 3], summary.CompletedRows.Select(row => row.SourceRowNumber));
         Assert.Equal(1, checkpoint.CreateCount);
-        Assert.Equal(3, checkpoint.UpdateCount);
-        Assert.Equal([(1, 0), (1, 1), (1, 2)],
+        Assert.Equal(7, checkpoint.UpdateCount);
+        Assert.Equal([(1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (5, 1), (5, 2)],
             checkpoint.Updates.Select(item => (item.References.Length, item.CompletedRows.Length)));
-        Assert.Equal(1, references.CallCount);
+        Assert.Equal(5, references.CallCount);
         Assert.Equal(2, normal.Payloads.Count);
         Assert.Equal(2, specials.CallCount);
         Assert.Equal(1, finalizer.CallCount);
@@ -162,13 +162,13 @@ public sealed class DurableQuantificationOrchestratorTests
                 cancellationToken: TestContext.Current.CancellationToken);
 
         await WaitUntilAsync(() => events.Contains("row:3"), TestContext.Current.CancellationToken);
-        Assert.DoesNotContain("checkpoint:update:1:1", events);
+        Assert.DoesNotContain("checkpoint:update:5:1", events);
         allowFirstNormal.SetResult();
         RunSummary summary = await run.WaitAsync(TestWait, TestContext.Current.CancellationToken);
 
         Assert.Equal(QuantificationRunStatusCodes.Success, summary.StatusCode);
         Assert.Equal([2, 3, 4], summary.CompletedRows.Select(row => row.SourceRowNumber));
-        Assert.Equal([(1, 0), (1, 1), (1, 2), (1, 3)],
+        Assert.Equal([(1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (5, 1), (5, 2), (5, 3)],
             checkpoint.Updates.Select(item => (item.References.Length, item.CompletedRows.Length)));
     }
 
@@ -269,7 +269,7 @@ public sealed class DurableQuantificationOrchestratorTests
         Assert.Equal(QuantificationRunStatusCodes.Cancelled, first.StatusCode);
         Assert.True(first.IsPartial);
         Assert.Single(first.CompletedRows);
-        Assert.Equal(1, firstReferences.CallCount);
+        Assert.Equal(5, firstReferences.CallCount);
         Assert.Equal([2], firstRows.Requests.Select(item => item.SourceRowNumber));
         Assert.Equal(0, checkpoint.LoadCount);
 
@@ -468,7 +468,7 @@ public sealed class DurableQuantificationOrchestratorTests
         Assert.True(File.Exists(partialPath));
         Assert.Null(interrupted.FinalPath);
         Assert.Single(interrupted.CompletedRows);
-        Assert.Equal(1, firstReferences.CallCount);
+        Assert.Equal(5, firstReferences.CallCount);
 
         RecordingReferenceRunner resumedReferences = new((_, _) => throw new InvalidOperationException("saved reference must be reused"));
         ScriptedRunner resumedNormal = NormalSuccess();

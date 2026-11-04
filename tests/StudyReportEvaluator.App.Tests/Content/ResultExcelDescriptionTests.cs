@@ -180,7 +180,7 @@ public sealed class ResultExcelDescriptionTests
         }
 
         List<(string Column, string Header)> referenceHeaders = ReadRow(reopened, names.ReferencesSheetName, 1);
-        Assert.Equal(8, referenceHeaders.Count);
+        Assert.Equal(16, referenceHeaders.Count); // FR-115: slot・条件の列を加えた
         foreach ((string column, string header) in referenceHeaders)
         {
             Assert.Contains($"| {column} | `{header}` |", description, StringComparison.Ordinal);
@@ -188,7 +188,7 @@ public sealed class ResultExcelDescriptionTests
 
         List<string> runFields = ReadColumn(reopened, names.RunSheetName, "A");
         Assert.Equal("Field", runFields[0]);
-        Assert.Equal(27, runFields.Count);
+        Assert.Equal(29, runFields.Count); // FR-115: 参照 slot 数と比較条件の要約を加えた
         foreach (string field in runFields.Skip(1))
         {
             Assert.Matches(new Regex($@"^\| `{Regex.Escape(field)}` \|", RegexOptions.Multiline), description);

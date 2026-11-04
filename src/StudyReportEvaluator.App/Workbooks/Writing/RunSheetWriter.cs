@@ -25,6 +25,12 @@ public sealed record RunSheetMetadata
 
     public string? ContextTier { get; init; }
 
+    /// <summary>FR-115 AC-084: 設問ごとの参照 slot 数（旧形式は 1）。</summary>
+    public int ReferenceSlotsPerQuestion { get; init; } = 1;
+
+    /// <summary>FR-115 AC-084: 参照集合の比較条件の要約（References sheet と同じ snapshot）。null は未取得。</summary>
+    public string? ReferenceConditionSummary { get; init; }
+
     public required DateTimeOffset StartedAtUtc { get; init; }
 
     public required DateTimeOffset EndedAtUtc { get; init; }
@@ -86,6 +92,8 @@ public sealed class RunSheetWriter
         AppendInlineRecord(sheetData, ref rowNumber, "ModelIdentity", metadata.ModelIdentity);
         AppendInlineRecord(sheetData, ref rowNumber, "ReasoningEffort", metadata.ReasoningEffort ?? "未指定");
         AppendInlineRecord(sheetData, ref rowNumber, "ContextTier", metadata.ContextTier ?? ModelOptionPolicy.DefaultContextTier);
+        AppendNumberRecord(sheetData, ref rowNumber, "ReferenceSlotsPerQuestion", Math.Max(1, metadata.ReferenceSlotsPerQuestion));
+        AppendInlineRecord(sheetData, ref rowNumber, "ReferenceConditions", metadata.ReferenceConditionSummary ?? "未取得");
         AppendInlineRecord(sheetData, ref rowNumber, "OpenXmlSdkIdentity", GetOpenXmlSdkIdentity());
         AppendInlineRecord(
             sheetData,
