@@ -47,6 +47,7 @@ public sealed class QuantificationResultValidator
 
         ImmutableArray<CriterionQuantificationResult> submittedCriteria =
             submitted.Criteria.IsDefault ? [] : submitted.Criteria;
+        Dictionary<string, string> resolvedEvidence = new(StringComparer.Ordinal);
         Dictionary<string, ExpectedCriterion> expectedById = expected.ExpectedCriteria.ToDictionary(
             criterion => criterion.CriterionId,
             StringComparer.Ordinal);
@@ -77,7 +78,7 @@ public sealed class QuantificationResultValidator
                 continue;
             }
 
-            ValidateCriterion(expected, expectedCriterion, criterion, errors);
+            ValidateCriterion(expected, expectedCriterion, criterion, errors, resolvedEvidence);
         }
 
         foreach (ExpectedCriterion missing in expected.ExpectedCriteria.Where(
@@ -100,14 +101,15 @@ public sealed class QuantificationResultValidator
         ImmutableArray<QuantificationResultValidationError> immutableErrors = errors.ToImmutable();
         return new QuantificationResultValidationOutcome(
             immutableErrors,
-            immutableErrors.IsEmpty ? Freeze(submitted) : null);
+            immutableErrors.IsEmpty ? Freeze(submitted, resolvedEvidence) : null);
     }
 
     private static void ValidateCriterion(
         SafeEvaluationPayload expectedPayload,
         ExpectedCriterion expectedCriterion,
         CriterionQuantificationResult submitted,
-        ImmutableArray<QuantificationResultValidationError>.Builder errors)
+        ImmutableArray<QuantificationResultValidationError>.Builder errors,
+        Dictionary<string, string> resolvedEvidence)
     {
         if (submitted.RawScore < expectedCriterion.Range.Minimum
             || submitted.RawScore > expectedCriterion.Range.Maximum)
@@ -159,7 +161,8 @@ public sealed class QuantificationResultValidator
                     submitted,
                     expectedPayload.PrimarySource,
                     EvidenceSourceKind.PrimaryAnswer,
-                    errors);
+                    errors,
+                    resolvedEvidence);
                 break;
 
             case EvidenceSourceKind.SupportingColumn:
@@ -176,7 +179,8 @@ public sealed class QuantificationResultValidator
                     submitted,
                     supporting,
                     EvidenceSourceKind.SupportingColumn,
-                    errors);
+                    errors,
+                    resolvedEvidence);
                 break;
         }
     }
@@ -186,7 +190,8 @@ public sealed class QuantificationResultValidator
         CriterionQuantificationResult submitted,
         EvaluationSourceCell expectedSource,
         EvidenceSourceKind expectedKind,
-        ImmutableArray<QuantificationResultValidationError>.Builder errors)
+        ImmutableArray<QuantificationResultValidationError>.Builder errors,
+        Dictionary<string, string> resolvedEvidence)
     {
         if (!string.Equals(submitted.EvidenceSourceColumnId, expectedSource.SourceColumnId, StringComparison.Ordinal))
         {
@@ -211,14 +216,25 @@ public sealed class QuantificationResultValidator
 
         if (!expectedSource.Value.Contains(submitted.Evidence, StringComparison.Ordinal))
         {
-            Add(errors, "EVIDENCE_NOT_EXACT_SUBSTRING", expectedPayload.EvaluatorId, submitted.CriterionId, "Evidence", "<nonmatching-body>");
+            if (EvidenceResolver.TryResolve(expectedSource.Value, submitted.Evidence, out string exactEvidence))
+            {
+                resolvedEvidence[submitted.CriterionId] = exactEvidence;
+            }
+            else
+            {
+                Add(errors, "EVIDENCE_NOT_EXACT_SUBSTRING", expectedPayload.EvaluatorId, submitted.CriterionId, "Evidence", "<nonmatching-body>");
+            }
         }
     }
 
-    private static QuantificationResult Freeze(QuantificationResult submitted) => submitted with
+    private static QuantificationResult Freeze(
+        QuantificationResult submitted,
+        IReadOnlyDictionary<string, string> resolvedEvidence) => submitted with
     {
         Criteria = (submitted.Criteria.IsDefault ? [] : submitted.Criteria)
-            .Select(criterion => criterion with { })
+            .Select(criterion => resolvedEvidence.TryGetValue(criterion.CriterionId, out string? exactEvidence)
+                ? criterion with { Evidence = exactEvidence }
+                : criterion with { })
             .ToImmutableArray(),
     };
 

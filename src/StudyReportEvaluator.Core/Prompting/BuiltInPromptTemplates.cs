@@ -50,6 +50,7 @@ public static class BuiltInPromptTemplates
         For each criterion return only its raw score, a short reason, exact contiguous evidence, evidence source kind, and source column ID.
         Never return an evaluator score, question score, overall score, weight, pass/fail decision, or additional field.
         Evidence must come from the identified same-row primary or supporting source. If no evidence exists, return an empty evidence string, NONE, and an empty source column ID.
+        Evidence must be one short verbatim quote (preferably one sentence or one line) copied character for character from exactly one source. Never join separate passages, never use an ellipsis, and never combine the primary and supporting sources in one quote.
         """;
 
     public const string ReferenceAnswerTemplate = """

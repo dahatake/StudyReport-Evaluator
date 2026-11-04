@@ -221,6 +221,60 @@ public sealed class QuantificationResultValidatorTests
         Assert.Contains(outcome.Errors, error => error.Code == "EVIDENCE_REQUIRED");
     }
 
+    [Theory]
+    [InlineData("一行目。\n二行目。", "一行目。 \n二行目。 ", "一行目。\n二行目。")]
+    [InlineData("一行目。 \n二行目。 \n三行目。", "一行目。\n…\n三行目。", "一行目。 \n二行目。 \n三行目。")]
+    [InlineData("一行目。 \n二行目。 \n三行目。", "一行目。\n...\n三行目。", "一行目。 \n二行目。 \n三行目。")]
+    [InlineData("a\u00a0b\u3000c", "a b c", "a\u00a0b\u3000c")]
+    public void Whitespace_and_ellipsis_quote_differences_resolve_to_the_exact_source_span(
+        string source,
+        string quoted,
+        string expectedEvidence)
+    {
+        SafeEvaluationPayload payload = new(
+            "Q1",
+            "E1",
+            "<redacted-test-prompt>",
+            new EvaluationSourceCell(EvaluationSourceKind.PrimaryAnswer, "G", source),
+            [],
+            [new ExpectedCriterion("C1", "Criterion", new ScoreRange(0m, 10m))]);
+        QuantificationResult submitted = ValidResult() with
+        {
+            Criteria = [ResultTestData.Criterion(evidence: quoted)],
+        };
+
+        QuantificationResultValidationOutcome outcome = _validator.Validate(payload, submitted);
+
+        Assert.True(outcome.IsValid);
+        string accepted = outcome.AcceptedResult!.Criteria[0].Evidence;
+        Assert.Equal(expectedEvidence, accepted);
+        Assert.Contains(accepted, source, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("二行目。\n一行目。")]
+    [InlineData("一行目。 別の文。")]
+    [InlineData("...")]
+    public void Out_of_order_or_unsent_quotes_are_still_rejected(string quoted)
+    {
+        SafeEvaluationPayload payload = new(
+            "Q1",
+            "E1",
+            "<redacted-test-prompt>",
+            new EvaluationSourceCell(EvaluationSourceKind.PrimaryAnswer, "G", "一行目。 \n二行目。"),
+            [],
+            [new ExpectedCriterion("C1", "Criterion", new ScoreRange(0m, 10m))]);
+        QuantificationResult submitted = ValidResult() with
+        {
+            Criteria = [ResultTestData.Criterion(evidence: quoted)],
+        };
+
+        QuantificationResultValidationOutcome outcome = _validator.Validate(payload, submitted);
+
+        Assert.False(outcome.IsValid);
+        Assert.Contains(outcome.Errors, error => error.Code is "EVIDENCE_NOT_EXACT_SUBSTRING" or "EVIDENCE_REQUIRED");
+    }
+
     [Fact]
     public void Blank_reason_and_evidence_are_not_leaked_in_errors()
     {
