@@ -155,6 +155,11 @@ public sealed class MultiReferenceSetTests
         Assert.Matches(new Regex(@"(^|\D)0\s*[/／]\s*5(\D|$)"), resultsText);
         Assert.Contains("重複", resultsText, StringComparison.Ordinal);
         Assert.Contains("暫定", resultsText, StringComparison.Ordinal);
+        // AC-081（ff31b8d 改訂）: 最大・最小・中央値は記述統計として確認できる。中央値・最小値・差は表示だけで採点・減点に使わない
+        // （減点は完全な参照集合の参照別合成値の最大値 = AC-011 側で検証）。
+        Assert.Contains("最大", resultsText, StringComparison.Ordinal);
+        Assert.Contains("最小", resultsText, StringComparison.Ordinal);
+        Assert.Contains("中央値", resultsText, StringComparison.Ordinal);
 
         // AC-084: Run sheet の比較条件要約は References と同じ指定 model を示す
         Assert.Contains(runSheet, v => v.Contains("auto", StringComparison.Ordinal));
