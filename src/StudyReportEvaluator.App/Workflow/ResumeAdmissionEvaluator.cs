@@ -3,6 +3,7 @@ using StudyReportEvaluator.App.Workbooks.Checkpoint;
 using StudyReportEvaluator.App.Workbooks.Intake;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
+using StudyReportEvaluator.Core.Similarity;
 using StudyReportEvaluator.Core.Validation;
 
 namespace StudyReportEvaluator.App.Workflow;
@@ -121,25 +122,35 @@ public static class ResumeAdmissionEvaluator
         }
 
         QuestionDefinition[] enabledQuestions = snapshot.Definition.Questions.Where(question => question.Enabled).ToArray();
-        if (checkpoint.References.Length > enabledQuestions.Length) return false;
+        // FR-115 AC-083: 旧単独参照の集合は予定数 1 のまま。新形式は PARAM-003 の slot 数と現在の比較条件の版に一致しなければならない。
+        bool legacy = checkpoint.ReferenceSlotCount == 0;
+        int slots = ReferenceSetPolicy.PlannedSlots(checkpoint.ReferenceSlotCount);
+        if (!legacy
+            && (checkpoint.ReferenceSlotCount != ReferenceSetPolicy.SlotCount
+                || !string.Equals(checkpoint.ReferenceTemplateVersion, ReferenceSetPolicy.SystemTemplateVersion, StringComparison.Ordinal)
+                || !string.Equals(checkpoint.ReferenceComparisonVersion, ReferenceSetPolicy.ComparisonVersion, StringComparison.Ordinal)
+                || !string.Equals(checkpoint.ReferenceNormalizationVersion, ReferenceSetPolicy.NormalizationVersion, StringComparison.Ordinal))) return false;
+        if (checkpoint.References.Length > enabledQuestions.Length * slots) return false;
         for (int index = 0; index < checkpoint.References.Length; index++)
         {
             CheckpointReference reference = checkpoint.References[index];
             if (reference is null
-                || !string.Equals(reference.QuestionId, enabledQuestions[index].Id, StringComparison.Ordinal)
+                || !string.Equals(reference.QuestionId, enabledQuestions[index / slots].Id, StringComparison.Ordinal)
+                || reference.SlotIndex != (legacy ? 0 : (index % slots) + 1)
                 || string.Equals(reference.StatusCode, ResultsStatusCodes.Cancelled, StringComparison.Ordinal)) return false;
         }
 
         if (checkpoint.CompletedRows.Length > plan.Mapping.SelectedRowCount
-            || (checkpoint.CompletedRows.Length > 0 && checkpoint.References.Length != enabledQuestions.Length)) return false;
+            || (checkpoint.CompletedRows.Length > 0 && checkpoint.References.Length != enabledQuestions.Length * slots)) return false;
         for (int index = 0; index < checkpoint.CompletedRows.Length; index++)
         {
             CheckpointCompletedRow row = checkpoint.CompletedRows[index];
             if (row is null || row.SourceRowNumber != plan.Mapping.FirstDataRow + index
                 || !ValidateCompletedRowShape(row, plan, enabledQuestions)
                 || row.SimilarityResults.Select((similarity, questionIndex) => new
-                    { Similarity = similarity, Reference = checkpoint.References[questionIndex] })
-                    .Any(pair => !string.Equals(pair.Reference.StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal)
+                    { Similarity = similarity, References = checkpoint.References.Skip(questionIndex * slots).Take(slots) })
+                    .Any(pair => pair.References.Any(reference =>
+                            !string.Equals(reference.StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal))
                         && string.Equals(pair.Similarity.StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal))) return false;
         }
 

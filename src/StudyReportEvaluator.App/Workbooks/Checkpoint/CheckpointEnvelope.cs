@@ -43,6 +43,10 @@ public sealed record CheckpointReference
 {
     public required string QuestionId { get; init; }
 
+    // FR-115 AC-009 / AC-083: 設問内の slot 番号（1 起点）。旧単独参照 checkpoint は 0（旧形式の単独集合）で、書かない。
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int SlotIndex { get; init; }
+
     public string? Answer { get; init; }
 
     public required string StatusCode { get; init; }
@@ -114,6 +118,10 @@ public sealed record CheckpointSimilarityResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ImmutableArray<SimilarityReferenceDiagnostic>? ReferenceDiagnostics { get; init; }
 
+    // FR-115 AC-081: 比較に使った参照集合の成功数／予定数と重複。旧形式にはない（null）。null のときは書かない。
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SimilarityReferenceSetInfo? ReferenceSet { get; init; }
+
     public override string ToString() =>
         $"{nameof(CheckpointSimilarityResult)} {{ StatusCode = {StatusCode}, Content = <redacted> }}";
 }
@@ -155,6 +163,20 @@ public sealed record CheckpointEnvelope
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ContextTier { get; init; }
+
+    // FR-115 AC-009 / AC-080 / AC-083: 設問ごとの予定 slot 数（PARAM-003）と、集合に結び付けた比較条件の版。
+    // 旧形式（0 / null）は旧単独参照の集合で、PARAM-003 へ水増しせず、条件は「未取得」として扱う。書かない。
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int ReferenceSlotCount { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReferenceTemplateVersion { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReferenceComparisonVersion { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReferenceNormalizationVersion { get; init; }
 
     public required CheckpointRuntimeIdentity Runtime { get; init; }
 

@@ -72,10 +72,47 @@ public sealed class DurableEvaluationScheduler
             inFlightChanged,
             cancellationToken);
 
-    public async Task<DurableRowEvaluationResult> EvaluateRowAsync(
+    /// <summary>設問ごとに単独の参照（旧形式の単独集合）を渡す互換オーバーロード。</summary>
+    public Task<DurableRowEvaluationResult> EvaluateRowAsync(
         EvaluationPlan plan,
         int sourceRowNumber,
         IReadOnlyDictionary<string, CheckpointReference> references,
+        string modelId,
+        string? reasoningEffort,
+        int maxConcurrency,
+        int? maximumPromptTokens = null,
+        int? maximumContextWindowTokens = null,
+        Action<int>? inFlightChanged = null,
+        CancellationToken cancellationToken = default,
+        AdaptiveEvaluationConcurrencyLimiter? concurrencyLimiter = null,
+        Action<LivePreviewRow>? livePreview = null)
+    {
+        ArgumentNullException.ThrowIfNull(references);
+        return EvaluateRowAsync(
+            plan,
+            sourceRowNumber,
+            references.ToDictionary(
+                pair => pair.Key,
+                pair => ImmutableArray.Create(pair.Value),
+                StringComparer.Ordinal),
+            modelId,
+            reasoningEffort,
+            maxConcurrency,
+            maximumPromptTokens,
+            maximumContextWindowTokens,
+            inFlightChanged,
+            cancellationToken,
+            concurrencyLimiter,
+            livePreview);
+    }
+
+    /// <summary>
+    /// FR-115: 設問ごとの参照集合（slot 順）を使って 1 行を評価する。全学生が同じ集合を使い、再生成しない。
+    /// </summary>
+    public async Task<DurableRowEvaluationResult> EvaluateRowAsync(
+        EvaluationPlan plan,
+        int sourceRowNumber,
+        IReadOnlyDictionary<string, ImmutableArray<CheckpointReference>> references,
         string modelId,
         string? reasoningEffort,
         int maxConcurrency,
@@ -203,9 +240,9 @@ public sealed class DurableEvaluationScheduler
                     question.PrimarySourceColumn,
                     [question.PrimarySourceColumn],
                     column => ReadCell(row, column)),
-                ComparisonText = references.TryGetValue(question.Id, out CheckpointReference? reference)
-                    && string.Equals(reference.StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal)
-                    ? reference.Answer
+                ComparisonText = references.TryGetValue(question.Id, out ImmutableArray<CheckpointReference> setReferences)
+                    ? setReferences.FirstOrDefault(reference =>
+                        string.Equals(reference.StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal))?.Answer
                     : null,
             };
         });
@@ -471,7 +508,7 @@ public sealed class DurableEvaluationScheduler
         QuantificationSnapshot snapshot,
         QuestionDefinition question,
         EvaluationRowData row,
-        IReadOnlyDictionary<string, CheckpointReference> references,
+        IReadOnlyDictionary<string, ImmutableArray<CheckpointReference>> references,
         CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested)
@@ -485,37 +522,13 @@ public sealed class DurableEvaluationScheduler
             return Task.FromResult(SimilarityFailure(question.Id, ResultsStatusCodes.Empty));
         }
 
-        if (!references.TryGetValue(question.Id, out CheckpointReference? reference)
-            || !string.Equals(reference.StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal)
-            || string.IsNullOrWhiteSpace(reference.Answer))
-        {
-            string status = reference is not null && ResultsStatusCodes.IsDefined(reference.StatusCode)
-                ? reference.StatusCode
-                : ResultsStatusCodes.AiRuntimeFailed;
-            return Task.FromResult(SimilarityFailure(question.Id, status));
-        }
-
         try
         {
-            SurfaceSimilarityResult result = similarityCalculator.Calculate(studentAnswer, reference.Answer);
-            // FR-114 AC-010: 参照別の詳細を保持し、減点に使う Similarity は完全な参照集合の参照別合成値の最大値。
-            // 現在の参照集合は 1 件（完全な集合 = 成功した 1 件）。
-            ImmutableArray<SimilarityReferenceDiagnostic> diagnostics = [SimilarityReferenceDiagnostic.From(1, result)];
-            SimilarityReferenceDiagnostic maximum = SimilarityDiagnostics.SelectMaximum(diagnostics)!;
-            return Task.FromResult(new CheckpointSimilarityResult
-            {
-                QuestionId = question.Id,
-                StatusCode = ResultsStatusCodes.Success,
-                AttemptCount = 1,
-                AcceptedResult = new SimilarityQuantificationResult
-                {
-                    QuestionId = question.Id,
-                    Similarity = maximum.Score,
-                    Reason = result.ToReason(),
-                },
-                ReferenceDiagnostics = diagnostics,
-                TokenUsage = DurableOperationConversions.ToCheckpointUsage(EvaluationTokenUsage.Unavailable),
-            });
+            return Task.FromResult(ComputeSimilarity(
+                similarityCalculator,
+                question.Id,
+                studentAnswer,
+                references.TryGetValue(question.Id, out ImmutableArray<CheckpointReference> set) ? set : []));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -525,6 +538,96 @@ public sealed class DurableEvaluationScheduler
         {
             return Task.FromResult(SimilarityFailure(question.Id, ResultsStatusCodes.AiRuntimeFailed));
         }
+    }
+
+    /// <summary>
+    /// FR-115 AC-009 / AC-081: 学生回答と設問の参照集合から、参照別の確認指標（未検証）と集合の成功数／予定数・重複を求める。
+    /// 採点に使う Similarity は完全な集合の参照別合成値の最大値だけ（FR-114 AC-010 / AC-011）。一部失敗の集合は成功参照に限った
+    /// 暫定の診断だけを持ち、採点値を持たない（blank）。中央値・最小値・差は表示のためで採点に使わない。
+    /// 学生回答は空でないこと（空は呼び出し側が EMPTY にする）。
+    /// </summary>
+    internal static CheckpointSimilarityResult ComputeSimilarity(
+        SurfaceTextSimilarityCalculator calculator,
+        string questionId,
+        string studentAnswer,
+        ImmutableArray<CheckpointReference> set)
+    {
+        if (set.IsDefaultOrEmpty)
+        {
+            return SimilarityFailure(questionId, ResultsStatusCodes.AiRuntimeFailed);
+        }
+
+        List<(int Slot, string Answer, SurfaceSimilarityResult Result)> succeeded = [];
+        string? failedStatus = null;
+        for (int index = 0; index < set.Length; index++)
+        {
+            CheckpointReference reference = set[index];
+            if (string.Equals(reference.StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(reference.Answer))
+            {
+                // 旧形式の単独参照（slot 0）は参照 1 として扱う。
+                int slot = reference.SlotIndex > 0 ? reference.SlotIndex : index + 1;
+                succeeded.Add((slot, reference.Answer, calculator.Calculate(studentAnswer, reference.Answer)));
+            }
+            else
+            {
+                failedStatus ??= ResultsStatusCodes.IsDefined(reference.StatusCode)
+                    && !string.Equals(reference.StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal)
+                    ? reference.StatusCode
+                    : ResultsStatusCodes.AiRuntimeFailed;
+            }
+        }
+
+        ImmutableArray<SimilarityDuplicateReference>.Builder duplicates = ImmutableArray.CreateBuilder<SimilarityDuplicateReference>();
+        for (int index = 1; index < succeeded.Count; index++)
+        {
+            int earlier = succeeded.FindIndex(0, index, item =>
+                string.Equals(item.Answer.Trim(), succeeded[index].Answer.Trim(), StringComparison.Ordinal));
+            if (earlier >= 0)
+            {
+                duplicates.Add(new SimilarityDuplicateReference
+                {
+                    Slot = succeeded[index].Slot,
+                    DuplicateOfSlot = succeeded[earlier].Slot,
+                });
+            }
+        }
+
+        SimilarityReferenceSetInfo info = new()
+        {
+            Planned = set.Length,
+            Succeeded = succeeded.Count,
+            Duplicates = duplicates.ToImmutable(),
+        };
+        ImmutableArray<SimilarityReferenceDiagnostic> diagnostics = succeeded
+            .Select(item => SimilarityReferenceDiagnostic.From(item.Slot, item.Result))
+            .ToImmutableArray();
+        if (failedStatus is not null)
+        {
+            return SimilarityFailure(questionId, failedStatus) with
+            {
+                ReferenceDiagnostics = diagnostics.IsEmpty ? null : diagnostics,
+                ReferenceSet = info,
+            };
+        }
+
+        SimilarityReferenceDiagnostic maximum = SimilarityDiagnostics.SelectMaximum(diagnostics)!;
+        SurfaceSimilarityResult maximumResult = succeeded.First(item => item.Slot == maximum.ReferenceIndex).Result;
+        return new CheckpointSimilarityResult
+        {
+            QuestionId = questionId,
+            StatusCode = ResultsStatusCodes.Success,
+            AttemptCount = 1,
+            AcceptedResult = new SimilarityQuantificationResult
+            {
+                QuestionId = questionId,
+                Similarity = maximum.Score,
+                Reason = maximumResult.ToReason(),
+            },
+            ReferenceDiagnostics = diagnostics,
+            ReferenceSet = info,
+            TokenUsage = DurableOperationConversions.ToCheckpointUsage(EvaluationTokenUsage.Unavailable),
+        };
     }
 
     private static DurableRowEvaluationResult FailedRow(

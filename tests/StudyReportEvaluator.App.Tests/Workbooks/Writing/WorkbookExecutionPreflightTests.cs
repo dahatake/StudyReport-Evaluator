@@ -22,7 +22,7 @@ public sealed class WorkbookExecutionPreflightTests
         Assert.True(result.IsValid, string.Join(',', result.Errors.Select(error => error.Code)));
         Assert.Empty(result.Errors);
         // FR-114 AC-010: 類似度の確認指標の 11 列を含む。
-        Assert.Equal(37, result.ResultsColumnCount);
+        Assert.Equal(38, result.ResultsColumnCount); // FR-115: 参照集合の表示列を含む。
         Assert.Equal(11, result.RepresentativeFormulaCount);
         Assert.True(result.ConfigRowCount >= 7);
         Assert.Contains("<redacted>", result.ToString(), StringComparison.Ordinal);

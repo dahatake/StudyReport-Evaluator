@@ -97,6 +97,9 @@ public sealed record DurableEvaluationProgress
 
     public string? PartialPath { get; init; }
 
+    /// <summary>FR-115 AC-085: PARAM-003 の参照 slot を含む、retry 込みの最大 attempt 数（予定の AI 操作数 × 1 操作の最大 attempt）。</summary>
+    public long WorstCaseAttemptCount { get; init; }
+
     public override string ToString() =>
         $"{nameof(DurableEvaluationProgress)} {{ Stage = {Stage}, ReferenceCompleted = {ReferenceCompleted}, RowCompleted = {RowCompleted}, OperationCompleted = {OperationCompleted}, InFlight = {InFlight}, StatusCode = {StatusCode}, Content = <redacted> }}";
 }
@@ -290,6 +293,11 @@ public sealed class DurableQuantificationOrchestrator
                 ReferenceModelId = run.ModelId,
                 ReasoningEffort = run.ReasoningEffort,
                 ContextTier = run.ContextTier,
+                // FR-115 AC-009 / AC-080: 新規 run は PARAM-003 の固定 slot と比較条件の版を集合に結び付けて保存する。
+                ReferenceSlotCount = ReferenceSetPolicy.SlotCount,
+                ReferenceTemplateVersion = ReferenceSetPolicy.SystemTemplateVersion,
+                ReferenceComparisonVersion = ReferenceSetPolicy.ComparisonVersion,
+                ReferenceNormalizationVersion = ReferenceSetPolicy.NormalizationVersion,
                 Runtime = request.Runtime,
                 FinalPath = reservation.FinalPath,
                 PartialPath = reservation.PartialPath,
@@ -345,10 +353,18 @@ public sealed class DurableQuantificationOrchestrator
         }
 
         textLog.Directory = Path.GetDirectoryName(checkpoint.FinalPath);
-        int referenceTotal = snapshot.Definition.Questions.Count(question => question.Enabled);
+        // FR-115 AC-083: 旧単独参照 checkpoint の予定数は旧形式の 1 件のまま（PARAM-003 へ水増ししない）。
+        int slotsPerQuestion = ReferenceSetPolicy.PlannedSlots(checkpoint.ReferenceSlotCount);
+        bool legacyReferences = checkpoint.ReferenceSlotCount == 0;
+        QuestionDefinition[] enabledQuestions = snapshot.Definition.Questions.Where(question => question.Enabled).ToArray();
+        int referenceTotal = checked(enabledQuestions.Length * slotsPerQuestion);
         int rowTotal = plan.Mapping.SelectedRowCount;
         int perRowOperations = OperationsPerRow(plan);
         int operationTotal = checked(referenceTotal + (rowTotal * perRowOperations));
+        // FR-115 AC-085: 予定生成数（全 slot）を含む retry 込み attempt 上限。
+        long worstCaseAttempts = checked(
+            (referenceTotal + ((long)rowTotal * LlmOperationsPerRow(plan)))
+            * RetryAndCleanupCoordinator.MaximumTransientAttempts);
         string? terminalCode = null;
         Action<DurableEvaluationProgress>? boundProgress = progress is null
             ? null
@@ -356,6 +372,7 @@ public sealed class DurableQuantificationOrchestrator
             {
                 FinalPath = checkpoint.FinalPath,
                 PartialPath = checkpoint.PartialPath,
+                WorstCaseAttemptCount = worstCaseAttempts,
             });
         ImmutableArray<CheckpointReference>.Builder references = checkpoint.References.ToBuilder();
         ImmutableArray<CheckpointCompletedRow>.Builder completedRows = checkpoint.CompletedRows.ToBuilder();
@@ -398,9 +415,9 @@ public sealed class DurableQuantificationOrchestrator
                 break;
             }
 
-            QuestionDefinition question = snapshot.Definition.Questions
-                .Where(item => item.Enabled)
-                .ElementAt(index);
+            // 参照は設問順・slot 順に保存する。保存済み slot は再生成せず、未保存の slot だけを再開する。
+            QuestionDefinition question = enabledQuestions[index / slotsPerQuestion];
+            int slotIndex = legacyReferences ? 0 : (index % slotsPerQuestion) + 1;
             ReportCurrent(boundProgress, DurableEvaluationStage.GeneratingReferences, references.Count, referenceTotal, completedRows.Count, rowTotal, completedRows.Count * perRowOperations + references.Count, operationTotal, 1, "GENERATING_REFERENCE");
             CheckpointReference reference = await EvaluateReferenceAsync(
                 snapshot,
@@ -411,6 +428,7 @@ public sealed class DurableQuantificationOrchestrator
                 run.MaximumPromptTokens,
                 run.MaximumContextWindowTokens,
                 cancellationToken).ConfigureAwait(false);
+            reference = reference with { SlotIndex = slotIndex };
             // Quota exhaustion is not persisted so that a resume regenerates the reference.
             if (string.Equals(reference.StatusCode, ResultsStatusCodes.Cancelled, StringComparison.Ordinal)
                 || string.Equals(reference.StatusCode, ResultsStatusCodes.QuotaExhausted, StringComparison.Ordinal))
@@ -437,9 +455,7 @@ public sealed class DurableQuantificationOrchestrator
 
         if (terminalCode is null && references.Count == referenceTotal)
         {
-            Dictionary<string, CheckpointReference> referencesByQuestion = references.ToDictionary(
-                reference => reference.QuestionId,
-                StringComparer.Ordinal);
+            Dictionary<string, ImmutableArray<CheckpointReference>> referencesByQuestion = GroupReferences(references);
             concurrencyLimiter ??= new AdaptiveEvaluationConcurrencyLimiter(run.MaxConcurrency);
             using CancellationTokenSource rowCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             Dictionary<int, Task<DurableRowEvaluationResult>> inFlightRows = [];
@@ -758,6 +774,11 @@ public sealed class DurableQuantificationOrchestrator
             ReferenceModelId = run.ModelId,
             ReasoningEffort = run.ReasoningEffort,
             ContextTier = run.ContextTier,
+            // FR-115: 継承した参照集合の予定数・比較条件は元の run のまま（再生成しない）。
+            ReferenceSlotCount = original.ReferenceSlotCount,
+            ReferenceTemplateVersion = original.ReferenceTemplateVersion,
+            ReferenceComparisonVersion = original.ReferenceComparisonVersion,
+            ReferenceNormalizationVersion = original.ReferenceNormalizationVersion,
             Runtime = request.Runtime,
             FinalPath = reservation.FinalPath,
             PartialPath = reservation.PartialPath,
@@ -779,9 +800,7 @@ public sealed class DurableQuantificationOrchestrator
         int rowTotal = targets.Length;
         int perRowOperations = OperationsPerRow(plan);
         int operationTotal = checked(rowTotal * perRowOperations);
-        Dictionary<string, CheckpointReference> referencesByQuestion = original.References.ToDictionary(
-            reference => reference.QuestionId,
-            StringComparer.Ordinal);
+        Dictionary<string, ImmutableArray<CheckpointReference>> referencesByQuestion = GroupReferences(original.References);
         concurrencyLimiter ??= new AdaptiveEvaluationConcurrencyLimiter(run.MaxConcurrency);
         using CancellationTokenSource rowCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         using SemaphoreSlim gate = new(Math.Max(1, run.MaxConcurrency));
@@ -1043,9 +1062,7 @@ public sealed class DurableQuantificationOrchestrator
         CheckpointEnvelope checkpoint,
         CancellationToken cancellationToken)
     {
-        Dictionary<string, CheckpointReference> references = checkpoint.References.ToDictionary(
-            reference => reference.QuestionId,
-            StringComparer.Ordinal);
+        Dictionary<string, ImmutableArray<CheckpointReference>> references = GroupReferences(checkpoint.References);
         foreach (CheckpointReference reference in checkpoint.References)
         {
             if (reference.Answer is not null)
@@ -1206,7 +1223,6 @@ public sealed class DurableQuantificationOrchestrator
                 QuestionDefinition question = snapshot.Definition.Questions.Single(item =>
                     item.Enabled && string.Equals(item.Id, saved.QuestionId, StringComparison.Ordinal));
                 string studentAnswer = ReadCell(row, question.PrimarySourceColumn);
-                CheckpointReference reference = references[question.Id];
                 if (string.Equals(saved.StatusCode, ResultsStatusCodes.Empty, StringComparison.Ordinal))
                 {
                     if (!string.IsNullOrWhiteSpace(studentAnswer))
@@ -1217,41 +1233,63 @@ public sealed class DurableQuantificationOrchestrator
                     continue;
                 }
 
-                if (!string.Equals(reference.StatusCode, ResultsStatusCodes.Success, StringComparison.Ordinal))
+                if (!references.TryGetValue(question.Id, out ImmutableArray<CheckpointReference> set) || set.IsDefaultOrEmpty)
                 {
-                    if (!string.Equals(saved.StatusCode, reference.StatusCode, StringComparison.Ordinal))
-                    {
-                        return false;
-                    }
-
-                    continue;
+                    return false;
                 }
 
-                if (saved.AcceptedResult is not null)
+                // FR-115 AC-081 / AC-082: 同じ参照集合から再計算した値（成功数／予定数・最大値・参照別詳細）と一致しなければならない。
+                // 旧形式（集合情報・詳細なし）の行は、診断を持たない旧結果として再計算の採点値・理由だけを確かめる。
+                CheckpointSimilarityResult expected = DurableEvaluationScheduler.ComputeSimilarity(
+                    similarityCalculator,
+                    question.Id,
+                    studentAnswer,
+                    set);
+                if (!string.Equals(saved.StatusCode, expected.StatusCode, StringComparison.Ordinal)
+                    || (saved.AcceptedResult is null) != (expected.AcceptedResult is null))
                 {
-                    SurfaceSimilarityResult expected = similarityCalculator.Calculate(
-                        studentAnswer,
-                        reference.Answer);
-                    if (!string.Equals(saved.AcceptedResult.QuestionId, question.Id, StringComparison.Ordinal)
-                        || saved.AcceptedResult.Similarity != expected.Score
-                        || !string.Equals(saved.AcceptedResult.Reason, expected.ToReason(), StringComparison.Ordinal))
-                    {
-                        return false;
-                    }
+                    return false;
+                }
 
-                    // FR-114 AC-079: 旧形式（詳細なし）はそのまま受け入れる。詳細があれば再計算と一致しなければならない。
-                    if (saved.ReferenceDiagnostics is ImmutableArray<SimilarityReferenceDiagnostic> diagnostics
-                        && (diagnostics.Length != 1
-                            || diagnostics[0] != SimilarityReferenceDiagnostic.From(1, expected)))
-                    {
-                        return false;
-                    }
+                if (saved.AcceptedResult is not null
+                    && (!string.Equals(saved.AcceptedResult.QuestionId, question.Id, StringComparison.Ordinal)
+                        || saved.AcceptedResult.Similarity != expected.AcceptedResult!.Similarity
+                        || !string.Equals(saved.AcceptedResult.Reason, expected.AcceptedResult.Reason, StringComparison.Ordinal)))
+                {
+                    return false;
+                }
+
+                // FR-114 AC-079: 旧形式（詳細なし）はそのまま受け入れる。詳細があれば再計算と一致しなければならない。
+                if (saved.ReferenceDiagnostics is ImmutableArray<SimilarityReferenceDiagnostic> diagnostics
+                    && (expected.ReferenceDiagnostics is not ImmutableArray<SimilarityReferenceDiagnostic> expectedDiagnostics
+                        || !diagnostics.SequenceEqual(expectedDiagnostics)))
+                {
+                    return false;
+                }
+
+                if (saved.ReferenceSet is SimilarityReferenceSetInfo savedSet
+                    && (expected.ReferenceSet is not SimilarityReferenceSetInfo expectedSet
+                        || savedSet.Planned != expectedSet.Planned
+                        || savedSet.Succeeded != expectedSet.Succeeded
+                        || !savedSet.Duplicates.SequenceEqual(expectedSet.Duplicates)))
+                {
+                    return false;
                 }
             }
         }
 
         return true;
     }
+
+    /// <summary>設問ごとに参照集合を slot 順（保存順）でまとめる。</summary>
+    private static Dictionary<string, ImmutableArray<CheckpointReference>> GroupReferences(
+        IEnumerable<CheckpointReference> references) =>
+        references
+            .GroupBy(reference => reference.QuestionId, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.ToImmutableArray(),
+                StringComparer.Ordinal);
 
     private static EvaluationScheduleResult BuildSchedule(
         EvaluationPlan plan,
@@ -1317,7 +1355,13 @@ public sealed class DurableQuantificationOrchestrator
             wasResumed,
             finalizationCode,
             partialCleanupFailed,
-            peerSimilarities);
+            peerSimilarities)
+        {
+            ReferenceSlotCount = checkpoint.ReferenceSlotCount,
+            ReferenceTemplateVersion = checkpoint.ReferenceTemplateVersion,
+            ReferenceComparisonVersion = checkpoint.ReferenceComparisonVersion,
+            ReferenceNormalizationVersion = checkpoint.ReferenceNormalizationVersion,
+        };
 
     private async Task<ImmutableArray<RunPeerSimilarityResult>> CalculatePeerSimilaritiesAsync(
         QuantificationSnapshot snapshot,
@@ -1397,7 +1441,9 @@ public sealed class DurableQuantificationOrchestrator
         long worstCaseAttempts;
         try
         {
-            int referenceCount = plan.Snapshot.Definition.Questions.Count(question => question.Enabled);
+            // FR-115 AC-085: 予定生成数に PARAM-003 の全 slot を含める。
+            int referenceCount = checked(plan.Snapshot.Definition.Questions.Count(question => question.Enabled)
+                * ReferenceSetPolicy.SlotCount);
             long operationCount = checked(referenceCount + ((long)plan.Mapping.SelectedRowCount * LlmOperationsPerRow(plan)));
             worstCaseAttempts = checked(operationCount * RetryAndCleanupCoordinator.MaximumTransientAttempts);
         }

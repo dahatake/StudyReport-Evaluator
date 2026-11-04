@@ -408,6 +408,17 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
             ModelIdentity = context.ModelId,
             ReasoningEffort = context.ReasoningEffort,
             ContextTier = context.ContextTier,
+            ReferenceSlotsPerQuestion = summary.ReferenceSlotsPerQuestion,
+            ReferenceConditionSummary = string.Join(
+                "; ",
+                "input=質問文字列のみ",
+                "model=" + context.ModelId,
+                "effort=" + (context.ReasoningEffort ?? "未指定"),
+                "tier=" + (context.ContextTier ?? "未指定"),
+                "systemTemplate=" + (summary.ReferenceTemplateVersion ?? ReferenceSetPolicy.Unobserved),
+                "comparison=" + (summary.ReferenceComparisonVersion ?? ReferenceSetPolicy.Unobserved),
+                "normalization=" + (summary.ReferenceNormalizationVersion ?? ReferenceSetPolicy.Unobserved),
+                "observedModel/temperature/seed=" + ReferenceSetPolicy.Unobserved),
             StartedAtUtc = summary.StartedAtUtc,
             EndedAtUtc = summary.EndedAtUtc,
             PlannedEvaluationCount = summary.PlannedOperationCount,
@@ -426,21 +437,33 @@ public sealed class ResultsOutputBoundary : IResultsOutputBoundary
     private static IEnumerable<ReferenceAnswerSheetRow> CreateReferenceRows(ExecutionRunContext context)
     {
         RunSummary summary = context.Summary;
-        Dictionary<string, CheckpointReference> references = summary.References
-            .ToDictionary(reference => reference.QuestionId, StringComparer.Ordinal);
+        // FR-115 AC-080 / AC-084: 完成 Excel と同じ集合（全 slot）・条件を出す。旧形式は 1 件の単独集合で、条件は未取得。
+        ILookup<string, CheckpointReference> references = summary.References
+            .ToLookup(reference => reference.QuestionId, StringComparer.Ordinal);
+        int planned = summary.ReferenceSlotsPerQuestion;
         foreach (QuestionDefinition question in summary.Snapshot.Definition.Questions.Where(question => question.Enabled))
         {
-            references.TryGetValue(question.Id, out CheckpointReference? reference);
-            yield return new ReferenceAnswerSheetRow
+            CheckpointReference[] set = references[question.Id].ToArray();
+            for (int slot = 0; slot < planned; slot++)
             {
-                QuestionId = question.Id,
-                // Reference answers use the run model and run-level effort (requirements §7.1).
-                ModelId = context.ModelId,
-                ReasoningEffort = context.ReasoningEffort,
-                Answer = reference?.Answer,
-                StatusCode = reference?.StatusCode ?? ResultsStatusCodes.AiRuntimeFailed,
-                GeneratedAtUtc = reference?.GeneratedAtUtc ?? summary.EndedAtUtc,
-            };
+                CheckpointReference? reference = slot < set.Length ? set[slot] : null;
+                yield return new ReferenceAnswerSheetRow
+                {
+                    QuestionId = question.Id,
+                    // Reference answers use the run model and run-level effort (requirements §7.1).
+                    ModelId = context.ModelId,
+                    ReasoningEffort = context.ReasoningEffort,
+                    Answer = reference?.Answer,
+                    StatusCode = reference?.StatusCode ?? ResultsStatusCodes.AiRuntimeFailed,
+                    GeneratedAtUtc = reference?.GeneratedAtUtc ?? summary.EndedAtUtc,
+                    SlotIndex = summary.ReferenceSlotCount == 0 ? 0 : slot + 1,
+                    SlotCount = summary.ReferenceSlotCount,
+                    ContextTier = context.ContextTier,
+                    TemplateVersion = summary.ReferenceTemplateVersion,
+                    ComparisonVersion = summary.ReferenceComparisonVersion,
+                    NormalizationVersion = summary.ReferenceNormalizationVersion,
+                };
+            }
         }
     }
 
@@ -1618,6 +1641,19 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
     // FR-114 AC-078 / AC-079: 確認指標（未検証）の 1 問分の表示。失敗は値を出さず状態だけ、旧形式は未取得と示す。
     private static string DescribeSimilarity(SimilarityResultInput similarity)
     {
+        // FR-115 AC-081 / AC-084: 参照集合の成功数／予定数・記述統計・重複・暫定を、Excel の Results と同じ表示で示す。
+        // 診断を持たない成功結果は旧形式（詳細未取得）として、従来どおりの旧形式の表示にする。
+        if (similarity.ReferenceSet is SimilarityReferenceSetInfo set
+            && (similarity.ReferenceDiagnostics is not null || similarity.AiRaw is null))
+        {
+            string setText = SimilarityDiagnostics.DescribeSet(set, similarity.ReferenceDiagnostics);
+            return similarity.AiRaw is not null
+                && similarity.ReferenceDiagnostics is ImmutableArray<SimilarityReferenceDiagnostic> complete
+                && SimilarityDiagnostics.SelectMaximum(complete) is SimilarityReferenceDiagnostic completeMaximum
+                    ? SimilarityDiagnostics.Describe(completeMaximum) + " / " + setText
+                    : $"{SimilarityDiagnostics.IndicatorLabel}: 未算出（{similarity.Status}） / {setText}";
+        }
+
         if (similarity.ReferenceDiagnostics is ImmutableArray<SimilarityReferenceDiagnostic> diagnostics
             && SimilarityDiagnostics.SelectMaximum(diagnostics) is SimilarityReferenceDiagnostic maximum)
         {
@@ -1680,7 +1716,10 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
                     Status = similarity?.StatusCode ?? ResultsStatusCodes.Cancelled,
                     PeerMax = peer?.PeerMax,
                     PeerRow = peer?.PeerRow,
-                    ReferenceDiagnostics = similarity?.AcceptedResult is null ? null : similarity.ReferenceDiagnostics,
+                    ReferenceDiagnostics = similarity?.AcceptedResult is null && similarity?.ReferenceSet is null
+                        ? null
+                        : similarity.ReferenceDiagnostics,
+                    ReferenceSet = similarity?.ReferenceSet,
                 }
                 : null,
         };

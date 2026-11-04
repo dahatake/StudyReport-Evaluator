@@ -104,6 +104,9 @@ public sealed record SimilarityResultInput
     // FR-114 AC-010 / AC-077: 参照別の確認指標（未検証）の詳細。null は旧形式（詳細なし）。
     public ImmutableArray<SimilarityReferenceDiagnostic>? ReferenceDiagnostics { get; init; }
 
+    // FR-115 AC-081: 参照集合の成功数／予定数と重複。null は旧形式（集合情報なし）。
+    public SimilarityReferenceSetInfo? ReferenceSet { get; init; }
+
     public override string ToString() =>
         $"{nameof(SimilarityResultInput)} {{ Status = {Status}, Content = <redacted> }}";
 }
@@ -271,6 +274,8 @@ public sealed class ResultsSheetWriter
     public const string SimilarityReferenceMatchStartSuffix = "Similarity_Reference_Match_Start";
     public const string SimilarityShortTextCautionSuffix = "Similarity_Short_Text_Caution";
     public const string SimilarityDetailStatusSuffix = "Similarity_Detail_Status";
+    // FR-115 AC-081 / AC-084: 参照集合の成功数／予定数・参照別値・記述統計（最大・最小・中央値・差）・重複・暫定の表示列（採点に使わない）。
+    public const string SimilarityReferenceSetSuffix = "Similarity_Reference_Set";
     public const string SimilarityPeerMaxSuffix = "Similarity_Peer_Max";
     public const string SimilarityPeerRowSuffix = "Similarity_Peer_Row";
     public const string BasePointsHeader = "Base_Points";
@@ -671,7 +676,9 @@ public sealed class ResultsSheetWriter
                     Column(nextColumn++, questionPrefix + SimilarityStudentMatchStartSuffix),
                     Column(nextColumn++, questionPrefix + SimilarityReferenceMatchStartSuffix),
                     Column(nextColumn++, questionPrefix + SimilarityShortTextCautionSuffix),
-                    Column(nextColumn++, questionPrefix + SimilarityDetailStatusSuffix)),
+                    Column(nextColumn++, questionPrefix + SimilarityDetailStatusSuffix),
+                    // FR-115: 既存の列位置（式・golden）を動かさないよう、参照集合の表示列は全列の末尾に置く（後で割り当てる）。
+                    new ColumnLayout(0, string.Empty, questionPrefix + SimilarityReferenceSetSuffix)),
                 Column(nextColumn++, questionPrefix + SimilarityPeerMaxSuffix),
                 Column(nextColumn++, questionPrefix + SimilarityPeerRowSuffix));
             questions.Add(new QuestionLayout(
@@ -690,9 +697,21 @@ public sealed class ResultsSheetWriter
         ColumnLayout specialEarned = Column(nextColumn++, SpecialEarnedHeader);
         ColumnLayout finalRaw = Column(nextColumn++, FinalRawHeader);
         ColumnLayout finalScore = Column(nextColumn++, FinalScoreHeader);
+        ImmutableArray<QuestionLayout> builtQuestions = questions
+            .Select(question => question with
+            {
+                Similarity = question.Similarity with
+                {
+                    Diagnostics = question.Similarity.Diagnostics with
+                    {
+                        ReferenceSet = Column(nextColumn++, question.Similarity.Diagnostics.ReferenceSet.Header),
+                    },
+                },
+            })
+            .ToImmutableArray();
         ResultsLayout layout = new(
             sourceRow,
-            questions.ToImmutable(),
+            builtQuestions,
             basePoints,
             specialEarned,
             finalRaw,
@@ -940,11 +959,28 @@ public sealed class ResultsSheetWriter
 
             ValidateString(similarity.Status, sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.Status", errors);
             ValidateString(similarity.Reason, sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.Reason", errors);
+            if (similarity.ReferenceSet is SimilarityReferenceSetInfo set
+                && (set.Planned < 1
+                    || set.Succeeded < 0
+                    || set.Succeeded > set.Planned
+                    || set.Duplicates.IsDefault
+                    || (similarity.ReferenceDiagnostics is ImmutableArray<SimilarityReferenceDiagnostic> counted
+                        && !counted.IsDefaultOrEmpty
+                        && counted.Length != set.Succeeded)))
+            {
+                AddError(errors, "SIMILARITY_REFERENCE_SET_MISMATCH", sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.ReferenceSet", "mismatch");
+            }
+
+            // FR-115 AC-081: 一部失敗の暫定診断は採点値を持たない（成功参照だけの診断で、AiRaw は blank）。
+            bool provisional = similarity.AiRaw is null
+                && similarity.ReferenceSet is SimilarityReferenceSetInfo provisionalSet
+                && provisionalSet.Succeeded < provisionalSet.Planned;
             if (similarity.ReferenceDiagnostics is ImmutableArray<SimilarityReferenceDiagnostic> diagnostics
                 && (diagnostics.IsDefaultOrEmpty
                     || diagnostics.Any(item => item is null)
-                    || similarity.AiRaw is not decimal aiRaw
-                    || SimilarityDiagnostics.SelectMaximum(diagnostics)!.Score != aiRaw))
+                    || (!provisional
+                        && (similarity.AiRaw is not decimal aiRaw
+                            || SimilarityDiagnostics.SelectMaximum(diagnostics)!.Score != aiRaw))))
             {
                 // FR-114 AC-010: 採点に使う Similarity は参照別合成値の最大値と結び付く。
                 AddError(errors, "SIMILARITY_DIAGNOSTIC_MISMATCH", sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.ReferenceDiagnostics", "mismatch");
@@ -1305,14 +1341,20 @@ public sealed class ResultsSheetWriter
                         similarityInput.Reason,
                         similarityInput.Status,
                         similarityPenalty,
-                        similarityInput.ReferenceDiagnostics is ImmutableArray<SimilarityReferenceDiagnostic> referenceDiagnostics
+                        similarityInput.AiRaw is not null
+                            && similarityInput.ReferenceDiagnostics is ImmutableArray<SimilarityReferenceDiagnostic> referenceDiagnostics
                             ? SimilarityDiagnostics.SelectMaximum(referenceDiagnostics)
                             : null,
                         similarityInput.ReferenceDiagnostics is null
                             && similarityInput.AiRaw is not null
                             && string.Equals(similarityInput.Status, ResultsStatusCodes.Success, StringComparison.Ordinal),
                         similarityInput.PeerMax,
-                        similarityInput.PeerRow)));
+                        similarityInput.PeerRow,
+                        similarityInput.ReferenceSet,
+                        similarityInput.ReferenceDiagnostics is ImmutableArray<SimilarityReferenceDiagnostic> allDiagnostics
+                            && !allDiagnostics.IsDefault
+                            ? allDiagnostics
+                            : [])));
             }
 
             ImmutableArray<PreparedQuestion> preparedQuestions = questions.ToImmutable();
@@ -1618,6 +1660,11 @@ public sealed class ResultsSheetWriter
         AppendFormula(row, formulas, sheetNames, layout.SpecialEarned, prepared.SourceRowNumber, prepared.SpecialEarned, writtenFormulaCells);
         AppendFormula(row, formulas, sheetNames, layout.FinalRaw, prepared.SourceRowNumber, prepared.FinalRaw, writtenFormulaCells);
         AppendFormula(row, formulas, sheetNames, layout.FinalScore, prepared.SourceRowNumber, prepared.FinalScore, writtenFormulaCells);
+        foreach (PreparedQuestion question in prepared.Questions)
+        {
+            AppendReferenceSet(row, question.Similarity, prepared.SourceRowNumber);
+        }
+
         return row;
     }
 
@@ -1717,6 +1764,15 @@ public sealed class ResultsSheetWriter
 
         static decimal? Position(int? value) => value is int position && position >= 0 ? position : null;
     }
+
+    // FR-115 AC-081: 集合の集計は表示だけ。採点・減点は Similarity 列（完全な集合の最大値）だけを使う。
+    private void AppendReferenceSet(Row row, PreparedSimilarity similarity, int sourceRowNumber) =>
+        stringCellWriter.Write(
+            row,
+            CellReference(similarity.Layout.Diagnostics.ReferenceSet, sourceRowNumber),
+            similarity.ReferenceSet is SimilarityReferenceSetInfo set
+                ? SimilarityDiagnostics.DescribeSet(set, similarity.AllDiagnostics)
+                : string.Empty);
 
     private static Cell CreateOptionalNumberCell(ColumnLayout column, int row, decimal? value) =>
         value is decimal number
@@ -1878,7 +1934,8 @@ public sealed class ResultsSheetWriter
         ColumnLayout StudentMatchStart,
         ColumnLayout ReferenceMatchStart,
         ColumnLayout ShortTextCaution,
-        ColumnLayout DetailStatus)
+        ColumnLayout DetailStatus,
+        ColumnLayout ReferenceSet)
     {
         internal IEnumerable<ColumnLayout> AllColumns =>
         [
@@ -1937,7 +1994,8 @@ public sealed class ResultsSheetWriter
         internal IEnumerable<ColumnLayout> AllColumns =>
             new[] { SourceRow }
                 .Concat(Questions.SelectMany(question => question.AllColumns))
-                .Concat([BasePoints, SpecialEarned, FinalRaw, FinalScore]);
+                .Concat([BasePoints, SpecialEarned, FinalRaw, FinalScore])
+                .Concat(Questions.Select(question => question.Similarity.Diagnostics.ReferenceSet));
     }
 
     private sealed record PreparedCriterion(
@@ -1976,7 +2034,9 @@ public sealed class ResultsSheetWriter
         SimilarityReferenceDiagnostic? Maximum,
         bool IsLegacyDetail,
         decimal? PeerMax,
-        int? PeerRow);
+        int? PeerRow,
+        SimilarityReferenceSetInfo? ReferenceSet,
+        ImmutableArray<SimilarityReferenceDiagnostic> AllDiagnostics);
 
     private sealed record PreparedQuestion(
         QuestionLayout Layout,

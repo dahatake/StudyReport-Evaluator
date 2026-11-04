@@ -1009,7 +1009,8 @@ public sealed class ResultsOutputViewTests
             rowCount: 2,
             primary: emptyPrimary ? "   " : "synthetic answer",
             cancelAfterRows: cancelAfterFirst ? 1 : null);
-        Assert.Equal(ResultsStatusCodes.Success, Assert.Single(context.Summary.References).StatusCode);
+        Assert.Equal(5, context.Summary.References.Length); // FR-115 PARAM-003: 設問ごとに 5 slot
+        Assert.All(context.Summary.References, reference => Assert.Equal(ResultsStatusCodes.Success, reference.StatusCode));
         RunOutputPreparation preparation = context.Summary.PrepareOutput();
         using ResultsOutputViewModel viewModel = new(new RecordingOutputBoundary(), context);
         using MemoryStream stream = new();

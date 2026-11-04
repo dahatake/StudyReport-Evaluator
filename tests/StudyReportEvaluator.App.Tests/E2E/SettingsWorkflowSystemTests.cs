@@ -101,7 +101,7 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Null(dispatched.ResumePartialPath);
         Assert.Equal(expectedDirectory, Path.GetDirectoryName(finalPath));
         Assert.False(summary.WasResumed);
-        AssertAiCalls(session.Ai, [FirstAnswer, "0", LastAnswer], [FirstSpecial, "0", LastSpecial], referenceCalls: 1);
+        AssertAiCalls(session.Ai, [FirstAnswer, "0", LastAnswer], [FirstSpecial, "0", LastSpecial], referenceCalls: 5);
         Assert.Equal(settingsBytes, await File.ReadAllBytesAsync(settingsPath, TestToken));
         AssertUnchanged(original.Path, originalBefore);
         AssertUnchanged(replacement.Path, replacementBefore);
@@ -120,7 +120,7 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Equal(2, summary.SucceededCount);
         Assert.Equal(1, summary.EmptyCount);
         Assert.Equal(1, summary.FailureCount);
-        AssertAiCalls(session.Ai, [FirstAnswer, "0", LastAnswer], [FirstSpecial, "0", LastSpecial], referenceCalls: 1);
+        AssertAiCalls(session.Ai, [FirstAnswer, "0", LastAnswer], [FirstSpecial, "0", LastSpecial], referenceCalls: 5);
 
         // The existing durable Workflow oracle is 88 + (2 * .7) + (10 * .8) - (2 * .25 * .2) = 97.3.
         Assert.Equal(97.3m, Score(session, 3).FinalScore);
@@ -233,7 +233,7 @@ public sealed class SettingsWorkflowSystemTests
         Assert.True(session.Shell.Settings.HasUnsavedChanges);
         Assert.Equal(settingsBytes, await File.ReadAllBytesAsync(settingsPath, TestToken));
         Assert.Single(session.Boundary.Requests);
-        AssertAiCalls(session.Ai, [FirstAnswer, "0", LastAnswer], [FirstSpecial, "0", LastSpecial], referenceCalls: 1);
+        AssertAiCalls(session.Ai, [FirstAnswer, "0", LastAnswer], [FirstSpecial, "0", LastSpecial], referenceCalls: 5);
         AssertUnchanged(workbook.Path, before);
         AssertUnchanged(originalFinal, finalBefore);
     }
@@ -280,11 +280,11 @@ public sealed class SettingsWorkflowSystemTests
             Assert.Null(partial.FinalPath);
             Assert.Null(partial.FinalizationCode);
             Assert.Equal([3], partial.CompletedRows.Select(row => row.SourceRowNumber));
-            Assert.Equal(4, partial.CompletedOperationCount);
+            Assert.Equal(8, partial.CompletedOperationCount);
             Assert.Equal(9, partial.OperationCancelledCount);
             Assert.Equal([FirstAnswer, "0"], interrupted.Ai.NormalCalls.Select(call => call.Payload.PrimarySource.Value));
             Assert.Single(interrupted.Ai.SpecialCalls);
-            Assert.Single(interrupted.Ai.ReferenceCalls);
+            Assert.Equal(5, interrupted.Ai.ReferenceCalls.Count); // FR-115 PARAM-003: 設問ごとに 5 slot
             Assert.Equal(ResultsRowStatus.Unprocessed, Score(interrupted, 5).Status);
             Assert.Equal(ResultsRowStatus.Unprocessed, Score(interrupted, 6).Status);
             Assert.Null(Score(interrupted, 5).FinalScore);
@@ -353,8 +353,8 @@ public sealed class SettingsWorkflowSystemTests
             JsonSerializer.Serialize(saved.CompletedRows),
             JsonSerializer.Serialize(completed.CompletedRows.Take(saved.CompletedRows.Length)));
         Assert.Equal(JsonSerializer.Serialize(baseline.CompletedRows), JsonSerializer.Serialize(completed.CompletedRows));
-        Assert.Equal(7, completed.OperationUsageObservedCount);
-        Assert.Equal(70L, completed.OperationTokenUsage.InputTokens);
+        Assert.Equal(11, completed.OperationUsageObservedCount);
+        Assert.Equal(110L, completed.OperationTokenUsage.InputTokens);
         Assert.Equal(JsonSerializer.Serialize(baseline.OperationTokenUsage), JsonSerializer.Serialize(completed.OperationTokenUsage));
         Assert.Equal(ReadWorksheetXml(baseline.FinalPath!, AppOwnedSheetNameResolver.ResultsBaseName),
             ReadWorksheetXml(finalPath, AppOwnedSheetNameResolver.ResultsBaseName));
@@ -449,7 +449,7 @@ public sealed class SettingsWorkflowSystemTests
         AssertUnchanged(finalPath, finalBefore);
         AssertUnchanged(workbook.Path, before);
         Assert.Single(session.Boundary.Requests);
-        AssertAiCalls(session.Ai, [FirstAnswer, "0", LastAnswer], [FirstSpecial, "0", LastSpecial], referenceCalls: 1);
+        AssertAiCalls(session.Ai, [FirstAnswer, "0", LastAnswer], [FirstSpecial, "0", LastSpecial], referenceCalls: 5);
     }
 
     private static QuantificationDefinition Definition()
@@ -705,8 +705,8 @@ public sealed class SettingsWorkflowSystemTests
         Assert.False(summary.PartialCleanupFailed);
         Assert.Equal(4, summary.PlannedEvaluationCount);
         Assert.Equal(4, summary.CompletedEvaluationCount);
-        Assert.Equal(13, summary.PlannedOperationCount);
-        Assert.Equal(13, summary.CompletedOperationCount);
+        Assert.Equal(17, summary.PlannedOperationCount);
+        Assert.Equal(17, summary.CompletedOperationCount);
         Assert.Equal(operationFailures, summary.OperationFailureCount);
         Assert.Equal(0, summary.OperationCancelledCount);
         Assert.Equal([3, 4, 5, 6], summary.CompletedRows.Select(row => row.SourceRowNumber));
@@ -715,10 +715,13 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Equal(session.Input.Snapshot, summary.InputSnapshot);
         Assert.Equal(FixedUtc, summary.StartedAtUtc);
         Assert.Equal(FixedUtc, summary.EndedAtUtc);
-        CheckpointReference reference = Assert.Single(summary.References);
-        Assert.Equal(ReferenceAnswer, reference.Answer);
-        Assert.Equal(ResultsStatusCodes.Success, reference.StatusCode);
-        Assert.Equal(1, reference.AttemptCount);
+        Assert.Equal(5, summary.References.Length); // FR-115 PARAM-003: 設問ごとに 5 slot
+        Assert.All(summary.References, reference =>
+        {
+            Assert.Equal(ReferenceAnswer, reference.Answer);
+            Assert.Equal(ResultsStatusCodes.Success, reference.StatusCode);
+            Assert.Equal(1, reference.AttemptCount);
+        });
         Assert.All(summary.Units, unit => Assert.InRange(unit.AttemptCount, 0, RetryAndCleanupCoordinator.MaximumTransientAttempts));
         string finalPath = Assert.IsType<string>(summary.FinalPath);
         Assert.NotEqual(workbook.Path, finalPath);
@@ -752,7 +755,7 @@ public sealed class SettingsWorkflowSystemTests
             document, summary.Snapshot, names, config, preparation.Rows);
         Assert.Equal(4, results.DataRowCount);
         // FR-114 AC-010: 類似度の確認指標の 11 列を含む。
-        Assert.Equal(44, results.ColumnCount);
+        Assert.Equal(45, results.ColumnCount);
         Assert.Equal(48, results.FormulaCells.Length);
         return OutputPackageValidationPlan.Capture(inputPath, names, config.FormulaCells.Concat(results.FormulaCells)
             .Select(cell => new ExpectedFormulaCell(cell.Definition, cell.CachedValue)));
@@ -786,7 +789,8 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Equal(summary.DefinitionSha256, Text(definition, "W"));
         Worksheet references = Worksheet(document, plan.SheetNames.ReferencesSheetName);
         Assert.Empty(references.Descendants<CellFormula>());
-        Cell answer = Assert.Single(references.Descendants<Cell>(), cell => cell.InnerText == ReferenceAnswer);
+        Assert.Equal(5, references.Descendants<Cell>().Count(cell => cell.InnerText == ReferenceAnswer));
+        Cell answer = references.Descendants<Cell>().First(cell => cell.InnerText == ReferenceAnswer);
         Assert.Equal(CellValues.InlineString, answer.DataType?.Value);
         Assert.Null(answer.CellFormula);
         Worksheet run = Worksheet(document, plan.SheetNames.RunSheetName);
@@ -796,8 +800,8 @@ public sealed class SettingsWorkflowSystemTests
         Assert.Equal(summary.InputSnapshot.Sha256, records["InputSha256"]);
         Assert.Equal(summary.DefinitionSha256, records["DefinitionSha256"]);
         Assert.Equal(ModelId, records["ModelIdentity"]);
-        Assert.Equal("13", records["PlannedEvaluationCount"]);
-        Assert.Equal("13", records["CompletedEvaluationCount"]);
+        Assert.Equal("17", records["PlannedEvaluationCount"]);
+        Assert.Equal("17", records["CompletedEvaluationCount"]);
         Assert.Equal(summary.OperationFailureCount.ToString(CultureInfo.InvariantCulture), records["ErrorCount"]);
         CalculationProperties properties = Assert.IsType<CalculationProperties>(workbook.CalculationProperties);
         Assert.Equal(CalculateModeValues.Auto, properties.CalculationMode?.Value);

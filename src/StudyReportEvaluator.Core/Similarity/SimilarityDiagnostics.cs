@@ -52,6 +52,85 @@ public static class SimilarityDiagnostics
         return best;
     }
 
+    /// <summary>
+    /// FR-115 AC-081: 参照集合の記述統計（最大・最小・中央値・差）。表示だけに使い、採点・減点には使わない
+    /// （減点は <see cref="SelectMaximum"/> の完全な集合の最大値）。診断が空なら null。
+    /// </summary>
+    public static SimilarityReferenceStatistics? Summarize(IEnumerable<SimilarityReferenceDiagnostic> diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        decimal[] scores = diagnostics.Where(item => item is not null).Select(item => item.Score).Order().ToArray();
+        if (scores.Length == 0)
+        {
+            return null;
+        }
+
+        decimal median = scores.Length % 2 == 1
+            ? scores[scores.Length / 2]
+            : (scores[(scores.Length / 2) - 1] + scores[scores.Length / 2]) / 2m;
+        SimilarityReferenceDiagnostic maximum = SelectMaximum(diagnostics)!;
+        return new SimilarityReferenceStatistics(
+            scores[^1],
+            scores[0],
+            median,
+            scores[^1] - scores[0],
+            maximum.ReferenceIndex);
+    }
+
+    /// <summary>
+    /// FR-115 AC-081 / AC-084: 参照集合の 1 行の集計表示（成功数／予定数・参照別値・記述統計・重複・暫定）。
+    /// 一部失敗は暫定集計と明示し、完全な集合の値や減点入力へ読み替えない。成功参照なしは集計なし。学生本文・参照本文は含めない。
+    /// </summary>
+    public static string DescribeSet(
+        SimilarityReferenceSetInfo set,
+        IEnumerable<SimilarityReferenceDiagnostic>? diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(set);
+        List<string> parts =
+        [
+            string.Create(CultureInfo.InvariantCulture, $"成功数/予定数 {set.Succeeded}/{set.Planned}"),
+        ];
+        ImmutableArray<SimilarityReferenceDiagnostic> items = diagnostics is null
+            ? []
+            : diagnostics.Where(item => item is not null).OrderBy(item => item.ReferenceIndex).ToImmutableArray();
+        bool partial = set.Succeeded < set.Planned;
+        if (partial)
+        {
+            parts.Add(set.Succeeded == 0
+                ? "集計なし（成功した参照なし）"
+                : "暫定（一部失敗・成功参照に限った集計で採点・減点には使わない）");
+        }
+
+        SimilarityReferenceStatistics? statistics = items.IsEmpty ? null : Summarize(items);
+        if (statistics is not null)
+        {
+            parts.Add(string.Create(
+                CultureInfo.InvariantCulture,
+                $"最大 {Format(statistics.Maximum)}（参照 {statistics.MaximumReferenceIndex}）"));
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"最小 {Format(statistics.Minimum)}"));
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"中央値 {Format(statistics.Median)}"));
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"最大と最小の差 {Format(statistics.Range)}"));
+            parts.Add("参照別 " + string.Join(
+                ", ",
+                items.Select(item => string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{item.ReferenceIndex}:{Format(item.Score)}"))));
+        }
+
+        if (!set.Duplicates.IsDefaultOrEmpty)
+        {
+            parts.Add("重複あり（独立の裏付けとしない）: " + string.Join(
+                ", ",
+                set.Duplicates.Select(item => string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"参照 {item.Slot}=参照 {item.DuplicateOfSlot}"))));
+        }
+
+        return string.Join(" / ", parts);
+
+        static string Format(decimal value) => value.ToString("0.####", CultureInfo.InvariantCulture);
+    }
+
     /// <summary>画面表示用の 1 行要約（学生本文・参照本文は含めない）。</summary>
     public static string Describe(SimilarityReferenceDiagnostic diagnostic)
     {
@@ -69,6 +148,62 @@ public static class SimilarityDiagnostics
             CultureInfo.InvariantCulture,
             $"{IndicatorLabel}: 参照 {diagnostic.ReferenceIndex} / {exact} / 最長一致 {diagnostic.LongestCommonSubstringLength}文字 / 被覆率 学生 {diagnostic.StudentCoverage:0.00}・参照 {diagnostic.ReferenceCoverage:0.00} / {position}{caution}");
     }
+}
+
+/// <summary>
+/// FR-115 PARAM-003 と、参照集合の比較条件の版。新規 run の設問ごとの参照回答数は固定の有限集合で、件数設定 UI を持たない。
+/// </summary>
+public static class ReferenceSetPolicy
+{
+    /// <summary>PARAM-003: 新規 run の設問ごとの参照回答数。</summary>
+    public const int SlotCount = 5;
+
+    /// <summary>旧単独参照 checkpoint の予定数（PARAM-003 へ水増ししない）。</summary>
+    public const int LegacySlotCount = 1;
+
+    /// <summary>参照生成の比較入力（質問文字列のみ）と結果収集のための system 指示の版。</summary>
+    public const string SystemTemplateVersion = "reference-answer-v1";
+
+    /// <summary>アプリの比較方式の版（FR-114 の表面類似度）。</summary>
+    public const string ComparisonVersion = "surface-similarity-v1";
+
+    /// <summary>比較前の正規化条件の版。</summary>
+    public const string NormalizationVersion = "surface-normalization-v1";
+
+    /// <summary>SDK で観測できない・旧形式で欠けている条件の表示。</summary>
+    public const string Unobserved = "未取得";
+
+    /// <summary>checkpoint の予定数欄（0 は旧形式）から、設問ごとの予定 slot 数を得る。</summary>
+    public static int PlannedSlots(int recordedSlotCount) =>
+        recordedSlotCount <= 0 ? LegacySlotCount : recordedSlotCount;
+}
+
+/// <summary>FR-115 AC-081: 参照集合の記述統計（表示のみ。採点・減点には使わない）。</summary>
+public sealed record SimilarityReferenceStatistics(
+    decimal Maximum,
+    decimal Minimum,
+    decimal Median,
+    decimal Range,
+    int MaximumReferenceIndex);
+
+/// <summary>FR-115 AC-081: 同一本文の参照（<see cref="Slot"/> が <see cref="DuplicateOfSlot"/> と同じ本文）。</summary>
+public sealed record SimilarityDuplicateReference
+{
+    public int Slot { get; init; }
+
+    public int DuplicateOfSlot { get; init; }
+}
+
+/// <summary>
+/// FR-115 AC-081: ある設問・学生の比較に使った参照集合の成功数／予定数と重複。参照本文は持たない。
+/// </summary>
+public sealed record SimilarityReferenceSetInfo
+{
+    public int Planned { get; init; }
+
+    public int Succeeded { get; init; }
+
+    public ImmutableArray<SimilarityDuplicateReference> Duplicates { get; init; } = [];
 }
 
 /// <summary>

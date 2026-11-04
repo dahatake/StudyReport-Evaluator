@@ -412,7 +412,7 @@ public sealed class DocumentationScreenshotTests
             Activate(Required<Button>(window, "NextStepButton"));
             Assert.Equal(WorkflowStep.Execution, viewModel.CurrentStep);
             execution.MaxConcurrency = 2;
-            Assert.Equal(402, execution.PlannedEvaluationCount);
+            Assert.Equal(410, execution.PlannedEvaluationCount);
             ExecutionView executionView = CurrentView<ExecutionView>(window);
             Assert.Null(executionView.FindControl<CheckBox>("ResumeModeCheckBox"));
             TextBox effectiveOutput = ById<TextBox>(executionView, "ExecutionEffectiveOutputDirectory");
@@ -529,13 +529,13 @@ public sealed class DocumentationScreenshotTests
             Assert.Equal(QuantificationRunStatusCodes.Success, context.Summary.StatusCode);
             Assert.Equal(AtomicOutputStatusCodes.Success, context.Summary.FinalizationCode);
             Assert.Equal(100, context.Summary.CompletedRows.Length);
-            Assert.Equal(2, context.Summary.References.Length);
+            Assert.Equal(10, context.Summary.References.Length); // 2 設問 × PARAM-003 の 5 slot
             Assert.True(results.IsLoaded);
             // MainWindow's actual RunCompleted handler moves Execution to Results.
             Assert.Equal(WorkflowStep.Results, viewModel.CurrentStep);
             ResultsOutputView resultsView = CurrentView<ResultsOutputView>(window);
-            Assert.Equal(402, results.PlannedEvaluationCount);
-            Assert.Equal(402, results.CompletedEvaluationCount);
+            Assert.Equal(410, results.PlannedEvaluationCount);
+            Assert.Equal(410, results.CompletedEvaluationCount);
             Assert.Equal(0, results.FailureCount);
             Assert.Equal(0, results.CancelledCount);
             Assert.Equal(200, results.Results.Count);
