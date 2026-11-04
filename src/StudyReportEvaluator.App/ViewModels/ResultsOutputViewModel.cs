@@ -1029,6 +1029,26 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
     // Display-only projection of the loaded job's cost record (§11.21); null cost is reported, not zeroed.
     public string RunMetricsText => context is { } run ? RunMetricsFormatter.DescribeRun(run.Cost) : string.Empty;
 
+    // FR-117 AC-091 / AC-092: 全行の状態別件数（読取専用。ページ・選択に非依存）。未読込は空。
+    public string RowStatusCountsText => context is null
+        ? string.Empty
+        : DescribeRowStatusCounts(rowScoreItems.Select(row => row.Status));
+
+    internal static string DescribeRowStatusCounts(IEnumerable<ResultsRowStatus> statuses)
+    {
+        ResultsRowStatus[] all = [.. statuses];
+        (ResultsRowStatus Status, string Name)[] order =
+        [
+            (ResultsRowStatus.Success, "成功"),
+            (ResultsRowStatus.TechnicalError, "技術エラー"),
+            (ResultsRowStatus.Empty, "回答空欄"),
+            (ResultsRowStatus.Cancelled, "取消"),
+            (ResultsRowStatus.Unprocessed, "未処理・未確定"),
+        ];
+        return string.Join(" · ", order.Select(item =>
+            item.Name + " " + all.Count(status => status == item.Status).ToString(CultureInfo.InvariantCulture)));
+    }
+
     public string RunMetricsToolTip => context is null
         ? string.Empty
         : RunMetricsText + Environment.NewLine + RunMetricsFormatter.AiCreditNote;
@@ -1255,6 +1275,7 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
             nameof(IsInputUnchanged),
             nameof(RunIdentityText),
             nameof(RunMetricsText),
+            nameof(RowStatusCountsText),
             nameof(RunMetricsToolTip),
             nameof(PlannedEvaluationCount),
             nameof(CompletedEvaluationCount),
@@ -1618,6 +1639,7 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
         }
 
         RefreshPresentation(selectedRow);
+        OnPropertyChanged(nameof(RowStatusCountsText));
     }
 
     // FR-RS-02/03: the snapshot question text (Excel header cell) with whitespace collapsed;
