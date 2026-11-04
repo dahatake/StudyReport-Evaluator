@@ -130,6 +130,16 @@ dotnet run --project .\src\StudyReportEvaluator.App\StudyReportEvaluator.App.csp
 
 この`bin`出力はself-containedではなく、起動端末に.NETが必要です。配布物と同じ前提ではありません。
 
+### A'. 最新ソースをwinget経由のCopilot CLI同梱で起動する（npm不要）
+
+npmへ到達できない環境でも、wingetの公式MSI（winget側でSHA-256検証）から`copilot.exe`を取得し、現在のソースをビルドして起動します。`winget`が必要です。
+
+```powershell
+pwsh.exe -NoLogo -NoProfile -File .\scripts\run-local-winget.ps1
+```
+
+MSIは`artifacts\winget-copilot`へ取得・展開（システムへインストールしない）し、SDKの`CopilotCliBinaryPath`でビルドへ渡します。アプリは従来どおり生成された`copilot-runtime.json`のRID・版・SHA-256を検証します。出力は`src\StudyReportEvaluator.App\bin\Debug\net10.0\win-x64`です。`-NoRun`でビルドだけ行います。unsignedのローカルビルドで、配布物ではありません。
+
 ### B. 配布物と同じ構成で起動する（同梱CLIあり）
 
 AI評価まで確認する場合は、公開用と同じself-contained `win-x64`をローカルで作ります。
