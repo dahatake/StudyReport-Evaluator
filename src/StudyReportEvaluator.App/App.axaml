@@ -24,9 +24,9 @@
       <SolidColorBrush x:Key="WarningBackgroundBrush" Color="#FFF4D6" />
       <SolidColorBrush x:Key="WarningBorderBrush" Color="#EAB547" />
       <SolidColorBrush x:Key="WarningTextBrush" Color="#6D4600" />
-      <SolidColorBrush x:Key="TechnicalBackgroundBrush" Color="#EAF5FF" />
-      <SolidColorBrush x:Key="TechnicalBorderBrush" Color="#62A9E8" />
-      <SolidColorBrush x:Key="TechnicalTextBrush" Color="#174F7C" />
+      <SolidColorBrush x:Key="TechnicalBackgroundBrush" Color="#FDE7E9" />
+      <SolidColorBrush x:Key="TechnicalBorderBrush" Color="#C50F1F" />
+      <SolidColorBrush x:Key="TechnicalTextBrush" Color="#A4262C" />
       <SolidColorBrush x:Key="FocusRingBrush" Color="#7A35D2" />
     </ResourceDictionary>
   </Application.Resources>

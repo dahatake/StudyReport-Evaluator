@@ -26,9 +26,9 @@
         <TextBlock Grid.RowSpan="2" Text="{Binding Number}" FontSize="16" FontWeight="Bold"
                    VerticalAlignment="Center" />
         <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="14" LineHeight="18"
-                   FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                   FontWeight="SemiBold" TextTrimming="None" />
         <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding StatusText}" FontSize="12" LineHeight="16"
-                   TextTrimming="CharacterEllipsis" />
+                   TextTrimming="None" />
       </Grid>
     </DataTemplate>
   </Window.Resources>
@@ -41,6 +41,7 @@
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="Padding" Value="8,4" />
     </Style>
+    <!-- FR-118: エラー表示は色だけに頼らず、左の太い枠（2）とエラー文言で識別できる。 -->
     <Style Selector="Border.technical-validation">
       <Setter Property="Background" Value="{DynamicResource TechnicalBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource TechnicalBorderBrush}" />
@@ -80,9 +81,9 @@
       <Setter Property="BorderBrush" Value="{DynamicResource AppAccentStrongBrush}" />
     </Style>
     <Style Selector="Button.shell-action.cancel">
-      <Setter Property="Background" Value="{DynamicResource TechnicalBackgroundBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource TechnicalTextBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource TechnicalBorderBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppAccentStrongBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppAccentStrongBrush}" />
     </Style>
     <Style Selector="Button.shell-action:focus-visible, Button.step-button:focus-visible">
       <Setter Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
@@ -209,7 +210,7 @@
       <Grid Grid.Column="1" TabIndex="1" KeyboardNavigation.TabNavigation="Local">
         <Grid IsVisible="{Binding !ExecutionViewModel.IsRunning}" VerticalAlignment="Center">
           <TextBlock Text="{Binding CurrentStepStatusText}" IsVisible="{Binding !IsSettingsOpen}"
-                     FontSize="14" FontWeight="SemiBold" TextAlignment="Center" TextTrimming="CharacterEllipsis" />
+                     FontSize="14" FontWeight="SemiBold" TextAlignment="Center" TextTrimming="None" TextWrapping="Wrap" />
           <TextBlock x:Name="SettingsNavigationHint" Text="設定画面の「設定から戻る」で元のステップへ"
                      IsVisible="{Binding IsSettingsOpen}" FontSize="14" TextAlignment="Center" TextWrapping="Wrap"
                      AutomationProperties.AutomationId="SettingsNavigationHint" />

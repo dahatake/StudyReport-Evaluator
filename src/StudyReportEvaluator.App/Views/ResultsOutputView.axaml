@@ -273,7 +273,7 @@
                             </StackPanel>
                           </Grid>
                           <TextBlock Text="{Binding OverrideError}" IsVisible="{Binding HasOverrideError}" TextWrapping="Wrap"
-                                     Foreground="{DynamicResource TechnicalBorderBrush}" AutomationProperties.AutomationId="ResultsCriterionOverrideError" />
+                                     Foreground="{DynamicResource TechnicalTextBrush}" AutomationProperties.AutomationId="ResultsCriterionOverrideError" />
                           <StackPanel>
                             <TextBlock Text="評価の理由（Reason）" Classes="label" />
                             <TextBlock Text="{Binding ReasonText}" TextWrapping="Wrap"
