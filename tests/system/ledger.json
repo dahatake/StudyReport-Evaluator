@@ -9,7 +9,14 @@
     "AC-062": "sha256:ac1fa9d6a4ec956e",
     "AC-063": "sha256:0c12d44db6950d87",
     "AC-072": "sha256:e8c4744ccb45a08b",
-    "AC-074": "sha256:856477122e47d14b"
+    "AC-074": "sha256:856477122e47d14b",
+    "AC-009": "sha256:20caff4fb05095a6",
+    "AC-085": "sha256:c9db498a29902bb4",
+    "AC-080": "sha256:30c67f6c3be9e4b0",
+    "AC-081": "sha256:1be03108ae7fa654",
+    "AC-084": "sha256:97cc72d11eb8e77c",
+    "AC-082": "sha256:420f76352cae007d",
+    "AC-083": "sha256:2030b7aecc60a433"
   },
   "cases": [
     {
@@ -231,6 +238,85 @@
       "history": [
         {
           "at": "2026-11-04T00:15:51+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "IT-002",
+      "requirement_ids": [
+        "FR-115"
+      ],
+      "ac_ids": [
+        "AC-009",
+        "AC-085"
+      ],
+      "title": "FR-115 参照解答の固定スロット生成（質問のみ・全学生共有・試行上限）",
+      "layer": "contract",
+      "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR115_Generation\"",
+      "canary": false,
+      "status": "not_run",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-04T09:03:24+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "IT-003",
+      "requirement_ids": [
+        "FR-115"
+      ],
+      "ac_ids": [
+        "AC-080",
+        "AC-081",
+        "AC-084"
+      ],
+      "title": "FR-115 参照集合の条件・診断（n/5・重複・暫定）と出力の一致・安全表示",
+      "layer": "contract",
+      "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR115_Conditions\"",
+      "canary": false,
+      "status": "not_run",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-04T09:03:25+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "IT-004",
+      "requirement_ids": [
+        "FR-115"
+      ],
+      "ac_ids": [
+        "AC-082",
+        "AC-083"
+      ],
+      "title": "FR-115 保存済みスロットの再利用・未保存スロットのみ再開・保存失敗/上限・旧 checkpoint 互換",
+      "layer": "contract",
+      "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR115_Resume\"",
+      "canary": false,
+      "status": "not_run",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-04T09:03:25+09:00",
           "by": "test-designer",
           "change": "追加",
           "reason": "受入基準からケースを作成"
