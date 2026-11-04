@@ -98,7 +98,7 @@ pwsh -NoLogo -NoProfile -File .\build-singlefile.ps1 -SkipPull
 
 現在の作業ツリーから同梱Copilot CLIを含む単一EXEとSHA-256 sidecarを生成し、`artifacts\package\StudyReportEvaluator-win-x64.exe`を起動します。ビルドのみの場合は`-SkipLaunch`を追加します。`-SkipPull`を省略すると、先に`git pull --ff-only`で最新化します（tracked fileに変更がある場合は停止）。各段階の失敗時は古いEXEを起動しません。
 
-詳細・検証方法は[開発手順](dev/README.md#単一exeをビルドして起動する)を参照してください。これはローカルのunsigned成果物であり、公開済み配布物やclean-host試験の完了を意味しません。
+詳細・検証方法はリポジトリの`dev/README.md`（単一EXEをビルドして起動する）を参照してください（配布パッケージには含まれません）。これはローカルのunsigned成果物であり、公開済み配布物やclean-host試験の完了を意味しません。
 
 ## ローカルビルドから起動するクイックスタート
 
