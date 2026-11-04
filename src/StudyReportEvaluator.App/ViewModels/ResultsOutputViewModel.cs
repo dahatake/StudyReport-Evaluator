@@ -12,6 +12,7 @@ using StudyReportEvaluator.App.Workbooks.Validation;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Scoring;
+using StudyReportEvaluator.Core.Similarity;
 
 namespace StudyReportEvaluator.App.ViewModels;
 
@@ -190,6 +191,9 @@ public sealed class ResultsRowScoreViewModel : UiObservableObject
     public string SpecialEarnedText => Format(SpecialEarned);
 
     public string SimilarityPenaltyText => Format(SimilarityPenalty);
+
+    // FR-114 AC-078: 類似度の詳細は通常評価と別の「確認指標・未検証」として表示する（学生本文は含めない）。
+    public string SimilarityDiagnosticsText { get; internal init; } = SimilarityDiagnostics.IndicatorLabel;
 
     public string FinalRawText => Format(FinalRaw);
 
@@ -711,6 +715,9 @@ public sealed class ResultsCriterionViewModel : UiObservableObject
 public sealed partial class ResultsOutputViewModel : UiObservableObject, IDisposable
 {
     public JobCostViewModel Cost { get; } = new();
+
+    // FR-114 AC-078: 類似度は確認指標・未検証であり、通常評価とは別であることの説明。
+    public string SimilarityIndicatorNotice => SimilarityDiagnostics.IndicatorNotice;
 
     private const NumberStyles OverrideNumberStyles =
         NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent;
@@ -1489,6 +1496,7 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
                 definition.RoundingDigits);
             List<(string Label, decimal? Earned)> questionEarned = [];
             List<decimal?> similarityPenalties = [];
+            List<string> similarityDiagnostics = [];
             List<decimal?> specialQuestionRates = [];
             foreach (QuestionDefinition question in definition.Questions.Where(item => item.Enabled))
             {
@@ -1521,6 +1529,10 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
                     similarity,
                     definition.SimilarityPenaltyWeight,
                     definition.RoundingDigits));
+                if (questionInput.Similarity is { } similarityDetail)
+                {
+                    similarityDiagnostics.Add($"{QuestionLabel(question)}: {DescribeSimilarity(similarityDetail)}");
+                }
 
                 SpecialEvaluationDefinition[] enabledSpecials = question.SpecialEvaluations
                     .Where(special => special.Enabled)
@@ -1561,7 +1573,12 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
                 specialEarned,
                 totalPenalty,
                 finalRaw,
-                finalScore);
+                finalScore)
+            {
+                SimilarityDiagnosticsText = similarityDiagnostics.Count == 0
+                    ? SimilarityDiagnostics.IndicatorLabel
+                    : string.Join(" · ", similarityDiagnostics),
+            };
             AttachRerunSelection(createdRow, summary, completedRow is not null);
             rowScoreItems.Add(createdRow);
 
@@ -1596,6 +1613,30 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
         }
 
         return question.Id;
+    }
+
+    // FR-114 AC-078 / AC-079: 確認指標（未検証）の 1 問分の表示。失敗は値を出さず状態だけ、旧形式は未取得と示す。
+    private static string DescribeSimilarity(SimilarityResultInput similarity)
+    {
+        if (similarity.ReferenceDiagnostics is ImmutableArray<SimilarityReferenceDiagnostic> diagnostics
+            && SimilarityDiagnostics.SelectMaximum(diagnostics) is SimilarityReferenceDiagnostic maximum)
+        {
+            return SimilarityDiagnostics.Describe(maximum);
+        }
+
+        if (string.Equals(similarity.Status, ResultsStatusCodes.Empty, StringComparison.Ordinal))
+        {
+            return $"{SimilarityDiagnostics.IndicatorLabel}: 回答空欄のため 0";
+        }
+
+        if (similarity.AiRaw is decimal value)
+        {
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"{SimilarityDiagnostics.IndicatorLabel}: 合成値 {value:G29}（{SimilarityDiagnostics.LegacyDetailLabel}）");
+        }
+
+        return $"{SimilarityDiagnostics.IndicatorLabel}: 未算出（{similarity.Status}）";
     }
 
     private static QuestionResultInput CreateDisplayQuestionInput(
@@ -1639,6 +1680,7 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
                     Status = similarity?.StatusCode ?? ResultsStatusCodes.Cancelled,
                     PeerMax = peer?.PeerMax,
                     PeerRow = peer?.PeerRow,
+                    ReferenceDiagnostics = similarity?.AcceptedResult is null ? null : similarity.ReferenceDiagnostics,
                 }
                 : null,
         };

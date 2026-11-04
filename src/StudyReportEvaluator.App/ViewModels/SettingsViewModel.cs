@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Globalization;
 using System.Text.Json;
@@ -55,6 +56,7 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
     private byte[]? persistedValues = ComparisonBytes(new ApplicationSettings());
     private string? persistenceMessage;
     private string applyStatusText = string.Empty;
+    private ImmutableArray<string> storedDefinitionNotices = [];
     private CancellationTokenSource? applicationCancellation;
     private bool isSelectingOutputFolder;
     private string outputFolderStatus = string.Empty;
@@ -163,7 +165,11 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
         ? string.Format(CultureInfo.InvariantCulture, "保存定義: {0} · 設問 {1} 件 · 質問行 {2} · 回答行 {3}–{4}",
             definition.SourceSheet, definition.Questions.Length, definition.HeaderRow,
             definition.FirstDataRow, definition.LastDataRow)
+            + (storedDefinitionNotices.IsEmpty ? string.Empty : Environment.NewLine + string.Join(Environment.NewLine, storedDefinitionNotices))
         : "保存した採点定義はありません。";
+
+    /// <summary>FR-114 AC-004: 保存定義の読込で補った値の通知（旧形式で欠けた減点係数へ 0.1 を補ったなど）。</summary>
+    public ImmutableArray<string> StoredDefinitionNotices => storedDefinitionNotices;
 
     public bool IsInitialized => initialized;
 
@@ -408,6 +414,7 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
                     }
 
                     StoredDefinition = loaded.Definition;
+                    storedDefinitionNotices = loaded.Definition is null ? [] : result.Notices;
                     persistedValues = values;
                     OnPropertiesChanged(nameof(StoredDefinition), nameof(StoredDefinitionSummary));
                 }
@@ -502,6 +509,8 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
             if (result.IsSuccess)
             {
                 StoredDefinition = frozen.Definition;
+                // 保存した定義は係数を明示して書くので、補完の通知は消える。
+                storedDefinitionNotices = [];
                 persistedValues = frozenValues;
                 OnPropertiesChanged(nameof(StoredDefinition), nameof(StoredDefinitionSummary));
             }
@@ -620,6 +629,8 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
             try
             {
                 Design.SynchronizeFromInput(Input.DefinitionDraft, Input.AvailableColumnNames);
+                // FR-114 AC-004: 補った値を黙って使わず、採点設計画面に通知する。
+                Design.ShowDefinitionNotices(storedDefinitionNotices);
                 latestEditor = DefinitionEditor.Synchronized;
             }
             finally
@@ -627,7 +638,9 @@ public sealed class SettingsViewModel : UiObservableObject, IDisposable
                 synchronizing = false;
             }
 
-            applyStatusText = "保存定義を現在の入力と設計に適用しました。";
+            applyStatusText = storedDefinitionNotices.IsEmpty
+                ? "保存定義を現在の入力と設計に適用しました。"
+                : "保存定義を現在の入力と設計に適用しました。" + string.Join(string.Empty, storedDefinitionNotices);
             return true;
         }
         catch

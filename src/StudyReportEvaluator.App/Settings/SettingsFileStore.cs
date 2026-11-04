@@ -24,6 +24,12 @@ public sealed record SettingsLoadResult(SettingsLoadStatus Status, ApplicationSe
 {
     public bool IsSuccess => Status is SettingsLoadStatus.Loaded or SettingsLoadStatus.Missing;
 
+    /// <summary>
+    /// FR-114 AC-004: 読込時に補った値の通知（例: 旧形式で欠けた類似度減点係数へ旧既定値 0.1 を補った）。
+    /// 明示された値（0 を含む）では空。
+    /// </summary>
+    public ImmutableArray<string> Notices { get; init; } = [];
+
     public override string ToString() =>
         $"{nameof(SettingsLoadResult)} {{ Status = {Status}, Settings = <redacted> }}";
 }
@@ -211,7 +217,7 @@ public sealed class SettingsFileStore
 
             ApplicationSettings? settings = root.Deserialize<ApplicationSettings>(JsonOptions);
             return IsValid(settings)
-                ? new(SettingsLoadStatus.Loaded, settings)
+                ? new(SettingsLoadStatus.Loaded, settings) { Notices = LegacyDefinitionNotices(root) }
                 : new(SettingsLoadStatus.JsonInvalid);
         }
         catch (Exception exception) when (
@@ -220,6 +226,15 @@ public sealed class SettingsFileStore
             return new(SettingsLoadStatus.JsonInvalid);
         }
     }
+
+    // FR-114 AC-004: 旧形式の保存定義で類似度減点係数が欠けると record の旧既定値 0.1 が入る。
+    // 黙って補わず、Core の読込と同じ通知を返す。明示値（0 を含む）は通知しない。
+    private static ImmutableArray<string> LegacyDefinitionNotices(JsonElement root) =>
+        root.TryGetProperty("definition", out JsonElement definition)
+        && definition.ValueKind == JsonValueKind.Object
+        && !definition.TryGetProperty("similarityPenaltyWeight", out _)
+            ? [Core.Serialization.CanonicalDefinitionDeserializer.LegacySimilarityPenaltyWeightNotice]
+            : [];
 
     private SettingsLoadResult ClassifyMissingPath()
     {

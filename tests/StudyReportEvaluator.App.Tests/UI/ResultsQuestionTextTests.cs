@@ -109,6 +109,36 @@ public sealed class ResultsQuestionTextTests
         }
     }
 
+    // FR-114 / AC-078: 結果の詳細では類似度を通常評価と別の「確認指標・未検証」として表示する。
+    [AvaloniaFact]
+    public async Task FR114_AC078_Result_detail_shows_similarity_as_unverified_indicator()
+    {
+        (_, ResultsOutputViewModel viewModel) = await CreateAsync(FirstText, SecondText);
+        using (viewModel)
+        {
+            string label = StudyReportEvaluator.Core.Similarity.SimilarityDiagnostics.IndicatorLabel;
+            Assert.Contains(label, viewModel.SimilarityIndicatorNotice, StringComparison.Ordinal);
+            Window window = new() { Width = 950, Height = 450, Content = new ResultsOutputView(viewModel) };
+            window.Show();
+            try
+            {
+                ResultsOutputView view = Assert.IsType<ResultsOutputView>(window.Content);
+                Button detail = Assert.IsType<Button>(view.FindControl<Button>("ShowDetailButton"));
+                detail.Command!.Execute(detail.CommandParameter);
+                Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+                string? shown = ById<TextBlock>(view, "ResultsSimilarityDiagnostics").Text;
+                Assert.Equal(viewModel.SelectedRow?.SimilarityDiagnosticsText, shown);
+                Assert.Contains(label, shown!, StringComparison.Ordinal);
+                Assert.DoesNotContain(label, ById<TextBlock>(view, "ResultsQuestionEarnedFull").Text!, StringComparison.Ordinal);
+            }
+            finally
+            {
+                window.Close();
+            }
+        }
+    }
+
     [AvaloniaFact]
     public async Task Row_list_preview_shows_only_five_columns_without_question_scores()
     {

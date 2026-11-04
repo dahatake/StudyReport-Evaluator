@@ -331,10 +331,14 @@ public static class FormulaExpressions
                 similarityCell),
             FormulaBinaryOperator.Multiply,
             new FormulaCell(penaltyWeight));
+        // FR-114 AC-011: 係数ゼロなら Similarity が blank でも減点は 0。
         return If(
-            IsNumber(similarityCell),
-            Function(FormulaFunctionName.Round, product, new FormulaCell(roundingDigits)),
-            FormulaBlank.Value);
+            Binary(new FormulaCell(penaltyWeight), FormulaBinaryOperator.Equal, new FormulaNumber(0m)),
+            new FormulaNumber(0m),
+            If(
+                IsNumber(similarityCell),
+                Function(FormulaFunctionName.Round, product, new FormulaCell(roundingDigits)),
+                FormulaBlank.Value));
     }
 
     public static FormulaExpression FinalRaw(

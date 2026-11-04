@@ -9,7 +9,26 @@
     "AC-062": "sha256:ac1fa9d6a4ec956e",
     "AC-063": "sha256:0c12d44db6950d87",
     "AC-072": "sha256:e8c4744ccb45a08b",
-    "AC-074": "sha256:856477122e47d14b"
+    "AC-074": "sha256:856477122e47d14b",
+    "AC-009": "sha256:20caff4fb05095a6",
+    "AC-085": "sha256:c9db498a29902bb4",
+    "AC-080": "sha256:30c67f6c3be9e4b0",
+    "AC-081": "sha256:6b58002b823f6072",
+    "AC-084": "sha256:97cc72d11eb8e77c",
+    "AC-082": "sha256:420f76352cae007d",
+    "AC-083": "sha256:2030b7aecc60a433",
+    "AC-004": "sha256:a6cdf1853dd567b5",
+    "AC-011": "sha256:fd24b285018a974c",
+    "AC-012": "sha256:e59fcff60d459e40",
+    "AC-010": "sha256:9d24500f435f675a",
+    "AC-077": "sha256:b50007389549fcb1",
+    "AC-078": "sha256:3cf0d5b729a9330c",
+    "AC-079": "sha256:6459bd5dc1fcfd73",
+    "AC-086": "sha256:4119262035b3d7d9",
+    "AC-087": "sha256:61e0fa62a80cdc2f",
+    "AC-088": "sha256:95a2b2e7cb47fd62",
+    "AC-089": "sha256:1d096f79819b1ea9",
+    "AC-090": "sha256:f6ab18f4f90b2b62"
   },
   "cases": [
     {
@@ -25,9 +44,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
       "status": "pass",
-      "last_commit": "0b00037",
-      "last_run_at": "2026-11-04T05:12:00+09:00",
-      "evidence": "work/runs/202611040504/logs/system-test/E2E-001-202611040511.log",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/E2E-001-202611041026.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
@@ -62,9 +81,9 @@
       "command": "python -m pytest tests/system/test_fr002_output_folder.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "0b00037",
-      "last_run_at": "2026-11-04T05:12:00+09:00",
-      "evidence": "work/runs/202611040504/logs/system-test/E2E-002-202611040511.log",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/E2E-002-202611041026.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
@@ -105,9 +124,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR003_AC057\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "0335534",
-      "last_run_at": "2026-11-04T01:17:28+09:00",
-      "evidence": "work/runs/202611032347/logs/system-test/E2E-003-202611040117.log",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/E2E-003-202611041027.log",
       "history": [
         {
           "at": "2026-11-02T15:00:42+09:00",
@@ -200,9 +219,9 @@
       "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR112_AC072\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "0335534",
-      "last_run_at": "2026-11-04T01:17:28+09:00",
-      "evidence": "work/runs/202611032347/logs/system-test/IT-001-202611040117.log",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/IT-001-202611041027.log",
       "history": [
         {
           "at": "2026-11-03T23:59:54+09:00",
@@ -225,12 +244,253 @@
       "command": "dotnet test tests/system/integration --filter \"FullyQualifiedName~FR113_AC074\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "3e0f56a",
-      "last_run_at": "2026-11-04T05:13:24+09:00",
-      "evidence": "work/runs/202611040504/logs/system-test/E2E-006-202611040512.log",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/E2E-006-202611041027.log",
       "history": [
         {
           "at": "2026-11-04T00:15:51+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "IT-002",
+      "requirement_ids": [
+        "FR-115"
+      ],
+      "ac_ids": [
+        "AC-009",
+        "AC-085"
+      ],
+      "title": "FR-115 参照解答の固定スロット生成（質問のみ・全学生共有・試行上限）",
+      "layer": "contract",
+      "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR115_Generation\"",
+      "canary": false,
+      "status": "fail",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/IT-002-202611041027.log",
+      "history": [
+        {
+          "at": "2026-11-04T09:03:24+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "IT-003",
+      "requirement_ids": [
+        "FR-115"
+      ],
+      "ac_ids": [
+        "AC-080",
+        "AC-081",
+        "AC-084"
+      ],
+      "title": "FR-115 参照集合の条件・診断（n/5・重複・暫定）と出力の一致・安全表示",
+      "layer": "contract",
+      "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR115_Conditions\"",
+      "canary": false,
+      "status": "fail",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/IT-003-202611041027.log",
+      "history": [
+        {
+          "at": "2026-11-04T09:03:25+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "IT-004",
+      "requirement_ids": [
+        "FR-115"
+      ],
+      "ac_ids": [
+        "AC-082",
+        "AC-083"
+      ],
+      "title": "FR-115 保存済みスロットの再利用・未保存スロットのみ再開・保存失敗/上限・旧 checkpoint 互換",
+      "layer": "contract",
+      "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR115_Resume\"",
+      "canary": false,
+      "status": "fail",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/IT-004-202611041027.log",
+      "history": [
+        {
+          "at": "2026-11-04T09:03:25+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "E2E-007",
+      "requirement_ids": [
+        "FR-114"
+      ],
+      "ac_ids": [
+        "AC-004"
+      ],
+      "title": "FR-114 減点係数の新規既定0・明示値の保存復元・旧定義0.1補完の通知・範囲外の拒否",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC004",
+      "canary": false,
+      "status": "pass",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/E2E-007-202611041027.log",
+      "history": [
+        {
+          "at": "2026-11-04T09:06:38+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "E2E-008",
+      "requirement_ids": [
+        "FR-114"
+      ],
+      "ac_ids": [
+        "AC-011",
+        "AC-012"
+      ],
+      "title": "FR-114 係数0で診断失敗を総合点から隔離・係数>0で一部失敗/全失敗は減点と総合点と合計をblank・減点Similarityは完全な参照集合の最大値・空回答は参照状態によらず減点0・通常評価失敗はblank",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC011_AC012",
+      "canary": true,
+      "status": "pass",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/E2E-008-202611041026.log",
+      "history": [
+        {
+          "at": "2026-11-04T09:06:39+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-04T09:19:31+09:00",
+          "by": "test-designer",
+          "change": "title: 'FR-114 係数0で診断失敗を総合点から隔離・係数>0で診断失敗は減点と総合点をblank・通常評価失敗はblank' -> 'FR-114 係数0で診断失敗を総合点から隔離・係数>0で一部失敗/全失敗は減点と総合点と合計をblank・減点Similarityは完全な参照集合の最大値・空回答は参照状態によらず減点0・通常評価失敗はblank'",
+          "reason": "ff31b8d（監査C1/C2/M1）: AC-011/AC-012 改訂に合わせ、1 slot だけ全文一致の参照集合で最大値を使う確認、W=0.5 の一部 slot 失敗で blank、空回答の参照状態によらない減点0 を追加"
+        }
+      ]
+    },
+    {
+      "id": "E2E-009",
+      "requirement_ids": [
+        "FR-114"
+      ],
+      "ac_ids": [
+        "AC-010",
+        "AC-077"
+      ],
+      "title": "FR-114 ローカル診断の全文一致／部分一致・被覆率・一致位置・短文注意（PARAM-004）を区別",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC010_AC077",
+      "canary": false,
+      "status": "pass",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/E2E-009-202611041027.log",
+      "history": [
+        {
+          "at": "2026-11-04T09:06:40+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "E2E-010",
+      "requirement_ids": [
+        "FR-114"
+      ],
+      "ac_ids": [
+        "AC-078",
+        "AC-079"
+      ],
+      "title": "FR-114 確認指標・未検証の表示と旧形式の保存済み結果を変更しない",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC078_AC079",
+      "canary": false,
+      "status": "pass",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/E2E-010-202611041027.log",
+      "history": [
+        {
+          "at": "2026-11-04T09:06:41+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "E2E-011",
+      "requirement_ids": [
+        "FR-116"
+      ],
+      "ac_ids": [
+        "AC-086",
+        "AC-087",
+        "AC-088"
+      ],
+      "title": "FR-116 ラベル付き対照データ・設問単位holdout分割（不成立条件）・誤検知／見逃し／保留の集計を独立oracleで照合",
+      "layer": "e2e",
+      "command": "python -m pytest tests/system/fr116/test_fr116_control_evaluation.py -q -k core",
+      "canary": false,
+      "status": "fail",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/E2E-011-202611041027.log",
+      "history": [
+        {
+          "at": "2026-11-04T09:06:42+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "E2E-012",
+      "requirement_ids": [
+        "FR-116"
+      ],
+      "ac_ids": [
+        "AC-089",
+        "AC-090"
+      ],
+      "title": "FR-116 オフライン再実行の再現性・評価記録の自己記述・限界の明記・保存済み結果を変更しない",
+      "layer": "e2e",
+      "command": "python -m pytest tests/system/fr116/test_fr116_control_evaluation.py -q -k record",
+      "canary": false,
+      "status": "fail",
+      "last_commit": "dea44c9",
+      "last_run_at": "2026-11-04T10:27:48+09:00",
+      "evidence": "work/runs/202611040836/logs/system-test/E2E-012-202611041027.log",
+      "history": [
+        {
+          "at": "2026-11-04T09:06:43+09:00",
           "by": "test-designer",
           "change": "追加",
           "reason": "受入基準からケースを作成"

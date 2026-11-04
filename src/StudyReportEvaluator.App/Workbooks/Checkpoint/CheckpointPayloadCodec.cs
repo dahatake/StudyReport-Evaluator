@@ -7,6 +7,7 @@ using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Serialization;
+using StudyReportEvaluator.Core.Similarity;
 
 namespace StudyReportEvaluator.App.Workbooks.Checkpoint;
 
@@ -357,7 +358,46 @@ internal static class CheckpointPayloadCodec
                 ValidateCellText(accepted.Reason);
             }
 
+            ValidateSimilarityDiagnostics(result);
             ValidateTokenUsage(result.TokenUsage);
+        }
+    }
+
+    // FR-114 AC-010 / AC-077: 詳細は成功した結果にだけあり、値は範囲内で、最大値が採点値と一致する。
+    private static void ValidateSimilarityDiagnostics(CheckpointSimilarityResult result)
+    {
+        if (result.ReferenceDiagnostics is not ImmutableArray<SimilarityReferenceDiagnostic> diagnostics)
+        {
+            return;
+        }
+
+        if (diagnostics.IsDefaultOrEmpty || result.AcceptedResult is not SimilarityQuantificationResult accepted)
+        {
+            throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
+        }
+
+        HashSet<int> indexes = [];
+        foreach (SimilarityReferenceDiagnostic? diagnostic in diagnostics)
+        {
+            if (diagnostic is null
+                || diagnostic.ReferenceIndex < 1
+                || !indexes.Add(diagnostic.ReferenceIndex)
+                || diagnostic.Score is < 0m or > 1m
+                || diagnostic.StudentCoverage is < 0m or > 1m
+                || diagnostic.ReferenceCoverage is < 0m or > 1m
+                || diagnostic.LongestCommonSubstringLength < 0
+                || diagnostic.StudentNormalizedLength < 0
+                || diagnostic.ReferenceNormalizedLength < 0
+                || diagnostic.StudentNormalizedMatchStart < -1
+                || diagnostic.ReferenceNormalizedMatchStart < -1)
+            {
+                throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
+            }
+        }
+
+        if (SimilarityDiagnostics.SelectMaximum(diagnostics)!.Score != accepted.Similarity)
+        {
+            throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
         }
     }
 

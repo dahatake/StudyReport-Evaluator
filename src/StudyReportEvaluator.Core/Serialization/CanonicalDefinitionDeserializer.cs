@@ -20,10 +20,14 @@ public sealed record DefinitionReadError(DefinitionReadErrorKind Kind, string Me
 
 public sealed class CanonicalDefinitionReadResult
 {
-    private CanonicalDefinitionReadResult(QuantificationDefinition? definition, ImmutableArray<DefinitionReadError> errors)
+    private CanonicalDefinitionReadResult(
+        QuantificationDefinition? definition,
+        ImmutableArray<DefinitionReadError> errors,
+        ImmutableArray<string> notices)
     {
         Definition = definition;
         Errors = errors;
+        Notices = notices;
     }
 
     public bool IsSuccess => Definition is not null && Errors.IsEmpty;
@@ -32,18 +36,28 @@ public sealed class CanonicalDefinitionReadResult
 
     public ImmutableArray<DefinitionReadError> Errors { get; }
 
+    // FR-114 AC-004: 読込時に旧形式の欠損値を補ったなどの事実（エラーではない）。
+    public ImmutableArray<string> Notices { get; }
+
     public static CanonicalDefinitionReadResult Success(QuantificationDefinition definition) =>
-        new(definition, []);
+        new(definition, [], []);
+
+    public static CanonicalDefinitionReadResult Success(QuantificationDefinition definition, IEnumerable<string> notices) =>
+        new(definition, [], [.. notices]);
 
     public static CanonicalDefinitionReadResult Failure(IEnumerable<DefinitionReadError> errors) =>
-        new(null, [.. errors]);
+        new(null, [.. errors], []);
 
     public static CanonicalDefinitionReadResult Failure(DefinitionReadErrorKind kind, string message) =>
-        new(null, [new DefinitionReadError(kind, message)]);
+        new(null, [new DefinitionReadError(kind, message)], []);
 }
 
 public sealed class CanonicalDefinitionDeserializer
 {
+    /// <summary>FR-114 AC-004: 旧形式で類似度減点係数が未記録のとき、旧既定値を補ったことの通知。</summary>
+    public const string LegacySimilarityPenaltyWeightNotice =
+        "旧形式の定義のため類似度減点係数（similarityPenaltyWeight）が未記録でした。旧既定値 0.1 を補いました。";
+
     public CanonicalDefinitionReadResult Deserialize(string? json)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -68,14 +82,15 @@ public sealed class CanonicalDefinitionDeserializer
         using (document)
         {
             List<DefinitionReadError> errors = [];
-            QuantificationDefinition? definition = ReadDefinition(document.RootElement, errors);
+            List<string> notices = [];
+            QuantificationDefinition? definition = ReadDefinition(document.RootElement, errors, notices);
             return errors.Count == 0 && definition is not null
-                ? CanonicalDefinitionReadResult.Success(definition)
+                ? CanonicalDefinitionReadResult.Success(definition, notices)
                 : CanonicalDefinitionReadResult.Failure(errors);
         }
     }
 
-    private static QuantificationDefinition? ReadDefinition(JsonElement root, List<DefinitionReadError> errors)
+    private static QuantificationDefinition? ReadDefinition(JsonElement root, List<DefinitionReadError> errors, List<string> notices)
     {
         if (root.ValueKind != JsonValueKind.Object)
         {
@@ -93,7 +108,17 @@ public sealed class CanonicalDefinitionDeserializer
         int? lastDataRow = Int(root, "lastDataRow", "$", errors);
         decimal? basePoints = Dec(root, "basePoints", "$", errors);
         decimal? specialPoints = Dec(root, "specialPoints", "$", errors);
-        decimal? penalty = Dec(root, "similarityPenaltyWeight", "$", errors);
+        // FR-114 AC-004: 欠損（プロパティなし）だけを旧形式として旧既定値で補う。壊れた値はエラーのまま。
+        decimal? penalty;
+        if (root.TryGetProperty("similarityPenaltyWeight", out _))
+        {
+            penalty = Dec(root, "similarityPenaltyWeight", "$", errors);
+        }
+        else
+        {
+            penalty = QuantificationDefinition.LegacyDefaultSimilarityPenaltyWeight;
+            notices.Add(LegacySimilarityPenaltyWeightNotice);
+        }
         int? rounding = Int(root, "roundingDigits", "$", errors);
         ImmutableArray<QuestionDefinition>.Builder questions = ImmutableArray.CreateBuilder<QuestionDefinition>();
         foreach ((JsonElement item, string path) in Items(root, "questions", "$", errors))

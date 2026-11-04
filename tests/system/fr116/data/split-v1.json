@@ -1,0 +1,6 @@
+{
+  "tuning_groups": ["G1", "G2"],
+  "holdout_groups": ["G3"],
+  "seed": 20261104,
+  "order": ["G1", "G2", "G3"]
+}

@@ -3,6 +3,7 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using StudyReportEvaluator.App.Copilot;
 using StudyReportEvaluator.App.Tests.UI;
+using StudyReportEvaluator.App.Tests.Workbooks.Intake;
 using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.App.ViewModels;
 using StudyReportEvaluator.App.Workflow;
@@ -12,6 +13,7 @@ using StudyReportEvaluator.App.Workbooks.Reading;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Prompting;
+using StudyReportEvaluator.Core.Similarity;
 using Xunit;
 
 namespace StudyReportEvaluator.App.Tests.Workflow;
@@ -731,6 +733,248 @@ public sealed class DurableQuantificationOrchestratorTests
         Assert.Empty(normal.Payloads);
         Assert.Equal(0, checkpoint.UpdateCount);
         Assert.DoesNotContain("FORGED-NOT-IN-SOURCE", exception.ToString(), StringComparison.Ordinal);
+    }
+
+    // FR-114 / AC-011: 係数 0 なら類似度の診断が失敗（blank）しても減点 0 で採点できる。係数が正で診断が失敗したら
+    // 減点・最終点は blank。どちらも Excel の数式キャッシュ（Final_Score・採点結果の合計）と画面の FinalScore が一致する。
+    [Theory]
+    [InlineData("0")]
+    [InlineData("0.1")]
+    public async Task FR114_AC011_Failed_similarity_diagnostic_matches_between_excel_and_preview(string weightText)
+    {
+        decimal weight = decimal.Parse(weightText, System.Globalization.CultureInfo.InvariantCulture);
+        QuantificationDefinition definition = Definition(2, 3) with { SimilarityPenaltyWeight = weight };
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        RecordingReferenceRunner failedReference = new((_, _) => Task.FromResult(
+            AuxiliaryOperationResult<ReferenceAnswerResult>.Failed(ResultsStatusCodes.AiTimeout)));
+
+        RunSummary summary = await Orchestrator(
+            Rows(),
+            NormalSuccess(),
+            failedReference,
+            SpecialSuccess(),
+            new ScriptedInputSnapshots(U01TestSupport.InputSnapshot()),
+            new RecordingCheckpointStore(),
+            new RecordingPathPlanner(),
+            new RecordingFinalizer(),
+            new RecordingCleaner()).RunAsync(
+                Request(definition, metadata),
+                cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, summary.CompletedRows.Length);
+        Assert.All(summary.PrepareOutput().Rows, row =>
+        {
+            SimilarityResultInput similarity = Assert.Single(row.Questions).Similarity!;
+            Assert.Null(similarity.AiRaw);
+            Assert.NotEqual(ResultsStatusCodes.Success, similarity.Status);
+        });
+        using ResultsOutputViewModel results = new(new RecordingOutputBoundary(), U04TestSupport.Context(summary));
+        IReadOnlyDictionary<int, Fr114WrittenRow> written = WriteFr114Workbook(summary);
+        Assert.Equal(2, results.RowScores.Count);
+        Assert.All(results.RowScores, row =>
+        {
+            Fr114WrittenRow excel = written[row.SourceRowNumber];
+            if (weight == 0m)
+            {
+                Assert.Equal(0m, row.SimilarityPenalty);
+                Assert.NotNull(row.FinalScore);
+                Assert.Equal("0", excel.Penalty);
+            }
+            else
+            {
+                Assert.Null(row.SimilarityPenalty);
+                Assert.Null(row.FinalScore);
+                Assert.Equal(string.Empty, excel.Penalty);
+            }
+
+            Assert.Equal(Fr114Text(row.FinalScore), excel.FinalScore);
+            Assert.Equal(Fr114Text(row.FinalScore), excel.Total);
+        });
+    }
+
+    // FR-114 / AC-012: 空回答は参照の状態や係数に関わらず Similarity 0・減点 0 で、blank にならない。
+    [Fact]
+    public async Task FR114_AC012_Empty_answer_scores_zero_similarity_and_zero_penalty_with_positive_weight()
+    {
+        QuantificationDefinition definition = Definition(2, 2) with { SimilarityPenaltyWeight = 0.5m };
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        ScriptedRowSource emptyRows = new((request, _) => Task.FromResult(Row(request, primary: "   ", special: "   ")));
+
+        RunSummary summary = await Orchestrator(
+            emptyRows,
+            new ScriptedRunner((_, _, _) => throw new InvalidOperationException("must not run")),
+            new RecordingReferenceRunner((_, _) => Task.FromResult(
+                AuxiliaryOperationResult<ReferenceAnswerResult>.Failed(ResultsStatusCodes.AiTimeout))),
+            new RecordingSpecialRunner((_, _, _) => throw new InvalidOperationException("must not run")),
+            new ScriptedInputSnapshots(U01TestSupport.InputSnapshot()),
+            new RecordingCheckpointStore(),
+            new RecordingPathPlanner(),
+            new RecordingFinalizer(),
+            new RecordingCleaner()).RunAsync(
+                Request(definition, metadata),
+                cancellationToken: TestContext.Current.CancellationToken);
+
+        SimilarityResultInput similarity = Assert.Single(Assert.Single(summary.PrepareOutput().Rows).Questions).Similarity!;
+        Assert.Equal(ResultsStatusCodes.Empty, similarity.Status);
+        Assert.Equal(0m, similarity.AiRaw);
+        using ResultsOutputViewModel results = new(new RecordingOutputBoundary(), U04TestSupport.Context(summary));
+        ResultsRowScoreViewModel row = Assert.Single(results.RowScores);
+        Assert.Equal(0m, row.SimilarityPenalty);
+        Assert.NotNull(row.FinalScore);
+        Fr114WrittenRow excel = WriteFr114Workbook(summary)[2];
+        Assert.Equal("0", excel.Penalty);
+        Assert.Equal(Fr114Text(row.FinalScore), excel.FinalScore);
+        Assert.Equal(Fr114Text(row.FinalScore), excel.Total);
+    }
+
+    // FR-114 / AC-079: ReferenceDiagnostics を持たない旧形式の checkpoint から再開でき、旧採点値を保持する。
+    // Excel の詳細状態と画面の確認指標には「旧形式・未取得」を示し、新しく評価した行には示さない。
+    [Fact]
+    public async Task FR114_AC079_Legacy_checkpoint_without_diagnostics_resumes_and_keeps_the_old_score()
+    {
+        QuantificationDefinition definition = Definition(2, 3);
+        WorkbookMetadata metadata = U01TestSupport.ValidateMapping(definition).Metadata;
+        ScriptedInputSnapshots input = new(U01TestSupport.InputSnapshot());
+        RecordingCheckpointStore checkpoint = new();
+        RecordingPathPlanner paths = new();
+        using CancellationTokenSource firstCancellation = new();
+        checkpoint.UpdateCallback = envelope =>
+        {
+            if (envelope.CompletedRows.Length == 1)
+            {
+                firstCancellation.Cancel();
+            }
+        };
+        RunSummary first = await Orchestrator(
+            Rows(),
+            NormalSuccess(),
+            ReferenceSuccess(),
+            SpecialSuccess(),
+            input,
+            checkpoint,
+            paths,
+            new RecordingFinalizer(),
+            new RecordingCleaner()).RunAsync(
+                Request(definition, metadata),
+                cancellationToken: firstCancellation.Token);
+        Assert.Equal(QuantificationRunStatusCodes.Cancelled, first.StatusCode);
+        CheckpointSimilarityResult savedSimilarity = Assert.Single(Assert.Single(checkpoint.Current!.CompletedRows).SimilarityResults);
+        Assert.NotNull(savedSimilarity.ReferenceDiagnostics);
+        decimal legacyScore = savedSimilarity.AcceptedResult!.Similarity;
+
+        // 旧形式: 詳細の欄を持たない checkpoint にする。
+        checkpoint.UpdateCallback = null;
+        checkpoint.Current = checkpoint.Current with
+        {
+            CompletedRows =
+            [
+                .. checkpoint.Current.CompletedRows.Select(row => row with
+                {
+                    SimilarityResults = [.. row.SimilarityResults.Select(item => item with { ReferenceDiagnostics = null })],
+                }),
+            ],
+        };
+
+        RunSummary resumed = await Orchestrator(
+            Rows(),
+            NormalSuccess(),
+            new RecordingReferenceRunner((_, _) => throw new InvalidOperationException("reference must be reused")),
+            SpecialSuccess(),
+            input,
+            checkpoint,
+            paths,
+            new RecordingFinalizer(),
+            new RecordingCleaner()).RunAsync(
+                Request(definition, metadata) with { ResumePartialPath = checkpoint.Current.PartialPath },
+                cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(QuantificationRunStatusCodes.Success, resumed.StatusCode);
+        Assert.True(resumed.WasResumed);
+        ImmutableArray<ResultsSheetRowInput> output = resumed.PrepareOutput().Rows;
+        SimilarityResultInput legacy = Assert.Single(output.Single(row => row.SourceRowNumber == 2).Questions).Similarity!;
+        Assert.Null(legacy.ReferenceDiagnostics);
+        Assert.Equal(legacyScore, legacy.AiRaw);
+        Assert.NotNull(Assert.Single(output.Single(row => row.SourceRowNumber == 3).Questions).Similarity!.ReferenceDiagnostics);
+
+        using ResultsOutputViewModel results = new(new RecordingOutputBoundary(), U04TestSupport.Context(resumed));
+        ResultsRowScoreViewModel legacyRow = results.RowScores.Single(row => row.SourceRowNumber == 2);
+        ResultsRowScoreViewModel freshRow = results.RowScores.Single(row => row.SourceRowNumber == 3);
+        Assert.Contains(SimilarityDiagnostics.LegacyDetailLabel, legacyRow.SimilarityDiagnosticsText, StringComparison.Ordinal);
+        Assert.Contains(SimilarityDiagnostics.IndicatorLabel, legacyRow.SimilarityDiagnosticsText, StringComparison.Ordinal);
+        Assert.DoesNotContain(SimilarityDiagnostics.LegacyDetailLabel, freshRow.SimilarityDiagnosticsText, StringComparison.Ordinal);
+        Assert.NotNull(legacyRow.SimilarityPenalty);
+        Assert.NotNull(legacyRow.FinalScore);
+
+        IReadOnlyDictionary<int, Fr114WrittenRow> written = WriteFr114Workbook(resumed);
+        Assert.Equal(SimilarityDiagnostics.LegacyDetailLabel, written[2].DetailStatus);
+        Assert.Equal(string.Empty, written[3].DetailStatus);
+        Assert.Equal(Fr114Text(legacyRow.FinalScore), written[2].FinalScore);
+        Assert.Equal(Fr114Text(freshRow.FinalScore), written[3].FinalScore);
+        Assert.Equal(Fr114Text(legacyRow.SimilarityPenalty), written[2].Penalty);
+    }
+
+    private sealed record Fr114WrittenRow(string Penalty, string FinalScore, string DetailStatus, string Total);
+
+    private static string Fr114Text(decimal? value) =>
+        value is decimal number ? number.ToString("G29", System.Globalization.CultureInfo.InvariantCulture) : string.Empty;
+
+    // 結果 workbook（Quantification_Results と 採点結果）を実際の書き込み部品で作り、行ごとの数式キャッシュを読む。
+    private static IReadOnlyDictionary<int, Fr114WrittenRow> WriteFr114Workbook(RunSummary summary)
+    {
+        using TemporaryWorkbook workbook = X01SyntheticWorkbookFactory.Create();
+        RunOutputPreparation output = summary.PrepareOutput();
+        string resultsName;
+        string summaryName;
+        using (SpreadsheetDocument document = SpreadsheetDocument.Open(workbook.Path, true))
+        {
+            AppOwnedSheetNameResolver resolver = new();
+            AppOwnedSheetNames names = resolver.Resolve(document);
+            string[] originals = document.WorkbookPart!.Workbook!.Descendants<Sheet>().Select(sheet => sheet.Name!.Value!).ToArray();
+            names = names.WithScoreSummarySheetName(ScoreSummarySheetWriter.ResolveName(resolver, originals, names));
+            ConfigCellAddressMap config = new ConfigSheetWriter().Write(document, output.Snapshot, names);
+            ResultsSheetWriteResult written = new ResultsSheetWriter().Write(document, output.Snapshot, names, config, output.Rows);
+            new ScoreSummarySheetWriter().Write(document, names, written);
+            resultsName = names.ResultsSheetName;
+            summaryName = names.ScoreSummarySheetName!;
+        }
+
+        using SpreadsheetDocument reopened = SpreadsheetDocument.Open(workbook.Path, false);
+        Worksheet resultsSheet = Fr114Worksheet(reopened, resultsName);
+        Worksheet summarySheet = Fr114Worksheet(reopened, summaryName);
+        Dictionary<int, Fr114WrittenRow> rows = [];
+        int summaryRow = 1;
+        foreach (ResultsSheetRowInput row in output.Rows)
+        {
+            summaryRow++;
+            int source = row.SourceRowNumber;
+            rows[source] = new Fr114WrittenRow(
+                Fr114Cell(resultsSheet, "Q1." + ResultsSheetWriter.SimilarityPenaltySuffix, source),
+                Fr114Cell(resultsSheet, ResultsSheetWriter.FinalScoreHeader, source),
+                Fr114Cell(resultsSheet, "Q1." + ResultsSheetWriter.SimilarityDetailStatusSuffix, source),
+                Fr114Cell(summarySheet, ScoreSummarySheetWriter.TotalHeader, summaryRow));
+        }
+
+        return rows;
+    }
+
+    private static Worksheet Fr114Worksheet(SpreadsheetDocument document, string name)
+    {
+        Sheet sheet = document.WorkbookPart!.Workbook!.Descendants<Sheet>().Single(item => item.Name!.Value == name);
+        return ((WorksheetPart)document.WorkbookPart.GetPartById(sheet.Id!.Value!)).Worksheet!;
+    }
+
+    private static string Fr114Cell(Worksheet sheet, string header, int row)
+    {
+        Cell headerCell = sheet.Descendants<Row>().Single(item => item.RowIndex!.Value == 1)
+            .Elements<Cell>().Single(cell => cell.InnerText == header);
+        string column = new(headerCell.CellReference!.Value!.TakeWhile(char.IsAsciiLetter).ToArray());
+        Cell? cell = sheet.Descendants<Cell>().SingleOrDefault(item => item.CellReference!.Value == column + row);
+        if (cell is null)
+        {
+            return string.Empty;
+        }
+
+        return cell.CellFormula is not null ? cell.CellValue?.Text ?? string.Empty : cell.InnerText;
     }
 
     private static DurableQuantificationOrchestrator Orchestrator(

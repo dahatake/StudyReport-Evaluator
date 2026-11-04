@@ -498,6 +498,10 @@ public sealed class DurableEvaluationScheduler
         try
         {
             SurfaceSimilarityResult result = similarityCalculator.Calculate(studentAnswer, reference.Answer);
+            // FR-114 AC-010: 参照別の詳細を保持し、減点に使う Similarity は完全な参照集合の参照別合成値の最大値。
+            // 現在の参照集合は 1 件（完全な集合 = 成功した 1 件）。
+            ImmutableArray<SimilarityReferenceDiagnostic> diagnostics = [SimilarityReferenceDiagnostic.From(1, result)];
+            SimilarityReferenceDiagnostic maximum = SimilarityDiagnostics.SelectMaximum(diagnostics)!;
             return Task.FromResult(new CheckpointSimilarityResult
             {
                 QuestionId = question.Id,
@@ -506,9 +510,10 @@ public sealed class DurableEvaluationScheduler
                 AcceptedResult = new SimilarityQuantificationResult
                 {
                     QuestionId = question.Id,
-                    Similarity = result.Score,
+                    Similarity = maximum.Score,
                     Reason = result.ToReason(),
                 },
+                ReferenceDiagnostics = diagnostics,
                 TokenUsage = DurableOperationConversions.ToCheckpointUsage(EvaluationTokenUsage.Unavailable),
             });
         }

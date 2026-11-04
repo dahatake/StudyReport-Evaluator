@@ -1,0 +1,48 @@
+{
+  "dataset_version": "fr116-synthetic-v1",
+  "note": "合成の質問・参照回答・対照回答のみ。実学生・履歴を含まない。ラベルは作成者が定めた対照条件。",
+  "questions": [
+    {"id": "Q-G1", "group": "G1", "text": "光合成のはたらきを説明しなさい。",
+     "references": ["光合成は、植物が光エネルギーを使って二酸化炭素と水からデンプンなどの有機物をつくり、酸素を放出するはたらきである。"]},
+    {"id": "Q-G2", "group": "G2", "text": "地球に季節が生じる理由を説明しなさい。",
+     "references": ["地球の自転軸が公転面に対して約23.4度傾いたまま太陽のまわりを公転するため、太陽の南中高度と昼の長さが変わり、季節が生じる。"]},
+    {"id": "Q-G3", "group": "G3", "text": "鉄が錆びるしくみを説明しなさい。",
+     "references": ["鉄は空気中の酸素や水と反応して酸化され、酸化鉄（赤さび）に変化する。塩分があると反応は速く進む。"]}
+  ],
+  "items": [
+    {"id": "G1-NONE", "question_id": "Q-G1", "label": "追加指示なし", "creation_method": "参照回答の生成条件（追加指示なし）の出力を固定したもの", "source_item_id": null, "relation": "全文",
+     "answer": "光合成は、植物が光エネルギーを使って二酸化炭素と水からデンプンなどの有機物をつくり、酸素を放出するはたらきである。"},
+    {"id": "G1-INST", "question_id": "Q-G1", "label": "追加指示あり", "creation_method": "追加指示（中学生向けに言い換え）の代替回答をローカルで固定したもの", "source_item_id": "G1-NONE", "relation": "言換え",
+     "answer": "植物は日光のエネルギーで、水と二酸化炭素からデンプンをつくり、そのとき酸素を出す。これを光合成という。"},
+    {"id": "G1-EXC", "question_id": "Q-G1", "label": "抜粋", "creation_method": "G1-NONE の一部を抜き出したもの", "source_item_id": "G1-NONE", "relation": "抜粋",
+     "answer": "二酸化炭素と水からデンプンなどの有機物をつくり"},
+    {"id": "G1-EDIT", "question_id": "Q-G1", "label": "編集", "creation_method": "G1-NONE の語句を一部書き換えたもの", "source_item_id": "G1-NONE", "relation": "編集",
+     "answer": "光合成とは、植物が光のエネルギーを利用して二酸化炭素と水からデンプンなどの有機物をつくり、酸素を出すはたらきのことだ。"},
+    {"id": "G1-SELF", "question_id": "Q-G1", "label": "自力", "creation_method": "作成者が参照回答を見ずに書いたもの", "source_item_id": null, "relation": "独立",
+     "answer": "葉の緑色の部分で日光を受けて養分を作る。その結果、空気中に酸素が増えると習った。"},
+
+    {"id": "G2-NONE", "question_id": "Q-G2", "label": "追加指示なし", "creation_method": "参照回答の生成条件（追加指示なし）の出力を固定したもの", "source_item_id": null, "relation": "全文",
+     "answer": "地球の自転軸が公転面に対して約23.4度傾いたまま太陽のまわりを公転するため、太陽の南中高度と昼の長さが変わり、季節が生じる。"},
+    {"id": "G2-INST", "question_id": "Q-G2", "label": "追加指示あり", "creation_method": "追加指示（箇条書きで短く）の代替回答をローカルで固定したもの", "source_item_id": "G2-NONE", "relation": "言換え",
+     "answer": "・地軸が傾いている ・その状態で太陽の周りを回る ・南中高度と昼の長さが変わる"},
+    {"id": "G2-EXC", "question_id": "Q-G2", "label": "抜粋", "creation_method": "G2-NONE の一部を抜き出したもの", "source_item_id": "G2-NONE", "relation": "抜粋",
+     "answer": "太陽の南中高度と昼の長さが変わり、季節が生じる。"},
+    {"id": "G2-EDIT", "question_id": "Q-G2", "label": "編集", "creation_method": "G2-NONE の語順と語句を書き換えたもの", "source_item_id": "G2-NONE", "relation": "編集",
+     "answer": "季節が生じるのは、地球が自転軸を公転面に対して約23.4度傾けたまま太陽のまわりを公転し、南中高度と昼の長さが変わるからである。"},
+    {"id": "G2-SELF", "question_id": "Q-G2", "label": "自力", "creation_method": "作成者が参照回答を見ずに書いたもの", "source_item_id": null, "relation": "独立",
+     "answer": "夏は太陽が高くて日が長いので暑く、冬はその逆になる。地球がかたむいているせい。"},
+
+    {"id": "G3-NONE", "question_id": "Q-G3", "label": "追加指示なし", "creation_method": "参照回答の生成条件（追加指示なし）の出力を固定したもの", "source_item_id": null, "relation": "全文",
+     "answer": "鉄は空気中の酸素や水と反応して酸化され、酸化鉄（赤さび）に変化する。塩分があると反応は速く進む。"},
+    {"id": "G3-INST", "question_id": "Q-G3", "label": "追加指示あり", "creation_method": "追加指示（理由を一文で）の代替回答をローカルで固定したもの", "source_item_id": "G3-NONE", "relation": "言換え",
+     "answer": "酸素と水にふれた鉄が酸化して赤さびになるから。"},
+    {"id": "G3-EXC", "question_id": "Q-G3", "label": "抜粋", "creation_method": "G3-NONE の一部を抜き出したもの", "source_item_id": "G3-NONE", "relation": "抜粋",
+     "answer": "酸化鉄（赤さび）に変化する。"},
+    {"id": "G3-EDIT", "question_id": "Q-G3", "label": "編集", "creation_method": "G3-NONE の記号と語句を書き換えたもの", "source_item_id": "G3-NONE", "relation": "編集",
+     "answer": "鉄は空気中の酸素や水と反応して酸化され、酸化鉄(赤サビ)になる。塩水だと反応がはやい。"},
+    {"id": "G3-SELF", "question_id": "Q-G3", "label": "自力", "creation_method": "作成者が参照回答を見ずに書いたもの", "source_item_id": null, "relation": "独立",
+     "answer": "くぎを外に置いておくと茶色くなる。雨の日が多いと早くなる。"},
+    {"id": "G3-MISSING", "question_id": "Q-G3", "label": "自力", "creation_method": "回答欄が空の欠損データ（保留の確認用）", "source_item_id": null, "relation": "独立",
+     "answer": ""}
+  ]
+}

@@ -172,7 +172,18 @@ Excelの機能「フィルター」や「検索」で、`.Reason`、`.Final`な�
 | `.Similarity_AI_Raw` | 値 | 学生の回答と参照回答の類似度（0〜1）。0は似ていない、1は同じ。列名に`AI`とありますが、実際にはアプリが計算した値です（古い版との互換のためにこの名前を残しています）。回答が空なら0。 |
 | `.Similarity_Reason` | 値 | 類似度の値だけを示す機械が作った説明文。学生の回答の文章は含みません。 |
 | `.Similarity_Status` | 値 | 状態コード。回答が空なら`EMPTY`。 |
-| `.Similarity_Penalty` | 数式 | 類似度による減点。設問の配点 × 類似度 × 減点係数。例: 20 × 0.5 × 0.1 = 1点。 |
+| `.Similarity_Penalty` | 数式 | 類似度による減点。設問の配点 × 類似度 × 減点係数。例: 20 × 0.5 × 0.1 = 1点。減点係数が0（新規の既定）なら類似度の有無にかかわらず0。 |
+| `.Similarity_Indicator` | 値 | 類似度の位置づけ。常に`確認指標・未検証`（不正の判定や確率ではありません）。 |
+| `.Similarity_Max_Reference` | 値 | 類似度がいちばん高かった参照の番号（同点なら小さい番号）。 |
+| `.Similarity_Raw_Exact` | 値 | 正規化前の全文一致なら1、そうでなければ0。 |
+| `.Similarity_Normalized_Exact` | 値 | 正規化後の全文一致なら1、そうでなければ0。 |
+| `.Similarity_LCS_Length` | 値 | 正規化後の最長一致の文字数。 |
+| `.Similarity_Student_Coverage` | 値 | 最長一致が学生の回答（正規化後）に占める割合（0〜1）。 |
+| `.Similarity_Reference_Coverage` | 値 | 最長一致が参照回答（正規化後）に占める割合（0〜1）。 |
+| `.Similarity_Student_Match_Start` | 値 | 最長一致の学生の回答（正規化後）での開始位置（0から数える）。一致がなければ空欄。 |
+| `.Similarity_Reference_Match_Start` | 値 | 最長一致の参照回答（正規化後）での開始位置（0から数える）。一致がなければ空欄。 |
+| `.Similarity_Short_Text_Caution` | 値 | 正規化後の学生の回答か参照回答が30文字以下なら1（短文注意）。 |
+| `.Similarity_Detail_Status` | 値 | 詳細が取れない旧形式の結果なら`旧形式・未取得`。それ以外は空欄。 |
 | `.Similarity_Peer_Max` | 値 | **同じ設問の他の学生の回答**との類似度のうち、いちばん高い値（0〜1）。情報として付けた列で、点数の計算には使いません。 |
 | `.Similarity_Peer_Row` | 値 | 上の`Similarity_Peer_Max`の相手にあたる学生の**元のシートでの行番号**。 |
 
@@ -330,7 +341,7 @@ Final_Score = 75
 | Y | `SnapshotChunk` | 設計の控えの本文（分割した一部）。 |
 | Z | `BasePoints` | 基礎点（既定60）。 |
 | AA | `SpecialPoints` | 固有評価の配点（既定0）。 |
-| AB | `SimilarityPenaltyWeight` | 類似度減点の係数（既定0.1）。0〜1で、0にすると類似度があっても減点されません。 |
+| AB | `SimilarityPenaltyWeight` | 類似度減点の係数（新規の採点設計の既定は0。係数を持たない旧形式は0.1を補って表示）。0〜1で、0にすると類似度があっても減点されません。 |
 | AC | `QuestionPoints` | 設問ごとの配点。 |
 | AD | `AllocationTotal` | 配点の合計（数式）。基礎点 ＋ 固有評価の点 ＋ 有効な設問の配点の合計。 |
 | AE | `AllocationValid` | 合計がちょうど100なら`1`、そうでなければ`0`（数式）。 |

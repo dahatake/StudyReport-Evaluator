@@ -1238,6 +1238,14 @@ public sealed class DurableQuantificationOrchestrator
                     {
                         return false;
                     }
+
+                    // FR-114 AC-079: 旧形式（詳細なし）はそのまま受け入れる。詳細があれば再計算と一致しなければならない。
+                    if (saved.ReferenceDiagnostics is ImmutableArray<SimilarityReferenceDiagnostic> diagnostics
+                        && (diagnostics.Length != 1
+                            || diagnostics[0] != SimilarityReferenceDiagnostic.From(1, expected)))
+                    {
+                        return false;
+                    }
                 }
             }
         }
