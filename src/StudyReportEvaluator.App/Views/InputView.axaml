@@ -138,7 +138,7 @@
           <TextBlock Text="設問" Classes="label" VerticalAlignment="Center" />
           <ComboBox x:Name="QuestionSelector" Grid.Column="1" ItemsSource="{Binding Questions}"
                     SelectedItem="{Binding SelectedQuestion, Mode=TwoWay, Converter={StaticResource InputSelectionWriteback}}" MaxDropDownHeight="264"
-                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" PlaceholderText="全設問へ移動"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" Padding="8,0" PlaceholderText="全設問へ移動"
                     TabIndex="8" AutomationProperties.AutomationId="InputQuestionSelector"
                     AutomationProperties.Name="全設問から編集対象へ直接移動"
                     ToolTip.Tip="選んだ設問を含むページへ移動します。詳細設定でも同じ設問を編集します。">
@@ -234,7 +234,7 @@
                   ToolTip.Tip="エラーを選ぶと右側で項目と内容の全文を確認できます。">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="viewModels:InputValidationError">
-              <TextBlock Text="{Binding Field}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Message}" />
+              <TextBlock Text="{Binding Field}" TextTrimming="None" ToolTip.Tip="{Binding Message}" />
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
