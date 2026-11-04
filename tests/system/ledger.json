@@ -28,7 +28,8 @@
     "AC-087": "sha256:61e0fa62a80cdc2f",
     "AC-088": "sha256:95a2b2e7cb47fd62",
     "AC-089": "sha256:1d096f79819b1ea9",
-    "AC-090": "sha256:f6ab18f4f90b2b62"
+    "AC-090": "sha256:f6ab18f4f90b2b62",
+    "AC-092": "sha256:0d8ada5e34e80265"
   },
   "cases": [
     {
@@ -494,6 +495,37 @@
           "by": "test-designer",
           "change": "追加",
           "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "E2E-013",
+      "requirement_ids": [
+        "FR-117"
+      ],
+      "ac_ids": [
+        "AC-092"
+      ],
+      "title": "FR-117 結果画面の状態別件数がページ移動・行選択で不変、再読込で更新、全文表示・Accessible Name",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/ui --filter \"FullyQualifiedName~FR117_AC092\"",
+      "canary": false,
+      "status": "blocked",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-04T22:39:51+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "AC-092 のケースを作成"
+        },
+        {
+          "at": "2026-11-04T22:40:07+09:00",
+          "by": "test-designer",
+          "change": "blocked",
+          "reason": "AC-092 の検証レベルは integration で System Test の対象外（CHK-10）。implementer が App.Tests に書く"
         }
       ]
     }
