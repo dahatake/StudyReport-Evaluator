@@ -1,0 +1,11 @@
+{
+  "tuned_on_groups": ["G1", "G2"],
+  "rules": [
+    {"id": "R-LEGACY", "metric": "legacy_composite", "threshold": 0.6},
+    {"id": "R-REFCOV", "metric": "reference_coverage", "threshold": 0.3},
+    {"id": "R-STUCOV", "metric": "student_coverage", "threshold": 0.8},
+    {"id": "R-EXACT", "metric": "normalized_exact", "threshold": 1},
+    {"id": "R-NOTHRESHOLD", "metric": "student_coverage"},
+    {"id": "R-UNKNOWN", "metric": "unsupported_metric", "threshold": 0.5}
+  ]
+}

@@ -16,7 +16,19 @@
     "AC-081": "sha256:1be03108ae7fa654",
     "AC-084": "sha256:97cc72d11eb8e77c",
     "AC-082": "sha256:420f76352cae007d",
-    "AC-083": "sha256:2030b7aecc60a433"
+    "AC-083": "sha256:2030b7aecc60a433",
+    "AC-004": "sha256:a6cdf1853dd567b5",
+    "AC-011": "sha256:a88a449c53cb016f",
+    "AC-012": "sha256:a263ba415d825f2d",
+    "AC-010": "sha256:040ae6e0ee74e343",
+    "AC-077": "sha256:b50007389549fcb1",
+    "AC-078": "sha256:3cf0d5b729a9330c",
+    "AC-079": "sha256:dc82fab85fe96e53",
+    "AC-086": "sha256:4119262035b3d7d9",
+    "AC-087": "sha256:61e0fa62a80cdc2f",
+    "AC-088": "sha256:95a2b2e7cb47fd62",
+    "AC-089": "sha256:1d096f79819b1ea9",
+    "AC-090": "sha256:f6ab18f4f90b2b62"
   },
   "cases": [
     {
@@ -317,6 +329,162 @@
       "history": [
         {
           "at": "2026-11-04T09:03:25+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "E2E-007",
+      "requirement_ids": [
+        "FR-114"
+      ],
+      "ac_ids": [
+        "AC-004"
+      ],
+      "title": "FR-114 減点係数の新規既定0・明示値の保存復元・旧定義0.1補完の通知・範囲外の拒否",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC004",
+      "canary": false,
+      "status": "not_run",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-04T09:06:38+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "E2E-008",
+      "requirement_ids": [
+        "FR-114"
+      ],
+      "ac_ids": [
+        "AC-011",
+        "AC-012"
+      ],
+      "title": "FR-114 係数0で診断失敗を総合点から隔離・係数>0で診断失敗は減点と総合点をblank・通常評価失敗はblank",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC011_AC012",
+      "canary": true,
+      "status": "not_run",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-04T09:06:39+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "E2E-009",
+      "requirement_ids": [
+        "FR-114"
+      ],
+      "ac_ids": [
+        "AC-010",
+        "AC-077"
+      ],
+      "title": "FR-114 ローカル診断の全文一致／部分一致・被覆率・一致位置・短文注意（PARAM-004）を区別",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC010_AC077",
+      "canary": false,
+      "status": "not_run",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-04T09:06:40+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "E2E-010",
+      "requirement_ids": [
+        "FR-114"
+      ],
+      "ac_ids": [
+        "AC-078",
+        "AC-079"
+      ],
+      "title": "FR-114 確認指標・未検証の表示と旧形式の保存済み結果を変更しない",
+      "layer": "e2e",
+      "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC078_AC079",
+      "canary": false,
+      "status": "not_run",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-04T09:06:41+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "E2E-011",
+      "requirement_ids": [
+        "FR-116"
+      ],
+      "ac_ids": [
+        "AC-086",
+        "AC-087",
+        "AC-088"
+      ],
+      "title": "FR-116 ラベル付き対照データ・設問単位holdout分割（不成立条件）・誤検知／見逃し／保留の集計を独立oracleで照合",
+      "layer": "e2e",
+      "command": "python -m pytest tests/system/fr116/test_fr116_control_evaluation.py -q -k core",
+      "canary": false,
+      "status": "not_run",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-04T09:06:42+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        }
+      ]
+    },
+    {
+      "id": "E2E-012",
+      "requirement_ids": [
+        "FR-116"
+      ],
+      "ac_ids": [
+        "AC-089",
+        "AC-090"
+      ],
+      "title": "FR-116 オフライン再実行の再現性・評価記録の自己記述・限界の明記・保存済み結果を変更しない",
+      "layer": "e2e",
+      "command": "python -m pytest tests/system/fr116/test_fr116_control_evaluation.py -q -k record",
+      "canary": false,
+      "status": "not_run",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-04T09:06:43+09:00",
           "by": "test-designer",
           "change": "追加",
           "reason": "受入基準からケースを作成"
