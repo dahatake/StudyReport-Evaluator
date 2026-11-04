@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>StudyReportEvaluator.ControlEvaluation</AssemblyName>
+    <RootNamespace>StudyReportEvaluator.ControlEvaluation</RootNamespace>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\StudyReportEvaluator.Core\StudyReportEvaluator.Core.csproj" />
+  </ItemGroup>
+</Project>
