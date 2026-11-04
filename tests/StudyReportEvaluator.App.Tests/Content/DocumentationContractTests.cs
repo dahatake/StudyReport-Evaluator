@@ -1006,7 +1006,7 @@ public sealed class DocumentationContractTests
             "sample/realdata.xlsx",
             "469,995",
             "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D");
-        AssertSequentialTableIds(requirements, "AC-", 53);
+        AssertAscendingTableIds(requirements, "AC-", 48, 53);
         AssertSequentialTableIds(ledger, "C-", 47);
         AssertContainsAll(ledger, "VERIFIED", "BLOCKED", "EXCLUDED");
         AssertContainsAll(
@@ -1460,6 +1460,20 @@ public sealed class DocumentationContractTests
             .Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))
             .ToArray();
         Assert.Equal(Enumerable.Range(1, expectedCount), actual);
+    }
+
+    // Retired ACs leave permanent gaps, so IDs must only be unique, ascending and end at the last assigned number.
+    private static void AssertAscendingTableIds(string content, string prefix, int expectedCount, int expectedLast)
+    {
+        int[] actual = Regex.Matches(
+                content,
+                $@"^\| {Regex.Escape(prefix)}(\d{{3}}) \|",
+                RegexOptions.Multiline | RegexOptions.CultureInvariant)
+            .Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))
+            .ToArray();
+        Assert.Equal(expectedCount, actual.Length);
+        Assert.Equal(actual.OrderBy(id => id).Distinct(), actual);
+        Assert.Equal(expectedLast, actual[^1]);
     }
 
     private static void AssertContainsAll(string content, params string[] expectedFragments)
