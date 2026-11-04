@@ -42,6 +42,7 @@
       <Setter Property="Padding" Value="6" />
     </Style>
     <Style Selector="Border.ok"><Setter Property="Background" Value="{DynamicResource AppCompletedSoftBrush}" /></Style>
+    <!-- FR-118: 赤系の背景（エラー表示用ブラシ）。色以外の識別（エラー文言・太い枠）は利用側で併用する。 -->
     <Style Selector="Border.invalid"><Setter Property="Background" Value="{DynamicResource TechnicalBackgroundBrush}" /></Style>
     <Style Selector="ListBox.question-summaries">
       <Setter Property="Background" Value="Transparent" />
