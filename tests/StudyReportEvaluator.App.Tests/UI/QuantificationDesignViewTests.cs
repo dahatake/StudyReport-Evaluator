@@ -146,7 +146,8 @@ public sealed class QuantificationDesignViewTests
 
         Assert.Equal(60m, viewModel.BasePoints);
         Assert.Equal(0m, viewModel.SpecialPoints);
-        Assert.Equal(0.1m, viewModel.SimilarityPenaltyWeight);
+        // FR-114 AC-004: 新規の既定減点係数は PARAM-002 = 0。
+        Assert.Equal(0m, viewModel.SimilarityPenaltyWeight);
         Assert.Equal(40m, first.Points);
         Assert.Equal(100m, viewModel.AllocationTotal);
         Assert.Equal(0m, viewModel.AllocationRemaining);
@@ -521,7 +522,8 @@ public sealed class QuantificationDesignViewTests
             AssertNormalBodyFits(view);
             Assert.Equal("60", baseValue.Text);
             Assert.Equal("0", specialValue.Text);
-            Assert.Equal("0.1", similarityValue.Text);
+            // FR-114 AC-004: 新規の既定減点係数は PARAM-002 = 0。
+            Assert.Equal("0", similarityValue.Text);
             Assert.Equal("B + Σ(Pq×Rq) + SpecialEarned − Σ(Pq×Lq×W)",
                 RequiredByAutomationId<TextBlock>(view, "DesignFormulaSummary").Text);
             Button detailsButton = Required<Button>(view, "FormulaDetailsButton");

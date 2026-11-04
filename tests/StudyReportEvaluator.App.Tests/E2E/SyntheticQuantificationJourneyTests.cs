@@ -200,7 +200,8 @@ public sealed class SyntheticQuantificationJourneyTests
             }
 
             Assert.Equal(530, resultsWrite.DataRowCount);
-            Assert.Equal(57, resultsWrite.ColumnCount);
+            // FR-114 AC-010: 2 設問それぞれに類似度の確認指標の 11 列を含む。
+            Assert.Equal(79, resultsWrite.ColumnCount);
             Assert.Equal(10_600, resultsWrite.FormulaCells.Length);
             ImmutableArray<ExpectedFormulaCell> expectedFormulas = configCells.FormulaCells
                 .Concat(resultsWrite.FormulaCells)
@@ -761,7 +762,8 @@ public sealed class SyntheticQuantificationJourneyTests
 
         Worksheet results = GetWorksheet(document, sheetNames.ResultsSheetName);
         Dictionary<string, string> headers = ReadHeaders(results);
-        Assert.Equal(57, headers.Count);
+        // FR-114 AC-010: 2 設問それぞれに類似度の確認指標の 11 列を含む。
+        Assert.Equal(79, headers.Count);
         Assert.Equal(531, results.Descendants<Row>().Count());
         Assert.Equal(10_600, results.Descendants<CellFormula>().Count());
         Assert.DoesNotContain(headers.Keys, header =>

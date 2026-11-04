@@ -179,9 +179,20 @@ public sealed class WeightedScoreCalculator
     {
         ValidateRoundingDigits(roundingDigits);
         if (questionPoints is < 0m or > 100m
-            || similarity is not decimal score
-            || score is < 0m or > 1m
             || penaltyWeight is < 0m or > 1m)
+        {
+            return null;
+        }
+
+        // FR-114 AC-011 / AC-012: 係数ゼロなら診断の欠損・失敗に関係なく減点はゼロ（診断が採点を壊さない）。
+        // 係数が正なら、完全な診断の Similarity（参照別合成値の最大値）だけを使い、それ以外は blank。
+        if (penaltyWeight == 0m)
+        {
+            return 0m;
+        }
+
+        if (similarity is not decimal score
+            || score is < 0m or > 1m)
         {
             return null;
         }

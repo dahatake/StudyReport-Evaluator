@@ -94,7 +94,8 @@ public sealed class DesignPresentationTests
         Assert.True(viewModel.IsValid);
         Assert.Equal(60m, viewModel.BasePoints);
         Assert.Equal(0m, viewModel.SpecialPoints);
-        Assert.Equal(0.1m, viewModel.SimilarityPenaltyWeight);
+        // FR-114 AC-004: 新規の既定減点係数は PARAM-002 = 0。
+        Assert.Equal(0m, viewModel.SimilarityPenaltyWeight);
         Assert.Equal(100m, viewModel.AllocationTotal);
         Assert.Equal("配点合計 100 / 100 · 残り 0", viewModel.AllocationSummary);
         AssertPage(viewModel, 0, "1–1 / 1 件", [question], false, false);

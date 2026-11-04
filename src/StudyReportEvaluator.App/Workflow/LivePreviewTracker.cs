@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using StudyReportEvaluator.App.Workbooks.Checkpoint;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
+using StudyReportEvaluator.Core.Similarity;
 
 namespace StudyReportEvaluator.App.Workflow;
 
@@ -104,8 +105,9 @@ internal static class LivePreviewItems
     public static string SpecialTitle(QuestionDefinition question, SpecialEvaluationDefinition special) =>
         $"固有評価 · 設問「{question.DisplayName}」· 項目「{special.DisplayName}」";
 
+    // FR-114 AC-078: 実行速報でも類似度を通常評価と別の確認指標・未検証として示す。
     public static string SimilarityTitle(QuestionDefinition question) =>
-        $"類似度 · 設問「{question.DisplayName}」";
+        $"類似度（{SimilarityDiagnostics.IndicatorLabel}）· 設問「{question.DisplayName}」";
 
     public static LivePreviewItem Waiting(LivePreviewItemKind kind, string title) =>
         new() { Kind = kind, Title = title, Phase = LivePreviewItemPhase.Waiting };
@@ -238,7 +240,7 @@ internal static class LivePreviewItems
             items.Add(Settled(
                 Waiting(
                     LivePreviewItemKind.Similarity,
-                    question is not null ? SimilarityTitle(question) : $"類似度 · {result.QuestionId}") with
+                    question is not null ? SimilarityTitle(question) : $"類似度（{SimilarityDiagnostics.IndicatorLabel}）· {result.QuestionId}") with
                 {
                     TextAvailable = false,
                 },

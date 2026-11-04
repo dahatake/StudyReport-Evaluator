@@ -28,6 +28,28 @@ public sealed record SurfaceSimilarityResult
 
     public decimal LongestCommonSubstringCoverage { get; init; }
 
+    // FR-114 AC-010 / AC-077: 確認指標（未検証）の詳細。合成値（Score）とは別の項目として持つ。
+    // 原文全文一致（正規化前の文字列が序数比較で一致）。
+    public bool IsRawExactMatch { get; init; }
+
+    // 正規化後全文一致（§7.5 の正規化後の文字列が一致）。合成値が 1 でも、これが false なら全文一致ではない。
+    public bool IsNormalizedExactMatch { get; init; }
+
+    // 最長一致長 ÷ 学生側の正規化後全文長（4 桁丸め）。合成指標の最長一致被覆率と異なり n-gram 長未満でも 0 にしない。
+    public decimal StudentCoverage { get; init; }
+
+    // 最長一致長 ÷ 参照側の正規化後全文長（4 桁丸め）。
+    public decimal ReferenceCoverage { get; init; }
+
+    // 最長一致の学生側の開始位置（正規化後文字の 0 起点。原文位置ではない）。一致がなければ -1。
+    public int StudentNormalizedMatchStart { get; init; } = -1;
+
+    // 最長一致の参照側の開始位置（正規化後文字の 0 起点。原文位置ではない）。一致がなければ -1。
+    public int ReferenceNormalizedMatchStart { get; init; } = -1;
+
+    // いずれかの正規化後全文長が PARAM-004 以下（表示上の注意。判定・減点閾値ではない）。
+    public bool IsShortTextCaution { get; init; }
+
     public bool IsEmpty => StudentNormalizedLength == 0 || ReferenceNormalizedLength == 0;
 
     public string ToReason() => IsEmpty
@@ -54,6 +76,9 @@ public sealed class SurfaceTextSimilarityCalculator
 
         string student = NormalizeForComparison(studentAnswer);
         string reference = NormalizeForComparison(referenceAnswer);
+        bool rawExact = !string.IsNullOrEmpty(studentAnswer)
+            && string.Equals(studentAnswer, referenceAnswer, StringComparison.Ordinal);
+        bool shortTextCaution = SimilarityDiagnostics.IsShortText(student.Length, reference.Length);
         if (student.Length == 0 || reference.Length == 0)
         {
             return new SurfaceSimilarityResult
@@ -61,6 +86,7 @@ public sealed class SurfaceTextSimilarityCalculator
                 Score = 0m,
                 StudentNormalizedLength = student.Length,
                 ReferenceNormalizedLength = reference.Length,
+                IsShortTextCaution = shortTextCaution,
             };
         }
 
@@ -81,6 +107,13 @@ public sealed class SurfaceTextSimilarityCalculator
                 JaccardIndex = 1m,
                 LongestCommonSubstringLength = student.Length,
                 LongestCommonSubstringCoverage = 1m,
+                IsRawExactMatch = rawExact,
+                IsNormalizedExactMatch = true,
+                StudentCoverage = 1m,
+                ReferenceCoverage = 1m,
+                StudentNormalizedMatchStart = 0,
+                ReferenceNormalizedMatchStart = 0,
+                IsShortTextCaution = shortTextCaution,
             };
         }
 
@@ -91,7 +124,7 @@ public sealed class SurfaceTextSimilarityCalculator
         decimal containment = Ratio(intersection, studentNGrams.Count, roundingDigits);
         decimal dice = Ratio(2 * intersection, studentNGrams.Count + referenceNGrams.Count, roundingDigits);
         decimal jaccard = Ratio(intersection, studentNGrams.Count + referenceNGrams.Count - intersection, roundingDigits);
-        int lcs = LongestCommonSubstringLength(student, reference);
+        (int lcs, int studentStart, int referenceStart) = LongestCommonSubstring(student, reference);
         decimal lcsCoverage = lcs < n ? 0m : Ratio(lcs, student.Length, roundingDigits);
         decimal nGramBlend = Round((containment * 0.70m) + (dice * 0.20m) + (jaccard * 0.10m), roundingDigits);
         decimal score = Round(Math.Max(nGramBlend, lcsCoverage), roundingDigits);
@@ -109,6 +142,13 @@ public sealed class SurfaceTextSimilarityCalculator
             JaccardIndex = jaccard,
             LongestCommonSubstringLength = lcs,
             LongestCommonSubstringCoverage = lcsCoverage,
+            IsRawExactMatch = rawExact,
+            IsNormalizedExactMatch = false,
+            StudentCoverage = Ratio(lcs, student.Length, roundingDigits),
+            ReferenceCoverage = Ratio(lcs, reference.Length, roundingDigits),
+            StudentNormalizedMatchStart = lcs == 0 ? -1 : studentStart,
+            ReferenceNormalizedMatchStart = lcs == 0 ? -1 : referenceStart,
+            IsShortTextCaution = shortTextCaution,
         };
     }
 
@@ -267,14 +307,19 @@ public sealed class SurfaceTextSimilarityCalculator
         return count;
     }
 
-    private static int LongestCommonSubstringLength(string pattern, string text)
+    // FR-114 AC-077: 最長連続部分一致の長さと、双方の開始位置（正規化後文字の 0 起点）。
+    // 同じ長さの一致が複数あれば、学生側で最初に現れる一致と、参照側での最初の出現位置を返す。
+    private static (int Length, int PatternStart, int TextStart) LongestCommonSubstring(string pattern, string text)
     {
         SuffixAutomaton automaton = new(text);
         int length = 0;
         int best = 0;
+        int bestPatternEnd = -1;
+        int bestTextEnd = -1;
         int state = 0;
-        foreach (char ch in pattern)
+        for (int index = 0; index < pattern.Length; index++)
         {
+            char ch = pattern[index];
             while (state != 0 && !automaton.HasTransition(state, ch))
             {
                 state = automaton.Link(state);
@@ -295,10 +340,14 @@ public sealed class SurfaceTextSimilarityCalculator
             if (length > best)
             {
                 best = length;
+                bestPatternEnd = index;
+                bestTextEnd = automaton.FirstEnd(state);
             }
         }
 
-        return best;
+        return best == 0
+            ? (0, -1, -1)
+            : (best, bestPatternEnd - best + 1, bestTextEnd - best + 1);
     }
 
     private static bool IsIgnoredCategory(UnicodeCategory category) => category is
@@ -369,6 +418,9 @@ public sealed class SurfaceTextSimilarityCalculator
 
         internal int Length(int state) => states[state].Length;
 
+        // 状態に属する部分文字列が text 内で最初に終わる位置（0 起点）。
+        internal int FirstEnd(int state) => states[state].FirstEnd;
+
         internal bool HasTransition(int state, char ch) => states[state].Transitions.ContainsKey(ch);
 
         internal bool TryTransition(int state, char ch, out int next) => states[state].Transitions.TryGetValue(ch, out next);
@@ -410,6 +462,7 @@ public sealed class SurfaceTextSimilarityCalculator
         {
             int current = size++;
             states[current].Length = states[last].Length + 1;
+            states[current].FirstEnd = states[current].Length - 1;
             int previous = last;
             while (previous >= 0 && !states[previous].Transitions.ContainsKey(ch))
             {
@@ -434,6 +487,7 @@ public sealed class SurfaceTextSimilarityCalculator
                     states[clone].Length = states[previous].Length + 1;
                     states[clone].Transitions = new Dictionary<char, int>(states[next].Transitions);
                     states[clone].Link = states[next].Link;
+                    states[clone].FirstEnd = states[next].FirstEnd;
                     while (previous >= 0 && states[previous].Transitions.TryGetValue(ch, out int target) && target == next)
                     {
                         states[previous].Transitions[ch] = clone;
@@ -453,6 +507,8 @@ public sealed class SurfaceTextSimilarityCalculator
             internal int Length { get; set; }
 
             internal int Link { get; set; } = -1;
+
+            internal int FirstEnd { get; set; }
 
             internal Dictionary<char, int> Transitions { get; set; } = [];
         }

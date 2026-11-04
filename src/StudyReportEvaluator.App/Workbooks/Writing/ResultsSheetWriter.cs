@@ -7,6 +7,7 @@ using DocumentFormat.OpenXml.Spreadsheet;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Formulas;
 using StudyReportEvaluator.Core.Scoring;
+using StudyReportEvaluator.Core.Similarity;
 
 namespace StudyReportEvaluator.App.Workbooks.Writing;
 
@@ -99,6 +100,9 @@ public sealed record SimilarityResultInput
     public decimal? PeerMax { get; init; }
 
     public int? PeerRow { get; init; }
+
+    // FR-114 AC-010 / AC-077: 参照別の確認指標（未検証）の詳細。null は旧形式（詳細なし）。
+    public ImmutableArray<SimilarityReferenceDiagnostic>? ReferenceDiagnostics { get; init; }
 
     public override string ToString() =>
         $"{nameof(SimilarityResultInput)} {{ Status = {Status}, Content = <redacted> }}";
@@ -255,6 +259,18 @@ public sealed class ResultsSheetWriter
     public const string SimilarityReasonSuffix = "Similarity_Reason";
     public const string SimilarityStatusSuffix = "Similarity_Status";
     public const string SimilarityPenaltySuffix = "Similarity_Penalty";
+    // FR-114 AC-010 / AC-077 / AC-078: 確認指標（未検証）の詳細列。減点列と学生間最大類似度（情報列）の間に置く。
+    public const string SimilarityIndicatorSuffix = "Similarity_Indicator";
+    public const string SimilarityMaxReferenceSuffix = "Similarity_Max_Reference";
+    public const string SimilarityRawExactSuffix = "Similarity_Raw_Exact";
+    public const string SimilarityNormalizedExactSuffix = "Similarity_Normalized_Exact";
+    public const string SimilarityLcsLengthSuffix = "Similarity_LCS_Length";
+    public const string SimilarityStudentCoverageSuffix = "Similarity_Student_Coverage";
+    public const string SimilarityReferenceCoverageSuffix = "Similarity_Reference_Coverage";
+    public const string SimilarityStudentMatchStartSuffix = "Similarity_Student_Match_Start";
+    public const string SimilarityReferenceMatchStartSuffix = "Similarity_Reference_Match_Start";
+    public const string SimilarityShortTextCautionSuffix = "Similarity_Short_Text_Caution";
+    public const string SimilarityDetailStatusSuffix = "Similarity_Detail_Status";
     public const string SimilarityPeerMaxSuffix = "Similarity_Peer_Max";
     public const string SimilarityPeerRowSuffix = "Similarity_Peer_Row";
     public const string BasePointsHeader = "Base_Points";
@@ -644,6 +660,18 @@ public sealed class ResultsSheetWriter
                 Column(nextColumn++, questionPrefix + SimilarityReasonSuffix),
                 Column(nextColumn++, questionPrefix + SimilarityStatusSuffix),
                 Column(nextColumn++, questionPrefix + SimilarityPenaltySuffix),
+                new SimilarityDiagnosticLayout(
+                    Column(nextColumn++, questionPrefix + SimilarityIndicatorSuffix),
+                    Column(nextColumn++, questionPrefix + SimilarityMaxReferenceSuffix),
+                    Column(nextColumn++, questionPrefix + SimilarityRawExactSuffix),
+                    Column(nextColumn++, questionPrefix + SimilarityNormalizedExactSuffix),
+                    Column(nextColumn++, questionPrefix + SimilarityLcsLengthSuffix),
+                    Column(nextColumn++, questionPrefix + SimilarityStudentCoverageSuffix),
+                    Column(nextColumn++, questionPrefix + SimilarityReferenceCoverageSuffix),
+                    Column(nextColumn++, questionPrefix + SimilarityStudentMatchStartSuffix),
+                    Column(nextColumn++, questionPrefix + SimilarityReferenceMatchStartSuffix),
+                    Column(nextColumn++, questionPrefix + SimilarityShortTextCautionSuffix),
+                    Column(nextColumn++, questionPrefix + SimilarityDetailStatusSuffix)),
                 Column(nextColumn++, questionPrefix + SimilarityPeerMaxSuffix),
                 Column(nextColumn++, questionPrefix + SimilarityPeerRowSuffix));
             questions.Add(new QuestionLayout(
@@ -912,6 +940,15 @@ public sealed class ResultsSheetWriter
 
             ValidateString(similarity.Status, sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.Status", errors);
             ValidateString(similarity.Reason, sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.Reason", errors);
+            if (similarity.ReferenceDiagnostics is ImmutableArray<SimilarityReferenceDiagnostic> diagnostics
+                && (diagnostics.IsDefaultOrEmpty
+                    || diagnostics.Any(item => item is null)
+                    || similarity.AiRaw is not decimal aiRaw
+                    || SimilarityDiagnostics.SelectMaximum(diagnostics)!.Score != aiRaw))
+            {
+                // FR-114 AC-010: 採点に使う Similarity は参照別合成値の最大値と結び付く。
+                AddError(errors, "SIMILARITY_DIAGNOSTIC_MISMATCH", sourceRow, "Question", layout.Definition.Id, layout.Definition.DisplayName, "Similarity.ReferenceDiagnostics", "mismatch");
+            }
         }
     }
 
@@ -1268,6 +1305,12 @@ public sealed class ResultsSheetWriter
                         similarityInput.Reason,
                         similarityInput.Status,
                         similarityPenalty,
+                        similarityInput.ReferenceDiagnostics is ImmutableArray<SimilarityReferenceDiagnostic> referenceDiagnostics
+                            ? SimilarityDiagnostics.SelectMaximum(referenceDiagnostics)
+                            : null,
+                        similarityInput.ReferenceDiagnostics is null
+                            && similarityInput.AiRaw is not null
+                            && string.Equals(similarityInput.Status, ResultsStatusCodes.Success, StringComparison.Ordinal),
                         similarityInput.PeerMax,
                         similarityInput.PeerRow)));
             }
@@ -1561,6 +1604,7 @@ public sealed class ResultsSheetWriter
             stringCellWriter.Write(row, CellReference(question.Similarity.Layout.Reason, prepared.SourceRowNumber), question.Similarity.Reason);
             stringCellWriter.Write(row, CellReference(question.Similarity.Layout.Status, prepared.SourceRowNumber), question.Similarity.Status);
             AppendFormula(row, formulas, sheetNames, question.Similarity.Layout.Penalty, prepared.SourceRowNumber, question.Similarity.Penalty, writtenFormulaCells);
+            AppendSimilarityDiagnostics(row, question.Similarity, prepared.SourceRowNumber);
             row.Append(CreateOptionalNumberCell(
                 question.Similarity.Layout.PeerMax,
                 prepared.SourceRowNumber,
@@ -1647,6 +1691,31 @@ public sealed class ResultsSheetWriter
 
         validations.Count = count;
         return validations;
+    }
+
+    // FR-114 AC-010 / AC-077 / AC-078 / AC-079: 確認指標（未検証）の詳細。学生本文・参照本文は書かない（位置と長さだけ）。
+    private void AppendSimilarityDiagnostics(Row row, PreparedSimilarity similarity, int sourceRowNumber)
+    {
+        SimilarityDiagnosticLayout layout = similarity.Layout.Diagnostics;
+        SimilarityReferenceDiagnostic? maximum = similarity.Maximum;
+        stringCellWriter.Write(row, CellReference(layout.Indicator, sourceRowNumber), SimilarityDiagnostics.IndicatorLabel);
+        row.Append(CreateOptionalNumberCell(layout.MaxReference, sourceRowNumber, maximum?.ReferenceIndex));
+        row.Append(CreateOptionalNumberCell(layout.RawExact, sourceRowNumber, Flag(maximum?.IsRawExactMatch)));
+        row.Append(CreateOptionalNumberCell(layout.NormalizedExact, sourceRowNumber, Flag(maximum?.IsNormalizedExactMatch)));
+        row.Append(CreateOptionalNumberCell(layout.LcsLength, sourceRowNumber, maximum?.LongestCommonSubstringLength));
+        row.Append(CreateOptionalNumberCell(layout.StudentCoverage, sourceRowNumber, maximum?.StudentCoverage));
+        row.Append(CreateOptionalNumberCell(layout.ReferenceCoverage, sourceRowNumber, maximum?.ReferenceCoverage));
+        row.Append(CreateOptionalNumberCell(layout.StudentMatchStart, sourceRowNumber, Position(maximum?.StudentNormalizedMatchStart)));
+        row.Append(CreateOptionalNumberCell(layout.ReferenceMatchStart, sourceRowNumber, Position(maximum?.ReferenceNormalizedMatchStart)));
+        row.Append(CreateOptionalNumberCell(layout.ShortTextCaution, sourceRowNumber, Flag(maximum?.IsShortTextCaution)));
+        stringCellWriter.Write(
+            row,
+            CellReference(layout.DetailStatus, sourceRowNumber),
+            similarity.IsLegacyDetail ? SimilarityDiagnostics.LegacyDetailLabel : string.Empty);
+
+        static decimal? Flag(bool? value) => value is bool flag ? (flag ? 1m : 0m) : null;
+
+        static decimal? Position(int? value) => value is int position && position >= 0 ? position : null;
     }
 
     private static Cell CreateOptionalNumberCell(ColumnLayout column, int row, decimal? value) =>
@@ -1788,10 +1857,43 @@ public sealed class ResultsSheetWriter
         ColumnLayout Reason,
         ColumnLayout Status,
         ColumnLayout Penalty,
+        SimilarityDiagnosticLayout Diagnostics,
         ColumnLayout PeerMax,
         ColumnLayout PeerRow)
     {
-        internal IEnumerable<ColumnLayout> AllColumns => [AiRaw, Reason, Status, Penalty, PeerMax, PeerRow];
+        internal IEnumerable<ColumnLayout> AllColumns =>
+            new[] { AiRaw, Reason, Status, Penalty }
+                .Concat(Diagnostics.AllColumns)
+                .Concat([PeerMax, PeerRow]);
+    }
+
+    private sealed record SimilarityDiagnosticLayout(
+        ColumnLayout Indicator,
+        ColumnLayout MaxReference,
+        ColumnLayout RawExact,
+        ColumnLayout NormalizedExact,
+        ColumnLayout LcsLength,
+        ColumnLayout StudentCoverage,
+        ColumnLayout ReferenceCoverage,
+        ColumnLayout StudentMatchStart,
+        ColumnLayout ReferenceMatchStart,
+        ColumnLayout ShortTextCaution,
+        ColumnLayout DetailStatus)
+    {
+        internal IEnumerable<ColumnLayout> AllColumns =>
+        [
+            Indicator,
+            MaxReference,
+            RawExact,
+            NormalizedExact,
+            LcsLength,
+            StudentCoverage,
+            ReferenceCoverage,
+            StudentMatchStart,
+            ReferenceMatchStart,
+            ShortTextCaution,
+            DetailStatus,
+        ];
     }
 
     private sealed record QuestionLayout(
@@ -1871,6 +1973,8 @@ public sealed class ResultsSheetWriter
         string Reason,
         string Status,
         decimal? Penalty,
+        SimilarityReferenceDiagnostic? Maximum,
+        bool IsLegacyDetail,
         decimal? PeerMax,
         int? PeerRow);
 

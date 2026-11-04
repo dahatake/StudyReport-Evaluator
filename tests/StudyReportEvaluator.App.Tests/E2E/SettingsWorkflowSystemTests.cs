@@ -751,7 +751,8 @@ public sealed class SettingsWorkflowSystemTests
         ResultsSheetWriteResult results = new ResultsSheetWriter().Write(
             document, summary.Snapshot, names, config, preparation.Rows);
         Assert.Equal(4, results.DataRowCount);
-        Assert.Equal(33, results.ColumnCount);
+        // FR-114 AC-010: 類似度の確認指標の 11 列を含む。
+        Assert.Equal(44, results.ColumnCount);
         Assert.Equal(48, results.FormulaCells.Length);
         return OutputPackageValidationPlan.Capture(inputPath, names, config.FormulaCells.Concat(results.FormulaCells)
             .Select(cell => new ExpectedFormulaCell(cell.Definition, cell.CachedValue)));

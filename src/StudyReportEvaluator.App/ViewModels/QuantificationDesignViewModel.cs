@@ -2231,7 +2231,8 @@ public sealed class QuantificationDesignViewModel : UiObservableObject
             LastDataRow = 2,
             BasePoints = 60m,
             SpecialPoints = 0m,
-            SimilarityPenaltyWeight = 0.1m,
+            // FR-114 AC-004: 新規定義は PARAM-002（類似度は確認指標・未検証のため既定では減点しない）。
+            SimilarityPenaltyWeight = QuantificationDefinition.NewDefaultSimilarityPenaltyWeight,
             RoundingDigits = 1,
             Questions = [CreateDefaultQuestion(questionId, 1, "A") with { Points = 40m }],
         };
