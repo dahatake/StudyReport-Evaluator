@@ -10,7 +10,7 @@
 | 出力 | 入力を変更せず作成する別の標準 `.xlsx` 1ファイル |
 | 対応環境 | Windows 11 x64。macOS、Linux、Windows Arm64は現版の正式公開対象外 |
 | UI / Runtime | Avalonia `12.1.1` / .NET `10.0.11` self-contained。build SDK `10.0.400`を固定 |
-| AI | GitHub Copilot SDK for .NET `1.0.11` / bundled CLI `1.0.79`を固定。参照回答・通常評価・固有評価は利用者選択model・思考レベル・Context Sizeをrunで統一（§11.18）。類似度はローカル計算 |
+| AI | GitHub Copilot SDK for .NET `1.0.11`を固定。実行時はOS利用者がPATHに導入したCopilot CLIを使い、版・実行ファイルSHA-256は観測診断情報であり信頼証明ではない。参照回答・通常評価・固有評価は同じ解決CLIと利用者選択model・思考レベル・Context Sizeをrunで統一（§11.18）。類似度はローカル計算 |
 | 旧版 | v4.5の業務・入力・採点・数式・checkpoint・privacy・delivery境界をcarry forwardし、承認されたUI簡素化・設定保存・復元の差分だけを追加。v3.0はv4.0により全面的にsupersede済み |
 
 > 本版は、要求所有者が2026-09-07に[UI・設定保存プランv2](../dev/docs/archive/work/20260907-ui-settings-redesign-plan-v2.md)のD01〜D20デフォルト・全実装を明示承認した差分を反映する。元プランの承認待ち表記は履歴であり、後続指示を優先する。最小実装契約と測定範囲は[UI layout contract](../dev/docs/ui-layout-contract.md)へ分離する。D17の当初上書き「全タスク完了後だけUnreleased追記、続いて製品PATCH `0.8.4` → `0.8.5`」と「T01では製品版・CHANGELOGを変更しない」は履歴として保持する。さらに後続の利用者不在時の自律続行指示により、T39をBLOCKEDのままF01／F02を進める。F01はREVIEWED、親担当による製品PATCHは反映済みだが、G4・全タスク完了・公開PASSを意味しない。以後のF02最終再検証は[実行記録](../dev/docs/archive/work/20260907-ui-settings-execution-record.md)の最新欄を正本とする。
@@ -109,9 +109,10 @@
 
 AI処理にはGitHub Copilotを利用できるaccount、login、必要なnetwork接続と組織policy上の利用許可が必要である。これらはGUI起動の前提とは分離する。
 
-- 配布物は、固定したGitHub Copilot SDKと互換なCopilot CLI runtimeを同梱する。
-- PATH上の任意CLIへ黙ってfallbackしない。
-- loginは、起動時にOS利用者の既存GitHub資格情報を同梱CLIが自力で解決する自動確認（§11.10）を先に行い、利用できる資格情報がない場合だけ、CLI／ブラウザーを通じたGitHubとの対話認証を自動で開始する。手動の「GitHubにログイン」も維持する。アプリはPAT、password、client secret、token、device codeを入力・収集・解析・保存しない。
+- AI runtimeは固定SDKとOS利用者がインストールしたCopilot CLIを使う。PATHから一意に解決した同じCLIを認証確認、login、model列挙、参照回答生成、通常評価、固有評価に一貫して使用し、同梱・展開されたCLIやruntime manifestへ切り替えない。
+- Windowsでは絶対PATH entryだけを探索し、空または相対entryを無視して`copilot.exe`を解決する。Unix source foundationではPATH上の実行可能な`copilot`を解決する。CLIがない場合はOSへのインストールとPATH設定を促し、WindowsではWinGetを推奨する。SDKとの互換性がない場合は、互換性エラーとして明示し、AI処理を開始しない。
+- CLI versionと実行file hashは、実行時に観測できたidentityの診断記録に限り、固定値との一致検証、runtime manifestによる選択、信頼性のattestationに使わない。CLIの既存loginを利用し、アプリはtoken、password、device codeを読み取り・解析・収集・保存・log出力しない。
+- loginは、起動時にPATHから解決したCLIがOS利用者の既存GitHub資格情報を利用できるか確認する自動確認（§11.10）を先に行い、利用できる資格情報がない場合だけCLI／ブラウザーを通じたGitHubとの対話認証を自動で開始する。手動の「GitHubにログイン」も維持する。
 - CLIまたはloginが利用できない場合、アプリ起動、Excel読込、mapping、設計編集、checkpoint確認は利用できるが、新しいAI処理は開始できない。
 - 利用できない理由、明示的な「GitHubにログイン」開始・取消、既存の「Copilot 状態を確認」による再確認を入力画面（§11.15）へ表示する。D-06は採用済みとし、動作とprocess所有範囲は§11.3に従う。
 
@@ -319,6 +320,8 @@ $$
 ### 7.1 共通境界
 
 - GitHub Copilot SDK for .NETの固定versionを使う。
+- 実行時はOS利用者のPATHから解決したCopilot CLIを全AI操作で一貫して使う。bundled CLI／manifestへの選択・fallbackはしない。SDK非互換は明示的なruntime errorとし、CLI identity（観測version・SHA-256）は診断情報に限る。
+- checkpoint内のCLI runtime identityは実行環境の診断・再開互換情報であり、CLIの真正性・信頼性を証明するattestationではない。
 - 通常評価のmodelは、SDKが実行時に列挙したmodelから利用者が選択する。`auto`を含む列挙された全modelを選択できる（列挙の除外条件と件数の扱いは§11.13、FR-MS-01〜05）。
 - 参照回答生成・通常評価・固有評価は、runで選択した同じmodelを使う。類似度評価はLLMを使わない（7.5節）。
 - 保存希望modelが列挙されない場合は未選択とし、別modelへ黙ってfallbackしない。
@@ -655,6 +658,8 @@ run開始時、完成名に対応する次のfileを作る。
 - app major schema compatibility
 - Copilot CLI runtime identity
 
+CLI runtime identityはPATHから実行したOS-installed CLIについて観測した診断・再開互換情報であり、同梱manifestやSHA-256による信頼attestationではない。
+
 model IDの一致はID文字列の一致であり、`auto`の場合に同一の実modelへroutingされることを保証しない。
 
 不一致時は当該checkpointを変更せず、具体的なsafe errorを表示して再開しない。回答、Prompt、reason、evidence本文をerrorへ含めない。
@@ -731,15 +736,15 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 - checkbox、同意、dismiss、role、期限を要求しない。
 - warning操作をrun、cancel、resume、formula、finalizationの条件にしない。
 
-### 11.3 同梱CLIによるlogin開始（D-06採用済み）
+### 11.3 OS-installed PATH CLIによるlogin開始（D-06採用済み、2026-11-05変更）
 
 1. loginは、利用者が「GitHubにログイン」を押した場合、または§11.10（FR-AL-03）の起動時自動loginの場合だけ開始する。画面遷移、Prompt適用、設定の読込／保存／適用、手動の認証状態確認から暗黙に開始しない。
-2. 既存のbundled resolverでmanifest、RID、SDK／CLI版、SHA-256を検証した絶対CLI pathだけを使い、固定CLI `1.0.79`の`login` subcommandを直接子processとして起動する。shell command文字列、PowerShell、`cmd /c`、任意command実行を介さない。optionは固定版で実在と動作を確認したものだけに限定する。
+2. §3.2の規則でOS利用者がPATHに導入したCLIを解決し、そのCLIの`login` subcommandを直接子processとして起動する。Windowsは絶対PATH entryにある`copilot.exe`、Unix source foundationは実行可能な`copilot`を対象とし、空・相対PATH entryを探索しない。bundled CLI、manifest、固定CLI版へ切替・fallbackしない。shell command文字列、PowerShell、`cmd /c`、任意command実行を介さない。
 3. 認証用console／ブラウザーとcredential保管はCLIに委譲する。アプリはtokenやdevice code等を解析・収集・保存せず、引数・標準入力・application logへ渡さない。独自OAuth、token入力UI、WebView、callback serverを追加しない。
 4. loginの二重開始と評価実行中のlogin開始を防ぐ。取消・失敗時もGUI、Excel読込、mapping、設計編集を利用可能に保ち、safeな理由と再試行操作を表示する。
 5. login子processを取消・強制終了するのは利用者のlogin取消またはアプリ終了時だけ（起動時自動loginも同じ）とし、アプリが開始・所有した当該login processだけを終了・解放する。process tree全体や名前一致で一括killせず、ブラウザー、他のCLI、credential storeに触れない。credentialの削除、logout、失効を行わない。
 6. login完了後は認証状態とmodel一覧を再確認する（完了時の自動再確認、および取消・失敗後の既存「Copilot 状態を確認」）。process起動・終了codeだけを認証成功とせず、自動model選択変更やAI評価開始を追加しない。
-7. login前後で固定CLIのversion／hashを維持し、自己更新によるmanifest不一致を許容しない。必要な更新抑止optionも固定版の確認に基づく。CLI欠落・不一致時は配布物の再取得／展開状態の確認を案内し、PATH上の別CLI導入やhash検証緩和で回避しない。
+7. login前後に観測したCLI version／file hashは診断にだけ記録し、固定CLIとの一致やmanifestを信頼判定に使わない。CLIの更新はOS利用者が管理する。CLI欠落時はOSへのインストールとPATH設定（WindowsではWinGetを推奨）を案内し、SDK互換性がない場合は明示的なruntime errorを表示する。bundled CLIを選択せず、hashによる信頼attestationを行わない。
 
 ### 11.4 主画面と設定の分担
 
@@ -810,20 +815,20 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 出典: 依頼原文（2026-09-30「アプリケーションの起動時に、ユーザーがPCやMacなどにログインしているアカウントで、GitHub Copilot CLIに自動的（可能な限りユーザーが何もしなくてもいいように）にログインしてください」）、[Authenticating GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli)（確認日2026-09-30）。§3.4・§11.3の「起動時に自動開始しない」を本節が置き換える。
 
-**既存ログイン**とは、同梱CLIが当該OS利用者の環境から自力で解決する資格情報を指す。CLIの解決順は、`COPILOT_GITHUB_TOKEN`、`GH_TOKEN`、`GITHUB_TOKEN`の各環境変数、OS資格情報ストア（Windows Credential Manager／macOS Keychain）のOAuth token、GitHub CLI（`gh auth token`）の順である。アプリはこの解決に関与せず、既存の認証確認（`UseLoggedInUser = true`、`GitHubToken = null`）でCLIへ委ねる。
+**既存ログイン**とは、PATHから解決したOS-installed CLIが当該OS利用者の環境で利用する認証状態を指す。認証の取得・保存・解決はCLIへ委ね、アプリはtoken等の値を読み取らず、既存の認証確認（`UseLoggedInUser = true`、`GitHubToken = null`）を用いる。2026-09-30の出典は当時の自動login依頼を示す履歴であり、CLIの配布・固定版に関する現行要件は本節の2026-11-05変更を優先する。
 
 | ID | 優先度 | 要求 |
 |---|---|---|
 | FR-AL-01 | MUST | メインwindowが最初に表示された直後（Openedイベント）に、1アプリ起動につき1回だけ、既存の「Copilot 状態を確認」と同じ認証確認を自動で開始する。利用者操作を要さず、GUI表示・入力操作を待たせない（非同期）。起動引数の有無、Prompt適用の有無によらず同じである。起動引数の検証エラーwindowでは開始しない。 |
 | FR-AL-02 | MUST | 認証確認が`Available`の場合、login子process・ブラウザー・入力欄を出さない。認証状態とmodel一覧を反映し、login状態文へ「この PC で利用中の GitHub アカウントで自動的にログインしました。」を表示する。 |
-| FR-AL-03 | MUST | 認証確認が`AuthRequired`（同梱CLIは正常に動作したが利用できる資格情報がない）の場合だけ、§11.3と同じ経路（検証済み絶対CLI path・固定`login` subcommandの直接起動）でloginを1回自動開始する。開始時は「利用できる GitHub ログインが見つからないため、自動ログインを開始します…」を表示し、完了後は§11.3 6の自動再確認でmodel一覧を更新する。`CliUnavailable`・`RuntimeFailed`・`Cancelled`ではloginを開始せず、「起動時の自動ログイン確認を完了できませんでした。「Copilot 状態を確認」で再試行してください。」を表示する。 |
+| FR-AL-03 | MUST | 認証確認が`AuthRequired`（PATHから解決したCLIは正常に動作したが利用できる資格情報がない）の場合だけ、§11.3と同じ経路（OS-installed CLIの直接起動）でloginを1回自動開始する。開始時は「利用できる GitHub ログインが見つからないため、自動ログインを開始します…」を表示し、完了後は§11.3 6の自動再確認でmodel一覧を更新する。CLI不在、SDK非互換、`RuntimeFailed`、`Cancelled`ではloginを開始せず、CLI不在時はインストールとPATH設定を案内し、その他は「起動時の自動ログイン確認を完了できませんでした。「Copilot 状態を確認」で再試行してください。」を表示する。 |
 | FR-AL-04 | MUST | 自動loginが取消・失敗・終了しても、同じアプリ起動中に自動再確認・自動再loginをしない。以後は利用者の「Copilot 状態を確認」「GitHubにログイン」操作だけとする。利用者が起動直後に手動で認証確認・login・runを行い自動確認を開始できない状態のときは、自動確認を行わず、後から再開もしない。 |
-| FR-AL-05 | MUST | 自動loginは、§11.3の2〜7（shell非使用、二重開始・評価中開始の防止、「ログインを取り消す」での取消、取消／アプリ終了時の所有process限定終了、CLI version／hash維持）をすべて満たす。 |
+| FR-AL-05 | MUST | 自動loginは、§11.3の2〜7（shell非使用、二重開始・評価中開始の防止、「ログインを取り消す」での取消、取消／アプリ終了時の所有process限定終了、PATH CLIの一貫利用、identity診断のみ）をすべて満たす。 |
 | FR-AL-06 | MUST | 自動処理は認証確認とlogin開始だけを行う。AI評価・run開始、Prompt適用、自動model選択変更（既存の認証確認後のmodel選択規則を超える変更）、別modelへのfallbackをしない。 |
-| FR-AL-07 | MUST | 自動確認・自動loginの成否によらず、GUI、Excel読込、mapping、設計編集を利用可能に保つ。失敗はsafeな理由と再試行操作（「Copilot 状態を確認」「GitHubにログイン」）で表示し、例外内容・path・token・device codeを表示しない。 |
+| FR-AL-07 | MUST | 自動確認・自動loginの成否によらず、GUI、Excel読込、mapping、設計編集を利用可能に保つ。失敗はsafeな理由と再試行操作（「Copilot 状態を確認」「GitHubにログイン」）で表示し、CLI不在時はOSへのインストールとPATH設定（WindowsではWinGetを推奨）、SDK非互換時はruntime incompatibility errorを明示する。例外内容・path・token・device codeは表示しない。 |
 | FR-AL-08 | MUST | 環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`が前後の空白を除いて`0`、または大文字小文字を区別せず`false`のとき、FR-AL-03の自動login開始をしない（FR-AL-01の認証確認は行い、`AuthRequired`時は「利用できる GitHub ログインが見つかりませんでした。「GitHubにログイン」を押してください。」を表示する）。未設定・空・その他の値は自動login有効とする。この環境変数は任意の抑止手段であり、必須ではない。 |
 | SEC-AL-01 | MUST | アプリはtoken、password、device code、`COPILOT_GITHUB_TOKEN`／`GH_TOKEN`／`GITHUB_TOKEN`の値、`gh`のtoken出力を読取・解析・保存・log出力・引数／標準入力への受渡しをしない。アプリは`gh`を起動せず、独自OAuth・token入力UI・WebView・callback serverを追加しない。 |
-| SEC-AL-02 | MUST | credentialの削除・logout・失効、ブラウザー・他CLIの終了、PATH上の別CLIへのfallback、hash検証の緩和をしない。 |
+| SEC-AL-02 | MUST | credentialの削除・logout・失効、ブラウザー・他CLIの終了をしない。PATHから解決したOS CLI以外（同梱CLIを含む）を選択・fallbackせず、CLIのSHA-256を信頼attestationとして使わない。 |
 | SEC-AL-03 | MUST | 自動確認・自動loginで送信し得るのはCLIによるGitHub認証通信だけとする。学生回答・Prompt・workbook pathを送らず、AI送信は0件である。 |
 | NFR-AL-01 | SHOULD | 認証確認が失敗・timeoutしても（既定15秒）UI操作を妨げない。offline時はGUI・Excel読込・mapping・設計を従来どおり利用できる。 |
 
@@ -1273,7 +1278,8 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 ### 13.1 共通
 
 - end-user packageは.NET 10 self-containedとし、利用端末への.NET Runtime／SDK導入を不要にする。
-- GitHub Copilot SDKと互換なCLI runtimeをpackageへ同梱する。
+- end-user runtimeのCopilot CLIはOS利用者が導入し、PATHから解決する。CLI runtimeの同梱は必須ではない。
+- 通常のApp buildでは`CopilotSkipCliDownload=true`を設定し、SDK／buildがCLIを自動downloadしない。歴史的packageのpublishだけは明示的にCLI fileを供給して同梱してよいが、runtimeは同梱fileもmanifestも選択・利用しない。
 - source build用SDKを一般利用者端末へ導入しない。
 - GitHub loginは利用者本人の対話が必要であり、scriptがcredentialを収集しない。
 - end-user primary pathは正式配布元から取得済みのWindows単一EXEを開く操作からGUI表示までとする。ダブルクリックを1起動gestureと数え、download、任意のhash比較、OS警告への操作、本人loginは含めない。ZIPは手動展開を伴う代替経路として残す。
@@ -1287,9 +1293,9 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 - 代替artifactは`StudyReportEvaluator-win-x64.zip`と`StudyReportEvaluator-win-x64.zip.sha256`とする。ZIPを新しいdirectoryへ展開し、`StudyReportEvaluator.App.exe`を起動する既存経路を維持する。両経路の手動hash比較は§13.1の任意推奨とする。
 - EXE／ZIPはunsignedであり、SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行拒否があり得る。「誰でも1操作」「すべての端末で警告なし」とは表示しない。拒否を回避する保護無効化、MOTW除去、証明書の自動trust、execution policy変更、UAC回避を実装・案内しない。
 - Windows 11で証明書なしのcontainer互換性を先行試験する場合は、Publisherの最終fieldに固定marker`OID.2.25.311729368913984317654407730594956997722=1`を置き、明示的なunsigned test artifact名を使用する。実行codeを含むため、使い捨てVMまたは復元可能なsnapshot上で管理者PowerShellの`Add-AppxPackage -AllowUnsigned`による全ユーザーinstallとして実行し、結果を`PASS_MECHANISM`に限定する。この経路を一般利用者setup、signature trust、production配布の証拠にしない。
-- development MSIX required gateはpackage作成、unpack、manifest/version/RID、block map、public payload、bundled CLI hash、sidecar、policy negative、cleanupまでとする。install／launch／upgrade／repair／uninstallは実行した場合だけ追加の`PASS_MECHANISM` evidenceとし、初回公開をblockしない。
+- development MSIXの既存required gateはpackage作成、unpack、manifest/version/RID、block map、public payload、歴史的package内CLI hash、sidecar、policy negative、cleanupまでのpackage integrity確認として維持する。これはruntimeでbundled CLIを選ぶ根拠ではない。install／launch／upgrade／repair／uninstallは実行した場合だけ追加の`PASS_MECHANISM` evidenceとし、初回公開をblockしない。
 - development MSIXの既存sourceと非公開regressionを維持するだけとし、新しいinstaller機能やrequired install試験へ拡張しない。
-- public ZIPはcleanな展開先でself-contained apphostとbundled CLI identityを検証する。installer、trusted package、SmartScreen reputation確立済みとは表示しない。
+- 既存public ZIPのclean展開先におけるbundled CLI identity確認は歴史的package artifactのintegrity確認として扱い、runtimeではPATH CLIだけを使う。installer、trusted package、SmartScreen reputation確立済みとは表示しない。
 - engineering用publish/package scriptはPowerShell 7以上だけを使用し、Windows PowerShell 5.1へfallbackしない。PowerShellをend-user setup要件にしない。
 
 ### 13.3 macOS source foundation（現版公開対象外）
@@ -1297,8 +1303,8 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 - `osx-arm64`と`osx-x64`のpublish、bundle、sign、notary script foundationをrepositoryに保持し、secretなしのstatic contractを検証できる。
 - bundle identifierは`com.github.dahatake.study-report-evaluator`とし、`Info.plist`のexecutable、version、icon、minimum OSをartifactへ一致させる。
 - DMGの一般利用者手順とdownload URLは、将来のproduction evidenceが揃うまで公開しない。
-- apphostとbundled CLIをnative architectureで検証し、x64成功をArm64へ、Rosetta成功をnative x64／Arm64へ代用しない。
-- Developer ID Applicationでnested executableを内側から署名し、shipped CLI hashをruntime manifestへ反映してからouter appを署名する。outer署名後にbundleを変更しない。
+- apphostとPATHから解決するUnix `copilot` executableをnative architectureで検証し、x64成功をArm64へ、Rosetta成功をnative x64／Arm64へ代用しない。
+- Developer ID Applicationでnested executableを内側から署名してからouter appを署名する。歴史的packageにCLI file／manifestを明示的に残す場合の署名・hash確認はpackage integrityだけに使い、runtimeはmanifestを参照せずPATH CLIを使う。outer署名後にbundleを変更しない。
 - hardened runtime、必要最小限のentitlement、secure timestamp、appとDMGのnotarization／stapling／validation、quarantine付きFinder launchを必須とする。
 - macOS 14、15、26は将来の試験候補であり、現版では対応表示しない。将来scopeへ追加する場合だけ、exact OS build × architectureの`PASS_PRODUCTION`行を要求する。
 
@@ -1314,8 +1320,8 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 - production projectは既存のCoreとAppの2つだけを維持する。Windows single-file profileをAppだけへ適用し、solution全体やCoreへ適用しない。通常folder／ZIP publishの引数なし動作・出力とmacOS source/static contractは変更しない。
 - restoreとpublishに同じ`win-x64`、self-contained、`PublishSingleFile=true`、`IncludeNativeLibrariesForSelfExtract=true`、`IncludeAllContentForSelfExtract=true`の条件を渡し、folder出力から分離する。`PublishTrimmed=false`、`PublishReadyToRun=false`、圧縮無効、symbols非配布を維持する。固定versionはheaderのとおり変更せず、実在するsingle-file build-only依存だけをlockし、検証やanalyzerを無効化して通さない。
 - `IncludeAllContentForSelfExtract`はMicrosoftが**非推奨**とする.NET Core 3.1互換モードであり、将来削除される可能性がある。S01で固定.NET SDK `10.0.400`／runtime `10.0.11`と固定Avalonia／SDK／CLIへの適合を開発hostで確認したことを条件に採用する。これはclean-host成功や将来versionの互換性を保証せず、正式公開前には§13.7の実測を必須とする。
-- .NET/native依存、固定CLI、runtime manifest、既存ZIPで明示allowlistにあるREADME／利用者docs／画像／LICENSEをbundle前に含める。repository全体のglobを使わず、sample、利用者input／final／partial、setting.txt、work、tests、secretを含めない。最終配布名へ配置したEXEのbytesからsidecarを作り、検証後にEXEを書き換えない。
-- 全内容展開後の`AppContext.BaseDirectory`を基準とする既存manifest／CLI相対配置を保持する。RID、SDK／CLI版、CLI SHA-256の検証とPATH fallback禁止を維持し、独自launcherによる引数組み直しやresolverの検証緩和を行わない。
+- default App buildは`CopilotSkipCliDownload=true`を設定し、Copilot CLIをdownloadしない。歴史的publishだけが必要に応じCLI file／manifestを明示供給できる。repository全体のglobを使わず、sample、利用者input／final／partial、setting.txt、work、tests、secretを含めない。最終配布名へ配置したEXEのbytesからsidecarを作り、検証後にEXEを書き換えない。
+- runtimeは`AppContext.BaseDirectory`配下のCLIやmanifestを解決に使わず、§3.2のPATH規則でOS-installed CLIを検出する。歴史的packageのRID／CLI版／CLI SHA-256検査はpackage artifactの検証に限定し、runtimeの固定版一致・trust attestation・PATH CLIからのfallback禁止には使わない。
 - Windowsでは.NET標準hostが起動前に通常`%TEMP%/.net/<app>/<bundle-id>/`配下へ内容を展開する。1ファイル配布は「ディスク上でも1ファイル」「痕跡なし」を意味しない。`DOTNET_BUNDLE_EXTRACT_BASE_DIR`は試験の隔離に使えるが、利用者の設定や独自環境変数・API keyを要求しない。
 - 標準hostのcache再利用・欠落復元・並行起動処理を利用し、独自の展開／cache／locking engine、cache管理UI、自動掃除を追加しない。標準抽出を全cached fileの暗号学的検証とみなさず、CLI integrity検証を残し、別権限userから書換え可能な抽出先を対応済みとしない。
 - cacheはアプリ配置用であり、input／final／partial／setting.txtの保存先にしない。§9.1の明示出力先を復元し、未指定（null）の場合だけ入力隣接の`result`を使う。配布・展開・起動のためにworkbookを移動・削除しない。checkpoint形式と同じ製品版・runtime identityのEXE／ZIP間の既存再開条件を維持する。§9〜10のatomic finalizationと完成成功後のpartial cleanupは変更しない。
@@ -1346,7 +1352,7 @@ fresh Windows 11 x64実機またはVMの標準userでexact EXEを試験する。
 |---|---|---|
 | CH-01 | OS edition／build／x64、fresh標準user、.NET SDK／Runtime、PowerShell 6+、Node／npm、Git／gh、別Copilot CLI、Office、IDEの未導入を確認 | 必須PASS |
 | CH-02 | EXE1個だけからofflineで入力画面、Excel読込、設計を利用。sidecar／repository／隣接file／既存CLI cache・認証に依存しない | 必須PASS。保護機能による実行拒否を起動成功としない |
-| CH-03 | 同梱CLIのStart／Ping／auth状態確認を外部PowerShell／Node／Git／gh／CLIなしで実行 | 必須PASS。正常な未認証応答とruntime failureを区別 |
+| CH-03 | GUI-only起動をCLI未導入の状態で確認した後、OS利用者がWinGet等で導入したCLIを絶対PATH entryから解決し、Start／Ping／auth／model／AI runtimeの契約を確認。空・相対PATH entryを無視し、CLI identityは診断情報だけとする | 必須PASS。正常な未認証応答、CLI不在、SDK非互換を区別し、bundled CLI／manifestを使わない |
 | CH-04 | 移動、再起動、同時起動、任意cwd／起動引数、日本語・空白path、read-onlyなEXE配置先、cache欠落からの復元、data保護 | 必須PASS |
 | CH-05 | 標準ブラウザーで取得したMOTW付きEXEのSmartScreen／SAC／企業policy状態、警告・拒否、実際の操作数を記録し承認範囲と比較 | 必須PASS。無警告を一律要求せず、警告や追加操作を隠して1操作成功へ丸めない |
 | CH-06 | fresh userの本人login、既存buttonでの完了後・再起動後の再確認、取消／アプリ終了時の当該login processだけの終了と他process／data／credential保護 | D-06採用済みのため必須PASS。JSONで任意化・N/A化しない |
@@ -1368,7 +1374,8 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 - app-owned cloud backend、database、telemetry本文送信を追加しない。
 - checkpointは暗号化containerではない。保存先のaccess controlは利用者のOS権限に従う。
 - runtime抽出cacheと利用者workbook／CLI credential storeを分離する。配布・展開・起動のために利用者workbookを移動・削除しない。アプリはcacheの再帰削除、旧版の自動掃除、credential削除を行わない。
-- loginでは検証済みCLIとブラウザーに本人認証を委譲し、アプリはtoken／device code等を収集・解析・保存・log出力しない（起動時の自動loginも同じ、§11.10 SEC-AL-01〜03）。取消／アプリ終了による終了対象は§11.3の所有login processだけとする。
+- loginではPATHから解決したOS CLIとブラウザーに本人認証を委譲し、アプリはtoken／device code等を収集・解析・保存・log出力しない（起動時の自動loginも同じ、§11.10 SEC-AL-01〜03）。取消／アプリ終了による終了対象は§11.3の所有login processだけとする。
+- CLI version／実行file hashは観測可能な場合に診断へ記録するだけで、実行可否の信頼証明には使わない。SDK互換性エラーやCLI不在を隠さず表示する。
 - Windowsの保護設定を変更せず、実行拒否を回避しない。公開用evidenceも§13.6のmetadataに限定し、利用者本文やcredentialをcontrol artifact／公開物へ混入させない。
 - 定義を明示保存すると、主回答列選択によって見出しセルから取り込まれた設問textもsetting.txtに平文で含まれる。Prompt・評価基準等へ利用者が貼り付けた内容、sheet名、明示出力pathも含まれ得る。読込・主列変更だけで自動保存する意味ではない。
 - 回答行本文の自動収集は追加しないが、機密な本文が設定へ絶対に含まれないとは保証しない。setting.txtは暗号化containerではなく、OSの利用者別保存先のaccess controlに従う。§11.6の非保存対象を守り、設定の実内容を公開物・画像・log・共有証跡へ混入させず、自動削除機能を追加しない。
@@ -1398,6 +1405,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 | reference generation failure | reference / similarityはblankと技術status。集合の一部失敗は暫定集計であることを明記。減点係数が正ならFinalRaw / FinalScore blank、ゼロなら診断だけの失敗は採点へ伝播しない（FR-114） |
 | invalid AI response after retry | 対象値blank、FinalRaw / FinalScore blank、`AI_OUTPUT_INVALID` |
 | authentication unavailable | 新規AI callなし、`AUTH_REQUIRED` |
+| Copilot CLI not found or incompatible with SDK | 新規AI callなし。CLI不在はOSへのインストール／PATH設定を案内し、SDK非互換は明示的runtime errorで示す。bundled CLIへfallbackしない |
 | timeout after retry | 対象値blank、`AI_TIMEOUT` |
 | network failure after retry | 対象値blank、`NETWORK_FAILED` |
 | rate limit after retry | 対象値blank、`RATE_LIMITED`。有効並列度を縮退 |
@@ -1416,7 +1424,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 
 - Windows 11 x64
 - RID別.NET 10 self-contained app
-- bundled compatible Copilot CLI runtime
+- 固定GitHub Copilot SDKとPATHから解決するOS-installed Copilot CLI runtime。Windowsは`copilot.exe`、Unix source foundationは実行可能な`copilot`。互換性確認・CLI不在の案内・identityの診断記録を含む
 - standard `.xlsx` from Microsoft Forms or Google Forms
 - native input picker
 - base / question / special point allocation
@@ -1426,11 +1434,11 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 - GUI prefill from input/Prompt text command-line options
 - App限定の.NET標準single-file全内容展開によるWindows self-contained unsigned EXEとSHA-256 sidecarを主配布へ追加
 - Windows self-contained unsigned ZIPとSHA-256 sidecarを代替として維持
-- D-06採用による同梱CLIの明示login開始・取消・既存buttonでの認証再確認
+- D-06採用によるOS-installed PATH CLIの明示login開始・取消・既存buttonでの認証再確認
 - 起動時の既存GitHubログイン自動確認と、資格情報がない場合の自動login開始（§11.10）
 - 実行画面の、Excel学生行と1:1・全件の速報値表示（対象の文字列・Prompt・生の定量値、画面内のみ、§11.12）
 - non-public development MSIXのpackage/unpack/integrity `PASS_MECHANISM` evidence
-- clean extract、apphost起動、bundled CLI identityのWindows evidence
+- clean extract／apphost起動と、歴史的package内CLI identity（存在する場合）のpackage-only確認、およびPATH CLI runtimeのWindows evidence
 - exact EXEのclean-host CH-01〜06と、EXE／ZIP／development MSIXのclosed 3-row matrix v2による公開判定
 - teacher, operator, engineer documentation and actual synthetic screenshots
 - 4ステップを維持した同一window内の設定（共通のみ。§11.23）、通常最小サイズの外側スクロール不要、ページ切替と長文／狭小／拡大の到達性例外
@@ -1486,27 +1494,27 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ構造化して移動した。�
 | AC-017 | 指定警告文を全stepと設定画面で常時全文nonblocking表示する。 |
 | AC-018 | `--input`と複数`--prompt`でGUIを事前入力し、利用者操作なしにAI実行しない。 |
 | AC-019 | selected same-row dataだけをAIへ送り、本文／Prompt／reason／evidence／credentialをlogへ残さない。 |
-| AC-020 | 移行中もWindows 11 x64 self-contained unsigned ZIPがcleanな展開先で起動し、SHA-256 sidecarとbundled CLI identityを検証できる。 |
+| AC-020 | Windows 11 x64 self-contained unsigned ZIPがcleanな展開先で起動し、SHA-256 sidecarと、歴史的packageにCLIが含まれる場合のartifact identityをpackage integrityとして検証できる。runtimeはPATH CLIだけを使用する。 |
 | AC-021 | `PASS_PRODUCTION`がないplatform、architecture、installer、signing、notarizationを対応済みとして表示しない。ただし本版のunsigned Windows EXE／ZIPは§13.6〜13.7の`PASS_REQUIRED`を公開判定とし、署名・installer・notarization等のproduction trustを満たしたとは表示しない。 |
 | AC-022 | README、教師tutorial、Prompt例、install、privacy、troubleshooting、開発設計、実画面screenshotsを現行UIとcurrent delivery evidenceへ同期する。 |
-| AC-023 | Windows x64 development MSIXを作成・unpackし、manifest/version/RID、block map、payload、bundled CLI、SHA-256 sidecar、test-only identityを検証し、一般配布しない。 |
+| AC-023 | Windows x64 development MSIXを作成・unpackし、manifest/version/RID、block map、payload、歴史的package内CLI（存在する場合）、SHA-256 sidecar、test-only identityをpackage integrityとして検証し、一般配布しない。runtimeは同梱CLI／manifestを使わない。 |
 | AC-024 | macOS publish/sign/notary source foundationのstatic contractを検証し、native production evidenceなしにartifactまたはsupport claimを公開しない。 |
 | AC-025 | macOS scriptがnested sign、shipped CLI hash、outer sign、notary log、app／DMG staple、strict verificationの順序を要求する。実行結果は現版のrequired acceptanceにしない。 |
 | AC-026 | Windows public EXEを主導線、ZIPの取得・展開・起動を代替として文書化する。sidecar公開とCIのexact hash検証は必須、利用者の手動比較は任意推奨、sidecarはEXE起動の前提にしない。.NET Runtime／SDK、PowerShell／Node／Git／gh、別Copilot CLI、Officeの導入やsetup scriptをGUI起動に要求せず、development MSIXを一般利用者手順へ含めない。 |
 | AC-027 | public EXE／ZIP/packageとdevelopment MSIXにsample、利用者入力、final、partialを含めず、package作成・展開・起動で利用者workbookを変更・削除しない。 |
 | AC-028 | release workflowはcandidateのpackage／mechanism required testsを満たしたEXE／ZIPと各sidecarの4 assetだけをdraftへ添付する。exact EXEの必須clean-host結果を照合したprotected publish時にEXE／ZIP／non-public development MSIXのclosed 3行でmatrix v2を確定し、`publish=true`かつrequired statusを満たすartifactだけを公開する。development MSIX本体・secret・未実測claimを漏らさない。 |
 | AC-029 | OSのみのfresh Windows 11 x64・標準userで、取得済みEXE1個を開く1起動gestureからofflineで入力画面を表示し、手動展開・追加導入・昇格を要求しない。OS警告・拒否・実操作数は別途記録し、無条件・無警告を保証しない。 |
-| AC-030 | 単一EXEに.NET/native依存・固定CLI・manifest・既存公開docs／画像／LICENSEを含め、外部PATH／SDKやsidecarに依存せず既存CLI integrity検証を維持する。App限定profileとCore／Appの2 production projectを維持する。 |
+| AC-030 | 既定App buildでは`CopilotSkipCliDownload=true`とし、単一EXEに.NET/native依存・既存公開docs／画像／LICENSEを含める。歴史的publishは明示供給CLI／manifestを含めてもよいが、runtimeはそれらを選択せずOS PATH CLIを使う。GUI起動はCLI／SDK／sidecarに依存せず、AI runtimeは互換SDKとPATH CLIを必要とし、不在・非互換を明示する。App限定profileとCore／Appの2 production projectを維持する。 |
 | AC-031 | EXE／ZIPで任意cwd、日本語・空白path、相対`--input`、複数`--prompt`、既存invalid入力・明示適用の契約を維持する。起動によるAI送信は0件で、EXE配置先や抽出先へcwd基準を変えない。 |
 | AC-032 | 初回・再起動・同時起動・cache欠落・抽出中断・容量／権限不足でも利用者input／final／partialを変更・削除しない。cacheとdata／setting.txtを分離し、明示出力先の復元と未指定時だけの入力隣接result、同版EXE／ZIP間の既存checkpoint再開条件を維持する。 |
-| AC-033 | 利用者のbutton操作または§11.10の起動時自動loginだけで検証済み同梱CLIのloginを直接開始し、shellを介さずcredential／device codeを収集しない。二重開始・評価中開始を防ぎ、取消・失敗後もGUIを継続する。取消／アプリ終了時だけ所有login processを終了し、ブラウザー・他CLI・credentialに触れず、既存buttonで再確認する。自動AI実行しない。 |
+| AC-033 | 利用者のbutton操作または§11.10の起動時自動loginだけで、絶対PATH entryから解決したOS-installed CLIのloginを直接開始し、shellを介さずcredential／device codeを読み取り・収集・解析しない。Windowsは`copilot.exe`、Unix source foundationは実行可能な`copilot`を使い、空・相対PATH entryを無視する。bundled CLI／manifestへのfallbackをせず、CLI version／hashは診断のみとする。二重開始・評価中開始を防ぎ、取消・失敗後もGUIを継続する。取消／アプリ終了時だけ所有login processを終了し、ブラウザー・他CLI・credentialに触れず、既存buttonで再確認する。CLI不在はOS install／PATH設定を案内し、SDK非互換は明示runtime errorとする。自動AI実行しない。 |
 | AC-034 | candidate run／source／version／bytes／hashに拘束されたexact EXEとCH-01〜06のPASSが一致した場合だけ新経路をprotected publishする。metadata限定JSON、candidate-bound MSIX検証記録、4 public assetsの再download照合を要求し、必須試験の欠落・FAIL・NOT_RUN・差替えを拒否する。未実測のOS-only／署名／installer claimを出さない。 |
 | AC-035 | 利用者別setting.txt（UTF-8 JSON、schema整数1）へ共通設定＋任意の採点定義1件を明示保存し（表示専用のmodel一覧cacheだけは§11.6の自動保存例外）、ID／decimal／Prompt／canonical hashを復元する。header由来の設問text・貼付内容は明示保存時に平文で含まれ、§11.6の非保存対象は保存しない。破損・未知schema・IO失敗は元fileとdraftを保持しoffline継続する。保存中再編集は未保存のまま、同時保存は最後の成功が優先する。明示出力先は再起動・入力変更後も復元し、初回の未指定または空欄への明示編集によるnullの場合だけ入力隣接resultを算出し、fallback・復元時directory作成をしない。 |
 | AC-036 | 保存定義はExcel読込後の明示操作で、保存headerのmetadata・sheet・行・列・定義全体を検証してからInput／Designへ一括適用する。失敗・取消時は現在状態とfileを変更せず、成功時はID・順序・設問text・Prompt・配点を保持する。Imported Prompt一覧は不変、run中の一括適用は禁止し、既存checkpoint admissionを緩めない。 |
 | AC-037 | 設定を第5ステップにせず、同じ対象へ1操作で移動し、値・対象ID・ページ・設定内の表示（設定は共通のみ。§11.23）・入力途中の編集を保持して戻れる。希望modelは明示確認後だけ実効選択にし、不在なら未選択・no fallback、確認失敗だけで保存希望を消さない。遷移・設定読込／保存／適用で認証確認／login／runを自動開始せず、login完了時は§11.3の6の認証状態・model一覧の自動再確認だけを行う（起動時の自動確認・自動loginだけは§11.10・AC-040に従う）、実行中の次回draft編集は現在snapshotへ混入しない。全画面で進捗・停止を保持し（実行画面では本文の進捗を保持とみなす。シェル帯の進捗を隠してもよい。FR-111）、設定中完了は結果通知だけとする。前回結果・override・未保存修正版を次回設定から分離する。 |
 | AC-038 | 中断後は部分結果のpartial pathと再開準備を表示し、同一セッションでは明示操作で、再起動後はpartial選択またはpath指定で再開条件を開始前に項目別検証する。不一致時はcheckpointを変更せず開始しない。入力・modelだけは明示操作で合わせられ、採点設計・runtimeは自動変更しない。window close時は有限時間の中断待機後に閉じる。 |
 | AC-039 | 実行・結果画面とジョブ単位のローカルJSON Linesログで、今回の開始操作に対応するAI使用量（入力・出力・推論・キャッシュtoken、`nano-AI units`、premium request消費量）を、AIを呼ぶ3 operation（参照回答・通常評価・固有評価）と再試行・失敗・取消・未保存行を含めて確認できる。未取得は0や推定値にせず理由とともに示し、明示0・未送信・送信状況不明・部分取得を区別する。項目別の取得元、試行番号・相関ID・終端結果、モデル内訳と総量の不一致を保持し、内訳を総量へ加算・配賦しない。SDK報告の原単位を保ち、通貨表示をしない。AIクレジットはnano-AI unitsから§11.21の規則で換算して示す（2026-10-01変更）。ログは数値・生成ID・閉じたコードだけを記録し、保存失敗でも観測済み表示と採点を壊さない。 |
-| AC-040 | 事前条件: fake認証境界とfake login processを注入した`ExecutionViewModel`（実CLI・実ブラウザー・実資格情報は使わない）。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~CopilotLoginCommandTests"`。期待結果（exit code 0）: ①window表示（Opened）で認証確認が1回だけ実行される（FR-AL-01）。②`Available`ならlogin processの起動0回・resolver呼出0回・状態文に「自動的にログインしました」（FR-AL-02）。③`AuthRequired`ならlogin processがちょうど1回起動し、完了後に認証を再確認し、2回目の起動時処理は何もしない（FR-AL-03、FR-AL-04）。④`CliUnavailable`／`RuntimeFailed`／`Cancelled`ではlogin起動0回で再試行案内を表示する（FR-AL-03、FR-AL-07）。⑤自動login中の「ログインを取り消す」で所有processだけを`Kill(false)`で1回終了し、再自動起動しない（FR-AL-04、FR-AL-05）。⑥run呼出0回・model fallbackなし（FR-AL-06）。⑦環境変数値`0`／`false`（大文字小文字・前後空白を無視）でlogin起動0回、未設定・空・その他値は有効（FR-AL-08）。⑧状態文・`ToString()`にcanary（token、device code、path、例外名）を含まない（SEC-AL-01〜02）。⑨dispose後・手動確認中・確認失敗時に例外を漏らさずloginを開始しない（FR-AL-07、NFR-AL-01）。証跡: テスト結果（.trx）。実資格情報での確認はAC-040に含めず、§18外の本人確認とする。 |
+| AC-040 | 事前条件: fake PATH resolver、認証境界、fake login processを注入した`ExecutionViewModel`（実CLI・実ブラウザー・実資格情報は使わない）。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~CopilotLoginCommandTests"`。期待結果（exit code 0）: ①window表示（Opened）でPATH CLIによる認証確認が1回だけ実行される（FR-AL-01）。②`Available`ならlogin起動0回・状態文に「自動的にログインしました」（FR-AL-02）。③`AuthRequired`ならPATHで解決した同一CLIのlogin processがちょうど1回起動し、完了後に同CLIで認証を再確認し、2回目の起動時処理は何もしない（FR-AL-03、FR-AL-04）。④CLI不在／SDK非互換／`RuntimeFailed`／`Cancelled`ではlogin起動0回で適切なinstall／PATH案内またはruntime errorを表示する（FR-AL-03、FR-AL-07）。⑤自動login中の「ログインを取り消す」で所有processだけを`Kill(false)`で1回終了し、再自動起動しない（FR-AL-04、FR-AL-05）。⑥run呼出0回・model fallbackなし（FR-AL-06）。⑦環境変数値`0`／`false`（大文字小文字・前後空白を無視）でlogin起動0回、未設定・空・その他値は有効（FR-AL-08）。⑧状態文・`ToString()`にcanary（token、device code、path、例外名）を含まず、CLI version／hashは診断情報だけ（SEC-AL-01〜02）。⑨dispose後・手動確認中・確認失敗時に例外を漏らさずloginを開始しない（FR-AL-07、NFR-AL-01）。証跡: テスト結果（.trx）。実資格情報での確認はAC-040に含めず、§18外の本人確認とする。 |
 | AC-041 | 事前条件: 設問文が`Question text Q1`（設問ID `Q1`、表示名`Question Q1`）等の合成runと、改行・連続空白・全角空白を含む設問文、空白のみの設問文を持つ合成run。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~ResultsQuestionTextTests|FullyQualifiedName~ResultsOutputViewTests"`。期待結果（exit code 0）: ①`RowScores[].QuestionEarnedText`が`<正規化した設問文>: <獲得点>`を設問順に` · `連結した値と完全一致し、設問IDまたは表示名を含まない（FR-RS-01、FR-RS-02）。②改行・タブ・全角空白を含む設問文は単一半角空白へ正規化され前後空白が除かれる。未確定の設問は`—`（FR-RS-02）。③空白のみの設問文は表示名、表示名も空白のみならIDを使う（FR-RS-03）。④実viewの詳細の`ResultsQuestionEarnedFull`が選択行の`QuestionEarnedText`と同じ文字列で、詳細の基準編集領域の`ResultsCriterionQuestionText`が原文（改行保持）である（FR-RS-01、FR-RS-04）。⑤表示しただけで未保存overrideが生じず、snapshotの設問文が原文のまま（正規化されない）である（FR-RS-05）。⑥実viewの一覧（`RowScoreList`）の見出しのTextBlockが`元の行`・`最終点`・`固有点`・`類似減点`・`状態`の5個だけでこの順に並び、各行のGridが列定義5・子5で、一覧の見出し・行のどのTextBlockのTextとtooltipにも`設問別得点`と`QuestionEarnedText`の値（設問文）を含まない。10設問の合成runでも一覧の列は5のままで、詳細の`ResultsQuestionEarnedFull`には全10設問が出る（FR-RS-06、FR-RS-01）。証跡: テスト結果（.trx）。実画面のスクリーンショット確認は§18外とする。 |
 | AC-042 | 事前条件: fake行source・fake AI runner・fake checkpoint storeと、fake run boundaryを注入した`ExecutionViewModel`／`ExecutionView`（実CLI・実AI・実資格情報は使わない）。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~LivePreview"`。期待結果（exit code 0）: ①評価計画確定後、対象行と同数（先頭行〜末尾行、昇順、欠落・重複なし）の全行が「待機中」で並ぶ（FR-LP-02、FR-LP-03）。②1行の評価で、AIへ渡した`RenderedPrompt`と一致するPrompt、主回答・補助列のセル値、criterion別RawScore・理由・根拠、固有Score、類似度がFR-LP-04どおり詳細に出る。Prompt組立後・応答前は「AI評価中」で対象の文字列とPromptが出て、応答後に値が入る（FR-LP-04、FR-LP-05）。③空回答は`空回答: AIへ送信せず0点相当`、固有配点0は`未実行`、AI失敗は`失敗（AI_TIMEOUT）: 値は空欄`で、0や成功値を出さない（FR-LP-05）。④一覧の要約が`通常 8,6 / 固有 0.8 / 類似 0.42`形式になり、項目数・状態が更新される（FR-LP-03）。⑤checkpoint再開では再開済み行が「再開前に完了」でcheckpointの値を表示し、対象の文字列・Promptは保存されていない旨を示す（FR-LP-06）。⑥取消・失敗で終わると評価途中の行が「中断」、未着手が「未処理」になり、次のrun開始・入力変更で破棄される（FR-LP-07）。⑦2,000文字超の値は`先頭 2,000 文字`注記つきで切り詰められ、保持合計が32,000,000文字を超えると以後は200文字になる（FR-LP-08）。⑧見出しが`速報値（Excel 行ごと・{N} 行）`で、20,000行でも全件が一覧に入り、Controlは仮想化される（FR-LP-01、FR-LP-02、FR-LP-09、NFR-LP-01）。⑨canary文字列が`ToString()`・logに現れず、追加のAI呼出しが0件、checkpointに速報値用の追加フィールドがない（SEC-LP-01、SEC-LP-02）。⑩1024×720で「実測」表示・予約名・主要操作がviewport内に収まり、速報値の行一覧・詳細が日本語Accessible Nameを持つ（NFR-LP-01）。証跡: テスト結果（.trx）、`docs/images`の実行画面screenshot。 |
 | AC-043 | 事前条件: 実CLI・実資格情報を使わない。SDKの`ModelInfo`をfakeとして与える。操作: `dotnet test tests/StudyReportEvaluator.App.Tests --filter "FullyQualifiedName~CopilotModelEnumerationTests|FullyQualifiedName~ModelCatalogTests"`。期待結果（exit code 0）: ①`auto`、policy未設定、`unconfigured`、大文字の`ENABLED`を含む全modelがSDK順に選択肢となり、上限・reasoning effortが保持される（FR-MS-01、FR-MS-04）。②1000件でも切り捨てない（FR-MS-01）。③`disabled`（大文字小文字不問）は除外され他modelは残る（FR-MS-02、FR-MS-03）。④null・空・空白のみ・前後空白・制御文字・257文字のIDは除外され、例外なく他modelが残る。256文字は残る（FR-MS-02、FR-MS-03）。⑤null・空の列挙は空一覧になる（FR-MS-03）。⑥cache 4096件は保存・復元でき、4097件の保存は`InvalidSettings`で既存fileを変更しない（FR-MS-05）。⑦4097件の一覧は全件を選択でき、最後のmodelを選択でき、cacheと設定fileは作られない（FR-MS-01、FR-MS-05）。証跡: テスト結果（.trx）。実accountでの列挙件数の確認は§18外の本人確認とする。 |
@@ -1547,20 +1555,20 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ構造化して移動した。�
 16. selected-column／same-row isolation、literal string、no-content log test。
 17. 4-step＋設定、warning exact text/nonblock、progress、resume、completion、keyboard、200% scale test。1024×720／1180×800の通常shellは実ClientSize、Extent／Viewport、主要Control完全包含を実測して外側scroll不要とhorizontal overflowなしを確認する。多数項目のページ切替・元行移動・空一覧・最終ページ・選択保持・リサイズとvirtualization、長文／path／dropdownの局所scroll、760×600 standalone／200%表示のreflow後の本文縦scroll例外を分離し、全操作への到達を検証する。44 DIP、focus復帰、一意Automation ID、native DPI／Narratorをheadlessと分けて記録する。主回答列ComboBox操作後の可視設問text同期も維持する。
 18. CLI option parser、UTF-8 Prompt file、複数Prompt、明示適用、no-auto-run test。
-19. Windows x64 legacy publish/package layout、bundled CLI、clean launch test。
+19. Windows x64 legacy publish/package layout（同梱CLI／manifestがある場合のpackage integrityのみ）、clean GUI launch、およびPATH CLI runtime test。
 20. unsigned ZIP、SHA-256 sidecar、safe layout、再現可能な再package regression test。
 21. README、利用者文書、package契約が未実測platform、architecture、installer、signing、notarizationを対応済みと主張しないtest。
 22. documentation link、screenshot provenance、unsupported claim、Prompt examples contract test。
 23. fixed-seed 531-row synthetic end-to-end、resume end-to-end、input hash不変test。
 24. optional authenticated synthetic Copilot smokeとexternal spreadsheet recalculation smoke。required deterministic testの代替にしない。
-25. Windows development MSIXのmanifest/version/layout、unpack、block map、bundled CLI、sidecar、unsigned OID、policy negative、cleanup test。
+25. Windows development MSIXのmanifest/version/layout、unpack、block map、歴史的同梱CLI（存在する場合）のpackage integrity、sidecar、unsigned OID、policy negative、cleanup test。runtimeではPATH CLIだけを使う。
 26. macOS RID別publish／bundle／sign／notary script、Info.plist、entitlement、secret boundaryのstatic contract test。
 27. macOS scriptがhardened runtime、nested/outer signature、secure timestamp、notary log、staple、DMG integrity、quarantine launchをproduction evidenceとして要求することのcontract test。
 28. Windows ZIPのclean extract/apphost/bundled CLI/input不変と、development MSIX packageに利用者workbookを含めないことのE2E／package test。
 29. Windows ZIPをrequired publish row、development MSIXをnon-public mechanism rowとして扱うmatrix、secret isolation、public candidate re-download、未実測artifact非公開のrelease workflow test。
-30. App限定single-file profile／locked restore／publishと最終EXEのpackage test。固定version、restore／publish条件一致、通常ZIP／Core／macOSへの非適用、AMD64／版、実行必須file1個、symbols除外、native／CLI／manifest integrity、docs／画像／LICENSE allowlist、禁止物非混入、sidecarのfinal bytes一致とsidecarなし起動を検証する（AC-029／030）。
+30. App限定single-file profile／locked restore／publishと最終EXEのpackage test。既定`CopilotSkipCliDownload=true`、歴史的publishで明示供給するCLI file／manifestのpackage-only検証、restore／publish条件一致、通常ZIP／Core／macOSへの非適用、AMD64／版、実行必須file1個、symbols除外、native integrity、docs／画像／LICENSE allowlist、禁止物非混入、sidecarのfinal bytes一致とsidecarなしGUI起動を検証する。runtimeがPATH CLIを選ぶことと同梱CLIを選ばないことも確認する（AC-029／030）。
 31. 実EXEの初回／再起動／同時起動／cache欠落復元／抽出中断／容量・権限不足、移動・read-only配置、任意cwd・日本語／空白・相対path・複数Prompt・invalid引数・明示適用・no-auto-run test。synthetic input／既存final／partialのhash・size・時刻不変、default result位置、同版EXE／ZIPのcheckpoint互換を検証する。実施できないfaultをPASSにしない（AC-031／032）。
-32. login専用service／Execution UIのdeterministic test。検証済み絶対CLI／固定login引数だけの直接起動、shell非使用、token／device code非収集・非log、本人操作まで未開始、二重開始／評価中開始防止、失敗・取消後のGUI継続と再試行、取消／app close時の所有process限定終了、ブラウザー／他CLI／credential非干渉、既存buttonでの再確認、no-auto-run、login前後のCLI identity維持、keyboard／Automation ID／200% scaleを検証する。本人loginの実測はCH-06として分離する（AC-033）。
+32. login専用service／Execution UIのdeterministic test。絶対PATH entryから解決したOS CLI／固定login引数だけの直接起動、空・相対PATHの無視、shell非使用、token／device code非読取・非収集・非log、bundled CLI／manifest非選択、SDK非互換・CLI不在の明示エラー、本人操作まで未開始、二重開始／評価中開始防止、失敗・取消後のGUI継続と再試行、取消／app close時の所有process限定終了、ブラウザー／他CLI／credential非干渉、既存buttonでの再確認、no-auto-run、login前後の観測CLI identityの診断記録、keyboard／Automation ID／200% scaleを検証する。本人loginの実測はCH-06として分離する（AC-033）。
 33. exact candidate EXEのfresh OS試験CH-01〜06と公開境界test。matrix v2のclosed 3行／public 4 assets、candidate workflow／run／source／version／hash／sidecar拘束、metadata限定JSONの型・長さ・許可field、MSIXのcandidate検証記録のみ受渡し・本体非upload、再download照合後の最終matrix確定を検証する。unknown／duplicate／missing row、必須試験欠落・FAIL・NOT_RUN、CH-06の任意化、別EXE証跡、機微field、MSIX公開を拒否し、ADV-01／02のNOT_RUNは許容する。開発host／fake成功をclean-host／本人認証の代用にしない（AC-028／029／034）。
 34. 一時absolute pathに限定した設定storeの明示保存・再読込test。fileなし、BOM、型／enum／範囲、schema欠損／不正型／未知版／未知項目、定義なし／不正draft、入力未読込時の保存定義保持、ID／decimal／Unicode／Prompt／canonical hash往復、保存中再編集、atomic置換と旧bytes保持・temp後始末を確認する。Windowsの排他file・file-valued親path等で実際のIO拒否を確認し、ReadOnlyディレクトリだけを拒否根拠にしない。合成header／貼付内容の平文保存、回答自動収集・credential／AI結果非保存・no-content logを検証する。未指定で入力A→Bのresult、明示先の再起動→入力Bでの復元、空欄→null、利用不可no fallback、復元時directory非作成を確認し、実利用者設定を使わない（AC-035）。
 35. 保存定義の明示適用test。Excel未読込／run中の禁止、同入力／別header／sheet・列・行不一致、取消・失敗時のInput metadata／draft／Design／保存file無変更、成功時のID・順序・設問text・Prompt・配点・canonical hash保持を確認する。後続主列変更の既存同期、Imported Prompt一覧・本文・順序不変、AI送信0、既存checkpoint admission維持を検証する（AC-036）。
@@ -1570,7 +1578,7 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ構造化して移動した。�
 
 38. ジョブ使用量の集計・表示・JSONLログのdeterministic test。取得成功／一部欠落／全欠落、明示0と未取得、最後の呼び出しのみ、イベント重複・順序逆転・final複数通知、再試行と3 operation（類似度はAIを呼ばない）、取消・cleanup失敗、項目別の取得元、モデル内訳と総量の不一致、下方訂正、overflow／負数を確認する。JSONLは一時directoryだけを使い、回答・Prompt・path・credentialのcanary非記録、容量上限・保存失敗時の観測値保持、終端記録の整合を検証する。実AI・実課金照合・通貨換算は含めない（AC-039）。AIクレジットの換算・書式はTR-48で検証する。
 
-39. 起動時の自動Copilotログインのdeterministic test。既存資格情報あり（login process起動0）、資格情報なし（自動login1回・完了後の再確認・以後の再実行なし）、`CliUnavailable`／`RuntimeFailed`／`Cancelled`でのlogin非開始、利用者取消後の非再試行、dispose後・手動確認中の非実行、確認失敗の封じ込め、環境変数の解釈（未設定・空・`0`・`false`・大文字小文字・空白）、window表示（Opened）で1回だけ開始されること、AI送信0件、状態文・ToStringへのcanary非混入をfake境界で検証する。実CLI・実ブラウザー・実資格情報は使わない（AC-040）。
+39. 起動時の自動Copilotログインのdeterministic test。既存資格情報あり（login process起動0）、資格情報なし（自動login1回・完了後の再確認・以後の再実行なし）、CLI不在／SDK非互換／`RuntimeFailed`／`Cancelled`でのlogin非開始、利用者取消後の非再試行、dispose後・手動確認中の非実行、確認失敗の封じ込め、環境変数の解釈（未設定・空・`0`・`false`・大文字小文字・空白）、window表示（Opened）で1回だけ開始されること、AI送信0件、状態文・ToStringへのcanary非混入、version／hashがdiagnostic-onlyであることをfake境界で検証する。実CLI・実ブラウザー・実資格情報は使わない（AC-040）。
 
 40. 結果画面の設問文表示のdeterministic test。詳細の設問別得点が正規化した設問文を使い、ID・表示名を含まないこと、空白正規化、空白のみの設問文の代替、未確定`—`、複数設問の順序と同一設問文の非統合、詳細の原文全文表示、表示によるsnapshot設問文・未保存overrideの不変、一覧が5列（元の行・最終点・固有点・類似減点・状態）だけで設問別得点の見出し・値・tooltipを含まないこと（設問数10でも同じ）を検証する（AC-041）。
 
@@ -1681,6 +1689,7 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ構造化して移動した。�
 | 2026-11-04 | AI提案・包括承認（approval_policy、工程2監査 20261104-0855-run1 のHIGH 3件・MEDIUM 1件） | AC-010、AC-011、AC-012、AC-079、AC-081、§7.5、§8.3、§17.2 | C1: 減点のSimilarityは完全な参照集合の参照別合成値の最大値（従来の単独参照と同じく保守的、AC-010と一致）。中央値・最小値・差は表示のみ。C2: 完全な診断＝新形式は予定slotすべて成功かつ各参照の合成値算出済み、旧形式（単独参照）は旧予定数1の成功で完全とし旧採点値を保持（AC-079と両立）。一部失敗・成功0は不完全で係数が正ならAC-011のblank伝播。C3: §17.2の対象外は採点値を決めるための投票・多数決・中央値と明確化し、AC-081の中央値等は記述統計の表示のみ。M1: 空回答は参照状態にかかわらずSimilarity 0・減点0（AC-012優先）。FR本文と承認済み要求の目的は変えず、条件の明確化に限る。新規ID・廃止なし。test-designerはAC-010・AC-011・AC-012・AC-079・AC-081のケースを見直す。残りのMEDIUM（M2〜M4）は§23 A-SC-01〜03へ。 |
 | 2026-11-04 | AI提案・包括承認（包括承認 2026-11-04・202611040836、最終監査 A-02） | §11.19 境界・例外、A-RV-02、§7.7 前文 | 最終監査の確度高の直接矛盾（§11.19・A-RV-02「類似度の項目別を詳細に追加しない」⇔ FR-114 AC-077・AC-078・AC-081）を、実装・統合済みの FR-114 に合わせて解消。結果詳細に類似度の確認指標の詳細を「確認指標・未検証」として表示することを許し、固有評価の項目別は従来どおり追加しない。A-RV-02 の覆す条件が FR-114 の依頼で満たされたと扱う。AC 本文・FR-RV-01〜06 の表は変更しない。新規ID・廃止なし。 |
 | 2026-11-04 | 包括承認の一覧（202611040836） | PARAM-004、AC-010・AC-011・AC-012・AC-079・AC-081（工程2監査 C1〜C3・M1）、§11.19・A-RV-02（最終監査 A-02） | この run で approval_policy により包括承認した項目は上の 3 行に記録したものだけ。利用者は次の Prompt の answers で却下・修正できる。FR-114〜116 は依頼承認であり包括承認ではない。 |
+| 2026-11-05 | 要求所有者・明示依頼承認 | §3.2、§7.1、§11.3、§11.10、§13、§16、§17、AC-020／023／030／033／040、INT-001 | 必須bundled／fixed Copilot CLIを廃し、固定SDKとOS利用者がPATHに導入したCLIを認証・model列挙・評価に一貫使用する。Windowsは絶対PATH entry上の`copilot.exe`（空・相対PATH entryを無視）、Unix source foundationは実行可能な`copilot`。CLI identity version／SHA-256は診断・再開互換情報に限り信頼attestationにしない。CLI不在はOS install／PATH設定を案内（WindowsはWinGet推奨）、SDK非互換は明示runtime error。既定App buildは`CopilotSkipCliDownload=true`。歴史的publishは明示供給CLIを含めてもよいが、runtimeはCLI manifest／bundled fileを使わない。現hostで観測されたWinGet導入native `copilot.exe`のreported CLI version `1.0.99-2`、PE version `1.0.98`は観測値であり固定要件ではない。§13〜§18の過去release／package証跡は歴史的記録として維持し、新規質問・採番・包括承認なし。 |
 
 調査記録: `rdcheck.py similar`と`similar --pairs`で既存を探索し、同じ目的のIDなし契約とACを再利用した。今回範囲で統合・廃止すべき別FRはない。originをfetchして管理データの未取込更新がないことを確認。今回の判断は依頼本文と既存契約で解決したため、社内情報未確認・外部仕様確認未実施。新たなSDKの仕様や実AIの挙動は主張しない。競合・新規質問・BLOCKEDなし。既存のbaseline警告と依頼外の監査指摘は維持する。
 
@@ -1747,11 +1756,11 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ構造化して移動した。�
 | A-MO-02 | [ASSUMPTION] | 未編集の思考レベルは既存の希望low、contextはdefaultを維持する。明示選択はmodel別に保存する。根拠: 既存のコスト・一貫性方針を保ち、model切替で非対応設定を漏らさない。影響: SDKのDefault表示と初期のlow選択は異なる場合がある。覆す条件: 初期値をSDK defaultへ合わせる依頼。 |
 | A-MO-03 | [ASSUMPTION] | context metadataの実験的SDK型は固定1.0.11に限定し、該当accessだけGHCP001を抑止する。根拠: 同versionで型とJSON契約を確認済み。影響: SDK更新時にmetadata・serialization回帰を再検証する。覆す条件: stable APIの提供。実accountの全model権限・請求額・Windows native本人loginの確認は外部前提で、本変更はfakeによるAC-049〜050の検証であり公開gateの解除ではない。 |
 | A-MO-04 | [ASSUMPTION] | 共通設定の既存950×450 DIP slotを保つため、採点定義名・revision・丸めの3項目を同じ1行へまとめ、空いた高さに思考レベルとContext Sizeを配置する。根拠: 既存44 DIP・body340 DIP・footer内包のcontractを維持する。影響: 項目の役割・保存・keyboard既存順は変わらず、長い名前はTextBox内で横scrollする。覆す条件: 別の配置を求められた場合。 |
-| A-AL-01 | [ASSUMPTION] | 「PCやMacにログインしているアカウント」は、OS利用者ごとに同梱CLIが解決する既存GitHub資格情報（§11.10の解決順）と解釈する。根拠: GitHub Copilot CLIの公式資料（確認日2026-09-30）に、Windows／macOSのサインインアカウントをCopilotへ直接連携する手段は記載されておらず、アプリがOSアカウントからGitHubの資格情報を作る実装は独自認証providerとなり§17.2・SEC-AL-01に反する。影響: OSサインインだけではGitHubへログインしない。覆す条件: GitHubがOSサインイン連携を提供した場合。 |
+| A-AL-01 | [ASSUMPTION] | 「PCやMacにログインしているアカウント」は、OS利用者ごとにPATHから解決したCopilot CLIが利用する既存GitHub資格情報（§11.10）と解釈する。根拠: 2026-09-30に確認したGitHub Copilot CLI資料にWindows／macOSのサインインアカウントをCopilotへ直接連携する手段は記載されておらず、アプリがOSアカウントからGitHub資格情報を作る実装は独自認証providerとなり§17.2・SEC-AL-01に反する。影響: OSサインインだけではGitHubへログインしない。覆す条件: GitHubがOSサインイン連携を提供した場合。 |
 | A-AL-02 | [ASSUMPTION] | 既存資格情報がない場合の「可能な限り利用者が何もしない」は、起動時にCLIのブラウザー認証を1回自動で開始し、利用者がブラウザーで承認するだけの状態にすることとする。根拠: 資格情報がない状態でCLIがlogin対話なしに認証することはできない。影響: 起動時にブラウザーが開く。覆す条件: 起動時のブラウザー自動起動が不適切と判断された場合、環境変数の既定値を無効へ変更する。 |
 | A-AL-03 | [ASSUMPTION] | 自動loginは1アプリ起動につき1回とし、取消・失敗後は自動再試行しない。根拠: 取消した利用者へ認証画面を繰り返し提示しない安全側の動作。覆す条件: 再試行間隔・回数を利用者が指定した場合。 |
 | A-AL-04 | [ASSUMPTION] | 任意の抑止手段として環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`を採用し、設定画面・setting.txtの項目は追加しない。根拠: 既存のsetting.txt schema・§17.2「必須環境変数」を増やさず、後から低コストで変更できる。覆す条件: 利用者向けの設定UIが必要になった場合。 |
-| A-AL-05 | [ASSUMPTION] | macOSでも同じ実装経路（Avalonia／同梱CLI）が動く想定だが、macOSは現版の正式公開対象外（§17.2）であり、実測していない。影響: macOSでの動作は保証しない。 |
+| A-AL-05 | [ASSUMPTION] | macOS source foundationでは同じ実装経路（Avalonia／PATHから解決したOS-installed CLI）が動く想定だが、macOSは現版の正式公開対象外（§17.2）であり、実測していない。影響: macOSでの動作は保証しない。 |
 | A-RS-01 | [ASSUMPTION] | 依頼の「questionの文字列」は、結果画面の設問別得点に出ていた内部設問ID（`question-<hash>`）を指し、「元のExcelのデータ」はその設問に対応するExcelの質問文（質問文行×主回答列のセル、§4.3の9）と解釈する。学生の回答本文の表示は依頼文から一意に読み取れず、run後にExcelを再読込する必要が生じるため本版では実装しない。根拠: 画面の実例と依頼文の「どの文字列が評価されたのか」、privacy境界（§14）。影響: 設問の識別はできるが回答本文は画面に出ない。覆す条件: 回答本文の表示が必要と確認された場合は、別要求として入力の再読込とprivacy要求を定義する。（2026-10-01: 覆す条件が成立し、回答本文の表示は§11.19・A-RV-01〜05で定義した。設問IDを設問文へ置き換える解釈は維持する） |
 | A-RS-02 | [ASSUMPTION] | 表示する設問文は、run開始時のsnapshotが持つ設問文（利用者が手動編集した場合はその値）とする。Excelセルの現在値を結果表示時に再読込しない。根拠: 前回の実行結果を現在のdraft・入力から再評価しない原則（§2.2の5、§11.8）。覆す条件: 元セルの現在値の表示が必要になった場合。 |
 | A-RS-03 | [ASSUMPTION] | 一覧の設問別得点の文字列は、設問文を長さ制限せず連結し、列幅を超える分は既存の表示上の省略記号に任せる。根拠: 全文は詳細で確認でき、業務上の文字数上限を決める根拠がない。覆す条件: 一覧の列構成の変更要望。（2026-10-01: 覆す条件が成立し、一覧から設問別得点を除いた（FR-RS-06、A-RS-04）。本仮定は詳細の全文表示には不要となり、適用外） |
@@ -1766,7 +1775,7 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ構造化して移動した。�
 | A-LP-03 | [ASSUMPTION] | 「元のExcelデータの1行と1:1」の対象は学生行だけとし、行に対応しない参照回答の生成は一覧に含めない。参照回答は類似度項目の比較文字列としてだけ表示する。根拠: 参照回答は設問単位で同一runの全学生に共有される。影響: 参照回答生成のPromptは画面に出ない（進捗は「実測: 参照 a / b」）。覆す条件: 参照回答のPrompt表示を求められた場合。 |
 | A-LP-04 | [ASSUMPTION] | 各文字列の保持上限を2,000文字、保持合計の閾値を32,000,000文字（超過後は200文字）とする。根拠: 全件（最大20,000行×複数項目）を保持してもメモリを際限なく増やさないための安全側の値で、標準的な回答・Promptは上限内に収まる。行数は制限しない。影響: 極端に長い回答・Promptの末尾は画面に出ない（出力workbookには従来どおり保存される）。覆す条件: 実測で上限が不足する場合、定数を変更する。 |
 | A-LP-05 | [ASSUMPTION] | 速報値の本文は画面とメモリだけに置き、ファイル・log・checkpointへ保存しない。根拠: 回答本文・Prompt・AI理由・根拠をlogへ記録しない既存方針（§2.2の6、AC-019）と、依頼に保存要求がないこと。影響: アプリ終了後・入力変更後は再表示できない（既存のcheckpointと出力workbookは変更しない）。覆す条件: 速報値のファイル保存を求められた場合。 |
-| A-MS-01 | [ASSUMPTION] | 「利用できる全てのモデル」は、同梱CLIのSDK `ListModelsAsync`が当該accountへ返すmodelから、ポリシーで`disabled`のものと不正IDを除いた集合と解釈する。根拠: 実測で`auto`を含む29 modelが返り、アプリ側の絞込み・件数上限は存在しなかったため、依頼の実質的な欠陥は、(1)1件の不正IDが列挙全体を失敗させ得ること、(2)cache 512件超がsetting.txt全体を無効にすること、(3)選択しても使えない`disabled` modelが選択肢に混ざり得ることと判断した。影響: SDKが返さないmodel（プラン外・組織ポリシーで未提供）は選べない。覆す条件: `disabled` modelも表示したい場合はFR-MS-02(b)を外す。 |
+| A-MS-01 | [ASSUMPTION] | 「利用できる全てのモデル」は、実行時にPATHから解決したCopilot CLI経由でSDK `ListModelsAsync`が当該accountへ返すmodelから、ポリシーで`disabled`のものと不正IDを除いた集合と解釈する。根拠: 2026-09-15の当時のCLI実測では`auto`を含む29 modelが返り、アプリ側の絞込み・件数上限は存在しなかったため、依頼の実質的な欠陥は、(1)1件の不正IDが列挙全体を失敗させ得ること、(2)cache 512件超がsetting.txt全体を無効にすること、(3)選択しても使えない`disabled` modelが選択肢に混ざり得ることと判断した。この件数は現行PATH CLIの返却数を保証しない。影響: SDKが返さないmodel（プラン外・組織ポリシーで未提供）は選べない。覆す条件: `disabled` modelも表示したい場合はFR-MS-02(b)を外す。 |
 | A-MS-02 | [ASSUMPTION] | cache上限は4096件とする。根拠: 実測は29件で、旧512件は将来のmodel増加に対して余裕が乏しく、4096件でも設定fileは高々数百KBである。上限を超える一覧は保存せず選択のみ可能にする。覆す条件: 上限の変更は`ApplicationSettings.MaximumCachedModels`を変えるだけでよい。 |
 | A-DOC-01 | [ASSUMPTION] | 「スクリーンショット」は、既存の実画面PNG `images/02-input-mapping.png`（設問の詳細から開く入力詳細画面を写す）の再利用とする。根拠: 同じ画面で、画像は8枚固定でpackaging・文書のcontract testが列挙している。影響: 新しいPNGを追加しない。画面の変更時は既存の再生成手順（AC-022）で更新する。覆す条件: 別の画面状態の画像が必要になった場合は9枚目の追加と全contractの更新を別依頼とする。 |
 | A-XD-01 | [ASSUMPTION] | 依頼の「教授や先生」は、Excelを開いて列を見る・セルへ数値を入力する基本操作ができる大学・高校の教員と解釈する。根拠: 本アプリの対象利用者（§2.1）と、結果Excelを開く操作の前提。影響: Excelの基本操作の説明は含めない。覆す条件: Excelの操作自体の説明が必要と確認された場合。 |

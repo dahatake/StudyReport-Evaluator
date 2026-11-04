@@ -61,7 +61,7 @@ public interface ICopilotLoginProcess : IDisposable
 }
 
 /// <summary>
-/// Starts an explicitly requested bundled CLI login, not an authentication check.
+/// Starts an explicitly requested installed CLI login, not an authentication check.
 /// Cancel the LoginAsync token to stop login; dispose this service on application close.
 /// The UI must separately exclude login while an evaluation is running.
 /// </summary>
@@ -80,7 +80,7 @@ public sealed class BundledCopilotLoginService : IDisposable
     private bool _disposed;
 
     public BundledCopilotLoginService()
-        : this(new BundledCopilotCliPathResolver())
+        : this(new SystemCopilotCliPathResolver())
     {
     }
 
@@ -317,7 +317,7 @@ public sealed class BundledCopilotLoginService : IDisposable
             RedirectStandardInput = false,
             RedirectStandardOutput = false,
             RedirectStandardError = false,
-            // Fixed CLI 1.0.79 global options precede the explicit web login command.
+            // Keep credential exchange in the CLI/browser, not the application.
             ArgumentList = { "--no-auto-update", "--log-level", "none", "login", "--web-flow" },
         };
 

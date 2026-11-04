@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1280" role="img" aria-labelledby="title desc">
   <title id="title">StudyReport Evaluatorの認証・評価・checkpoint・final出力message flow</title>
-  <desc id="desc">利用者、Avalonia UIとworkflow、Coreとworkbook処理、GitHub Copilot SDK、同梱Copilot CLI、GitHub Copilotサービス間の時系列を示す。明示loginまたは状態確認、run準備、各一時session、closed tool callback、結果検証、checkpoint、final workbook検証と保存を含む。</desc>
+  <desc id="desc">利用者、Avalonia UIとworkflow、Coreとworkbook処理、GitHub Copilot SDK、OSのCopilot CLI、GitHub Copilotサービス間の時系列を示す。明示loginまたは状態確認、run準備、各一時session、closed tool callback、結果検証、checkpoint、final workbook検証と保存を含む。</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0 0L10 5L0 10z" fill="#334155"/>
@@ -63,7 +63,7 @@
   <text x="650" y="141" text-anchor="middle" class="lane-sub">validation / Open XML</text>
   <text x="905" y="118" text-anchor="middle" class="lane-title">Copilot SDK</text>
   <text x="905" y="141" text-anchor="middle" class="lane-sub">GitHub.Copilot.SDK</text>
-  <text x="1127" y="118" text-anchor="middle" class="lane-title">同梱CLI</text>
+  <text x="1127" y="118" text-anchor="middle" class="lane-title">OSのCLI</text>
   <text x="1127" y="141" text-anchor="middle" class="lane-sub">copilot.exe / stdio</text>
   <text x="1362" y="118" text-anchor="middle" class="lane-title">GitHub Copilot</text>
   <text x="1362" y="141" text-anchor="middle" class="lane-sub">remote service</text>
@@ -81,7 +81,7 @@
   <path d="M125 225H372" class="arrow"/>
   <text x="248" y="216" text-anchor="middle" class="message">「GitHubにログイン」</text>
   <path d="M372 250H1127" class="arrow"/>
-  <text x="750" y="241" text-anchor="middle" class="message">検証済みCLIを固定引数で直接起動</text>
+  <text x="750" y="241" text-anchor="middle" class="message">OSのCLIを固定引数で直接起動</text>
   <text x="750" y="264" text-anchor="middle" class="detail">--no-auto-update --log-level none login --web-flow</text>
   <path d="M1127 282H1362" class="network"/>
   <text x="1245" y="274" text-anchor="middle" class="message">本人認証</text>

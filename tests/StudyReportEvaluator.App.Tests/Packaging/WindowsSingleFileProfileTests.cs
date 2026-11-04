@@ -39,6 +39,26 @@ public sealed class WindowsSingleFileProfileTests
     ];
 
     [Fact]
+    public void App_build_disables_automatic_cli_download_for_system_cli_use()
+    {
+        XElement project = XElement.Load(Path.Combine(
+            FindRepositoryRoot(), "src", "StudyReportEvaluator.App", "StudyReportEvaluator.App.csproj"));
+
+        XElement skipDownload = Assert.Single(project.Descendants("CopilotSkipCliDownload"));
+        Assert.Equal("true", skipDownload.Value);
+        Assert.Empty(skipDownload.Attributes());
+
+        XElement manifestTarget = Assert.Single(
+            project.Elements("Target"),
+            target => (string?)target.Attribute("Name") == "WriteBundledCopilotManifest");
+        Assert.Equal("_DownloadCopilotCli", (string?)manifestTarget.Attribute("DependsOnTargets"));
+        XElement manifest = Assert.Single(manifestTarget.Descendants("ContentWithTargetPath"));
+        Assert.Equal("copilot-runtime.json", (string?)manifest.Attribute("TargetPath"));
+        Assert.Equal("PreserveNewest", (string?)manifest.Attribute("CopyToOutputDirectory"));
+        Assert.Equal("PreserveNewest", (string?)manifest.Attribute("CopyToPublishDirectory"));
+    }
+
+    [Fact]
     public void Windows_single_file_profile_scopes_all_declarations_to_the_app()
     {
         XElement profile = LoadProfile();

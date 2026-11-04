@@ -342,7 +342,7 @@ public sealed class CopilotClientFactory : ICopilotClientFactory
     private readonly ICopilotCliPathResolver _pathResolver;
 
     public CopilotClientFactory()
-        : this(new BundledCopilotCliPathResolver())
+        : this(new SystemCopilotCliPathResolver())
     {
     }
 
@@ -438,7 +438,7 @@ public sealed class CopilotClientFactory : ICopilotClientFactory
             throw new FileNotFoundException("The Copilot CLI executable is unavailable.");
         }
 
-        string? cliVersion = ReadCliVersion(cliPath);
+        string? cliVersion = await ReadCliVersionAsync(cliPath, cancellationToken).ConfigureAwait(false);
         if (cliVersion is null)
         {
             throw new InvalidDataException("The Copilot CLI version cannot be verified.");
@@ -483,7 +483,7 @@ public sealed class CopilotClientFactory : ICopilotClientFactory
             sdkInformationalVersion);
     }
 
-    private static string? ReadCliVersion(string cliPath)
+    private static async Task<string?> ReadCliVersionAsync(string cliPath, CancellationToken cancellationToken)
     {
         FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(cliPath);
         foreach (string? candidate in new[] { versionInfo.ProductVersion, versionInfo.FileVersion })
@@ -494,7 +494,83 @@ public sealed class CopilotClientFactory : ICopilotClientFactory
             }
         }
 
+        using Process process = new()
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = cliPath,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                ArgumentList = { "--version" },
+            },
+        };
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        if (!process.Start())
+        {
+            throw new InvalidDataException("The installed Copilot CLI version check could not start.");
+        }
+
+        Task<string> output = ReadVersionOutputAsync(process.StandardOutput);
+        Task<string> error = ReadVersionOutputAsync(process.StandardError);
+        try
+        {
+            await Task.WhenAll(output, error, process.WaitForExitAsync(timeout.Token))
+                .WaitAsync(timeout.Token).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: false);
+                await process.WaitForExitAsync(CancellationToken.None)
+                    .WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+            }
+
+            await Task.WhenAll(output, error).WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }
+
+        string versionOutput = await output.ConfigureAwait(false);
+        await error.ConfigureAwait(false);
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidDataException("The installed Copilot CLI version check failed.");
+        }
+
+        foreach (string line in versionOutput.Split('\n'))
+        {
+            const string prefix = "GitHub Copilot CLI ";
+            string candidate = line.Trim();
+            if (candidate.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                candidate = candidate[prefix.Length..].TrimEnd('.');
+            }
+
+            if (CopilotRuntimeIdentity.IsSafeVersion(candidate))
+            {
+                return candidate;
+            }
+        }
+
         return null;
+    }
+
+    private static async Task<string> ReadVersionOutputAsync(StreamReader reader)
+    {
+        char[] buffer = new char[1024];
+        StringBuilder output = new();
+        int read;
+        while ((read = await reader.ReadAsync(buffer.AsMemory()).ConfigureAwait(false)) != 0)
+        {
+            if (output.Length < 4096)
+            {
+                output.Append(buffer, 0, Math.Min(read, 4096 - output.Length));
+            }
+        }
+
+        return output.ToString();
     }
 
     private static bool IsCliUnavailableException(Exception exception) =>

@@ -169,7 +169,7 @@
                   <Button Content="GitHubにログイン" Command="{Binding Execution.LoginCommand}" TabIndex="15"
                           AutomationProperties.AutomationId="SettingsStartCopilotLogin"
                           AutomationProperties.Name="GitHubにログイン"
-                          ToolTip.Tip="同梱 CLI を直接起動し、別のブラウザーで認証します。このアプリはパスワードやトークンを取得・保存しません。完了後にモデル一覧を自動更新します。" />
+                          ToolTip.Tip="OS 上の CLI を直接起動し、別のブラウザーで認証します。このアプリはパスワードやトークンを取得・保存しません。完了後にモデル一覧を自動更新します。" />
                   <Button Content="ログインを取り消す" Command="{Binding Execution.CancelLoginCommand}" TabIndex="16"
                           AutomationProperties.AutomationId="SettingsCancelCopilotLogin"
                           AutomationProperties.Name="ログインを取り消す"

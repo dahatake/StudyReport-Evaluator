@@ -26,6 +26,7 @@ TOOLKIT_VERSION = "0.5.2"
 SPECKIT_PATHS = [".specify/**", "specs/**/*.md"]
 
 DEFAULT_CONFIG: dict = {
+    "prompt_prefix": {"enabled": True, "file": ".github/ebak-prompt-prefix.md"},
     "management_files": {
         "requirements": "docs/requirements-definition.md",
         "requirements_dir": "docs/requirements",
@@ -45,7 +46,7 @@ DEFAULT_CONFIG: dict = {
     # worktree の依存ディレクトリの共有（主の作業ツリーの実体への junction / symlink）
     "worktree_share": {"enabled": True, "dirs": ["node_modules"]},
     "verify": {"commands": [], "timeout_sec": 1800},
-    "system_test": {"jobs": "auto", "serial_patterns": ["default_port"], "prebuild": ""},  # prebuild: ケース実行前に 1 回だけ走らせるコマンド（空なら実行しない）
+    "system_test": {"jobs": "auto", "serial_patterns": ["default_port"]},
     "checks": {
         "ambiguous_words": [
             "適切", "適宜", "なるべく", "できるだけ", "可能な限り", "十分な", "迅速", "高速に", "簡単",
@@ -283,6 +284,17 @@ def primary_tree_of(root: Path) -> Path:
     """The primary checkout of the repository that `root` belongs to (root itself when it is not a linked worktree)."""
     g = root / ".git"
     if g.is_file():
+        # `.git` の gitdir: <common>/worktrees/<name> と、その中の commondir から、git を起動せずに求める（1 回 60〜100 ms）
+        try:
+            txt = g.read_text(encoding="utf-8").strip()
+            if txt.startswith("gitdir:"):
+                gd = Path(txt.split(":", 1)[1].strip())
+                gd = gd if gd.is_absolute() else root / gd
+                cd = (gd / "commondir").read_text(encoding="utf-8").strip()
+                common = Path(cd) if Path(cd).is_absolute() else gd / cd
+                return common.resolve().parent
+        except OSError:
+            pass
         rc, out = git(["rev-parse", "--git-common-dir"], root)
         if rc == 0 and out.strip():
             common = Path(out.strip())

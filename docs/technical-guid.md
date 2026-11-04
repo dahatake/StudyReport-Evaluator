@@ -8,13 +8,13 @@
 
 ### 製品全体とGitHub Copilot CLI
 
-![利用者、入力Excel、StudyReport Evaluator、同梱GitHub Copilot CLI、GitHub Copilotサービス、結果Excelの関係](../images/architecture-overview.svg)
+![利用者、入力Excel、StudyReport Evaluator、OSのGitHub Copilot CLI、GitHub Copilotサービス、結果Excelの関係](../images/architecture-overview.svg)
 
-StudyReport EvaluatorはAI modelを内蔵しません。アプリ内のGitHub Copilot SDKが、検証済みの同梱GitHub Copilot CLIを子processとして起動し、CLIがGitHub Copilotサービスと通信します。入力・採点契約・検証・checkpoint・出力はアプリが管理します。
+StudyReport EvaluatorはAI modelを内蔵しません。アプリ内のGitHub Copilot SDKが、OSにインストールされたGitHub Copilot CLIを子processとして起動し、CLIがGitHub Copilotサービスと通信します。入力・採点契約・検証・checkpoint・出力はアプリが管理します。
 
 ### Componentとproject境界
 
-![App project、Core project、ローカルfile、同梱CLI、GitHub Copilotサービスの技術component図](../images/technical-architecture.svg)
+![App project、Core project、ローカルfile、OSのCLI、GitHub Copilotサービスの技術component図](../images/technical-architecture.svg)
 
 ### 認証・評価・保存のmessage flow
 
@@ -77,7 +77,7 @@ CoreはAvalonia、Open XML、Copilot SDK、filesystemを参照しません。変
 
 Avaloniaの一般的なMVVMでは、ViewをAXAML、ViewModelをUI frameworkへ依存しないclassとして分離し、bindingで接続します。本アプリもこの構造を採りますが、ViewModelはApp project内にあり、workbook／Copilot境界をinterface経由で置換できる箇所と直接compositionする箇所が混在します。
 
-## GitHub Copilot SDKと同梱CLI
+## GitHub Copilot SDKとOSのCLI
 
 ### Processとtransport
 
@@ -87,9 +87,11 @@ GitHubの公式説明では、Copilot SDKの基本構成は「application → SD
 - `CopilotClientMode.CopilotCli`
 - `UseLoggedInUser = true`、Appからの`GitHubToken`注入なし
 - remote session、SDK telemetry、runtime logを無効化
-- PATH上の別CLIや外部serverへfallbackしない
+- PATHで見つかったOSのnative CLIを使用し、同梱CLIや外部serverへfallbackしない
 
-`BundledCopilotCliPathResolver`は`AppContext.BaseDirectory`の`copilot-runtime.json`を読み、schema、RID、SDK版、CLI版、相対path、CLI SHA-256、実file版を照合します。成功した絶対pathだけをSDKとlogin serviceへ渡します。
+`SystemCopilotCliPathResolver`は起動時のPATHを順に調べ、Windowsは`copilot.exe`、Unix source buildは実行権限のある`copilot`を探します。空・相対PATHは無視し、作業directoryや同梱CLIを探索しません。SDKとlogin serviceはこのresolverの絶対pathを使います。未導入時はinstall／PATH／再起動を案内し、起動・RPC・認証・モデル取得失敗はSDK互換性を含むruntime failureとして明示します。
+
+通常ビルドは`CopilotSkipCliDownload=true`でCLIを取得しません。`copilot-runtime.json`との固定版・SHA-256照合は実行時の前提ではありません。実際のCLI版・SHA-256とSDK版は引き続き診断とcheckpoint互換性に使用します。旧`BundledCopilotCliPathResolver`と既存publishの同梱物検証は過去の配布形式の検査用に保持しますが、default runtimeには使用しません。公開`v0.8.6`の既存assetは従来の同梱方式です。
 
 > [!IMPORTANT]
 > 公式SDKの認証優先順位では、明示token、Copilot API用token、対応する環境変数token、保存済みCopilot CLI credential、GitHub CLI credentialの順です。現行Appはtokenを注入しませんが、子process環境を全面的には消去しません。UIは本人のCLI loginを主導線としています。認証方式を変更する場合は、`UseLoggedInUser`だけでなく、子process環境、credential優先順位、multi-user isolation、logとtest fixtureを一緒に設計してください。
@@ -98,7 +100,7 @@ GitHubの公式説明では、Copilot SDKの基本構成は「application → SD
 
 loginと状態確認は別操作です。
 
-- `BundledCopilotLoginService`は利用者の明示操作時だけ、検証済みCLIを`--no-auto-update --log-level none login --web-flow`で直接起動します。
+- `BundledCopilotLoginService`（既存型名を維持）は明示操作または起動時の1回限りの自動login時、OSのCLIを`--no-auto-update --log-level none login --web-flow`で直接起動します。
 - shellを介さず、標準streamやcredentialをAppへredirectしません。
 - process exit code 0は認証成功の証明ではありません。
 - `CopilotAuthenticationService`が別processで`StartAsync`、`PingAsync`、`GetAuthStatusAsync`、認証済みなら`ListModelsAsync`を実行します。
@@ -317,7 +319,7 @@ GitHub.Copilot.SDK、CLI、Avalonia、Open XML、.NET runtimeはpackage／配布
 5. folder publish、単一EXE抽出、ZIP／MSIX allowlist、起動境界を再検証
 6. README、第三者通知、release文書を更新
 
-`.NET`単一fileはOS／architecture固有です。現行profileはnative libraryだけでなく全contentをdiskへ展開する互換modeを使うため、`AppContext.BaseDirectory`、抽出cache、同梱CLI相対pathの挙動を維持する必要があります。
+`.NET`単一fileはOS／architecture固有です。現行profileはnative libraryだけでなく全contentをdiskへ展開する互換modeを使うため、`AppContext.BaseDirectory`と抽出cacheの挙動を維持する必要があります。現行runtimeのCLI探索は抽出先ではなくOSのPATHを使用します。
 
 ## Test strategy
 

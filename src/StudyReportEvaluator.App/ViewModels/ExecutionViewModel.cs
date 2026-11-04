@@ -436,8 +436,8 @@ public sealed class ExecutionRunCompletedEventArgs : EventArgs
 
 public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
 {
-    private const string BundledCliUnavailableMessage =
-        "同梱 Copilot CLI を確認できません。配布物を再取得し、ZIP 版は再展開してください。";
+    private const string SystemCliUnavailableMessage =
+        "OS 上の GitHub Copilot CLI を確認できません。CLI をインストールし、PATH を確認してアプリを再起動してください。";
     private const string LoginExitUnconfirmedMessage =
         "ログイン処理の終了を確認できませんでした。終了を待って再試行するか、アプリを終了して開き直してください。";
 
@@ -629,8 +629,8 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         ExecutionAuthenticationState.Checking => "Copilot CLI と利用可能 model を確認しています…",
         ExecutionAuthenticationState.Available => "既存の Copilot CLI login を利用できます。",
         ExecutionAuthenticationState.AuthRequired => "Copilot CLI で login してから再確認してください。",
-        ExecutionAuthenticationState.CliUnavailable => BundledCliUnavailableMessage,
-        ExecutionAuthenticationState.RuntimeFailed => "Copilot runtime の確認に失敗しました。",
+        ExecutionAuthenticationState.CliUnavailable => SystemCliUnavailableMessage,
+        ExecutionAuthenticationState.RuntimeFailed => "Copilot runtime の確認に失敗しました。CLI と SDK の互換性、ネットワーク、ログイン状態を確認してください。",
         ExecutionAuthenticationState.Cancelled => "Copilot 状態の確認を取り消しました。",
         _ => "Copilot runtime の状態を確認できません。",
     };
@@ -1458,9 +1458,9 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Runs the application-start sequence once: check the credentials the bundled CLI
+    /// Runs the application-start sequence once: check the credentials the installed CLI
     /// already resolves for this OS user and, only when none are usable, start the
-    /// bundled login once. Never throws; never selects a model or starts evaluation.
+    /// CLI login once. Never throws; never selects a model or starts evaluation.
     /// </summary>
     public Task RunStartupAuthenticationAsync(
         bool allowAutomaticLogin,
@@ -1808,7 +1808,7 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
     private static string LoginResultMessage(CopilotLoginResult result) => result.Status switch
     {
         CopilotLoginStatus.Completed => "ログイン処理が終了しました。認証状態とモデル一覧を更新します…",
-        CopilotLoginStatus.CliUnavailable => BundledCliUnavailableMessage,
+        CopilotLoginStatus.CliUnavailable => SystemCliUnavailableMessage,
         CopilotLoginStatus.RuntimeFailed when result.ErrorCategory is CopilotLoginErrorCategory.ProcessWaitFailed
             or CopilotLoginErrorCategory.CleanupFailed => LoginExitUnconfirmedMessage,
         CopilotLoginStatus.RuntimeFailed => "GitHub へのログインに失敗しました。再試行するか、「Copilot 状態を確認」を押してください。",
@@ -2380,13 +2380,13 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
                 AddError(errors, new ExecutionTechnicalError(
                     "COPILOT_CLI_UNAVAILABLE",
                     "Copilot",
-                    BundledCliUnavailableMessage));
+                    SystemCliUnavailableMessage));
                 break;
             case ExecutionAuthenticationState.RuntimeFailed:
                 AddError(errors, new ExecutionTechnicalError(
                     "COPILOT_RUNTIME_FAILED",
                     "Copilot",
-                    "Copilot runtime を安全に確認できませんでした。"));
+                    "Copilot runtime を安全に確認できませんでした。CLI と SDK の互換性、ネットワーク、ログイン状態を確認してください。"));
                 break;
         }
 

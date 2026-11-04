@@ -166,30 +166,30 @@ Windowsのフォルダーの**ReadOnly属性だけでは書込拒否を保証し
 
 ## Copilotを利用できない
 
-CLIはEXE／ZIPの配布物へ同梱され、manifestでpath、RID、SDK／CLI version、SHA-256を検証します。PATH上の別`copilot.exe`は使いません。GUI起動とAI利用は別条件で、AIにはnetwork、本人login、利用可能なCopilot account／model、組織policy上の許可が必要です。
+現行sourceはOSにインストールしたGitHub Copilot CLIを使います。WindowsではPATHから`copilot.exe`を解決し、同梱manifestとの照合や同梱CLIへのfallbackは行いません。GUI起動とAI利用は別条件で、AIにはCLI、network、本人login、利用可能なCopilot account／model、組織policy上の許可が必要です。公開`v0.8.6`の既存assetだけは従来の同梱方式です。
 
 | 表示 | 確認 |
 |---|---|
-| CLI unavailable | 配布物の欠落を確認。ZIPを一部だけ移動していないか確認し、下記の再取得・再展開で復旧 |
-| runtime確認失敗 | Start／Ping、認証・model取得、timeout、終了処理でも発生する。network・現在の処理状態・組織policyを確認し、所有CLIの終了を確認してから**Copilot 状態を確認**を明示的に再実行。不整合が確認できた場合だけ下記の再取得へ進む |
-| CLIのhash／版不一致が確認された | `copilot-runtime.json`または`runtimes\win-x64\native\copilot.exe`の欠落・変更、RID／version／SHA-256不一致を切り分ける。検証を緩めず、下記の再取得・再展開で確認 |
-| loginが必要 | 対象版に応じて同梱CLIの本人対話loginを完了。候補版のlogin buttonでは正常終了後に自動再確認し、失敗時は**Copilot 状態を確認**で再試行。旧公開版では手動再確認。対象版別の操作は下記を参照 |
+| CLI unavailable | 現行sourceは`winget install --id GitHub.Copilot --exact`でCLIを導入し、`copilot --version`を確認。terminal／VS Codeとアプリを再起動してPATHを反映。既存公開版は下記の再取得・再展開で復旧 |
+| runtime確認失敗 | Start／Ping、SDK互換性、認証・model取得、timeout、終了処理でも発生する。`copilot --version`とCLI／SDKの互換性、network・現在の処理状態・組織policyを確認し、所有CLIの終了後に**Copilot 状態を確認**を明示的に再実行 |
+| checkpointのCLI hash／版が一致しない | OSのCLI更新でruntime identityが変わる場合もある。checkpoint互換性と実行時のCLI探索は別。旧CLIを無断でcopyしたりcheckpointを改変せず、新規runか互換性の確認を行う |
+| loginが必要 | OSのCLIで本人対話loginを完了。login buttonでは正常終了後に自動再確認し、失敗時は**Copilot 状態を確認**で再試行。旧公開版は当該版の同梱CLI手順に従う |
 | modelがない | accountで利用できるmodelを確認。model IDを推測入力しない |
 | 保存したmodelが選択されない／`MODEL_SELECTION_REQUIRED` | 保存する希望IDと実効選択は別。明示または自動の認証・一覧再確認に成功し、希望IDが候補に存在するときだけ選択へ反映する。不在なら未選択・no fallbackなので、候補を確認し**設定 → 共通**で明示的に選び直す。認証確認の失敗だけでは希望IDを消さない |
 | model容量を取得できない（上限が「SDK未公開」） | `auto`などのrouterでは正常な状態。runは開始できるが、model相対の容量検査を行わない。上限を推測して回避せず、事前検査が必要なら上限を公開しているmodelを選ぶ |
 
 **設定 → 共通 → 診断**の認証状態・runtime情報は読取専用の表示で、保存対象外です。希望model IDが未指定の初回は、従来どおり確認成功後に初期選択を表示しますが、それだけで希望IDを保存しません。候補版では保存済み`cachedModels`がある場合（空配列を含む）だけ、起動時に一覧を表示用に復元して認証・一覧を自動再確認します。キャッシュなしの旧設定・初回起動は明示確認またはloginを待ちます。再確認失敗ではキャッシュを保持しても実行用の認証・model選択は解除され、一覧が見えても評価できません。設定の明示再読込・保存では認証確認やloginを始めません。
 
-CLI欠落・不一致時は処理を止め、利用中と**同じ製品版の正式配布物を再取得**してください。ZIP版はpackage全体を新しいdirectoryへ展開します。.NET標準抽出は書換え済みcacheの完全性を保証せず、再取得したEXEでも同じcacheを再利用し得ます。不一致が続く場合は、提供元が同じ製品版・runtime identityのZIPを提供していれば新しいdirectoryへ全体を展開し、なければ提供元へ確認してください。公開`v0.8.6`の代わりに旧公開`v0.8.1`を使ってcheckpoint互換を推測しないでください。
+公開`v0.8.6`以前の既存assetでCLI欠落・不一致時は処理を止め、利用中と**同じ製品版の正式配布物を再取得**してください。ZIP版はpackage全体を新しいdirectoryへ展開します。.NET標準抽出は書換え済みcacheの完全性を保証せず、再取得したEXEでも同じcacheを再利用し得ます。不一致が続く場合は、提供元が同じ製品版・runtime identityのZIPを提供していれば新しいdirectoryへ全体を展開し、なければ提供元へ確認してください。公開`v0.8.6`の代わりに旧公開`v0.8.1`を使ってcheckpoint互換を推測しないでください。
 
-PATH上の別CLIのinstall／追加、他版CLIのcopy、manifest変更やhash検証緩和で回避しないでください。
+現行sourceではOSのCLIのinstallとPATH設定が必要です。アプリは自動install／更新しません。既存公開版の同梱物検証をmanifest変更やhash検証緩和で回避しないでください。
 
 ### 本人loginと完了後の再確認
 
 **「GitHubにログイン」「ログインを取り消す」は公開`v0.8.6`のbuttonです。**旧公開`v0.8.1`にはこのbuttonがなく、従来どおり同梱CLIで本人loginを行い、既存の状態確認buttonを使います。buttonがないことだけを不具合と判断しないでください。
 
 1. 候補版は起動直後にこのPCで利用中のGitHubアカウントのログイン（環境変数`COPILOT_GITHUB_TOKEN`／`GH_TOKEN`／`GITHUB_TOKEN`、OSの資格情報ストア、GitHub CLI `gh`の順に同梱CLIが解決）を自動確認します。手動で再確認するにはExecution画面で**Copilot 状態を確認**を選びます。
-2. 利用できるログインがない場合、候補版は検証済みの同梱native CLIだけを直接起動し、ブラウザー認証を1回だけ自動で開始します。CLIのconsole／ブラウザーの案内に従って本人のGitHub accountで対話認証を完了します。取消・失敗後は自動では再試行しないので、必要なら**GitHubにログイン**を選びます。ブラウザーを開きたくない環境では環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`を`0`または`false`にします。
+2. 利用できるログインがない場合、現行sourceはOSのnative CLIを直接起動し、ブラウザー認証を1回だけ自動で開始します。CLIのconsole／ブラウザーの案内に従って本人のGitHub accountで対話認証を完了します。取消・失敗後は自動では再試行しないので、必要なら**GitHubにログイン**を選びます。ブラウザーを開きたくない環境では環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`を`0`または`false`にします。
 3. login processが正常終了すると、認証状態とmodel一覧を自動再確認します。取消・失敗後や自動再確認に失敗した場合は、**Copilot 状態を確認**で再試行します。CLI processの起動・終了やexit codeだけを認証成功とは扱いません。
 4. 状態と列挙されたmodelを確認し、候補版では必要な変更を**設定 → 共通**で行います。AI評価は**定量化を開始**の明示操作まで始まりません。
 

@@ -17,6 +17,21 @@ StudyReport Evaluatorの開発・保守資材です。
 PowerShell scriptはPowerShell Core 7以上で実行し、Windows PowerShell 5.1へfallbackしません。
 開発hostのsingle-file成功はfresh Windows clean-host／本人login／公開完了を意味しません。公開判定は[Traceability](docs/traceability.md)のCH-01〜CH-06とprotected publish境界に従います。
 
+## 開発用ビルドから起動する
+
+```powershell
+dotnet build .\src\StudyReportEvaluator.App -c Release
+& .\src\StudyReportEvaluator.App\bin\Release\net10.0\StudyReportEvaluator.App.exe
+```
+
+通常のビルドは`CopilotSkipCliDownload=true`でCLIを取得しません。認証・モデル取得・評価には、OSにインストールしたGitHub Copilot CLIを使います。WindowsではPATHから`copilot.exe`を解決し、同じ絶対pathをSDKとlogin処理へ渡します。shell scriptや相対PATH、作業directory、同梱CLIへのfallbackは使いません。
+
+CLIが未導入の場合は`winget install --id GitHub.Copilot --exact`で導入し、`copilot --version`を確認してから、terminal／VS Codeとアプリを再起動して更新後のPATHを反映します。アプリはCLIを自動install／更新しません。CLIの版とSHA-256はruntime診断とcheckpoint互換性に使用し、固定版やmanifestとの一致を要求しません。SDKとの互換性はStart／Ping／認証／モデル取得で確認し、失敗時は明示します。
+
+実CLIとの接続だけを検証する場合は、`STUDY_REPORT_EVALUATOR_TEST_SYSTEM_CLI=1`を設定し、`dotnet test tests\StudyReportEvaluator.App.Tests -c Release --filter FullyQualifiedName~Installed_cli_supports_sdk_authentication`を実行します。既存のCLI認証を使用し、認証とモデル一覧取得のみで、AI評価は実行しません。
+
+以下の配布scriptは既存releaseの互換性検証のためCLIを同梱する場合がありますが、現行アプリはそれを選択せずOSのCLIを使用します。配布物の再公開はこのsource変更とは別です。
+
 ## 単一EXEをビルドして起動する
 
 Windows 11 x64、x64 PowerShell 7以上、Git、[`global.json`](../global.json)に適合する.NET SDKが必要です。初回restoreと同梱Copilot CLIの取得にはnetworkも必要です。生成したEXEの実行にはSDKは不要です。

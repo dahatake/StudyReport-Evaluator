@@ -214,23 +214,35 @@ def require_own_worktree(root: Path, cfg: dict, args) -> Optional[int]:
     return 0
 
 
-def primary_tree(root: Path) -> Path:
+def worktree_paths(root: Path) -> list:
+    """Paths of the repository's worktrees (primary first), read from the git directory without starting git
+    (`git worktree list` costs 60-100 ms per call on Windows). Falls back to git when the layout is unexpected."""
+    try:
+        primary = h.primary_tree_of(root)
+        common = primary / ".git"
+        if common.is_dir():
+            paths = [primary]
+            wt = common / "worktrees"
+            for d in sorted(wt.iterdir()) if wt.is_dir() else []:
+                gd = (d / "gitdir").read_text(encoding="utf-8").strip()  # <worktree>/.git
+                paths.append(Path(gd).parent)
+            return paths
+    except (OSError, ValueError):
+        pass
     rc, out = h.git(["worktree", "list", "--porcelain"], root)
-    for line in out.splitlines():
-        if line.startswith("worktree "):
-            return Path(line.split(" ", 1)[1].strip())
-    return root
+    return [Path(line.split(" ", 1)[1].strip()) for line in out.splitlines() if line.startswith("worktree ")]
+
+
+def primary_tree(root: Path) -> Path:
+    paths = worktree_paths(root)
+    return paths[0] if paths else root
 
 
 def other_active_runs(root: Path) -> int:
     """Active runs in other worktrees of this repository (they share the machine's CPU and memory)."""
     n = 0
     here = os.path.normcase(str(root.resolve()))
-    rc, out = h.git(["worktree", "list", "--porcelain"], root)
-    for line in out.splitlines():
-        if not line.startswith("worktree "):
-            continue
-        p = Path(line.split(" ", 1)[1].strip())
+    for p in worktree_paths(root):
         if os.path.normcase(str(p.resolve())) == here or not p.exists():
             continue
         try:
@@ -383,7 +395,7 @@ def landed(root: Path, branch: str, base: str) -> bool:
     return rc == 0
 
 
-def cmd_land(args) -> int:
+def land_core(args) -> int:
     """Merge this run's integration branch into the base branch in the primary tree, one run at a time."""
     root, cfg = ctx(args)
     rid = h.current_run(root, cfg)
@@ -475,6 +487,71 @@ def cmd_land(args) -> int:
     h.save_meta(root, cfg, rid, meta)
     print(f"LANDED {rid}: {base} @ {sha}")
     return 0
+
+
+CONTRACT_FIELDS = (
+    ("main 統合", "pass"),
+    ("main 統合 commit", None),
+    ("完了条件", "pass"),
+    ("最終 verify", "pass"),
+    ("対象テスト", "pass"),
+    ("main 上の統合後 verify", "pass"),
+    ("清掃許可判定", "pass"),
+    ("清掃前版 run-report 確定", "pass"),
+)
+
+
+def finalize_report_for_cleanup(report: Path, sha: str) -> None:
+    """Append the pre-cleanup contract that clean-work.py requires; land has just verified the merged tree."""
+    text = report.read_text(encoding="utf-8")
+    lines = []
+    for name, value in CONTRACT_FIELDS:
+        if re.search(rf"(?m)^-\s*{re.escape(name)}\s*:", text):
+            continue
+        lines.append(f"- {name}: {sha if value is None else value}")
+    for name, tail in (("清掃候補", "work/runs の一時ファイル・統合済みの作業ブランチと統合ブランチ・run worktree"),
+                       ("保護・保持する資産と理由", "main の統合 commit と run-report（run 記録は主の work/runs へ退避）"),
+                       ("候補別結果", "not_run")):
+        if not re.search(rf"(?m)^-\s*{re.escape(name)}\s*:", text):
+            lines.append(f"- {name}: {tail}")
+    if not re.search(r"(?m)^-\s*run 最終状態\s*:", text):
+        lines.append("- run 最終状態: 清掃待ち")
+    if lines:
+        report.write_text(text.rstrip() + "\n" + "\n".join(lines) + "\n", encoding="utf-8")
+
+
+def cleanup_after_land(root: Path, cfg: dict, rid: str) -> int:
+    """After a successful land, finalize the report and delete the run worktree and merged branches."""
+    primary = primary_tree(root)
+    cc = subprocess.run([sys.executable, str(Path(__file__).resolve()), "complete-check"],
+                        cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if cc.returncode != 0:
+        print(f"CLEAN-SKIP {rid}: complete-check が通らないため worktree を保持します\n"
+              + "\n".join((cc.stdout or cc.stderr).splitlines()[-5:]))
+        return 0
+    meta = h.load_meta(root, cfg, rid)
+    report = h.run_dir(root, cfg, rid) / "run-report.md"
+    finalize_report_for_cleanup(report, str(meta.get("landed_commit") or "landed"))
+    os.chdir(primary)  # the run worktree is about to be deleted; this process must not sit inside it
+    proc = subprocess.run([sys.executable, str(Path(__file__).resolve().with_name("clean-work.py")), "--root", str(root)],
+                          cwd=primary, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    print("\n".join((proc.stdout or "").splitlines()[-12:]))
+    if proc.returncode != 0:
+        print(f"CLEAN-FAIL {rid}: 清掃が完了しませんでした（保持した資産は run-report の候補別結果を参照）\n"
+              + "\n".join((proc.stderr or "").splitlines()[-5:]))
+    return proc.returncode
+
+
+def cmd_land(args) -> int:
+    rc = land_core(args)
+    if rc != 0 or args.no_cleanup:
+        return rc
+    root, cfg = ctx(args)
+    rid = h.current_run(root, cfg)
+    if not rid:
+        runs = sorted(p.name for p in (h.work_dir(root, cfg) / "runs").glob("*") if (p / "meta.json").exists())
+        rid = runs[-1] if runs else None
+    return 0 if rid is None else cleanup_after_land(root, cfg, rid)
 
 
 def cmd_start(args) -> int:
@@ -1002,6 +1079,7 @@ def main(argv=None) -> int:
     sub.add_parser("complete-check")
     la = sub.add_parser("land", help="全件完了した run を、共通ロックの下で main へ取り込む")
     la.add_argument("--wait", type=float, default=1800, help="ロックと主の作業ツリーを待つ秒数")
+    la.add_argument("--no-cleanup", action="store_true", help="取り込み後の run worktree・統合ブランチの清掃をしない")
     ln = sub.add_parser("lane")
     ls = ln.add_subparsers(dest="lcmd", required=True)
     for name in ("decide", "confirm"):

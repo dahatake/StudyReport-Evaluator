@@ -17,11 +17,11 @@ AIが作る値は確認対象です。最終的な評点と利用判断は、授
 
 ## Architecture
 
-![利用者、入力Excel、StudyReport Evaluator、同梱GitHub Copilot CLI、GitHub Copilotサービス、結果Excelの関係](images/architecture-overview.svg)
+![利用者、入力Excel、StudyReport Evaluator、OSのGitHub Copilot CLI、GitHub Copilotサービス、結果Excelの関係](images/architecture-overview.svg)
 
-StudyReport EvaluatorはAI modelを内蔵していません。Windowsアプリ内のGitHub Copilot SDKが、配布物に同梱され版とSHA-256を検証したGitHub Copilot CLIを起動し、CLIがGitHub Copilotサービスとの通信を担当します。アプリは入力Excelのread-only読込、採点条件、AIへ渡す範囲、結果検証、checkpoint、別Excelへの出力を管理します。
+StudyReport EvaluatorはAI modelを内蔵していません。現行sourceではOSにインストールしたGitHub Copilot CLIを使用します。WindowsではPATHから`copilot.exe`を解決し、アプリ内のGitHub Copilot SDKがその絶対pathを起動します。CLIがGitHub Copilotサービスとの通信を担当し、アプリは入力Excelのread-only読込、採点条件、AIへ渡す範囲、結果検証、checkpoint、別Excelへの出力を管理します。
 
-1回のrunでは検証済み同梱CLIを1つの共有Copilot clientとして起動し、AI処理ごとに一時sessionを作ります。各sessionにはその処理専用の結果提出toolだけを公開し、shell、filesystem、Web、GitHub write、MCP toolは評価sessionへ公開しません。認証・model確認・AI評価にはnetworkが必要ですが、Excel読込と採点設計はAI処理を開始せずローカルで行えます。
+1回のrunではOSのCLIを1つの共有Copilot clientとして起動し、AI処理ごとに一時sessionを作ります。各sessionにはその処理専用の結果提出toolだけを公開し、shell、filesystem、Web、GitHub write、MCP toolは評価sessionへ公開しません。認証・model確認・AI評価にはnetworkが必要ですが、Excel読込と採点設計はAI処理を開始せずローカルで行えます。
 
 Component図、認証から出力までのmessage flow、変更時に同期すべき実装とtestは[ソフトウェアエンジニア向け技術ガイド](docs/technical-guid.md)を参照してください。
 
@@ -32,11 +32,15 @@ Component図、認証から出力までのmessage flow、変更時に同期す�
 | OS / architecture | Windows 11 x64 |
 | 配布 | .NET 10 self-contained。公開`v0.8.6`はunsigned単一EXEを主導線とし、unsigned ZIPも提供。各形式にSHA-256 sidecar |
 | 入力 | 標準Office Open XML `.xlsx` 1file |
-| AI runtime | 配布物へ同梱したGitHub Copilot CLI。PATH上の別CLIへfallbackしません |
+| AI runtime | 現行sourceはOSにインストールしたGitHub Copilot CLI。PATHのnative executableを使い、同梱CLIへfallbackしません。公開`v0.8.6`の既存配布物は従来の同梱方式です |
 | AI login | GitHub Copilotのlogin。公開`v0.8.6`は起動時にこのPCの既存GitHubログインを自動確認し、なければブラウザー認証を自動で開始します。GUI起動とは別条件です |
 | Spreadsheet runtime | Microsoft Excel、Office、LibreOfficeはアプリ実行に不要 |
 
 `.xls`、`.xlsb`、CSV、PDF、`.xlsm`等のmacro-enabled file、password／rights-protected／暗号化workbook、安全境界に違反するpackageは対象外です。
+
+### 現行sourceのCopilot CLI準備
+
+Windowsでは`winget install --id GitHub.Copilot --exact`でCLIを導入し、`copilot --version`を確認してください。導入後はterminal／VS Codeとアプリを再起動してPATHを反映します。既存CLIの本人loginを再利用し、未認証ならアプリの**GitHubにログイン**からCLI／ブラウザーで認証します。CLIの自動install／更新や同梱manifest検証は行いません。CLIの版・SHA-256は診断とcheckpoint互換性のために記録し、SDK互換性は接続時に確認します。公開済みassetの挙動は変更されません。
 
 ## 公開状況・SHA-256確認・起動
 

@@ -445,26 +445,21 @@ public sealed class DocumentationContractTests
     }
 
     [Fact]
-    public void Bundled_cli_documentation_matches_the_default_resolver_and_never_advises_path_fallback()
+    public void System_cli_documentation_matches_the_default_resolver()
     {
         string publicContent = string.Join(Environment.NewLine, PublicDocumentPaths.Select(Read));
         AssertContainsAll(
             publicContent,
-            "配布物へ同梱したGitHub Copilot CLI",
-            "PATH上の別CLIへfallbackしません",
-            "runtimes\\win-x64\\native\\copilot.exe");
-        AssertDoesNotContainAny(
-            publicContent,
-            "Copilot CLIを別途導入",
+            "OSにインストールしたGitHub Copilot CLI",
             "PATHから`copilot.exe`を解決",
-            "PATH上のCLIを使います");
+            "winget install --id GitHub.Copilot --exact");
 
         CopilotClientFactory factory = new();
         FieldInfo resolverField = typeof(CopilotClientFactory).GetField(
             "_pathResolver",
             BindingFlags.NonPublic | BindingFlags.Instance)
             ?? throw new InvalidOperationException("Copilot path resolver field not found.");
-        Assert.IsType<BundledCopilotCliPathResolver>(resolverField.GetValue(factory));
+        Assert.IsType<SystemCopilotCliPathResolver>(resolverField.GetValue(factory));
     }
 
     [Fact]

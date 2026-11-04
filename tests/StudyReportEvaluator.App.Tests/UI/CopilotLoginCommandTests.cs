@@ -733,9 +733,9 @@ public sealed class CopilotLoginCommandTests
         AssertSafe(viewModel);
         if (failure is FailurePoint.MissingCli or FailurePoint.Resolver)
         {
-            Assert.Contains("同梱", viewModel.LoginStatusText, StringComparison.Ordinal);
-            Assert.Contains("再取得", viewModel.LoginStatusText, StringComparison.Ordinal);
-            Assert.Contains("再展開", viewModel.LoginStatusText, StringComparison.Ordinal);
+            Assert.Contains("OS 上", viewModel.LoginStatusText, StringComparison.Ordinal);
+            Assert.Contains("インストール", viewModel.LoginStatusText, StringComparison.Ordinal);
+            Assert.Contains("再起動", viewModel.LoginStatusText, StringComparison.Ordinal);
             Assert.Equal(0, harness.FactoryCallCount);
         }
         else
@@ -1061,7 +1061,7 @@ public sealed class CopilotLoginCommandTests
     }
 
     [Fact]
-    public async Task Both_existing_cli_unavailable_messages_recommend_bundled_distribution_recovery_not_PATH()
+    public async Task Both_cli_unavailable_messages_recommend_system_installation_and_PATH()
     {
         using LoginHarness harness = new();
         harness.Authentication.Snapshot = new ExecutionAuthenticationSnapshot(ExecutionAuthenticationState.CliUnavailable);
@@ -1072,10 +1072,10 @@ public sealed class CopilotLoginCommandTests
             harness.ViewModel.TechnicalErrors, item => item.Code == "COPILOT_CLI_UNAVAILABLE");
         foreach (string message in new[] { harness.ViewModel.AuthenticationStatusText, error.Message })
         {
-            Assert.Contains("同梱", message, StringComparison.Ordinal);
-            Assert.Contains("再取得", message, StringComparison.Ordinal);
-            Assert.Contains("再展開", message, StringComparison.Ordinal);
-            Assert.DoesNotContain("PATH", message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("OS 上", message, StringComparison.Ordinal);
+            Assert.Contains("インストール", message, StringComparison.Ordinal);
+            Assert.Contains("再起動", message, StringComparison.Ordinal);
+            Assert.Contains("PATH", message, StringComparison.Ordinal);
         }
 
         Assert.Equal(0, harness.FactoryCallCount);
@@ -1114,7 +1114,7 @@ public sealed class CopilotLoginCommandTests
     }
 
     [Fact]
-    public async Task Startup_without_credentials_starts_bundled_login_once_and_rechecks_without_running_AI()
+    public async Task Startup_without_credentials_starts_cli_login_once_and_rechecks_without_running_AI()
     {
         using LoginHarness harness = new();
         ExecutionViewModel viewModel = harness.ViewModel;
@@ -1384,7 +1384,6 @@ public sealed class CopilotLoginCommandTests
         Assert.DoesNotContain("C:\\private", text, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("copilot-a02-private", text, StringComparison.Ordinal);
         Assert.DoesNotContain("InvalidOperationException", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("PATH", viewModel.LoginStatusText, StringComparison.OrdinalIgnoreCase);
     }
 
     public enum FailurePoint { None, MissingCli, Resolver, Factory, StartFalse, Start, NonzeroExit, Wait, PrematureWait, UnconfirmedExit }

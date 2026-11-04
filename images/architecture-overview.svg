@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
   <title id="title">StudyReport EvaluatorとGitHub Copilot CLIの関係</title>
-  <desc id="desc">Windows PC上の利用者、入力Excel、StudyReport Evaluator、アプリに同梱されたGitHub Copilot CLI、CLIが管理するログイン情報、GitHub Copilotサービス、別ファイルとして保存される結果Excelの関係を示す。根拠はCopilotClientFactory、DurableQuantificationOrchestrator、GitHub Copilot SDK公式Architecture。</desc>
+  <desc id="desc">Windows PC上の利用者、入力Excel、StudyReport Evaluator、OSにインストールされたGitHub Copilot CLI、CLIが管理するログイン情報、GitHub Copilotサービス、別ファイルとして保存される結果Excelの関係を示す。根拠はCopilotClientFactory、DurableQuantificationOrchestrator、GitHub Copilot SDK公式Architecture。</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
@@ -35,7 +35,7 @@
 
   <rect width="1280" height="720" fill="#ffffff"/>
   <text x="40" y="44" class="title">StudyReport Evaluatorは、Copilotを安全な採点処理へつなぐデスクトップアプリです</text>
-  <text x="40" y="72" class="subtitle">元のExcelは変更せず、アプリ内のSDKが同梱CLIを通じてGitHub Copilotへ依頼し、結果を別のExcelへ保存します。</text>
+  <text x="40" y="72" class="subtitle">元のExcelは変更せず、アプリ内のSDKがOSのCLIを通じてGitHub Copilotへ依頼し、結果を別のExcelへ保存します。</text>
 
   <rect x="25" y="105" width="845" height="560" rx="20" class="boundary"/>
   <text x="48" y="135" class="boundary-label">利用者のWindows 11 PC</text>
@@ -69,7 +69,7 @@
   <text x="480" y="429" text-anchor="middle" class="small">処理順序と入出力の境界を管理</text>
 
   <rect x="675" y="185" width="165" height="190" rx="20" class="cli"/>
-  <text x="757.5" y="222" text-anchor="middle" class="heading">同梱CLI</text>
+  <text x="757.5" y="222" text-anchor="middle" class="heading">OSのCLI</text>
   <text x="757.5" y="248" text-anchor="middle" class="body">GitHub Copilot</text>
   <text x="757.5" y="269" text-anchor="middle" class="body">CLI</text>
   <path d="M712 299h91v44h-91z" fill="#ffffff" stroke="#16a34a" stroke-width="1.5"/>

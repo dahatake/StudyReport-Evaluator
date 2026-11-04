@@ -13,7 +13,7 @@ public sealed class BundledCopilotLoginServiceTests
     private const string SensitiveFailure = "synthetic-token device-code C:\\private\\copilot.exe";
 
     [Fact]
-    public void Default_service_uses_the_existing_bundled_resolver_and_does_not_start_login()
+    public void Default_service_uses_the_system_resolver_and_does_not_start_login()
     {
         using BundledCopilotLoginService service = new();
         FieldInfo resolver = typeof(BundledCopilotLoginService).GetField(
@@ -21,7 +21,7 @@ public sealed class BundledCopilotLoginServiceTests
         FieldInfo process = typeof(BundledCopilotLoginService).GetField(
             "_ownedProcess", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
-        Assert.IsType<BundledCopilotCliPathResolver>(resolver.GetValue(service));
+        Assert.IsType<SystemCopilotCliPathResolver>(resolver.GetValue(service));
         Assert.Null(process.GetValue(service));
     }
 

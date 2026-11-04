@@ -19,7 +19,20 @@
 - 評価対象の標準`.xlsx`
 - AI処理を行う場合だけ、利用可能なGitHub Copilot account、本人の対話login、network接続、利用可能model、組織policy上の利用許可
 
-GUI起動に.NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI（`gh`）、別Copilot CLI、Microsoft Excel／Office／LibreOffice、IDEの導入を要求しないself-contained設計です。Copilot CLIは配布物へ同梱され、PATH上の別CLIへfallbackしません。GUI起動とAI利用の前提は別です。
+GUI起動に.NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI（`gh`）、別Copilot CLI、Microsoft Excel／Office／LibreOffice、IDEの導入を要求しないself-contained設計です。GUI起動とAI利用の前提は別です。公開`v0.8.6`の既存配布物はCLI同梱方式ですが、現行sourceではOSにインストールしたGitHub Copilot CLIを使用します。
+
+### 現行sourceのCLIセットアップ
+
+Windowsでは次を実行します（既にCLIが導入されていれば再installは不要です）。
+
+```powershell
+winget install --id GitHub.Copilot --exact
+copilot --version
+```
+
+導入後はterminal／VS Codeとアプリを再起動してPATHを反映します。アプリはPATHから`copilot.exe`を解決し、認証・モデル一覧取得・評価に同じCLIを使います。既存のCLI loginを再利用し、未認証なら**GitHubにログイン**から認証します。同梱CLIやmanifestは不要で、アプリによるCLIの自動install／更新は行いません。未導入やPATH不足は明示表示します。接続失敗時はCLIとSDKの互換性、network、本人loginを確認してください。CLIの版・SHA-256は診断・checkpoint互換性のために記録し、固定版の承認リストとしては使用しません。
+
+以下の公開版の入手・配布説明は公開済みassetの履歴であり、現行sourceの再公開を意味しません。
 
 development MSIXは非公開の開発検証専用であり、一般利用者向けの入手・起動手順には含めません。
 
@@ -128,14 +141,14 @@ $$
 
 ### GitHubにログイン（v0.8.6）
 
-1. 起動直後に、アプリが**このPCで利用中のGitHubアカウントのログインを自動確認**します（同梱CLIが環境変数`COPILOT_GITHUB_TOKEN`／`GH_TOKEN`／`GITHUB_TOKEN`、OSの資格情報ストア、GitHub CLI `gh`のログインの順に探します）。既に利用できるログインがあれば、操作は不要です。
-2. 利用できるログインがない場合は、検証済みの同梱native CLIの認証用ブラウザーを**1回だけ自動で開きます**。手動では**GitHubにログイン**を選んでも同じ処理を開始できます。確認だけを手動で繰り返すには**Copilot 状態を確認**を選びます。
+1. 起動直後に、アプリが**このPCで利用中のGitHubアカウントのログインを自動確認**します（現行sourceはOSのCLI、公開`v0.8.6`の既存assetは同梱CLIが資格情報を解決します）。既に利用できるログインがあれば、操作は不要です。
+2. 利用できるログインがない場合は、CLIの認証用ブラウザーを**1回だけ自動で開きます**。手動では**GitHubにログイン**を選んでも同じ処理を開始できます。確認だけを手動で繰り返すには**Copilot 状態を確認**を選びます。
 3. 本人のaccountで、CLI／ブラウザー上の対話を完了します。アプリへpassword、PAT、token、device codeを入力しないでください。環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`を`0`または`false`にすると、自動のブラウザー認証だけを止められます。
 4. login processが正常終了すると、認証状態とmodel一覧を自動で再確認します。取消・失敗後や自動再確認に失敗した場合は、**Copilot 状態を確認**で再試行します。processの起動・終了codeだけを認証成功とは扱いません。
 
 認証・一覧取得に成功すると、model一覧だけを利用者別`setting.txt`へ自動保存します。未保存の共通設定・採点定義は保存しません。次回起動はキャッシュを表示用に復元し、キャッシュがある場合（空配列を含む）だけ自動再確認します。キャッシュのない旧設定・初回起動は明示確認またはloginを待ちます。キャッシュの表示だけでは評価できません。詳細は[設定ガイド](settings.md#model一覧のキャッシュと自動再確認)を参照してください。
 
-認証とcredential保管は同梱CLI／ブラウザーに委譲します。アプリの認証処理はpassword、PAT、secret、token、device codeを入力・収集・解析・保存・log出力しません。これらを設問文やPromptへ貼り付けないでください。貼付内容は設定の明示保存時に平文で残り得ます。PowerShell等を介したlogin用commandの入力は、この候補版buttonの利用に不要です。
+認証とcredential保管はCLI／ブラウザーに委譲します。アプリの認証処理はpassword、PAT、secret、token、device codeを入力・収集・解析・保存・log出力しません。これらを設問文やPromptへ貼り付けないでください。貼付内容は設定の明示保存時に平文で残り得ます。PowerShell等を介したlogin用commandの入力は、この候補版buttonの利用に不要です。
 
 起動時の自動確認・自動login以外では、起動引数、画面遷移、状態確認からloginを暗黙に開始せず、AI評価は一切自動開始しません。自動loginを取消・失敗した後は、同じ起動中に自動では再試行しません。login後の自動再確認では希望modelが利用可能な場合に実効選択へ反映しますが、別modelへfallbackしません。AI評価は**定量化を開始**を選ぶまで行いません。GUI表示やlogin完了だけではAI利用可能とは判断せず、network、account、列挙されたmodel、組織policy上の許可を別途確認してください。
 
@@ -154,7 +167,7 @@ loginの二重開始と評価中の開始はできません。取消・失敗後
 1. 展開済みZIP内の`StudyReportEvaluator-win-x64\runtimes\win-x64\native\copilot.exe`を指定して、同梱CLIの対話loginを本人が行います。認証はCLI／ブラウザー上で完了してください。
 2. アプリへ戻り、既存の**Copilot 状態を確認**を選びます。
 
-どちらの版でも、CLI欠落・不一致時は正式配布物の再取得／展開状態を確認します。PATH上の別CLIの導入やhash検証の緩和で回避しないでください。別途.NET、PowerShell、Node.js、Git／`gh`、CLIを導入する案内ではありません。
+旧公開版のCLI欠落・不一致時は正式配布物の再取得／展開状態を確認し、hash検証の緩和で回避しないでください。現行sourceのOSのCLI導入手順とは別です。
 
 ### 新規run
 

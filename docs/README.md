@@ -38,7 +38,7 @@ StudyReport Evaluatorは、標準`.xlsx`の回答をGitHub Copilotで定量化�
 - **入力:** 標準Office Open XML `.xlsx` 1file
 - **出力:** 入力を保持した別の標準`.xlsx`
 - **設定（v0.8.6）:** 共通設定＋任意の採点定義1件を、利用者別`setting.txt`へ明示保存。起動時は共通値を読み込み、採点定義はExcel読込後の明示操作で適用
-- **AI runtime:** 配布物へ同梱したGitHub Copilot CLI。PATH上の別CLIへfallbackしません
+- **AI runtime:** 現行sourceはOSにインストールしたGitHub Copilot CLIをPATHから解決します。同梱CLIへfallbackしません。公開`v0.8.6`の既存assetは従来の同梱方式です
 - **GUI起動:** .NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI（`gh`）、別Copilot CLI、Microsoft Excel／Office／LibreOffice、IDEの追加導入を要求しない設計
 
 単一EXEの目標は、標準userがofflineで**取得済みEXEをダブルクリック → 入力画面**へ進む1起動gestureです。download、任意の手動hash比較、SmartScreen等の警告への操作、本人loginは含めません。手動hash比較は任意・推奨で、sidecarは起動の前提ではありません。
@@ -47,7 +47,7 @@ SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行�
 
 development MSIXは検証専用で、一般配布しません。
 
-**「GitHubにログイン」は公開`v0.8.6`の機能です。**明示操作で検証済み同梱native CLIのconsole／ブラウザーへ本人認証を委譲します。旧`v0.8.1`にはこのbuttonがなく、従来の同梱CLIで本人loginを行います。どちらも完了後は既存の「Copilot 状態を確認」で再確認します。
+**「GitHubにログイン」は公開`v0.8.6`の機能です。**現行sourceではOSのnative CLIのconsole／ブラウザーへ本人認証を委譲します。公開`v0.8.6`の既存assetは同梱CLIを使います。旧`v0.8.1`にはこのbuttonがなく、従来の同梱CLIで本人loginを行います。完了後は既存の「Copilot 状態を確認」で再確認します。
 
 AI処理には、本人loginに加え、利用可能なGitHub Copilot account／model、network接続、組織policy上の許可が別途必要です。GUI起動や状態確認からlogin・AI評価を自動開始しません。アプリの認証処理はPAT、password、client secret、token、device codeを入力・収集・保存・log出力しません。未認証でもアプリ起動、workbook読込、mapping、設計編集は利用できますが、新しいAI処理は開始できません。
 

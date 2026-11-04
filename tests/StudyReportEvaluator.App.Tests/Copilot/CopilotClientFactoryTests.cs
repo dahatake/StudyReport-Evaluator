@@ -76,7 +76,7 @@ public sealed class CopilotClientFactoryTests
     }
 
     [Fact]
-    public void Default_factory_uses_only_the_bundled_runtime_resolver()
+    public void Default_factory_uses_the_system_runtime_resolver()
     {
         CopilotClientFactory factory = new();
         FieldInfo field = typeof(CopilotClientFactory).GetField(
@@ -84,7 +84,7 @@ public sealed class CopilotClientFactoryTests
             BindingFlags.NonPublic | BindingFlags.Instance)
             ?? throw new InvalidOperationException("The path resolver field was not found.");
 
-        Assert.IsType<BundledCopilotCliPathResolver>(field.GetValue(factory));
+        Assert.IsType<SystemCopilotCliPathResolver>(field.GetValue(factory));
     }
 
     [Fact]

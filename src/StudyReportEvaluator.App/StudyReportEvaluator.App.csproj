@@ -4,8 +4,7 @@
     <AssemblyName>StudyReportEvaluator.App</AssemblyName>
     <RootNamespace>StudyReportEvaluator.App</RootNamespace>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <CopilotSkipCliDownload Condition="'$(RuntimeIdentifier)' == ''">true</CopilotSkipCliDownload>
-    <CopilotSkipCliDownload Condition="'$(RuntimeIdentifier)' != ''">false</CopilotSkipCliDownload>
+    <CopilotSkipCliDownload>true</CopilotSkipCliDownload>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
@@ -23,7 +22,7 @@
       Name="WriteBundledCopilotManifest"
       BeforeTargets="GetCopyToOutputDirectoryItems;ComputeFilesToPublish"
       DependsOnTargets="_DownloadCopilotCli"
-      Condition="'$(CopilotSkipCliDownload)' != 'true' And '$(_CopilotRid)' != '' And Exists('$(_CopilotCliBinaryPath)')">
+      Condition="('$(CopilotSkipCliDownload)' != 'true' Or '$(CopilotCliBinaryPath)' != '') And '$(_CopilotRid)' != '' And Exists('$(_CopilotCliBinaryPath)')">
     <GetFileHash Files="$(_CopilotCliBinaryPath)" Algorithm="SHA256">
       <Output TaskParameter="Hash" PropertyName="_BundledCopilotCliSha256" />
     </GetFileHash>

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 980" role="img" aria-labelledby="title desc">
   <title id="title">StudyReport Evaluatorの技術アーキテクチャ</title>
-  <desc id="desc">StudyReportEvaluator.AppとStudyReportEvaluator.Coreのproject境界、Avalonia UI、workflow、Open XML workbook adapter、Copilot SDK adapter、設定、ローカルファイル、同梱CLI、GitHub Copilotサービスの依存関係を示す。</desc>
+  <desc id="desc">StudyReportEvaluator.AppとStudyReportEvaluator.Coreのproject境界、Avalonia UI、workflow、Open XML workbook adapter、Copilot SDK adapter、設定、ローカルファイル、OSのCLI、GitHub Copilotサービスの依存関係を示す。</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0L10 5L0 10z" fill="#334155"/>
@@ -127,7 +127,7 @@
   <text x="1295" y="304" text-anchor="end" class="body">user setting</text>
 
   <rect x="1050" y="400" width="330" height="140" rx="16" class="cli"/>
-  <text x="1215" y="432" text-anchor="middle" class="heading">検証済み同梱Copilot CLI</text>
+  <text x="1215" y="432" text-anchor="middle" class="heading">OSのCopilot CLI</text>
   <text x="1215" y="459" text-anchor="middle" class="mono">copilot-runtime.json</text>
   <text x="1215" y="482" text-anchor="middle" class="mono">runtimes/win-x64/native/copilot.exe</text>
   <text x="1215" y="513" text-anchor="middle" class="body">SDK child process / stdio JSON-RPC</text>

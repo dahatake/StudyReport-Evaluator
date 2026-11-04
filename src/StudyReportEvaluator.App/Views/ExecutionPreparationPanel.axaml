@@ -57,8 +57,8 @@
                     Command="{Binding LoginCommand}" TabIndex="101"
                     AutomationProperties.AutomationId="StartCopilotLogin"
                     AutomationProperties.Name="GitHubにログイン"
-                    AutomationProperties.HelpText="同梱 Copilot CLI を起動し、別のブラウザーで認証します。このアプリはトークンを取得・保存しません。"
-                    ToolTip.Tip="同梱 CLI を直接起動し、別のブラウザーで認証します。このアプリはパスワードやトークンを取得・保存しません。完了後に認証状態とモデル一覧を自動更新します。" />
+                    AutomationProperties.HelpText="OS 上の Copilot CLI を起動し、別のブラウザーで認証します。このアプリはトークンを取得・保存しません。"
+                    ToolTip.Tip="OS 上の CLI を直接起動し、別のブラウザーで認証します。このアプリはパスワードやトークンを取得・保存しません。完了後に認証状態とモデル一覧を自動更新します。" />
             <Button x:Name="CancelCopilotLogin" Content="ログインを取り消す"
                     Command="{Binding CancelLoginCommand}" TabIndex="102"
                     AutomationProperties.AutomationId="CancelCopilotLogin"
