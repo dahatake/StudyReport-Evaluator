@@ -1462,6 +1462,61 @@ public sealed class SettingsViewModelTests
         AssertNoBackgroundActivity(harness);
     }
 
+    // FR-114 / AC-004: 旧形式の保存定義で欠けた係数へ 0.1 を補ったことを、設定画面と採点設計画面に表示する。
+    [Fact]
+    public async Task FR114_AC004_Legacy_saved_definition_shows_the_supplied_weight_notice_on_load_and_apply()
+    {
+        using SettingsHarness harness = new();
+        await harness.SeedSettingsAsync(SavedSettings(harness));
+        System.Text.Json.Nodes.JsonObject root = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(harness.SettingsPath))!.AsObject();
+        Assert.True(root["definition"]!.AsObject().Remove("similarityPenaltyWeight"));
+        harness.WriteJson(root.ToJsonString());
+        string notice = CanonicalDefinitionDeserializer.LegacySimilarityPenaltyWeightNotice;
+
+        await harness.Settings.InitializeAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(0.1m, harness.Settings.StoredDefinition!.SimilarityPenaltyWeight);
+        Assert.Equal([notice], harness.Settings.StoredDefinitionNotices);
+        Assert.Contains(notice, harness.Settings.StoredDefinitionSummary, StringComparison.Ordinal);
+        Assert.Null(harness.Design.DefinitionNoticeText);
+
+        await harness.LoadInputAsync();
+        Assert.True(await harness.Settings.ApplySavedDefinitionAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal(0.1m, harness.Design.SimilarityPenaltyWeight);
+        Assert.Equal(notice, harness.Design.DefinitionNoticeText);
+        Assert.True(harness.Design.HasDefinitionNotice);
+        Assert.Equal("0.1" + QuantificationDesignViewModel.LegacyWeightMarker, harness.Design.SimilarityPenaltyWeightDisplay);
+        Assert.Contains(notice, harness.Settings.ApplyStatusText, StringComparison.Ordinal);
+
+        // 利用者が係数を明示したら通知は消え、明示値をそのまま使う。
+        harness.Design.SimilarityPenaltyWeight = 0m;
+        Assert.Null(harness.Design.DefinitionNoticeText);
+        Assert.Equal("0", harness.Design.SimilarityPenaltyWeightDisplay);
+    }
+
+    // FR-114 / AC-004: 明示した係数 0 は保存・再起動相当の新しい画面の読込・適用でも 0 のままで、通知しない。
+    [Fact]
+    public async Task FR114_AC004_Explicit_zero_weight_survives_save_restart_and_apply_without_notice()
+    {
+        using SettingsHarness harness = new();
+        ApplicationSettings saved = SavedSettings(harness);
+        await harness.SeedSettingsAsync(saved with { Definition = saved.Definition! with { SimilarityPenaltyWeight = 0m } });
+
+        await harness.Settings.InitializeAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0m, harness.Settings.StoredDefinition!.SimilarityPenaltyWeight);
+        Assert.Empty(harness.Settings.StoredDefinitionNotices);
+        await harness.LoadInputAsync();
+        Assert.True(await harness.Settings.ApplySavedDefinitionAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(0m, harness.Design.SimilarityPenaltyWeight);
+        Assert.Null(harness.Design.DefinitionNoticeText);
+        Assert.Equal("0", harness.Design.SimilarityPenaltyWeightDisplay);
+
+        ApplicationSettings reread = await harness.ReadSettingsAsync();
+        Assert.Equal(0m, reread.Definition!.SimilarityPenaltyWeight);
+    }
+
     private static ApplicationSettings SavedSettings(SettingsHarness harness) => new()
     {
         PreferredModelId = "model-test",

@@ -693,8 +693,9 @@ public sealed class SettingsFileStoreTests
     {
         using TemporarySettingsDirectory fixture = new();
         ApplicationSettings settings = CreateSettings(fixture);
+        // FR-114 AC-004: Notices は固定の補完通知だけを持つ（設定の内容は含まない）。
         Assert.Equal(
-            ["IsSuccess", "Settings", "Status"],
+            ["IsSuccess", "Notices", "Settings", "Status"],
             typeof(SettingsLoadResult).GetProperties().Select(property => property.Name).Order(StringComparer.Ordinal));
         Assert.Equal(
             ["IsSuccess", "Status"],
@@ -745,6 +746,51 @@ public sealed class SettingsFileStoreTests
     {
         Assert.Equal(SettingsSaveStatus.Saved, result.Status);
         Assert.True(result.IsSuccess);
+    }
+
+    // FR-114 / AC-004: 明示した係数（0 を含む）は保存・再起動相当の新しい store の読込でそのまま往復し、通知しない。
+    [Theory]
+    [InlineData("0")]
+    [InlineData("0.1")]
+    [InlineData("0.5")]
+    public async Task FR114_AC004_Explicit_similarity_weight_round_trips_across_restart_without_notice(string weight)
+    {
+        using TemporarySettingsDirectory fixture = new();
+        decimal expected = decimal.Parse(weight, CultureInfo.InvariantCulture);
+        ApplicationSettings settings = CreateSettings(fixture);
+        settings = settings with { Definition = settings.Definition! with { SimilarityPenaltyWeight = expected } };
+
+        AssertSaved(await new SettingsFileStore(fixture.FilePath).SaveAsync(settings, TestContext.Current.CancellationToken));
+        SettingsLoadResult first = await new SettingsFileStore(fixture.FilePath).LoadAsync(TestContext.Current.CancellationToken);
+        AssertSaved(await new SettingsFileStore(fixture.FilePath).SaveAsync(first.Settings!, TestContext.Current.CancellationToken));
+        SettingsLoadResult second = await new SettingsFileStore(fixture.FilePath).LoadAsync(TestContext.Current.CancellationToken);
+
+        foreach (SettingsLoadResult loaded in new[] { first, second })
+        {
+            Assert.Equal(SettingsLoadStatus.Loaded, loaded.Status);
+            Assert.Equal(expected, loaded.Settings!.Definition!.SimilarityPenaltyWeight);
+            Assert.Empty(loaded.Notices);
+        }
+
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(fixture.FilePath));
+        Assert.Equal(expected, document.RootElement.GetProperty("definition").GetProperty("similarityPenaltyWeight").GetDecimal());
+    }
+
+    // FR-114 / AC-004: 係数を持たない旧形式の保存定義は record の旧既定値 0.1 を黙って使わず、補完の通知を返す。
+    [Fact]
+    public async Task FR114_AC004_Legacy_settings_without_similarity_weight_supply_0_1_with_notice()
+    {
+        using TemporarySettingsDirectory fixture = new();
+        JsonObject root = CreateJson(fixture);
+        Assert.True(root["definition"]!.AsObject().Remove("similarityPenaltyWeight"));
+        Directory.CreateDirectory(fixture.SettingsDirectory);
+        File.WriteAllBytes(fixture.FilePath, StrictUtf8.GetBytes(root.ToJsonString()));
+
+        SettingsLoadResult loaded = await new SettingsFileStore(fixture.FilePath).LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(SettingsLoadStatus.Loaded, loaded.Status);
+        Assert.Equal(QuantificationDefinition.LegacyDefaultSimilarityPenaltyWeight, loaded.Settings!.Definition!.SimilarityPenaltyWeight);
+        Assert.Equal([CanonicalDefinitionDeserializer.LegacySimilarityPenaltyWeightNotice], loaded.Notices);
     }
 
     private static JsonObject CreateJson(TemporarySettingsDirectory fixture) =>
