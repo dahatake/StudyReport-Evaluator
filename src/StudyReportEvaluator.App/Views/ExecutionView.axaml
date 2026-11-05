@@ -125,14 +125,15 @@
                            Maximum="{Binding ProgressTotal}" Value="{Binding ProgressCompleted}"
                            Height="10" VerticalAlignment="Center"
                            AutomationProperties.AutomationId="ExecutionProgress"
-                           AutomationProperties.Name="処理単位の完了進捗・送信回数とは別" />
+                           AutomationProperties.Name="処理単位の完了進捗（成功数・失敗数は進捗文に表示）" />
             </Grid>
             <TextBlock x:Name="OperationProgressSummary" Text="{Binding ProgressText, StringFormat='処理単位: {0}'}" TextWrapping="Wrap"
                        AutomationProperties.AutomationId="ExecutionOperationProgress"
-                       ToolTip.Tip="報告された処理単位の完了・実行中の件数です。学生行数やAIへの送信回数ではありません。" />
+                       AutomationProperties.Name="{Binding ProgressText, StringFormat='処理単位: {0}'}"
+                       ToolTip.Tip="処理単位の完了数・成功数・失敗数・実行中の件数です。学生行数やAIへの送信回数ではありません。" />
             <TextBlock x:Name="DurableProgressSummary" Text="{Binding DurableProgressText, StringFormat='実測: {0}'}" TextWrapping="Wrap"
                        AutomationProperties.AutomationId="ExecutionDurableProgress"
-                       ToolTip.Tip="実行中に報告された参照回答と学生行の進捗です。予定単位数や送信回数とは別です。" />
+                       ToolTip.Tip="実行中に報告された参照回答と学生行の進捗です。予定単位数やAIへの送信回数ではありません。" />
           </StackPanel>
         </ScrollViewer>
         <Button x:Name="ExecutionCostToggle" Grid.Row="1" MinHeight="44" HorizontalAlignment="Stretch"

@@ -239,7 +239,7 @@
             <ProgressBar x:Name="ShellRunProgressBar" Grid.Row="2" Height="4" Minimum="0"
                          Maximum="{Binding ExecutionViewModel.ProgressTotal}" Value="{Binding ExecutionViewModel.ProgressCompleted}"
                          AutomationProperties.AutomationId="ShellCurrentRunProgress"
-                         AutomationProperties.Name="今回runの処理単位の完了数（成功数とは別）" />
+                         AutomationProperties.Name="今回runの処理単位の完了数・成功数・失敗数・実行中の件数" />
           </Grid>
           <Button x:Name="ShellOpenRunButton" Grid.Column="1" Classes="shell-action" Content="進捗へ"
                   Command="{Binding NavigateCommand}" CommandParameter="{x:Static navigation:WorkflowStep.Execution}"

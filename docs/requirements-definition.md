@@ -1272,6 +1272,29 @@ model IDの一致はID文字列の一致であり、`auto`の場合に同一の�
 
 変更履歴: 2026-11-05 依頼を反映。FR-118、AC-093〜096、PARAM-005〜007、SRC-007を追加（既存に同目的の要求なし。FR-111・FR-117とは対象が異なる）。影響: `App.axaml`の3ブラシ（背景#FDE7E9・枠#C50F1F・文字#A4262C）、`Technical*Brush`の参照箇所、`MainWindow`のキャンセル操作（青のまま）、台帳のケース追加（test-designer）。競合なし。
 
+### 11.29 実行画面の処理単位の進捗に成功数・失敗数を加える（2026-11-05追加）
+
+出典: SRC-008（依頼原文、`ExecutionViewModel.ProgressText`、`ExecutionView.axaml`の`OperationProgressSummary`、`MainWindow.axaml`のAutomationProperties.Name、`DurableQuantificationOrchestrator`のcheckpoint、`RunSummary.OperationFailureCount`の定義）。
+
+`rdcheck similar`で類似0件。FR-111は進捗の「表示場所」（1か所だけ）、FR-117は結果画面の「学生行」の状態別件数で、本件の「実行中の処理単位の成功・失敗数」とは対象が違うため新規に1件追加する。FR-111・AC-069は変更しない（シェル帯が同じ進捗文を使うため連動して表示が変わってよい）。
+
+#### FR-119 [実行]画面の処理単位の進捗に成功数と失敗数を示す
+- 要求: 利用者は、「3 実行」の統計情報の進捗行（`OperationProgressSummary`）で、処理単位（AIへの1回の評価のまとまり）の完了数・総数に加えて、成功した処理単位の数と失敗した処理単位の数を確認できる。表示は「処理単位: 124 / 3,916 完了 · 成功 120 · 失敗 4 · 15 実行中 · 3.2%」の形（完了・成功・失敗・実行中・割合の順）とする。(1) 実行中の成功数・失敗数は、checkpoint済みの処理単位の結果の状態コードから集計する（成功＝Success・Empty、失敗＝Success・Empty・NotRunZeroBudget以外。`RunSummary.OperationFailureCount`と同じ定義）。(2) run完了時は`RunSummary.OperationFailureCount`の値を失敗数に使い、成功数は完了数から失敗数とNotRunZeroBudget（予算ゼロで未実行）の数を引いた値と一致させる。(3) 成功＋失敗は完了数を超えず、実行中の件数は含めない。(4) 集計できない間（run前・件数未報告）は成功・失敗を表示しない（0と偽らない）。シェル帯の進捗文は同じ進捗文を使うため連動してよい（FR-111・AC-069の表示の出し分けは変えない）。進捗行のツールチップとAccessible Name（ExecutionViewとMainWindowのシェル帯）は、「成功数とは別」「送信回数とは別」と書かず、「処理単位の完了数・成功数・失敗数・実行中の件数です。学生行数やAIへの送信回数ではありません」の趣旨に改める（成功数・失敗数を表示するため、「成功数とは別」の旧文は矛盾する）。読取専用で、進捗の計算・checkpoint・停止・採点値・出力は変えない。表示は1024×720 DIP以上で省略記号なしに全文が見える。
+- 決定状態: 承認済み（依頼 2026-11-05）　出自: 依頼　優先度: MUST（実行中に失敗の有無を早く確認し、停止・再実行の判断をするため）
+- 上位: 既定制約（ui_policy）　出典: SRC-008
+- 対象エンティティ: なし　関係する状態: なし　参照パラメータ: なし
+- 関連する既存資産: FR-111、FR-117、§11.15、`ExecutionViewModel`（`ProgressText`）、`ExecutionView`、`MainWindow`（`ShellRunProgressText`）、`DurableQuantificationOrchestrator`、`RunSummary`
+- 受入基準 AC-097: 処理単位の結果の状態コードが（Success 3、Empty 1、技術エラー 1、NotRunZeroBudget 1）で、完了6・総数10・実行中2のとき、進捗文が`処理単位: 6 / 10 完了 · 成功 4 · 失敗 1 · 2 実行中 · 60.0%`に完全一致する（NotRunZeroBudgetは成功にも失敗にも数えず、成功＋失敗が完了数を超え得る前提を置かない）。run前・件数未報告の間は成功・失敗の語が表示されない。
+  - 検証レベル: unit
+- 受入基準 AC-098: run完了後、進捗文の失敗数が`RunSummary.OperationFailureCount`と一致し、成功数が完了数から失敗数とNotRunZeroBudgetの数を引いた値と一致する（完了数にはNotRunZeroBudgetを含む。例: 完了6・失敗1・NotRunZeroBudget 1 → 成功4。FR-119 (2) と同じ式）。実行中から完了へ切り替わっても、失敗数が減らず、完了時の値で確定する。
+  - 検証レベル: integration
+- 受入基準 AC-099: 「3 実行」の`OperationProgressSummary`・そのツールチップ・Accessible Name、およびシェル帯（`ShellRunProgressText`）のAccessible Nameに、「成功数とは別」「送信回数とは別」の語が残らず、成功数・失敗数を含む説明になっている。進捗行の全文は1024×720 DIP以上で省略記号なしに見え、Accessible Nameが表示文と同じ内容を持つ。FR-111のAC-069（実行画面ではシェル帯の進捗を隠す）は変わらず満たす。
+  - 検証レベル: integration
+
+仮定: 「失敗」はFR-117の学生行の状態分類（技術エラー・回答空欄・取消・未処理・未確定）ではなく、処理単位の状態コードで数える（`RunSummary.OperationFailureCount`の定義に従う）。そのため学生行の件数（FR-117）と数が一致するとは限らない。覆す条件: 要求所有者が学生行単位の数を求めた場合。
+
+変更履歴: 2026-11-05 依頼を反映。FR-119、AC-097〜099、SRC-008を追加。既存の要求に「成功数とは別」の文はなく、矛盾は実装側の文言（`ExecutionView.axaml`:128・132、`MainWindow.axaml`:242）だけにあったため、FR-119の要求・AC-099で改める対象にした。影響: `ExecutionViewModel`の集計と`ProgressText`、`ExecutionView`・`MainWindow`の文言、台帳のケース追加（test-designer）。競合なし（FR-111・AC-069・FR-117は変更しない）。
+
 ## 12. Promptファイルからの起動
 
 ### 12.1 command line
@@ -1638,6 +1661,7 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ構造化して移動した。�
 | SRC-002 | 要求所有者の依頼原文（conductorからの引継ぎ、run 202611032044） | 2026-11-03 | 2026-11-03 | 本文確認。「設定画面の指定出力先と実行出力先は、1つのファイルの出力先に」「フォルダーピッカーの画面コンポーネントを使って、入力じゃなくて、画面操作のみで選択」。添付画像そのものは未取得、指定出力先と読取専用の実効出力先の二欄という要旨を確認。既存の出力workbookのフォルダーを単一欄にする変更として扱い、設定保存fileやcheckpointを統合する意味にはしない。 |
 | SRC-004 | 要求所有者の依頼原文（conductorからの引継ぎ、run 202611040007）と結果workbookの既存構造（Workbooks/Writing、docs/result-excel-description.md §3・§5） | 2026-11-04 | 2026-11-04 | 依頼本文と背景の確認。シート`採点結果`の見出し例（ID・質問Nの評価・質問NのPromptの評価・合計）。 |
 | SRC-003 | リポジトリの既存出力先UI・保存契約 | HEAD 91fe973、2026-11-03 | 2026-11-03 | PowerShell／rgで本文確認。SettingsView.axaml:103–116は明示指定のTwoWay入力と実効pathのOneWay読取専用表示。ExecutionViewModel.cs:658–680は空白→nullと入力隣接resultの算出、同:1078以降は設定復元。docs/settings.md:56–64は指定保持・null解除・算出値非保存。InputView.axaml.cs:29–55にネイティブfile pickerの既存実装があるが、出力用folder pickerの実装は未確認（OpenFolderPickerAsync等の検索は該当なし）。§9.1・§11.8・AC-013の出力・snapshot契約は維持。 |
+| SRC-008 | 要求所有者の依頼原文（run 202611052355）、`ExecutionViewModel.ProgressText`、`ExecutionView.axaml`:128–132の`OperationProgressSummary`・ツールチップ・Accessible Name、`MainWindow.axaml`:242のAccessible Name、`DurableQuantificationOrchestrator`のcheckpoint、`RunSummary.OperationFailureCount` | 2026-11-05 | 2026-11-05 | 依頼本文の表示例と成功・失敗の定義、既存の「成功数とは別」「送信回数とは別」の文言の位置を確認（grepで実在を確認。コードは変更していない）。 |
 | SRC-007 | 要求所有者の依頼原文（run 202611050055）、`src/StudyReportEvaluator.App/App.axaml`の`TechnicalBackgroundBrush`(#EAF5FF)・`TechnicalBorderBrush`(#62A9E8)・`TechnicalTextBrush`(#174F7C)、MainWindowの`Button.shell-action.cancel` | 2026-11-05 | 2026-11-05 | エラー表示の配色が青系で見落としやすいという依頼と現行ブラシ値を確認（依頼原文・App.axamlの記載）。Microsoft Design（Fluent 2）とWCAG 2.2 SC 1.4.3・1.4.11は依頼の引用であり、本担当は外部資料を取得していない（コントラスト比は計算で確認）。 |
 | SRC-006 | 要求所有者の依頼原文と添付画像（run 202611042230）、`ResultsOutputViewModel.cs`の`RunSummaryText`・`ResultsRowStatus` | 2026-11-04 | 2026-11-04 | 結果画面に成功件数とエラー種別ごとの件数を足す依頼と、既存の行状態の分類（成功・回答空欄・取消・未処理・未確定・技術エラー）を確認。 |
 | SRC-005 | 要求所有者の依頼・承認対象と関連する既存契約（run 202611040836） | 2026-11-04、HEAD bad7f3f | 2026-11-04 | 引継ぎ本文「履歴は入手ができない」「改善点を実装してください」と今回の明示承認対象を確認。未検証指標・新規既定減点ゼロ・既存係数保持、質問文字列のみ・参照集合の開始点5、ラベル付きローカル評価・設問holdout・失敗と互換性を承認。PowerShell／viewで§7.2・§7.5・§8・AC-004・AC-009〜012、src/StudyReportEvaluator.Core/Domain/QuantificationDefinition.cs:20–24の既定係数0.1、Similarity/SurfaceTextSimilarityCalculator.cs:1–112の既存指標、App/Copilot/AuxiliaryEvaluationRunner.cs:1–68のrun条件指定を事実確認。既存の保護境界は§14。実AI実験・外部書込・課金・pushは行わない。実学生の識別性能は未確認。 |
@@ -1897,3 +1921,10 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ構造化して移動した。�
 | F3-08 | 2026-11-04 | トレードオフ | 中 | §8.3 × PARAM-002=0 × PARAM-003=5、FA-A13 | 係数 0 でも参照を設問ごとに 5 件生成するため、AI 使用量が約 5 倍になる。費用の受入れ判断が未解決（要求所有者が判断して記録する）。 | 未解決（要求所有者の判断） |
 | F3-09 | 2026-11-04 | 記述の質 | 低 | AC-004「0.1」、FA-A10 | 旧形式の補完値 0.1 を直書き（PARAM 未参照。SRC-005 はコードの既定値を根拠にしている）。旧形式補完用 PARAM を新設するか、互換定数として A-ID に記録する。 | 未解決 |
 | F3-10 | 2026-11-04 | 記述の質 | 低 | AC-077、PARAM-004 | 短文注意の値が未校正（表示専用で AC-078・AC-011 と整合）。変更時は PARAM のみを変更する。 | 未解決（現状のまま） |
+| R119-01 | 2026-11-06 | 条件不明 | 中 | FR-119 (2)・AC-098 | 成功数の式が本文(2)と AC-098 で括弧の掛かり方が違い読み分けられなかった。AC-098 を本文(2)と同じ式・具体値つきに直して解消（run 202611052355）。 | 解決済み |
+| R119-02 | 2026-11-06 | 条件不明 | 中 | FR-119 (1)・FR-117 | 「失敗」が Success・Empty・NotRunZeroBudget 以外すべてで、ユーザー取消・未処理の処理単位も入り得る。FR-117 は取消を技術エラーと別に扱うため、同じ語の読みが分かれる。取消・中断を失敗に数えるか、別の語・内訳にするかを要判断。 | 未解決 |
+| R119-03 | 2026-11-06 | 条件不明 | 中 | AC-098 | 「実行中→完了で失敗数が減らない」と、完了時に RunSummary.OperationFailureCount へ置換する規則(2)の両立が未保証。再開・再試行で完了時の値が小さくなる場合の扱いが未記載。 | 未解決 |
+| R119-04 | 2026-11-06 | 条件不明 | 中 | FR-119・FR-111・AC-069・AC-099 | FR-111/AC-069 の進捗文言「処理単位: n / m 完了」と FR-119 の新文言の関係（AC-069 の判定を部分一致にするか FR-111 に参照追記）、他 step のシェル帯の新旧、AC-099 の非表示シェル帯の検証方法が未確定。 | 未解決 |
+| R119-05 | 2026-11-06 | 不足（用語） | 低 | FR-117・AC-091 | 本文は状態「未処理」「未確定」の 2 つ、AC-091 は「未処理・未確定 0」の合算表示で、状態列の名称が揃っていない。 | 未解決 |
+| R119-06 | 2026-11-06 | 不足（用語） | 低 | FR-119・FR-117・FR-115 AC-081/AC-085 | 「成功数」が処理単位・学生行・参照 slot の 3 単位で別の意味を持つ。FR-115 の参照生成が処理単位の総数・完了数に含まれるか、AC-085 の試行回数上限表示と FR-119 ツールチップの「送信回数ではない」の関係が不明。FR-119 に処理単位の範囲を 1 行で追記したい。 | 未解決 |
+| R119-07 | 2026-11-06 | 記述の質 | 低 | FR-119・FR-117 AC-092・AC-099 | 「1024×720 DIP 以上」を 2 要求・3 AC に直書き（CHK-14 警告）。FR-119 は複数主題で、参照パラメータ・対象エンティティ欄と割合（60.0%）の丸め規則が本文にない。PARAM 化と丸め規則の追記を検討。 | 未解決 |

@@ -162,7 +162,9 @@ public sealed record EvaluationProgress
         int rowTotal = 0,
         string? detailStatusCode = null,
         string? finalPath = null,
-        string? partialPath = null)
+        string? partialPath = null,
+        int? succeeded = null,
+        int? failed = null)
     {
         if (total < 0
             || completed < 0
@@ -174,11 +176,15 @@ public sealed record EvaluationProgress
             || referenceTotal < 0
             || rowCompleted < 0
             || rowCompleted > rowTotal
-            || rowTotal < 0)
+            || rowTotal < 0
+            || succeeded < 0
+            || failed < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(completed));
         }
 
+        Succeeded = succeeded;
+        Failed = failed;
         Total = total;
         Completed = completed;
         InFlight = inFlight;
@@ -194,6 +200,12 @@ public sealed record EvaluationProgress
     }
 
     public int Total { get; }
+
+    /// <summary>FR-119: 成功した処理単位の数。未報告は null。</summary>
+    public int? Succeeded { get; }
+
+    /// <summary>FR-119: 失敗した処理単位の数。未報告は null。</summary>
+    public int? Failed { get; }
 
     public int Completed { get; }
 

@@ -313,6 +313,12 @@ public sealed class RunSummary
             and not ResultsStatusCodes.Empty
             and not ResultsStatusCodes.NotRunZeroBudget);
 
+    /// <summary>FR-119 AC-098: 成功（Success・Empty）の処理単位数。完了数 − 失敗数 − NotRunZeroBudget に一致する。</summary>
+    public int OperationSuccessCount => !IsDurable
+        ? SucceededCount + EmptyCount
+        : EnumerateDurableStatuses().Count(status => status is ResultsStatusCodes.Success
+            or ResultsStatusCodes.Empty);
+
     public int OperationCancelledCount => !IsDurable
         ? CancelledCount
         : Math.Max(0, PlannedOperationCount - CompletedOperationCount);
