@@ -10,6 +10,7 @@
     xmlns:viewModels="using:StudyReportEvaluator.App.ViewModels"
     xmlns:views="using:StudyReportEvaluator.App.Views"
     Title="StudyReport Evaluator"
+    Icon="avares://StudyReportEvaluator.App/Assets/AppIcon.ico"
     Width="1180"
     Height="800"
     MinWidth="1024"
