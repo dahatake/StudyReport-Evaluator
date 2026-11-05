@@ -314,7 +314,9 @@ public sealed class QuantificationRunBoundary : IQuantificationRunBoundary
             value.RowTotal,
             value.StatusCode,
             value.FinalPath,
-            value.PartialPath);
+            value.PartialPath,
+            value.OperationSucceeded,
+            value.OperationFailed);
 
     internal static string ApplicationIdentity()
     {
@@ -484,6 +486,8 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
     private int progressTotal;
     private int progressCompleted;
     private int progressInFlight;
+    private int? progressSucceeded;
+    private int? progressFailed;
     private EvaluationProgressStatus? progressStatus;
     private DurableEvaluationStage? progressStage;
     private int referenceCompleted;
@@ -889,9 +893,14 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         ? 0d
         : (double)progressCompleted / progressTotal * 100d;
 
+    // FR-119 AC-097: 成功・失敗は集計できているときだけ表示する（未報告を 0 と偽らない）。
     public string ProgressText => progressTotal == 0
         ? "まだ実行していません。"
-        : $"{progressCompleted.ToString("N0", CultureInfo.InvariantCulture)} / {progressTotal.ToString("N0", CultureInfo.InvariantCulture)} 完了 · {progressInFlight.ToString(CultureInfo.InvariantCulture)} 実行中 · {ProgressPercent.ToString("0.0", CultureInfo.InvariantCulture)}%";
+        : $"{progressCompleted.ToString("N0", CultureInfo.InvariantCulture)} / {progressTotal.ToString("N0", CultureInfo.InvariantCulture)} 完了{OutcomeSegment} · {progressInFlight.ToString(CultureInfo.InvariantCulture)} 実行中 · {ProgressPercent.ToString("0.0", CultureInfo.InvariantCulture)}%";
+
+    private string OutcomeSegment => progressSucceeded is { } succeeded && progressFailed is { } failed
+        ? $" · 成功 {succeeded.ToString("N0", CultureInfo.InvariantCulture)} · 失敗 {failed.ToString("N0", CultureInfo.InvariantCulture)}"
+        : string.Empty;
 
     public string RunStatusText
     {
@@ -2101,6 +2110,8 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         progressTotal = progress.Total;
         progressCompleted = progress.Completed;
         progressInFlight = progress.InFlight;
+        progressSucceeded = progress.Succeeded;
+        progressFailed = progress.Failed;
         progressStatus = progress.Status;
         progressStage = progress.Stage;
         referenceCompleted = progress.ReferenceCompleted;
@@ -2133,6 +2144,8 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         progressTotal = summary.PlannedOperationCount;
         progressCompleted = summary.CompletedOperationCount;
         progressInFlight = 0;
+        progressFailed = summary.OperationFailureCount;
+        progressSucceeded = summary.OperationSuccessCount;
         progressStage = DurableEvaluationStage.Completed;
         if (summary.IsDurable)
         {
@@ -2171,6 +2184,8 @@ public sealed partial class ExecutionViewModel : UiObservableObject, IDisposable
         progressTotal = 0;
         progressCompleted = 0;
         progressInFlight = 0;
+        progressSucceeded = null;
+        progressFailed = null;
         progressStatus = null;
         progressStage = null;
         referenceCompleted = 0;

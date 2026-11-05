@@ -100,6 +100,12 @@ public sealed record DurableEvaluationProgress
     /// <summary>FR-115 AC-085: PARAM-003 の参照 slot を含む、retry 込みの最大 attempt 数（予定の AI 操作数 × 1 操作の最大 attempt）。</summary>
     public long WorstCaseAttemptCount { get; init; }
 
+    /// <summary>FR-119 AC-097: checkpoint 済みの処理単位のうち成功（Success・Empty）の数。未報告は null。</summary>
+    public int? OperationSucceeded { get; init; }
+
+    /// <summary>FR-119 AC-097: checkpoint 済みの処理単位のうち失敗（Success・Empty・NotRunZeroBudget 以外）の数。未報告は null。</summary>
+    public int? OperationFailed { get; init; }
+
     public override string ToString() =>
         $"{nameof(DurableEvaluationProgress)} {{ Stage = {Stage}, ReferenceCompleted = {ReferenceCompleted}, RowCompleted = {RowCompleted}, OperationCompleted = {OperationCompleted}, InFlight = {InFlight}, StatusCode = {StatusCode}, Content = <redacted> }}";
 }
@@ -367,14 +373,32 @@ public sealed class DurableQuantificationOrchestrator
             (referenceTotal + ((long)rowTotal * LlmOperationsPerRow(plan)))
             * RetryAndCleanupCoordinator.MaximumTransientAttempts);
         string? terminalCode = null;
+        // FR-119: checkpoint 済みの処理単位の成功数・失敗数。再開時は保存済みの分から初期化する。
+        OperationOutcomeCounter outcomes = new();
+        foreach (CheckpointReference savedReference in checkpoint.References)
+        {
+            outcomes.Add(savedReference);
+        }
+
+        foreach (CheckpointCompletedRow savedRow in checkpoint.CompletedRows)
+        {
+            outcomes.Add(savedRow);
+        }
+
         Action<DurableEvaluationProgress>? boundProgress = progress is null
             ? null
-            : value => progress(value with
+            : value =>
             {
-                FinalPath = checkpoint.FinalPath,
-                PartialPath = checkpoint.PartialPath,
-                WorstCaseAttemptCount = worstCaseAttempts,
-            });
+                (int succeeded, int failed) = outcomes.Snapshot();
+                progress(value with
+                {
+                    FinalPath = checkpoint.FinalPath,
+                    PartialPath = checkpoint.PartialPath,
+                    WorstCaseAttemptCount = worstCaseAttempts,
+                    OperationSucceeded = succeeded,
+                    OperationFailed = failed,
+                });
+            };
         ImmutableArray<CheckpointReference>.Builder references = checkpoint.References.ToBuilder();
         ImmutableArray<CheckpointCompletedRow>.Builder completedRows = checkpoint.CompletedRows.ToBuilder();
         Action<LivePreviewRow>? rowPreview = null;
@@ -438,6 +462,7 @@ public sealed class DurableQuantificationOrchestrator
             }
 
             references.Add(reference);
+            outcomes.Add(reference);
             checkpoint = checkpoint with
             {
                 References = references.ToImmutable(),
@@ -447,6 +472,7 @@ public sealed class DurableQuantificationOrchestrator
             CheckpointSaveResult saved = checkpointStore.Update(checkpoint, CancellationToken.None);
             if (!saved.IsSuccess)
             {
+                outcomes.Remove(references[references.Count - 1]);
                 references.RemoveAt(references.Count - 1);
                 checkpoint = checkpoint with { References = references.ToImmutable() };
                 terminalCode = saved.Code;
@@ -558,6 +584,7 @@ public sealed class DurableQuantificationOrchestrator
                     }
 
                     completedRows.Add(ready);
+                    outcomes.Add(ready);
                     checkpoint = checkpoint with
                     {
                         CompletedRows = completedRows.ToImmutable(),
@@ -567,6 +594,7 @@ public sealed class DurableQuantificationOrchestrator
                     CheckpointSaveResult saved = checkpointStore.Update(checkpoint, CancellationToken.None);
                     if (!saved.IsSuccess)
                     {
+                        outcomes.Remove(completedRows[completedRows.Count - 1]);
                         completedRows.RemoveAt(completedRows.Count - 1);
                         checkpoint = checkpoint with { CompletedRows = completedRows.ToImmutable() };
                         terminalCode = saved.Code;
