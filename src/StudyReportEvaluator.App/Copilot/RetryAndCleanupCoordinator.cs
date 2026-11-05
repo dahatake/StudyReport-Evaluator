@@ -24,19 +24,24 @@ public abstract class EvaluationAttemptException : Exception
 {
     private protected EvaluationAttemptException(
         EvaluationAttemptFailureKind failureKind,
-        string safeMessage)
+        string safeMessage,
+        string? diagnostic = null)
         : base(safeMessage)
     {
         FailureKind = failureKind;
+        Diagnostic = diagnostic;
     }
 
     public EvaluationAttemptFailureKind FailureKind { get; }
+
+    // Closed codes, ids and numbers only; never model or student content.
+    public string? Diagnostic { get; }
 }
 
 public sealed class EvaluationSchemaException : EvaluationAttemptException
 {
-    public EvaluationSchemaException()
-        : base(EvaluationAttemptFailureKind.SchemaInvalid, "The structured evaluation result is invalid.")
+    public EvaluationSchemaException(string? diagnostic = null)
+        : base(EvaluationAttemptFailureKind.SchemaInvalid, "The structured evaluation result is invalid.", diagnostic)
     {
     }
 }
@@ -45,7 +50,7 @@ public sealed class EvaluationSchemaException : EvaluationAttemptException
 public sealed class EvaluationReasoningEffortRejectedException : EvaluationAttemptException
 {
     public EvaluationReasoningEffortRejectedException()
-        : base(EvaluationAttemptFailureKind.SchemaInvalid, "The model rejected the requested reasoning effort.")
+        : base(EvaluationAttemptFailureKind.SchemaInvalid, "The model rejected the requested reasoning effort.", "REASONING_EFFORT_REJECTED")
     {
     }
 }
@@ -476,6 +481,7 @@ public sealed class RetryAndCleanupCoordinator
                 identity);
 
             TResult? acceptedResult = null;
+            string? attemptDiagnostic = null;
             EvaluationAttemptFailureKind? failureKind = validUniqueSessionId
                 ? null
                 : EvaluationAttemptFailureKind.Fatal;
@@ -518,6 +524,7 @@ public sealed class RetryAndCleanupCoordinator
                 {
                     failureKind = EvaluationAttemptFailureKind.Network;
                     abortRequired = true;
+                    attemptDiagnostic = "exception=" + exception.GetType().Name;
                 }
                 catch (EvaluationRateLimitException exception)
                 {
@@ -528,15 +535,17 @@ public sealed class RetryAndCleanupCoordinator
                 catch (EvaluationAttemptException exception)
                 {
                     failureKind = NormalizeFailureKind(exception.FailureKind);
+                    attemptDiagnostic = exception.Diagnostic;
                     abortRequired = failureKind is EvaluationAttemptFailureKind.Network
                         or EvaluationAttemptFailureKind.Timeout
                         or EvaluationAttemptFailureKind.RateLimited
                         or EvaluationAttemptFailureKind.Fatal;
                 }
-                catch
+                catch (Exception exception)
                 {
                     failureKind = EvaluationAttemptFailureKind.Fatal;
                     abortRequired = true;
+                    attemptDiagnostic = "exception=" + exception.GetType().Name;
                 }
             }
 
@@ -632,6 +641,9 @@ public sealed class RetryAndCleanupCoordinator
                 maxConcurrency,
                 ToSafeCategory(terminalFailure),
                 identity);
+            EvaluationDiagnostics.Report(
+                "ATTEMPT_FAILED",
+                $"kind={terminalFailure} attempt={attemptCount} session={identity?.Value ?? "none"} {attemptDiagnostic}");
 
             if (ShouldRetry(
                     terminalFailure,
@@ -670,6 +682,9 @@ public sealed class RetryAndCleanupCoordinator
                 continue;
             }
 
+            EvaluationDiagnostics.Report(
+                "EVALUATION_FAILED",
+                $"status={MapTerminalStatus(terminalFailure)} attempts={attemptCount}");
             return EphemeralEvaluationResult<TResult>.Failed(
                 MapTerminalStatus(terminalFailure),
                 attemptCount,

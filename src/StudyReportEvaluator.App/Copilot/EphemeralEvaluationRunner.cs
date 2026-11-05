@@ -292,7 +292,9 @@ internal sealed class CopilotEvaluationAttempt : IEphemeralEvaluationAttempt
             return acceptedResult;
         }
 
-        throw new EvaluationSchemaException();
+        SubmitQuantificationOutcome outcome = _collector.GetOutcome();
+        throw new EvaluationSchemaException(
+            $"tool={outcome.Status} invocations={outcome.InvocationCount} codes={string.Join(',', outcome.ErrorCodes)} details={string.Join(';', outcome.ErrorDetails)}");
     }
 
     public Task AbortAsync(CancellationToken cancellationToken)

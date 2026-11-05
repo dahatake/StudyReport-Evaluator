@@ -92,6 +92,20 @@ public sealed class QuantificationResultValidatorTests
     }
 
     [Fact]
+    public void Evidence_with_width_and_punctuation_differences_resolves_to_the_exact_source_span()
+    {
+        QuantificationResult submitted = ValidResult() with
+        {
+            Criteria = [ResultTestData.Criterion(evidence: "ｐｒｉｍａｒｙ，　evidence")],
+        };
+
+        QuantificationResultValidationOutcome outcome = _validator.Validate(CreatePayload(), submitted);
+
+        Assert.True(outcome.IsValid);
+        Assert.Equal("primary evidence", outcome.AcceptedResult!.Criteria[0].Evidence);
+    }
+
+    [Fact]
     public void Primary_evidence_must_bind_to_exact_primary_id_and_contiguous_substring()
     {
         QuantificationResult wrongColumn = ValidResult() with

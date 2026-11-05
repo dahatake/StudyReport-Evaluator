@@ -194,6 +194,7 @@ public sealed class DurableQuantificationOrchestrator
     {
         // FR-108: job progress text log (closed codes and numbers only). Saving never alters the run.
         RunTextLog textLog = new(timeProvider);
+        using IDisposable diagnosticsScope = EvaluationDiagnostics.BeginRun(textLog.AddDiagnostic);
         RunSummary summary;
         try
         {

@@ -23,12 +23,14 @@ public sealed class SubmitQuantificationOutcome
         SubmitQuantificationStatus status,
         int invocationCount,
         ImmutableArray<string> errorCodes,
-        QuantificationResult? acceptedResult)
+        QuantificationResult? acceptedResult,
+        ImmutableArray<string> errorDetails = default)
     {
         Status = status;
         InvocationCount = invocationCount;
         ErrorCodes = errorCodes;
         AcceptedResult = acceptedResult;
+        ErrorDetails = errorDetails.IsDefault ? [] : errorDetails;
     }
 
     public SubmitQuantificationStatus Status { get; }
@@ -36,6 +38,9 @@ public sealed class SubmitQuantificationOutcome
     public int InvocationCount { get; }
 
     public ImmutableArray<string> ErrorCodes { get; }
+
+    // Closed codes, ids and lengths for failure analysis; never submitted text.
+    public ImmutableArray<string> ErrorDetails { get; }
 
     public QuantificationResult? AcceptedResult { get; }
 
@@ -84,6 +89,7 @@ public sealed class SubmitQuantificationTool
     private int _invocationCount;
     private SubmitQuantificationStatus _status = SubmitQuantificationStatus.NotInvoked;
     private ImmutableArray<string> _errorCodes = [];
+    private ImmutableArray<string> _errorDetails = [];
     private QuantificationResult? _acceptedResult;
 
     public SubmitQuantificationTool(SafeEvaluationPayload expectedPayload)
@@ -125,6 +131,7 @@ public sealed class SubmitQuantificationTool
 
         QuantificationResult? acceptedResult = null;
         ImmutableArray<string> errorCodes;
+        ImmutableArray<string> errorDetails = [];
         try
         {
             if (!string.Equals(
@@ -149,6 +156,7 @@ public sealed class SubmitQuantificationTool
                 else
                 {
                     errorCodes = NormalizeCodes(validation.Errors.Select(error => error.Code));
+                    errorDetails = DescribeRejection(validation, submitted);
                 }
             }
         }
@@ -171,6 +179,7 @@ public sealed class SubmitQuantificationTool
 
             _acceptedResult = acceptedResult;
             _errorCodes = errorCodes;
+            _errorDetails = errorDetails;
             _status = acceptedResult is null
                 ? SubmitQuantificationStatus.InvalidPayload
                 : SubmitQuantificationStatus.Accepted;
@@ -188,8 +197,36 @@ public sealed class SubmitQuantificationTool
                 _status,
                 _invocationCount,
                 _errorCodes,
-                _acceptedResult);
+                _acceptedResult,
+                _errorDetails);
         }
+    }
+
+    // Content-free: validator codes with criterion id and field, plus lengths only (never the submitted text).
+    private ImmutableArray<string> DescribeRejection(
+        QuantificationResultValidationOutcome validation,
+        QuantificationResult submitted)
+    {
+        ImmutableArray<string>.Builder details = ImmutableArray.CreateBuilder<string>();
+        foreach (QuantificationResultValidationError error in validation.Errors)
+        {
+            details.Add($"{error.Code}@{error.CriterionId}.{error.Field}");
+        }
+
+        ImmutableArray<CriterionQuantificationResult> criteria =
+            submitted.Criteria.IsDefault ? [] : submitted.Criteria;
+        foreach (CriterionQuantificationResult? criterion in criteria)
+        {
+            if (criterion is null)
+            {
+                continue;
+            }
+
+            details.Add(
+                $"sent={criterion.CriterionId}:score={criterion.RawScore}:source={criterion.EvidenceSource}:evidenceLength={criterion.Evidence?.Length ?? 0}:reasonLength={criterion.Reason?.Length ?? 0}:primaryLength={ExpectedPayload.PrimarySource.Value.Length}");
+        }
+
+        return details.ToImmutable();
     }
 
     public bool TryGetAcceptedResult(

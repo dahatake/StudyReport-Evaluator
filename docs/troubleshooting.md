@@ -230,7 +230,7 @@ Windowsのフォルダーの**ReadOnly属性だけでは書込拒否を保証し
 | `SUCCESS` | valid result | 数値を使用 |
 | `EMPTY` | 主値が空 | AI callなし、0相当 |
 | `NOT_RUN_ZERO_BUDGET` | Special pointsが0 | 固有評価callなし、Special earned 0 |
-| `AI_OUTPUT_INVALID` | schema、ID、range、source等が不正 | 対象値blank |
+| `AI_OUTPUT_INVALID` | schema、ID、range、source等が不正 | 対象値blank。原因は `{yyyyMMddHHmm}-log.txt` 末尾の `DIAG` 行（row・question・evaluator、検証エラーコード、評価項目ID、文字数のみ。回答・引用・理由の本文は含まない）で確認する |
 | `AI_TIMEOUT` | retry後もtimeout（AIの応答待ちはSDK既定の60秒、起動を含む1回の試行は最大120秒） | 対象値blank |
 | `NETWORK_FAILED` | retry後もnetwork failure（CLIが返す通信失敗のsession errorを含む） | 対象値blank |
 | `AUTH_REQUIRED` | login利用不可 | 対象値blank |

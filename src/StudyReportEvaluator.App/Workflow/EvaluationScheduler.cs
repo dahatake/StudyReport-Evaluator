@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using StudyReportEvaluator.App.Copilot;
+using StudyReportEvaluator.App.Logging;
 using StudyReportEvaluator.App.Workbooks.Writing;
 using StudyReportEvaluator.Core.Domain;
 using StudyReportEvaluator.Core.Prompting;
@@ -514,6 +515,8 @@ public sealed class EvaluationScheduler
             return RuntimeFailure(item);
         }
 
+        using IDisposable diagnosticContext = EvaluationDiagnostics.BeginContext(
+            $"row={item.SourceRowNumber} question={item.QuestionId} evaluator={item.EvaluatorId}");
         Dictionary<string, string?> selectedCells = new(StringComparer.OrdinalIgnoreCase);
         foreach (string column in item.SelectedSourceColumns)
         {
@@ -565,6 +568,7 @@ public sealed class EvaluationScheduler
         // limit, but the model-independent app-owned ceiling always applies.
         if (!requestCapacityValidator.Validate(payload, maximumPromptTokens, maximumContextWindowTokens).IsValid)
         {
+            EvaluationDiagnostics.Report("REQUEST_CAPACITY_EXCEEDED", "status=AI_OUTPUT_INVALID");
             return Failure(item, ResultsStatusCodes.AiOutputInvalid, scorable: true);
         }
 
@@ -620,6 +624,9 @@ public sealed class EvaluationScheduler
                 runnerResult.AcceptedResult!);
             if (!validation.IsValid)
             {
+                EvaluationDiagnostics.Report(
+                    "RESULT_REVALIDATION_FAILED",
+                    "codes=" + string.Join(',', validation.Errors.Select(error => error.Code).Distinct()));
                 return new EvaluationUnitResult(
                     item,
                     ResultsStatusCodes.AiOutputInvalid,

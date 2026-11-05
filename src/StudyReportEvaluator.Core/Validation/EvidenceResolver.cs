@@ -18,23 +18,13 @@ internal static class EvidenceResolver
         }
 
         List<int> originalIndexes = new(source.Length);
-        StringBuilder squeezedSource = new(source.Length);
-        for (int index = 0; index < source.Length; index++)
-        {
-            if (!char.IsWhiteSpace(source[index]))
-            {
-                squeezedSource.Append(source[index]);
-                originalIndexes.Add(index);
-            }
-        }
-
-        string haystack = squeezedSource.ToString();
+        string haystack = Squeeze(source, originalIndexes);
         int searchFrom = 0;
         int spanStart = -1;
         int spanEnd = -1;
         foreach (string fragment in evidence.Split(EllipsisTokens, StringSplitOptions.None))
         {
-            string needle = RemoveWhitespace(fragment);
+            string needle = Squeeze(fragment, null);
             if (needle.Length == 0)
             {
                 continue;
@@ -61,18 +51,35 @@ internal static class EvidenceResolver
             return false;
         }
 
+        while (spanEnd < source.Length && char.IsPunctuation(source[spanEnd]))
+        {
+            spanEnd++;
+        }
+
         exactEvidence = source[spanStart..spanEnd];
         return true;
     }
 
-    private static string RemoveWhitespace(string value)
+    // Compatibility-normalizes each character (full-width/half-width digits, letters and parentheses)
+    // and drops whitespace and punctuation, which models routinely rewrite when quoting Japanese text.
+    private static string Squeeze(string value, List<int>? originalIndexes)
     {
         StringBuilder builder = new(value.Length);
-        foreach (char character in value)
+        for (int index = 0; index < value.Length; index++)
         {
-            if (!char.IsWhiteSpace(character))
+            char character = value[index];
+            string normalized = char.IsSurrogate(character)
+                ? character.ToString()
+                : character.ToString().Normalize(NormalizationForm.FormKC);
+            foreach (char part in normalized)
             {
-                builder.Append(character);
+                if (char.IsWhiteSpace(part) || char.IsPunctuation(part))
+                {
+                    continue;
+                }
+
+                builder.Append(part);
+                originalIndexes?.Add(index);
             }
         }
 

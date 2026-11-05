@@ -106,7 +106,24 @@ public sealed class SubmitQuantificationToolTests
 
         SubmitQuantificationOutcome outcome = tool.GetOutcome();
         Assert.Contains("EVIDENCE_NOT_EXACT_SUBSTRING", outcome.ErrorCodes);
+        Assert.Contains(outcome.ErrorDetails, detail => detail.StartsWith("EVIDENCE_NOT_EXACT_SUBSTRING@C1.Evidence", StringComparison.Ordinal));
+        Assert.DoesNotContain(outcome.ErrorDetails, detail => detail.Contains("different-row", StringComparison.Ordinal));
         Assert.Null(outcome.AcceptedResult);
+    }
+
+    [Fact]
+    public void Diagnostics_sanitize_content_and_report_only_inside_a_run_scope()
+    {
+        List<string> lines = [];
+        StudyReportEvaluator.App.Logging.EvaluationDiagnostics.Report("OUTSIDE", "ignored");
+        using (StudyReportEvaluator.App.Logging.EvaluationDiagnostics.BeginRun(lines.Add))
+        using (StudyReportEvaluator.App.Logging.EvaluationDiagnostics.BeginContext("row=10"))
+        {
+            StudyReportEvaluator.App.Logging.EvaluationDiagnostics.Report("ATTEMPT_FAILED", "codes=A 学生の回答");
+        }
+
+        string line = Assert.Single(lines);
+        Assert.Equal("DIAG ATTEMPT_FAILED row=10 codes=A ?????", line);
     }
 
     [Fact]

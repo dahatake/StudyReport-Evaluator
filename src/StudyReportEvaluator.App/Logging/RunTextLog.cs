@@ -16,13 +16,16 @@ internal sealed class RunTextLog
     internal const string WriteFailed = "RUN_LOG_WRITE_FAILED";
     internal const string NotAttempted = "RUN_LOG_NOT_ATTEMPTED";
     internal const int MaximumLines = 5000;
+    internal const int MaximumDiagnosticLines = 4000;
 
     private readonly TimeProvider timeProvider;
     private readonly DateTimeOffset startedLocal;
     private readonly List<string> lines = [];
+    private readonly List<string> diagnostics = [];
     private readonly object gate = new();
     private string? lastProgressLine;
     private int dropped;
+    private int diagnosticsDropped;
 
     internal RunTextLog(TimeProvider timeProvider)
     {
@@ -52,6 +55,21 @@ internal sealed class RunTextLog
             }
 
             lines.Add(Stamp() + closedText);
+        }
+    }
+
+    /// <summary>Failure diagnostics have their own budget so that progress lines can never crowd them out.</summary>
+    internal void AddDiagnostic(string closedText)
+    {
+        lock (gate)
+        {
+            if (diagnostics.Count >= MaximumDiagnosticLines)
+            {
+                diagnosticsDropped++;
+                return;
+            }
+
+            diagnostics.Add(Stamp() + closedText);
         }
     }
 
@@ -90,6 +108,12 @@ internal sealed class RunTextLog
                 if (dropped > 0)
                 {
                     lines.Add(Stamp() + "LINES_DROPPED count=" + dropped.ToString(CultureInfo.InvariantCulture));
+                }
+
+                lines.AddRange(diagnostics);
+                if (diagnosticsDropped > 0)
+                {
+                    lines.Add(Stamp() + "DIAG_LINES_DROPPED count=" + diagnosticsDropped.ToString(CultureInfo.InvariantCulture));
                 }
 
                 text = string.Join("\n", lines) + "\n";
