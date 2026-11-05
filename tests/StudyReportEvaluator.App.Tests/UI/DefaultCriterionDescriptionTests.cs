@@ -15,7 +15,7 @@ public sealed class DefaultCriterionDescriptionTests
         "学生が作成したレポートを高度に分析・解析をしてそれぞれの{論点}について説明がされているかどうかの評価を行ってください。\n論点:\n- xxx\n- xxx\n- xxx";
 
     private const string ExpectedPromptAnalysis =
-        "学生が作成したPromptを、Anthropic・OpenAI・Microsoftなどが公開するPrompt作成のベストプラクティスと照合して、高度に分析・評価を行ってください。\n観点:\n- 明確な目的が示されているか\n- 具体的で曖昧さのない指示になっているか\n- 必要な文脈・背景情報が与えられているか\n- 制約・禁止事項が明示されているか\n- 出力を検証できる基準が示されているか";
+        "学生が作成したPromptを、Anthropic・OpenAI・Microsoftなどが公開するPrompt作成のベストプラクティスと照合して、高度に分析・評価を行ってください。\n観点:\n- 明確な目的が示されているか\n- 具体的で曖昧さのない指示になっているか\n- 必要な文脈・背景情報が与えられているか\n- 制約・禁止事項が明示されているか";
 
     private const string ExpectedCustom =
         "（評価したい内容と判断の基準を、利用者が具体的に書き換えてください。）\n評価の観点:\n- xxx\n- xxx\n- xxx";
