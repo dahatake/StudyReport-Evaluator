@@ -291,6 +291,52 @@ public sealed class QuantificationResultValidatorTests
         Assert.Contains(outcome.Errors, error => error.Code is "EVIDENCE_NOT_EXACT_SUBSTRING" or "EVIDENCE_REQUIRED");
     }
 
+    // Row 389 of the 2026 PBL run: the student wrote "プログミング" and the model quoted it twice as "プログラミング".
+    private const string TypoSource =
+        "プログミングと機械学習の違いは、人間がルールを教えるか、コンピュータがルールを見出していくかの違いである。プログラミングは人間が指示するが機械学習は大量のデータを送り分析させる。";
+
+    [Theory]
+    [InlineData(
+        "プログラミングと機械学習の違いは、人間がルールを教えるか、コンピュータがルールを見出していくかの違いである",
+        "プログミングと機械学習の違いは、人間がルールを教えるか、コンピュータがルールを見出していくかの違いである。")]
+    [InlineData(
+        "コンピューターがルールを見出していくかの違いである",
+        "コンピュータがルールを見出していくかの違いである。")]
+    public void Quote_with_a_silently_corrected_typo_resolves_to_the_exact_source_span(string quoted, string expectedEvidence)
+    {
+        QuantificationResultValidationOutcome outcome = _validator.Validate(TypoPayload(), TypoResult(quoted));
+
+        Assert.True(outcome.IsValid);
+        string accepted = outcome.AcceptedResult!.Criteria[0].Evidence;
+        Assert.Equal(expectedEvidence, accepted);
+        Assert.Contains(accepted, TypoSource, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("プログラミングと深層学習の相違は、人間が規則を教えるか")]
+    [InlineData("機械学習は少量のデータで推論させる")]
+    [InlineData("人間がルールを教えるか、プログミングと機械学習の違いは")]
+    public void Quote_that_differs_beyond_typo_tolerance_is_still_rejected(string quoted)
+    {
+        QuantificationResultValidationOutcome outcome = _validator.Validate(TypoPayload(), TypoResult(quoted));
+
+        Assert.False(outcome.IsValid);
+        Assert.Contains(outcome.Errors, error => error.Code == "EVIDENCE_NOT_EXACT_SUBSTRING");
+    }
+
+    private static SafeEvaluationPayload TypoPayload() => new(
+        "Q1",
+        "E1",
+        "<redacted-test-prompt>",
+        new EvaluationSourceCell(EvaluationSourceKind.PrimaryAnswer, "G", TypoSource),
+        [],
+        [new ExpectedCriterion("C1", "Criterion", new ScoreRange(0m, 10m))]);
+
+    private static QuantificationResult TypoResult(string quoted) => ValidResult() with
+    {
+        Criteria = [ResultTestData.Criterion(evidence: quoted)],
+    };
+
     [Fact]
     public void Blank_reason_and_evidence_are_not_leaked_in_errors()
     {
