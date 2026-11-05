@@ -30,7 +30,8 @@
     "AC-089": "sha256:1d096f79819b1ea9",
     "AC-090": "sha256:f6ab18f4f90b2b62",
     "AC-092": "sha256:0d8ada5e34e80265",
-    "AC-096": "sha256:a3a4363b2f743abe"
+    "AC-096": "sha256:a3a4363b2f743abe",
+    "AC-007": "sha256:f02465452d03d14f"
   },
   "cases": [
     {
@@ -558,6 +559,37 @@
           "by": "test-designer",
           "change": "ac_ids: ['AC-093', 'AC-094', 'AC-095', 'AC-096'] -> ['AC-096']",
           "reason": "AC-093〜095 は検証レベルが unit/integration のため System Test 台帳の対象外。同ファイルのテストは残すが台帳の AC は AC-096 のみ"
+        }
+      ]
+    },
+    {
+      "id": "IT-005",
+      "requirement_ids": [
+        "FR-120"
+      ],
+      "ac_ids": [
+        "AC-007"
+      ],
+      "title": "通常評価のrequest-bound evaluator ID: Prompt・schemaにID生成指示なし、省略応答は送信時の行・evaluatorへ帰属（271/389回帰）、明示不一致はEVALUATOR_ID_MISMATCHで拒否しschema retry後AI_OUTPUT_INVALID・blank・ログ行の取り違えなし",
+      "layer": "contract",
+      "command": "dotnet test tests/system/integration --filter FullyQualifiedName~RequestBoundEvaluatorIdTests",
+      "canary": false,
+      "status": "blocked",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-06T06:52:32+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-06T06:53:03+09:00",
+          "by": "test-designer",
+          "change": "blocked",
+          "reason": "AC-007 は検証レベル=integration で System Test 台帳の対象外（CHK-10）。テスト本体 tests/system/integration/RequestBoundEvaluatorIdTests.cs は残し、dotnet test tests/system/integration --filter FullyQualifiedName~RequestBoundEvaluatorIdTests で直接実行する。検証レベルが system に変われば update で not_run に戻す"
         }
       ]
     }
