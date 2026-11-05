@@ -82,10 +82,10 @@
       "layer": "e2e",
       "command": "python -m pytest tests/system/test_fr002_output_folder.py -q",
       "canary": true,
-      "status": "fail",
-      "last_commit": "1cfcb6d",
-      "last_run_at": "2026-11-06T01:05:36+09:00",
-      "evidence": "work/runs/202611060052/logs/system-test/E2E-002-202611060104.log",
+      "status": "pass",
+      "last_commit": "ed362d9",
+      "last_run_at": "2026-11-06T01:06:41+09:00",
+      "evidence": "work/runs/202611060052/logs/system-test/E2E-002-202611060105.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
