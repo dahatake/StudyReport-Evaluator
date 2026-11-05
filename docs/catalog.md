@@ -8,6 +8,7 @@
 
 | 要求 ID | 題名 | 決定状態 | 実装ファイル | テスト | 使っている共通部品 |
 |---|---|---|---|---|---|
+| FR-120 | 通常評価のrequest-bound識別子と厳密な結果受理 | 承認済み | 未実装 | 未実装 | - |
 | FR-001 | 採点配分と通常評価の統合画面 | 承認済み | src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml, src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml.cs | tests/system/ui/IntegratedDesignAndSettingsTests.cs | - |
 | FR-002 | 共通設定と出力フォルダー選択の統一 | 承認済み | src/StudyReportEvaluator.App/Views/SettingsView.axaml, src/StudyReportEvaluator.App/Views/SettingsView.axaml.cs, src/StudyReportEvaluator.App/ViewModels/SettingsViewModel.cs, src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs, src/StudyReportEvaluator.App/ViewModels/MainWindowViewModel.cs, src/StudyReportEvaluator.App/Views/NativeOutputFolderPicker.cs | tests/system/ui/IntegratedDesignAndSettingsTests.cs, tests/system/ui/OutputFolderSelectionTests.cs, tests/system/test_fr002_output_folder.py, tests/StudyReportEvaluator.App.Tests/UI/SettingsViewTests.cs, tests/StudyReportEvaluator.App.Tests/UI/SettingsViewModelTests.cs, tests/StudyReportEvaluator.App.Tests/UI/SettingsAccessibilityTests.cs, tests/StudyReportEvaluator.App.Tests/E2E/SettingsWorkflowSystemTests.cs | デザイン基盤, 設定保存, ネイティブ出力フォルダー選択 |
 | FR-003 | 削除した3タブの機能の廃止 | 承認済み | src/StudyReportEvaluator.App/Composition/ServiceRegistration.cs, src/StudyReportEvaluator.App/ViewModels/MainWindowViewModel.cs, src/StudyReportEvaluator.App/Views/SettingsView.axaml, src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml, docs/settings.md, docs/getting-started.md | tests/system/ui/IntegratedDesignAndSettingsTests.cs, tests/StudyReportEvaluator.App.Tests/Settings/RetiredEditingUiRetentionTests.cs, tests/StudyReportEvaluator.App.Tests/Launch/LaunchOptionsTests.cs, tests/StudyReportEvaluator.App.Tests/Content/DocumentationContractTests.cs | - |
@@ -29,6 +30,8 @@
 | FR-119 | [実行]画面の処理単位の進捗に成功数と失敗数を示す | 承認済み | src/StudyReportEvaluator.App/Workflow/OperationOutcomeCounter.cs, src/StudyReportEvaluator.App/Workflow/DurableQuantificationOrchestrator.cs, src/StudyReportEvaluator.App/Workflow/EvaluationScheduler.cs, src/StudyReportEvaluator.App/Workflow/RunSummary.cs, src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs, src/StudyReportEvaluator.App/Views/ExecutionView.axaml, src/StudyReportEvaluator.App/Views/MainWindow.axaml | tests/StudyReportEvaluator.App.Tests/UI/OperationOutcomeProgressTests.cs | - |
 
 ## API・イベント
+
+通常評価の既存契約（要求定義書§7.3）をFR-120として構造化し、AC-007を変更して再利用した（run 202611060630）。既存資産は`src/StudyReportEvaluator.App/Copilot/EvaluationSchemaFactory.cs`、`src/StudyReportEvaluator.App/Copilot/SubmitQuantificationTool.cs`、`src/StudyReportEvaluator.Core/Prompting/BuiltInPromptTemplates.cs`。ID省略時の補完は既存実装にあるが、モデル向け契約からの生成依存除去と回帰検証は未実装・未検証。INT-001の連携先・認証・データ境界は変更しない。
 
 | 名前 | 定義ファイル | 関連する要求 ID |
 |---|---|---|
