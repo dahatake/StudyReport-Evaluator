@@ -30,11 +30,13 @@ public sealed class EvaluationSchemaFactoryTests
             ["Criteria"],
             Required(schema).Order(StringComparer.Ordinal).ToArray());
 
+        // FR-120 AC-007: the evaluator ID is request-bound; the model-facing schema has no field for it.
         JsonElement rootProperties = schema.GetProperty("properties");
         Assert.Equal(
-            ["Criteria", "EvaluatorId"],
+            ["Criteria"],
             PropertyNames(rootProperties).Order(StringComparer.Ordinal).ToArray());
-        Assert.Equal(["E1"], Strings(rootProperties.GetProperty("EvaluatorId").GetProperty("enum")));
+        Assert.DoesNotContain("evaluator", schema.GetRawText(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"E1\"", schema.GetRawText(), StringComparison.Ordinal);
 
         JsonElement criteria = rootProperties.GetProperty("Criteria");
         Assert.Equal(2, criteria.GetProperty("minItems").GetInt32());

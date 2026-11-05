@@ -16,7 +16,9 @@ public sealed class EvaluationSchemaFactory
 
     private const int MaximumCellCharacters = 32_767;
 
-    // EvaluatorId stays in the closed schema but is optional: the app already knows it and fills it when omitted.
+    // FR-120 AC-007: the evaluator ID is request-bound. The app keeps it with the sent request, so the model-facing
+    // schema has no field to generate or return it. SubmitQuantificationTool still accepts an explicit matching ID
+    // for compatibility and rejects any other explicit ID as EVALUATOR_ID_MISMATCH.
     private static readonly string[] RootRequiredProperties =
     [
         "Criteria",
@@ -48,11 +50,6 @@ public sealed class EvaluationSchemaFactory
             ["additionalProperties"] = false,
             ["properties"] = new JsonObject
             {
-                ["EvaluatorId"] = new JsonObject
-                {
-                    ["type"] = "string",
-                    ["enum"] = StringArray([payload.EvaluatorId]),
-                },
                 ["Criteria"] = new JsonObject
                 {
                     ["type"] = "array",
