@@ -14,13 +14,10 @@ public static class DefaultCriterionDescriptions
     public const string PromptAnalysis =
         "学生が作成したPromptを、Anthropic・OpenAI・Microsoftなどが公開するPrompt作成のベストプラクティスと照合して、高度に分析・評価を行ってください。\n"
         + "観点:\n"
-        + "- 明確な役割と目的が示されているか\n"
+        + "- 明確な目的が示されているか\n"
         + "- 具体的で曖昧さのない指示になっているか\n"
         + "- 必要な文脈・背景情報が与えられているか\n"
-        + "- 出力形式が指定されているか\n"
-        + "- 例示（入出力の例）が適切に用いられているか\n"
         + "- 制約・禁止事項が明示されているか\n"
-        + "- 段階的な思考や手順が促されているか\n"
         + "- 出力を検証できる基準が示されているか";
 
     public const string Custom =
