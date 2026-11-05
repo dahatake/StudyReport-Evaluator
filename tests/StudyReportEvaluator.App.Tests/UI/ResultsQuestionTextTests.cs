@@ -152,7 +152,7 @@ public sealed class ResultsQuestionTextTests
                 ResultsOutputView view = Assert.IsType<ResultsOutputView>(window.Content);
                 ListBox rows = Assert.IsType<ListBox>(view.FindControl<ListBox>("RowScoreList"));
                 Grid listPanel = Assert.IsType<Grid>(view.FindControl<Grid>("ResultsListPanel"));
-                Grid header = Assert.IsType<Grid>(listPanel.Children[0]);
+                Grid header = Assert.IsType<Grid>(listPanel.Children.Single(child => Grid.GetRow(child) == 1));
 
                 Assert.Equal(5, header.ColumnDefinitions.Count);
                 Assert.Equal(

@@ -141,8 +141,21 @@
       <Grid x:Name="ResultsReviewPanel" IsVisible="{Binding !Cost.IsExpanded}"
         RowDefinitions="*,44" RowSpacing="4">
         <Grid x:Name="ResultsListPanel" IsVisible="{Binding !IsDetailVisible}"
-              RowDefinitions="24,*" RowSpacing="4">
-          <Grid Margin="8,0" ColumnDefinitions="96,82,96,96,*" ColumnSpacing="8">
+              RowDefinitions="Auto,24,*" RowSpacing="4">
+          <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="4" Margin="8,0"
+                     IsVisible="{Binding HasErrorRows}">
+            <ToggleButton x:Name="ShowOnlyErrorsToggle" Content="{Binding ErrorFilterText}"
+                          IsChecked="{Binding ShowOnlyErrors, Mode=TwoWay}" MinHeight="32"
+                          AutomationProperties.AutomationId="ResultsShowOnlyErrors"
+                          AutomationProperties.Name="一覧をエラー（技術エラー）の行だけに絞り込む" />
+            <Button Content="エラー行をすべて選ぶ" Command="{Binding SelectTechnicalErrorRowsCommand}" MinHeight="32"
+                    AutomationProperties.AutomationId="ResultsErrorFilterSelectAll" />
+            <TextBlock Text="{Binding SelectedRerunCountText}" VerticalAlignment="Center" />
+            <Button Content="選んだ行を再実行" Command="{Binding RerunSelectedRowsCommand}" MinHeight="32"
+                    AutomationProperties.AutomationId="ResultsErrorFilterRerun"
+                    AutomationProperties.Name="チェックした行だけを再実行して実行画面へ切り替える" />
+          </WrapPanel>
+          <Grid Grid.Row="1" Margin="8,0" ColumnDefinitions="96,82,96,96,*" ColumnSpacing="8">
             <TextBlock Text="元の行" Classes="label" />
             <TextBlock Grid.Column="1" Text="最終点" Classes="label" />
             <TextBlock Grid.Column="2" Text="固有点" Classes="label" />
@@ -150,7 +163,7 @@
                        ToolTip.Tip="{Binding SimilarityIndicatorNotice}" />
             <TextBlock Grid.Column="4" Text="状態" Classes="label" />
           </Grid>
-          <ListBox x:Name="RowScoreList" Grid.Row="1" Padding="0" BorderThickness="0"
+          <ListBox x:Name="RowScoreList" Grid.Row="2" Padding="0" BorderThickness="0"
                    ItemsSource="{Binding VisibleRowScores}" SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
                    Focusable="True" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                    ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -173,7 +186,7 @@
                   <TextBlock Grid.Column="2" Text="{Binding SpecialEarnedText}" TextTrimming="CharacterEllipsis" />
                   <TextBlock Grid.Column="3" Text="{Binding SimilarityPenaltyText}" TextTrimming="CharacterEllipsis" />
                   <TextBlock Grid.Column="4" Text="{Binding StatusText}" TextTrimming="CharacterEllipsis"
-                             ToolTip.Tip="{Binding StatusText}" Classes="row-status"
+                             ToolTip.Tip="{Binding StatusDetailText}" Classes="row-status"
                              AutomationProperties.AutomationId="{Binding SourceRowNumber, StringFormat='ResultsRowStatus-{0}'}" />
                 </Grid>
               </DataTemplate>
@@ -192,10 +205,12 @@
                   <StackPanel Grid.Column="2"><TextBlock Text="固有点" Classes="label" /><TextBlock Text="{Binding SpecialEarnedText}" /></StackPanel>
                   <StackPanel Grid.Column="3"><TextBlock Text="類似減点" Classes="label" /><TextBlock Text="{Binding SimilarityPenaltyText}" /></StackPanel>
                   <StackPanel Grid.Column="4"><TextBlock Text="Final raw" Classes="label" /><TextBlock Text="{Binding FinalRawText}" AutomationProperties.AutomationId="ResultsSelectedFinalRaw" /></StackPanel>
-                  <StackPanel Grid.Column="5"><TextBlock Text="状態" Classes="label" /><TextBlock Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" AutomationProperties.AutomationId="ResultsSelectedRowStatus" /></StackPanel>
+                  <StackPanel Grid.Column="5"><TextBlock Text="状態" Classes="label" /><TextBlock Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusDetailText}" AutomationProperties.AutomationId="ResultsSelectedRowStatus" /></StackPanel>
                   <ScrollViewer Grid.Column="6" Focusable="True" HorizontalScrollBarVisibility="Disabled"
                                 VerticalScrollBarVisibility="Auto" AutomationProperties.Name="選択学生の全設問得点と類似度の確認指標の全文">
                     <StackPanel Spacing="4">
+                      <TextBlock Text="{Binding ErrorSummaryText}" TextWrapping="Wrap" IsVisible="{Binding IsTechnicalError}"
+                                 AutomationProperties.AutomationId="ResultsErrorSummary" />
                       <TextBlock Text="{Binding QuestionEarnedText}" TextWrapping="Wrap"
                                  AutomationProperties.AutomationId="ResultsQuestionEarnedFull" />
                       <!-- FR-114 AC-078: 類似度は通常評価と別の確認指標・未検証として表示する。 -->

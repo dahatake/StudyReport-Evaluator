@@ -168,6 +168,11 @@ public sealed class ResultsRowScoreViewModel : UiObservableObject
 
     public ResultsRowStatus Status { get; }
 
+    public bool IsTechnicalError => Status == ResultsRowStatus.TechnicalError;
+
+    // 技術エラーの行だけに入る、失敗した評価の status code 要約（学生本文は含めない）。
+    public string ErrorSummaryText { get; internal init; } = string.Empty;
+
     public string StatusText => Status switch
     {
         ResultsRowStatus.Success => "成功",
@@ -177,6 +182,8 @@ public sealed class ResultsRowScoreViewModel : UiObservableObject
         ResultsRowStatus.TechnicalError => "技術エラー",
         _ => throw new InvalidOperationException("The result row status is invalid."),
     };
+
+    public string StatusDetailText => ErrorSummaryText.Length == 0 ? StatusText : $"{StatusText}: {ErrorSummaryText}";
 
     public string QuestionEarnedText { get; }
 
@@ -751,6 +758,7 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
     private readonly WeightedScoreCalculator scoreCalculator = new();
     private readonly ObservableCollection<ResultsCriterionViewModel> resultItems = [];
     private readonly ObservableCollection<ResultsRowScoreViewModel> rowScoreItems = [];
+    private bool showOnlyErrors;
     private readonly ObservableCollection<ResultsRowScoreViewModel> visibleRowScoreItems = [];
     private readonly ObservableCollection<ResultsCriterionViewModel> selectedRowCriterionItems = [];
     private readonly ViewModelCommand exportCommand;
@@ -872,7 +880,15 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
                 return;
             }
 
-            int index = rowScoreItems.IndexOf(value);
+            int index = PagingRows.IndexOf(value);
+            if (index < 0 && showOnlyErrors && rowScoreItems.Contains(value))
+            {
+                // 絞り込みの外の行（行番号ジャンプなど）は、絞り込みを解除して表示する。
+                showOnlyErrors = false;
+                OnPropertiesChanged(nameof(ShowOnlyErrors), nameof(PageSummary));
+                index = PagingRows.IndexOf(value);
+            }
+
             if (index < 0)
             {
                 return;
@@ -902,7 +918,7 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
 
             if (SetProperty(ref pageSize, value))
             {
-                int selectedIndex = selectedRow is null ? -1 : rowScoreItems.IndexOf(selectedRow);
+                int selectedIndex = selectedRow is null ? -1 : PagingRows.IndexOf(selectedRow);
                 if (selectedIndex >= 0)
                 {
                     SetProperty(ref pageIndex, selectedIndex / value, nameof(PageIndex));
@@ -927,7 +943,32 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
 
     public string PageSummary => RowScores.Count == 0
         ? "結果はありません（0 行）"
-        : $"{(PageIndex * PageSize + 1).ToString("N0", CultureInfo.InvariantCulture)}–{(PageIndex * PageSize + VisibleRowScores.Count).ToString("N0", CultureInfo.InvariantCulture)} / {RowScores.Count.ToString("N0", CultureInfo.InvariantCulture)} 行";
+        : PagingRows.Count == 0
+            ? "エラーの行はありません"
+            : $"{(PageIndex * PageSize + 1).ToString("N0", CultureInfo.InvariantCulture)}–{(PageIndex * PageSize + VisibleRowScores.Count).ToString("N0", CultureInfo.InvariantCulture)} / {PagingRows.Count.ToString("N0", CultureInfo.InvariantCulture)} 行{(showOnlyErrors ? "（エラーのみ）" : string.Empty)}";
+
+    // 一覧の下のプレビューをエラー（技術エラー）の行だけに絞る。
+    public bool ShowOnlyErrors
+    {
+        get => showOnlyErrors;
+        set
+        {
+            if (disposed || !SetProperty(ref showOnlyErrors, value)) return;
+            pageIndex = 0;
+            RefreshPresentation(selectedRow);
+            OnPropertyChanged(nameof(PageIndex));
+        }
+    }
+
+    public int ErrorRowCount => rowScoreItems.Count(row => row.IsTechnicalError);
+
+    public bool HasErrorRows => ErrorRowCount > 0;
+
+    public string ErrorFilterText => $"エラーの行だけ表示（{ErrorRowCount.ToString("N0", CultureInfo.InvariantCulture)} 行）";
+
+    private List<ResultsRowScoreViewModel> PagingRows => showOnlyErrors
+        ? rowScoreItems.Where(row => row.IsTechnicalError).ToList()
+        : [.. rowScoreItems];
 
     public int? GoToRowNumber
     {
@@ -1243,6 +1284,7 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
         CancelAnswerRead();
         answerCache.Clear();
         context = runContext;
+        showOnlyErrors = false;
         ResetRerunSelection();
         Cost.Reset();
         if (runContext.Cost is { } cost) Cost.Apply(cost);
@@ -1622,6 +1664,9 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
                 SimilarityDiagnosticsText = similarityDiagnostics.Count == 0
                     ? SimilarityDiagnostics.IndicatorLabel
                     : string.Join(" · ", similarityDiagnostics),
+                ErrorSummaryText = rowStatus == ResultsRowStatus.TechnicalError
+                    ? DescribeRowErrors(sourceRow)
+                    : string.Empty,
             };
             AttachRerunSelection(createdRow, summary, completedRow is not null);
             rowScoreItems.Add(createdRow);
@@ -1747,6 +1792,21 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
         };
     }
 
+    private static string DescribeRowErrors(IEnumerable<ResultsCriterionViewModel> criteria)
+    {
+        string[] failures = criteria
+            .Where(item => item.StatusCode is not ResultsStatusCodes.Success
+                and not ResultsStatusCodes.Empty
+                and not ResultsStatusCodes.Cancelled
+                and not ResultsStatusCodes.NotRunZeroBudget)
+            .GroupBy(item => item.StatusCode, StringComparer.Ordinal)
+            .Select(group => $"{group.Key} ×{group.Count().ToString(CultureInfo.InvariantCulture)}")
+            .ToArray();
+        return failures.Length == 0
+            ? "特別評価または類似度評価で技術エラー"
+            : string.Join(" / ", failures);
+    }
+
     private static ResultsRowStatus GetRowStatus(
         bool isDurable,
         IEnumerable<EvaluationUnitResult> sourceUnits,
@@ -1800,7 +1860,7 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
         }
     }
 
-    private int LastPageIndex => RowScores.Count == 0 ? 0 : (RowScores.Count - 1) / PageSize;
+    private int LastPageIndex => PagingRows.Count == 0 ? 0 : (PagingRows.Count - 1) / PageSize;
 
     private ResultsRowScoreViewModel? FindRow(int? sourceRowNumber) => sourceRowNumber is > 0
         ? rowScoreItems.FirstOrDefault(row => row.SourceRowNumber == sourceRowNumber.Value)
@@ -1831,7 +1891,7 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
         {
             SetProperty(ref pageIndex, Math.Clamp(pageIndex, 0, LastPageIndex), nameof(PageIndex));
             visibleRowScoreItems.Clear();
-            foreach (ResultsRowScoreViewModel row in rowScoreItems.Skip(PageIndex * PageSize).Take(PageSize))
+            foreach (ResultsRowScoreViewModel row in PagingRows.Skip(PageIndex * PageSize).Take(PageSize))
             {
                 visibleRowScoreItems.Add(row);
             }
@@ -1845,7 +1905,12 @@ public sealed partial class ResultsOutputViewModel : UiObservableObject, IDispos
             updatingPresentation = false;
         }
 
-        OnPropertyChanged(nameof(PageSummary));
+        OnPropertiesChanged(
+            nameof(PageSummary),
+            nameof(ShowOnlyErrors),
+            nameof(ErrorRowCount),
+            nameof(HasErrorRows),
+            nameof(ErrorFilterText));
         RaiseCommandStates();
     }
 

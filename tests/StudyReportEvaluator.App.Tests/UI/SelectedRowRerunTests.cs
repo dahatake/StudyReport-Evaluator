@@ -60,6 +60,31 @@ public sealed class SelectedRowRerunTests
         Assert.False(viewModel.RerunSelectedRowsCommand.CanExecute(null));
     }
 
+    // 結果画面のエラー絞り込み: エラーの行だけを一覧に出し、詳細の要約を持ち、その行だけ選んで再実行できる。
+    [Fact]
+    public async Task ShowOnlyErrors_filters_the_list_to_technical_error_rows_with_a_summary()
+    {
+        RerunFixture fixture = new();
+        fixture.Runner.FailRows.UnionWith(FailingRows);
+        using ResultsOutputViewModel viewModel = new(new RecordingOutputBoundary(), await fixture.RunAsync());
+
+        Assert.True(viewModel.HasErrorRows);
+        Assert.Equal(2, viewModel.ErrorRowCount);
+        Assert.True(viewModel.VisibleRowScores.Count > 2);
+
+        viewModel.ShowOnlyErrors = true;
+
+        Assert.Equal(FailingRows, viewModel.VisibleRowScores.Select(row => row.SourceRowNumber).ToArray());
+        Assert.All(viewModel.VisibleRowScores, row => Assert.False(string.IsNullOrWhiteSpace(row.ErrorSummaryText)));
+        Assert.Contains("エラーのみ", viewModel.PageSummary);
+
+        viewModel.SelectTechnicalErrorRowsCommand.Execute(null);
+        Assert.Equal(2, viewModel.SelectedRerunCount);
+
+        viewModel.ShowOnlyErrors = false;
+        Assert.True(viewModel.VisibleRowScores.Count > 2);
+    }
+
     // FR-112 AC-070（異常系）: 技術エラーの行がなければ一括選択は無効。override の再計算で行を作り直してもチェックは保たれる。
     [Fact]
     public async Task FR112_AC070_selection_survives_override_recalculation_and_bulk_select_is_disabled_without_errors()
