@@ -19,10 +19,26 @@ internal static class EvidenceResolver
 
         List<int> originalIndexes = new(source.Length);
         string haystack = Squeeze(source, originalIndexes);
+        if (TryMatch(source, haystack, originalIndexes, evidence.Split(EllipsisTokens, StringSplitOptions.None), out exactEvidence))
+        {
+            return true;
+        }
+
+        // Models also rewrite the connectors between quoted pieces (for example "A / B" or "A→B" for "AとB").
+        // Treat punctuation and symbols as fragment boundaries; every piece must still appear in order in the source.
+        string[] pieces = evidence.Split(
+            evidence.Where(character => char.IsPunctuation(character) || char.IsSymbol(character) || char.IsWhiteSpace(character)).Distinct().ToArray(),
+            StringSplitOptions.RemoveEmptyEntries);
+        return pieces.Length > 1 && TryMatch(source, haystack, originalIndexes, pieces, out exactEvidence);
+    }
+
+    private static bool TryMatch(string source, string haystack, List<int> originalIndexes, string[] fragments, out string exactEvidence)
+    {
+        exactEvidence = string.Empty;
         int searchFrom = 0;
         int spanStart = -1;
         int spanEnd = -1;
-        foreach (string fragment in evidence.Split(EllipsisTokens, StringSplitOptions.None))
+        foreach (string fragment in fragments)
         {
             string needle = Squeeze(fragment, null);
             if (needle.Length == 0)
@@ -73,7 +89,7 @@ internal static class EvidenceResolver
                 : character.ToString().Normalize(NormalizationForm.FormKC);
             foreach (char part in normalized)
             {
-                if (char.IsWhiteSpace(part) || char.IsPunctuation(part))
+                if (char.IsWhiteSpace(part) || char.IsPunctuation(part) || char.IsSymbol(part))
                 {
                     continue;
                 }

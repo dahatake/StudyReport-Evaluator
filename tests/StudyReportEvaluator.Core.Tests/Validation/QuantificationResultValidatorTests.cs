@@ -240,6 +240,8 @@ public sealed class QuantificationResultValidatorTests
     [InlineData("一行目。 \n二行目。 \n三行目。", "一行目。\n…\n三行目。", "一行目。 \n二行目。 \n三行目。")]
     [InlineData("一行目。 \n二行目。 \n三行目。", "一行目。\n...\n三行目。", "一行目。 \n二行目。 \n三行目。")]
     [InlineData("a\u00a0b\u3000c", "a b c", "a\u00a0b\u3000c")]
+    [InlineData("ルールを教える。機械学習は大量のデータを分析する。", "ルールを教える + 機械学習は大量のデータを分析する", "ルールを教える。機械学習は大量のデータを分析する。")]
+    [InlineData("人間が指示する。機械学習はデータから学ぶ。", "人間が指示する→機械学習はデータから学ぶ", "人間が指示する。機械学習はデータから学ぶ。")]
     public void Whitespace_and_ellipsis_quote_differences_resolve_to_the_exact_source_span(
         string source,
         string quoted,
