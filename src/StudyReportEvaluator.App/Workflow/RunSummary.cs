@@ -311,7 +311,8 @@ public sealed class RunSummary
         ? FailureCount
         : EnumerateDurableStatuses().Count(status => status is not ResultsStatusCodes.Success
             and not ResultsStatusCodes.Empty
-            and not ResultsStatusCodes.NotRunZeroBudget);
+            and not ResultsStatusCodes.NotRunZeroBudget
+            and not ResultsStatusCodes.Cancelled);
 
     /// <summary>FR-119 AC-098: 成功（Success・Empty）の処理単位数。完了数 − 失敗数 − NotRunZeroBudget に一致する。</summary>
     public int OperationSuccessCount => !IsDurable

@@ -78,12 +78,27 @@ public sealed class OperationOutcomeProgressTests
     [InlineData(ResultsStatusCodes.Empty, true, false)]
     [InlineData(ResultsStatusCodes.NotRunZeroBudget, false, false)]
     [InlineData("TECHNICAL_ERROR", false, true)]
-    [InlineData(ResultsStatusCodes.Cancelled, false, true)]
+    [InlineData(ResultsStatusCodes.Cancelled, false, false)]
     public void FR119_AC097_status_classification_matches_operation_failure_definition(
         string status, bool success, bool failure)
     {
         Assert.Equal(success, OperationOutcomeCounter.IsSuccess(status));
         Assert.Equal(failure, OperationOutcomeCounter.IsFailure(status));
+    }
+
+    // FR-119 AC-097: Success 3・Empty 1・技術エラー 1・Cancelled 2 → 成功 4・失敗 1（取消はどちらにも数えない）
+    [Fact]
+    public void FR119_AC097_cancelled_is_counted_as_neither_success_nor_failure()
+    {
+        string[] statuses =
+        [
+            ResultsStatusCodes.Success, ResultsStatusCodes.Success, ResultsStatusCodes.Success,
+            ResultsStatusCodes.Empty, "TECHNICAL_ERROR",
+            ResultsStatusCodes.Cancelled, ResultsStatusCodes.Cancelled,
+        ];
+
+        Assert.Equal(4, statuses.Count(OperationOutcomeCounter.IsSuccess));
+        Assert.Equal(1, statuses.Count(OperationOutcomeCounter.IsFailure));
     }
 
     // FR-119 AC-098
