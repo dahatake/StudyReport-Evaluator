@@ -1051,7 +1051,7 @@ public sealed class MainWindowTests
             Assert.Equal(outputB, execution.OutputDirectory);
             Assert.Equal(outputB, Required<TextBox>(view, "EffectiveOutputDirectoryTextBox").Text);
             Assert.Equal("今回run 新規出力先: " + outputA, Required<TextBox>(view, "CurrentRunOutputTextBox").Text);
-            Assert.Contains("実行中 model-test 並列8", Required<TextBox>(view, "EffectiveModelTextBox").Text, StringComparison.Ordinal);
+            Assert.Contains("実行中 model-test 並列8", Required<SelectableTextBlock>(view, "EffectiveModelTextBox").Text, StringComparison.Ordinal);
             Assert.Contains("次回", Required<TextBlock>(view, "PlanSummaryLabel").Text, StringComparison.Ordinal);
             Assert.Equal(execution.PlanSummary, Required<TextBlock>(view, "PlanSummaryText").Text);
             Assert.Contains("11 evaluation units", execution.PlanSummary, StringComparison.Ordinal);

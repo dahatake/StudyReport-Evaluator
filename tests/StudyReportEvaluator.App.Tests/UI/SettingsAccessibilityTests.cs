@@ -103,8 +103,7 @@ public sealed class SettingsAccessibilityTests
             Assert.Same(execution, executionView.ViewModel);
             Assert.DoesNotContain(UniqueIds(executionView), id =>
                 id is "ExecutionModel" or "ExecutionConcurrency" or "ExecutionOutputDirectory");
-            TextBox actualModel = ById<TextBox>(executionView, "ExecutionEffectiveModel");
-            Assert.True(actualModel.IsReadOnly);
+            SelectableTextBlock actualModel = ById<SelectableTextBlock>(executionView, "ExecutionEffectiveModel");
             Assert.Equal("次回 model-z-other 並列3 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-z-other · 上限: 64,000 tokens", actualModel.Text);
             TextBox actualOutput = ById<TextBox>(executionView, "ExecutionEffectiveOutputDirectory");
             Assert.True(actualOutput.IsReadOnly);

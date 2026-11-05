@@ -60,12 +60,12 @@
 
   <!-- The normal 950 x 450 slot has a 346-DIP body. Only long content scrolls
        locally; the effective settings and Start/Cancel never join that scroll. -->
-  <Grid x:Name="ExecutionLayout" RowDefinitions="44,*,44" RowSpacing="8"
+  <Grid x:Name="ExecutionLayout" RowDefinitions="Auto,*,44" RowSpacing="8"
         KeyboardNavigation.TabNavigation="Continue">
-    <Grid x:Name="ExecutionSettingsSummary" ColumnDefinitions="84,*,108,84,72" ColumnSpacing="8">
+    <Grid x:Name="ExecutionSettingsSummary" MinHeight="44" ColumnDefinitions="84,*,108,84,72" ColumnSpacing="8">
       <TextBlock Text="実行条件&#10;今回／次回" Classes="label" />
-      <TextBox x:Name="EffectiveModelTextBox" Grid.Column="1" Classes="single-line"
-               IsReadOnly="True" TabIndex="70"
+      <SelectableTextBlock x:Name="EffectiveModelTextBox" Grid.Column="1" MinHeight="44" MinWidth="44"
+               TextWrapping="Wrap" VerticalAlignment="Center" Focusable="True" TabIndex="70"
                AutomationProperties.AutomationId="ExecutionEffectiveModel"
                AutomationProperties.Name="実行中または前回と次回のモデル・並列度・モデル上限・読取専用"
                ToolTip.Tip="実行中／前回runは開始時の固定値、次回は現在の設定の実効値です。希望IDが使えなくても別モデルへ自動変更しません。上限が「SDK未公開」のモデル（autoなど）では、実行前のモデル相対の容量検証を行いません。全文を選択・コピーできます。" />
@@ -85,7 +85,7 @@
 
     <Grid x:Name="ExecutionBody" Grid.Row="1">
       <Grid>
-      <Grid x:Name="ExecutionProgressPanel" IsVisible="{Binding !Cost.IsExpanded}"
+      <Grid x:Name="ExecutionProgressPanel"
         RowDefinitions="44,*,Auto,44,44" RowSpacing="4">
         <Grid ColumnDefinitions="110,*" ColumnSpacing="8">
           <TextBlock x:Name="OutputDirectorySource" Classes="label" />
@@ -96,6 +96,7 @@
                    ToolTip.Tip="次回新規runの実効出力先です。今回／前回runの出力条件とは別です。再開には左のpartialパスを使用します。長い値は欄内を横スクロールし、全文を選択・コピーできます。" />
         </Grid>
         <Grid x:Name="ExecutionProgressBody" Grid.Row="1" RowDefinitions="3*,4*" RowSpacing="4">
+        <Grid RowDefinitions="*,Auto" RowSpacing="4">
         <ScrollViewer x:Name="ExecutionProgressScroll"
                       HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="4">
@@ -134,6 +135,16 @@
                        ToolTip.Tip="実行中に報告された参照回答と学生行の進捗です。予定単位数や送信回数とは別です。" />
           </StackPanel>
         </ScrollViewer>
+        <Button x:Name="ExecutionCostToggle" Grid.Row="1" MinHeight="44" HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Left" TabIndex="63" Click="HandleOpenCost"
+                AutomationProperties.AutomationId="ExecutionCostToggle"
+                AutomationProperties.Name="コスト詳細とジョブログをポップアップで表示"
+                ToolTip.Tip="クリックでコスト詳細とジョブログをポップアップ表示します。">
+          <TextBlock Text="{Binding Cost.SummaryText}" TextWrapping="Wrap"
+                     AutomationProperties.AutomationId="ExecutionCostSummary"
+                     AutomationProperties.Name="{Binding Cost.SummaryText}" />
+        </Button>
+        </Grid>
         <Grid x:Name="ExecutionLivePreview" Grid.Row="1" RowDefinitions="Auto,*" RowSpacing="4"
               AutomationProperties.AutomationId="ExecutionLivePreview"
               AutomationProperties.Name="速報値・Excelの行ごとの対象の文字列とPromptと定量値">
@@ -188,25 +199,30 @@
                    ToolTip.Tip="partial checkpointの予約名です。保存の成否は実行状態で確認してください。長いパスも全文を選択・コピーできます。" />
         </Grid>
       </Grid>
-      <views:JobCostView x:Name="ExecutionCostView" DataContext="{Binding Cost}"
-                         AutomationScope="ExecutionCost" IsVisible="{Binding IsExpanded}" />
+      <Popup x:Name="ExecutionCostPopup" IsOpen="{Binding Cost.IsExpanded, Mode=TwoWay}"
+             PlacementTarget="{Binding #ExecutionLayout}" Placement="Center" IsLightDismissEnabled="True">
+        <Border Width="760" Height="340" Padding="8"
+                Background="{DynamicResource AppCanvasBrush}" BorderBrush="{DynamicResource AppAccentBrush}"
+                BorderThickness="2" CornerRadius="6">
+          <Grid RowDefinitions="44,*" RowSpacing="4">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="コスト詳細とジョブログ" Classes="label" />
+              <Button x:Name="ExecutionCostCloseButton" Grid.Column="1" Content="閉じる" Click="HandleCloseCost"
+                      AutomationProperties.AutomationId="ExecutionCostClose"
+                      AutomationProperties.Name="コスト詳細のポップアップを閉じる" />
+            </Grid>
+            <views:JobCostView x:Name="ExecutionCostView" Grid.Row="1" DataContext="{Binding Cost}"
+                               AutomationScope="ExecutionCost" />
+          </Grid>
+        </Border>
+      </Popup>
       </Grid>
     </Grid>
 
     <Grid x:Name="ExecutionActions" Grid.Row="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-      <Grid ColumnDefinitions="*,2*" ColumnSpacing="8">
+      <Grid ColumnDefinitions="*">
       <TextBlock x:Name="ExecutionValidationStatus" Text="{Binding ValidationSummary}" Classes="label"
                  AutomationProperties.AutomationId="ExecutionValidationStatus" />
-      <CheckBox x:Name="ExecutionCostToggle" Grid.Column="1" MinHeight="44"
-                HorizontalContentAlignment="Stretch" IsChecked="{Binding Cost.IsExpanded, Mode=TwoWay}"
-                TabIndex="63"
-                AutomationProperties.AutomationId="ExecutionCostToggle"
-                AutomationProperties.Name="コスト詳細とジョブログを表示。オフで進捗に戻る"
-                ToolTip.Tip="{Binding Cost.SummaryText}">
-        <TextBlock Text="{Binding Cost.SummaryText}" TextTrimming="CharacterEllipsis"
-                   AutomationProperties.AutomationId="ExecutionCostSummary"
-                   AutomationProperties.Name="{Binding Cost.SummaryText}" />
-      </CheckBox>
       </Grid>
       <Button x:Name="StartRunButton" Grid.Column="1" Classes="primary" Content="定量化を開始"
               Command="{Binding StartCommand}" MinWidth="144" TabIndex="61"

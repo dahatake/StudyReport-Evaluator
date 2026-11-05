@@ -520,7 +520,7 @@ public sealed class ExecutionViewTests
             Assert.Equal(0, runner.CallCount);
             Assert.False(viewModel.HasCurrentRun);
             Assert.False(Required<TextBox>(view, "CurrentRunOutputTextBox").IsEffectivelyVisible);
-            Assert.StartsWith("次回 ", Required<TextBox>(view, "EffectiveModelTextBox").Text, StringComparison.Ordinal);
+            Assert.StartsWith("次回 ", Required<SelectableTextBlock>(view, "EffectiveModelTextBox").Text, StringComparison.Ordinal);
 
             completion.TrySetResult(available);
             await checking.WaitAsync(LoginTestWait, TestContext.Current.CancellationToken);
@@ -846,8 +846,8 @@ public sealed class ExecutionViewTests
         using LoginViewHarness harness = new();
         Assert.Equal(new Size(950, 450), harness.Window.ClientSize);
         Assert.IsType<Grid>(harness.View.Content);
-        Assert.Equal(44d, Required<Grid>(harness.View, "ExecutionSettingsSummary").Bounds.Height);
-        Assert.Equal(346d, Required<Grid>(harness.View, "ExecutionBody").Bounds.Height);
+        Assert.True(Required<Grid>(harness.View, "ExecutionSettingsSummary").Bounds.Height >= 44d);
+        Assert.True(Required<Grid>(harness.View, "ExecutionBody").Bounds.Height > 200d);
         Assert.Equal(44d, Required<Grid>(harness.View, "ExecutionActions").Bounds.Height);
         Assert.False(Required<TextBox>(harness.View, "CurrentRunOutputTextBox").IsEffectivelyVisible);
         Assert.False(harness.ViewModel.HasCurrentRun);
@@ -917,7 +917,7 @@ public sealed class ExecutionViewTests
             ExecutionAuthenticationState.Available, models, U04TestSupport.RuntimeIdentity()));
         harness.ViewModel.ApplySettings(new ApplicationSettings { PreferredModelId = "not-listed", MaxConcurrency = 3 });
         Render();
-        TextBox model = Required<TextBox>(harness.View, "EffectiveModelTextBox");
+        SelectableTextBlock model = Required<SelectableTextBlock>(harness.View, "EffectiveModelTextBox");
         TextBlock effort = Required<TextBlock>(harness.View, "ReasoningEffortStatus");
         Assert.Equal("次回 未選択 並列3 · effort: 未選択 · Context Size: 未選択 · 希望: not-listed · 上限: 未選択", model.Text);
         Assert.Equal("effort\n未選択", effort.Text);
@@ -937,8 +937,7 @@ public sealed class ExecutionViewTests
         Assert.Equal("次回 model-test 並列3 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-test · 上限: 64,000 tokens", model.Text);
         Assert.Equal("effort\n未指定", effort.Text);
         Assert.True(Required<Button>(harness.View, "StartRunButton").IsEffectivelyEnabled);
-        Assert.True(model.IsReadOnly);
-        Assert.Equal(TextWrapping.NoWrap, model.TextWrapping);
+        Assert.Equal(TextWrapping.Wrap, model.TextWrapping);
         AssertNoAutomaticActivity(harness, authenticationChecks: 1);
     }
 
@@ -1026,7 +1025,7 @@ public sealed class ExecutionViewTests
 
         Assert.False(main.IsSettingsOpen);
         Assert.Same(harness.View, harness.Window.Content);
-        Assert.Equal("次回 model-z-other 並列3 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-z-other · 上限: 64,000 tokens", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+        Assert.Equal("次回 model-z-other 並列3 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-z-other · 上限: 64,000 tokens", Required<SelectableTextBlock>(harness.View, "EffectiveModelTextBox").Text);
         Assert.Equal("次回並列\n3 件", Required<TextBlock>(harness.View, "ConcurrencySummary").Text);
         Assert.Equal(explicitOutput, Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox").Text);
         Assert.Contains("明示指定", Required<TextBlock>(harness.View, "OutputDirectorySource").Text, StringComparison.Ordinal);
@@ -1176,7 +1175,7 @@ public sealed class ExecutionViewTests
         Button start = Required<Button>(harness.View, "StartRunButton");
         Assert.False(harness.ViewModel.HasCurrentRun);
         Assert.False(Required<TextBox>(harness.View, "CurrentRunOutputTextBox").IsEffectivelyVisible);
-        Assert.Equal("次回 model-a 並列1 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-a · 上限: 64,000 tokens", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+        Assert.Equal("次回 model-a 並列1 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-a · 上限: 64,000 tokens", Required<SelectableTextBlock>(harness.View, "EffectiveModelTextBox").Text);
         TaskCompletionSource finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
         void ObserveRunFinished(object? sender, PropertyChangedEventArgs args)
         {
@@ -1197,7 +1196,7 @@ public sealed class ExecutionViewTests
             QuantificationDefinition runDefinition = request.DraftDefinition;
             Assert.True(harness.ViewModel.HasCurrentRun);
             Assert.Equal("実行中 model-a 並列1 · effort: 未指定（model非対応またはauto） · context: default · 上限: 64,000 tokens / 次回 model-a 並列1 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-a · 上限: 64,000 tokens",
-                Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+                Required<SelectableTextBlock>(harness.View, "EffectiveModelTextBox").Text);
             AssertValidationStatus(harness.View, harness.ViewModel, "実行中");
 
             harness.ViewModel.ApplySettings(new ApplicationSettings
@@ -1207,7 +1206,7 @@ public sealed class ExecutionViewTests
             Render();
 
             Assert.Equal("実行中 model-a 並列1 · effort: 未指定（model非対応またはauto） · context: default · 上限: 64,000 tokens / 次回 model-b 並列3 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-b · 上限: 64,000 tokens",
-                Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+                Required<SelectableTextBlock>(harness.View, "EffectiveModelTextBox").Text);
             Assert.Equal("次回並列\n3 件", Required<TextBlock>(harness.View, "ConcurrencySummary").Text);
             Assert.Equal("model-a", harness.ViewModel.CurrentRunModelId);
             Assert.Equal(1, harness.ViewModel.CurrentRunMaxConcurrency);
@@ -1217,8 +1216,8 @@ public sealed class ExecutionViewTests
             TextBox currentOutput = Required<TextBox>(harness.View, "CurrentRunOutputTextBox");
             AssertReadOnlySingleLine(currentOutput, "今回run 新規出力先: " + runOutput, harness.Window);
             AssertFullyInside(currentOutput, harness.View);
-            Assert.Equal(44d, Required<Grid>(harness.View, "ExecutionSettingsSummary").Bounds.Height);
-            Assert.Equal(346d, Required<Grid>(harness.View, "ExecutionBody").Bounds.Height);
+            Assert.True(Required<Grid>(harness.View, "ExecutionSettingsSummary").Bounds.Height >= 44d);
+            Assert.True(Required<Grid>(harness.View, "ExecutionBody").Bounds.Height > 200d);
             Assert.Equal(44d, Required<Grid>(harness.View, "ExecutionActions").Bounds.Height);
             Assert.True(Required<Button>(harness.View, "ChangeExecutionSettingsButton").IsEffectivelyEnabled);
             Assert.False(start.IsEffectivelyEnabled);
@@ -1260,7 +1259,7 @@ public sealed class ExecutionViewTests
                 Assert.False(cancel.IsEffectivelyEnabled);
                 AssertValidationStatus(harness.View, harness.ViewModel, "取消処理中");
                 Assert.Equal("実行中 model-a 並列1 · effort: 未指定（model非対応またはauto） · context: default · 上限: 64,000 tokens / 次回 model-b 並列3 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-b · 上限: 64,000 tokens",
-                    Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+                    Required<SelectableTextBlock>(harness.View, "EffectiveModelTextBox").Text);
                 Assert.Equal("今回run 新規出力先: " + runOutput, currentOutput.Text);
             }
             else
@@ -1292,7 +1291,7 @@ public sealed class ExecutionViewTests
         Assert.Equal("model-a", harness.ViewModel.CurrentRunModelId);
         Assert.Equal(1, harness.ViewModel.CurrentRunMaxConcurrency);
         Assert.Equal("前回run model-a 並列1 · effort: 未指定（model非対応またはauto） · context: default · 上限: 64,000 tokens / 次回 model-b 並列3 · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: model-b · 上限: 64,000 tokens",
-            Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+            Required<SelectableTextBlock>(harness.View, "EffectiveModelTextBox").Text);
         Assert.Equal("前回run 新規出力先: " + runOutput, Required<TextBox>(harness.View, "CurrentRunOutputTextBox").Text);
         Assert.Equal(nextOutput, Required<TextBox>(harness.View, "EffectiveOutputDirectoryTextBox").Text);
         Assert.Equal(finalPath, Required<TextBox>(harness.View, "ReservedFinalPathTextBox").Text);
@@ -1478,7 +1477,7 @@ public sealed class ExecutionViewTests
         Render();
         Assert.Equal(0, ViewObserverCount(harness.ViewModel, harness.View));
         Assert.Equal(1, ViewObserverCount(next, harness.View));
-        Assert.Equal("次回 未選択 並列8 · effort: 未選択 · Context Size: 未選択 · 希望: new-owner · 上限: 未選択", Required<TextBox>(harness.View, "EffectiveModelTextBox").Text);
+        Assert.Equal("次回 未選択 並列8 · effort: 未選択 · Context Size: 未選択 · 希望: new-owner · 上限: 未選択", Required<SelectableTextBlock>(harness.View, "EffectiveModelTextBox").Text);
         Assert.Same(next.CheckAuthenticationCommand, Required<Button>(harness.Panel, "CheckAuthenticationButton").Command);
         Assert.Same(next.StartCommand, Required<Button>(harness.View, "StartRunButton").Command);
         Assert.Same(next.LoginCommand, Required<Button>(harness.Panel, "StartCopilotLogin").Command);

@@ -60,7 +60,7 @@ public sealed class PrimaryJourneyAccessibilityTests
             Button auth = Required<Button>(prep, "CheckAuthenticationButton");
             Button login = Required<Button>(prep, "StartCopilotLogin");
             Button changeSettings = Required<Button>(view, "ChangeExecutionSettingsButton");
-            TextBox model = Required<TextBox>(view, "EffectiveModelTextBox");
+            SelectableTextBlock model = Required<SelectableTextBlock>(view, "EffectiveModelTextBox");
             TextBlock concurrency = Required<TextBlock>(view, "ConcurrencySummary");
             CheckBox resumeMode = Required<CheckBox>(prep, "ResumeModeCheckBox");
             TextBox resumePath = Required<TextBox>(prep, "ResumePartialPathTextBox");
@@ -103,7 +103,6 @@ public sealed class PrimaryJourneyAccessibilityTests
             Assert.Same(viewModel.LoginCommand, login.Command);
             Assert.Same(viewModel.StartCommand, start.Command);
             Assert.Same(viewModel.CancelCommand, cancel.Command);
-            Assert.True(model.IsReadOnly);
             Assert.Equal(FormattableString.Invariant($"次回 model-test 並列{viewModel.MaxConcurrency} · effort: 未指定（model非対応またはauto） · Context Size: 64K (Default) · 希望: 未指定 · 上限: 64,000 tokens"), model.Text);
             Assert.Equal(FormattableString.Invariant($"次回並列\n{viewModel.MaxConcurrency} 件"), concurrency.Text);
             Assert.True(outputDirectory.IsReadOnly);
@@ -145,7 +144,14 @@ public sealed class PrimaryJourneyAccessibilityTests
             Assert.False(viewModel.IsResumeMode);
             Assert.True(start.IsEffectivelyEnabled);
 
-            foreach (TextBox actualValue in new[] { model, outputDirectory })
+            string? modelBefore = model.Text;
+            Assert.True(model.Focus(NavigationMethod.Tab));
+            model.SelectAll();
+            window.KeyTextInput("この画面では変更しない");
+            Render();
+            Assert.Equal(modelBefore, model.Text);
+
+            foreach (TextBox actualValue in new[] { outputDirectory })
             {
                 string? before = actualValue.Text;
                 Assert.True(actualValue.Focus(NavigationMethod.Tab));

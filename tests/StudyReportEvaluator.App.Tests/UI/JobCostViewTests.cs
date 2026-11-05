@@ -375,8 +375,7 @@ public sealed class JobCostViewTests
                 new RecordingAuthenticationBoundary(new ExecutionAuthenticationSnapshot(ExecutionAuthenticationState.AuthRequired)),
                 new RecordingRunBoundary((_, _, _) => throw new InvalidOperationException("must not run")));
             using ResultsOutputViewModel results = new(new NoIoOutputBoundary());
-            AssertHostToggle(window, new ExecutionView(execution), execution.Cost,
-                "ExecutionCost", "ExecutionProgressPanel");
+            AssertExecutionPopup(window, new ExecutionView(execution), execution.Cost);
             AssertHostToggle(window, new ResultsOutputView(results), results.Cost,
                 "ResultsCost", "ResultsReviewPanel");
             Assert.Empty(jobs.Launcher.Paths);
@@ -417,6 +416,30 @@ public sealed class JobCostViewTests
         Assert.Equal(JobCostViewModel.NoDataText, cost.LogStatusText);
         Assert.False(cost.OpenLogCommand.CanExecute(null));
         Assert.False(cost.OpenDirectoryCommand.CanExecute(null));
+    }
+
+    private static void AssertExecutionPopup(Window window, ExecutionView host, JobCostViewModel cost)
+    {
+        window.Content = host;
+        Render();
+        Popup popup = Required<Popup>(host, "ExecutionCostPopup");
+        Button open = Required<Button>(host, "ExecutionCostToggle");
+        Grid normal = Required<Grid>(host, "ExecutionProgressPanel");
+        Assert.Same(cost, Required<JobCostView>(host, "ExecutionCostView").DataContext);
+        Assert.False(popup.IsOpen);
+        Assert.True(normal.IsEffectivelyVisible);
+        open.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Render();
+        Assert.True(cost.IsExpanded);
+        Assert.True(popup.IsOpen);
+        Assert.True(normal.IsEffectivelyVisible);
+        Required<Button>(host, "ExecutionCostCloseButton")
+            .RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Render();
+        Assert.False(cost.IsExpanded);
+        Assert.False(popup.IsOpen);
+        window.Content = null;
+        Render();
     }
 
     private static void AssertHostToggle(Window window, Control host, JobCostViewModel cost,

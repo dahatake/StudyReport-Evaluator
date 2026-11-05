@@ -25,7 +25,7 @@ public sealed partial class ExecutionView : UserControl
         InitializeComponent();
         // Keep the pre-existing JobCost XAML intact; keep the primary Start/Interrupt
         // tab path ahead of the optional cost detail toggle.
-        this.FindControl<CheckBox>("ExecutionCostToggle")!.TabIndex = 63;
+        this.FindControl<Button>("ExecutionCostToggle")!.TabIndex = 63;
         DataContextChanged += HandleDataContextChanged;
         DataContext = viewModel;
         Loaded += HandleLoaded;
@@ -126,7 +126,7 @@ public sealed partial class ExecutionView : UserControl
         string nextConditions = $"次回 {owner?.SelectedModelId ?? "未選択"} 並列{owner?.MaxConcurrency.ToString(CultureInfo.InvariantCulture) ?? "—"} · effort: {owner?.SelectedModelReasoningEffortText ?? "未確認"} · Context Size: {owner?.SelectedContextSizeText ?? "未確認"} · 希望: {owner?.PreferredModelId ?? "未指定"} · 上限: {owner?.SelectedModelLimitText ?? "未確認"}";
         this.FindControl<TextBox>("CurrentRunOutputTextBox")!.IsVisible =
             owner is { HasCurrentRun: true, HasDistinctCurrentRunOutput: true };
-        this.FindControl<TextBox>("EffectiveModelTextBox")!.Text = owner is { HasCurrentRun: true } current
+        this.FindControl<SelectableTextBlock>("EffectiveModelTextBox")!.Text = owner is { HasCurrentRun: true } current
             ? $"{(current.IsRunning ? "実行中" : "前回run")} {current.CurrentRunModelId} 並列{current.CurrentRunMaxConcurrency?.ToString(CultureInfo.InvariantCulture)} · effort: {current.CurrentRunReasoningEffortText} · context: {current.CurrentRunContextTierText} · 上限: {current.CurrentRunLimitText} / {nextConditions}"
             : nextConditions;
         string reasoningEffort = owner?.SelectedModelId is null
@@ -135,6 +135,14 @@ public sealed partial class ExecutionView : UserControl
         this.FindControl<TextBlock>("ReasoningEffortStatus")!.Text = $"effort\n{reasoningEffort}";
         this.FindControl<TextBlock>("OutputDirectorySource")!.Text = owner?.OutputDirectoryOverride is null
             ? "次回新規出力\n（入力隣接）" : "次回新規出力\n（明示指定）";
+    }
+
+    private void HandleOpenCost(object? sender, RoutedEventArgs e) => ViewModel.Cost.IsExpanded = true;
+
+    private void HandleCloseCost(object? sender, RoutedEventArgs e)
+    {
+        ViewModel.Cost.IsExpanded = false;
+        this.FindControl<Button>("ExecutionCostToggle")?.Focus();
     }
 
     private void HandleOpenSettings(object? sender, RoutedEventArgs e)

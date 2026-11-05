@@ -137,7 +137,7 @@ public sealed class EthicsWarningTests
                 {
                     WorkflowStep.Input => Required<Button>(window, "DesignStepButton"),
                     WorkflowStep.Design => Required<TextBox>(originalView, "BasePointsTextBox"),
-                    WorkflowStep.Execution => Required<CheckBox>(originalView, "ExecutionCostToggle"),
+                    WorkflowStep.Execution => Required<Button>(originalView, "ExecutionCostToggle"),
                     _ => Required<Button>(window, "ResultsStepButton"),
                 };
                 Press(window, Key.Tab, previousFirst ? RawInputModifiers.Shift : RawInputModifiers.None);
