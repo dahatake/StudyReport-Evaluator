@@ -178,6 +178,73 @@ public sealed class SubmitQuantificationToolTests
         Assert.Contains("EVALUATOR_ID_MISMATCH", wrong.GetOutcome().ErrorCodes);
     }
 
+    // FR-120 AC-007 (互換受信 / 監査 C-01): 期待値と一致する明示 ID は受理し、未知・別 evaluator の ID は補正せず拒否する。
+    [Theory]
+    [InlineData("\"E1\"", true, null)]
+    [InlineData("\"ZZUNKNOWN9\"", false, "EVALUATOR_ID_MISMATCH")]
+    [InlineData("\"E2\"", false, "EVALUATOR_ID_MISMATCH")]
+    [InlineData("\"e1\"", false, "EVALUATOR_ID_MISMATCH")]
+    [InlineData("\"\"", false, null)]
+    [InlineData("1", false, null)]
+    [InlineData("null", false, null)]
+    [InlineData("[\"E1\"]", false, null)]
+    public async Task FR120_AC007_explicit_evaluator_id_is_accepted_only_when_it_matches_the_sent_request(
+        string evaluatorIdJson,
+        bool accepted,
+        string? expectedCode)
+    {
+        string criteria = $"[{CriterionJson("C1", 4m)}, {CriterionJson("C2", 1.5m)}]";
+        SubmitQuantificationTool tool = new(CreatePayload());
+
+        await tool.InvokeAsync(
+            Invocation($$"""{ "EvaluatorId": {{evaluatorIdJson}}, "Criteria": {{criteria}} }"""),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(accepted, tool.TryGetAcceptedResult(out QuantificationResult? result));
+        if (accepted)
+        {
+            Assert.Equal("E1", result!.EvaluatorId);
+        }
+        else
+        {
+            Assert.Null(tool.GetOutcome().AcceptedResult);
+            Assert.NotEmpty(tool.GetOutcome().ErrorCodes);
+            if (expectedCode is not null)
+            {
+                Assert.Contains(expectedCode, tool.GetOutcome().ErrorCodes);
+            }
+        }
+    }
+
+    // FR-120 AC-007: 異なる評価要求を交互に処理しても、省略応答は各要求の送信時の ID に帰属し、前の要求の ID を流用しない。
+    [Fact]
+    public async Task FR120_AC007_omitted_evaluator_id_binds_to_each_sent_request_when_requests_alternate()
+    {
+        string criteria = $"[{CriterionJson("C1", 4m)}, {CriterionJson("C2", 1.5m)}]";
+        string[] order = ["E1", "E2", "E1", "E2"];
+        List<string> bound = [];
+
+        foreach (string evaluatorId in order)
+        {
+            SubmitQuantificationTool tool = new(CreatePayload(evaluatorId));
+            await tool.InvokeAsync(
+                Invocation($$"""{ "Criteria": {{criteria}} }"""),
+                TestContext.Current.CancellationToken);
+            Assert.True(tool.TryGetAcceptedResult(out QuantificationResult? accepted));
+            bound.Add(accepted.EvaluatorId);
+        }
+
+        Assert.Equal(order, bound);
+
+        // 前の要求（E2）の ID を明示した応答は、次の要求（E1）では拒否される。
+        SubmitQuantificationTool next = new(CreatePayload());
+        await next.InvokeAsync(
+            Invocation($$"""{ "EvaluatorId": "E2", "Criteria": {{criteria}} }"""),
+            TestContext.Current.CancellationToken);
+        Assert.False(next.TryGetAcceptedResult(out _));
+        Assert.Contains("EVALUATOR_ID_MISMATCH", next.GetOutcome().ErrorCodes);
+    }
+
     [Theory]
     [MemberData(nameof(ClosedWirePayloads))]
     public async Task Unknown_missing_duplicate_and_wrong_type_fields_are_rejected_by_the_wire_parser(
@@ -405,9 +472,9 @@ public sealed class SubmitQuantificationToolTests
             ["EvidenceSourceColumnId"] = sourceColumn,
         });
 
-    private static SafeEvaluationPayload CreatePayload() => new(
+    private static SafeEvaluationPayload CreatePayload(string evaluatorId = "E1") => new(
         "Q1",
-        "E1",
+        evaluatorId,
         "<private-prompt>",
         new EvaluationSourceCell(
             EvaluationSourceKind.PrimaryAnswer,

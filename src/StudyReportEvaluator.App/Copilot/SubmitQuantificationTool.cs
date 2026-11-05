@@ -282,7 +282,9 @@ public sealed class SubmitQuantificationTool
             return false;
         }
 
-        // Models omit this app-known constant (observed with claude-sonnet-5); a returned value is still validated.
+        // FR-120 AC-007: the evaluator ID is request-bound and is not requested from the model (not in Prompt/schema).
+        // When omitted, the result binds to the ID kept with the sent request. An explicit value is accepted only for
+        // compatibility and is validated strictly (mismatch → EVALUATOR_ID_MISMATCH; never silently corrected).
         string evaluatorId = expectedEvaluatorId;
         bool evaluatorRead = !rootValues.ContainsKey("EvaluatorId")
             || TryReadString(
