@@ -1001,7 +1001,7 @@ public sealed class DocumentationContractTests
             "sample/realdata.xlsx",
             "469,995",
             "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D");
-        AssertAscendingTableIds(requirements, "AC-", 48, 53);
+        AssertAscendingTableIds(requirements, "AC-", 47, 53);
         AssertSequentialTableIds(ledger, "C-", 47);
         AssertContainsAll(ledger, "VERIFIED", "BLOCKED", "EXCLUDED");
         AssertContainsAll(
