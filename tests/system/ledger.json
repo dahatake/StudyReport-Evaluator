@@ -51,9 +51,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
       "status": "pass",
-      "last_commit": "29dd148",
-      "last_run_at": "2026-11-07T01:08:11+09:00",
-      "evidence": "work/runs/202611062322/logs/system-test/E2E-001-202611070107.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-001-202611070108.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
@@ -88,9 +88,9 @@
       "command": "python -m pytest tests/system/test_fr002_output_folder.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "29dd148",
-      "last_run_at": "2026-11-07T01:08:11+09:00",
-      "evidence": "work/runs/202611062322/logs/system-test/E2E-002-202611070107.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:10:39+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-002-202611070110.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
@@ -131,9 +131,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR003_AC057\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "b3f0cb7",
-      "last_run_at": "2026-11-06T15:52:44+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/E2E-003-202611061537.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-003-202611070109.log",
       "history": [
         {
           "at": "2026-11-02T15:00:42+09:00",
@@ -226,9 +226,9 @@
       "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR112_AC072\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "b3f0cb7",
-      "last_run_at": "2026-11-06T15:52:44+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/IT-001-202611061537.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/IT-001-202611070109.log",
       "history": [
         {
           "at": "2026-11-03T23:59:54+09:00",
@@ -251,9 +251,9 @@
       "command": "dotnet test tests/system/integration --filter \"FullyQualifiedName~FR113_AC074\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "b3f0cb7",
-      "last_run_at": "2026-11-06T15:52:44+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/E2E-006-202611061540.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-006-202611070109.log",
       "history": [
         {
           "at": "2026-11-04T00:15:51+09:00",
@@ -277,9 +277,9 @@
       "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR115_Generation\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "b3f0cb7",
-      "last_run_at": "2026-11-06T15:52:44+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/IT-002-202611061545.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/IT-002-202611070109.log",
       "history": [
         {
           "at": "2026-11-04T09:03:24+09:00",
@@ -304,9 +304,9 @@
       "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR115_Conditions\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "b3f0cb7",
-      "last_run_at": "2026-11-06T15:52:44+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/IT-003-202611061546.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/IT-003-202611070109.log",
       "history": [
         {
           "at": "2026-11-04T09:03:25+09:00",
@@ -330,9 +330,9 @@
       "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR115_Resume\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "b3f0cb7",
-      "last_run_at": "2026-11-06T15:52:44+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/IT-004-202611061546.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/IT-004-202611070109.log",
       "history": [
         {
           "at": "2026-11-04T09:03:25+09:00",
@@ -355,9 +355,9 @@
       "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC004",
       "canary": false,
       "status": "pass",
-      "last_commit": "b3f0cb7",
-      "last_run_at": "2026-11-06T15:52:44+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/E2E-007-202611061546.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-007-202611070109.log",
       "history": [
         {
           "at": "2026-11-04T09:06:38+09:00",
@@ -381,9 +381,9 @@
       "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC011_AC012",
       "canary": true,
       "status": "pass",
-      "last_commit": "29dd148",
-      "last_run_at": "2026-11-07T01:08:11+09:00",
-      "evidence": "work/runs/202611062322/logs/system-test/E2E-008-202611070107.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-008-202611070108.log",
       "history": [
         {
           "at": "2026-11-04T09:06:39+09:00",
@@ -413,9 +413,9 @@
       "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC010_AC077",
       "canary": false,
       "status": "pass",
-      "last_commit": "b3f0cb7",
-      "last_run_at": "2026-11-06T15:52:44+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/E2E-009-202611061547.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-009-202611070109.log",
       "history": [
         {
           "at": "2026-11-04T09:06:40+09:00",
@@ -439,9 +439,9 @@
       "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC078_AC079",
       "canary": false,
       "status": "pass",
-      "last_commit": "b3f0cb7",
-      "last_run_at": "2026-11-06T15:52:44+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/E2E-010-202611061547.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-010-202611070109.log",
       "history": [
         {
           "at": "2026-11-04T09:06:41+09:00",
@@ -466,9 +466,9 @@
       "command": "python -m pytest tests/system/fr116/test_fr116_control_evaluation.py -q -k core",
       "canary": false,
       "status": "pass",
-      "last_commit": "b3f0cb7",
-      "last_run_at": "2026-11-06T15:52:44+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/E2E-011-202611061550.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-011-202611070109.log",
       "history": [
         {
           "at": "2026-11-04T09:06:42+09:00",
@@ -492,9 +492,9 @@
       "command": "python -m pytest tests/system/fr116/test_fr116_control_evaluation.py -q -k record",
       "canary": false,
       "status": "pass",
-      "last_commit": "b3f0cb7",
-      "last_run_at": "2026-11-06T15:52:44+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/E2E-012-202611061550.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-012-202611070109.log",
       "history": [
         {
           "at": "2026-11-04T09:06:43+09:00",
@@ -548,9 +548,9 @@
       "command": "dotnet test tests/system/ui --filter \"FullyQualifiedName~FR118_\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "b3f0cb7",
-      "last_run_at": "2026-11-06T15:52:44+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/E2E-014-202611061548.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-014-202611070109.log",
       "history": [
         {
           "at": "2026-11-05T01:06:40+09:00",
@@ -610,9 +610,9 @@
       "command": "python -m pytest tests/system/fr121/test_ac028_gate.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "29dd148",
-      "last_run_at": "2026-11-07T01:08:11+09:00",
-      "evidence": "work/runs/202611062322/logs/system-test/IT-006-202611070107.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/IT-006-202611070108.log",
       "history": [
         {
           "at": "2026-11-06T23:43:13+09:00",
@@ -647,9 +647,9 @@
       "command": "python -m pytest tests/system/fr121/test_ac100_identity.py -q",
       "canary": false,
       "status": "pass",
-      "last_commit": "29dd148",
-      "last_run_at": "2026-11-07T01:08:11+09:00",
-      "evidence": "work/runs/202611062322/logs/system-test/IT-007-202611070107.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/IT-007-202611070109.log",
       "history": [
         {
           "at": "2026-11-06T23:43:14+09:00",
@@ -690,9 +690,9 @@
       "command": "python -m pytest tests/system/fr121/test_ac101_authority.py -q",
       "canary": false,
       "status": "pass",
-      "last_commit": "29dd148",
-      "last_run_at": "2026-11-07T01:08:11+09:00",
-      "evidence": "work/runs/202611062322/logs/system-test/IT-008-202611070107.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/IT-008-202611070109.log",
       "history": [
         {
           "at": "2026-11-06T23:43:15+09:00",
@@ -733,9 +733,9 @@
       "command": "python -m pytest tests/system/fr121/test_ac102_idempotency.py -q",
       "canary": false,
       "status": "pass",
-      "last_commit": "29dd148",
-      "last_run_at": "2026-11-07T01:08:11+09:00",
-      "evidence": "work/runs/202611062322/logs/system-test/IT-009-202611070107.log",
+      "last_commit": "aa2e1d2",
+      "last_run_at": "2026-11-07T01:09:51+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/IT-009-202611070109.log",
       "history": [
         {
           "at": "2026-11-06T23:43:16+09:00",
