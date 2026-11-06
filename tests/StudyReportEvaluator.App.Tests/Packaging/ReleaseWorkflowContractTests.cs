@@ -23,6 +23,7 @@ public sealed class ReleaseWorkflowContractTests
         Assert.Contains("PASS_CANDIDATE is non-publishable", workflow, StringComparison.Ordinal);
     }
 
+    // FR-121 AC-028: deterministic execution uses the same exclusions as TRX validation.
     [Fact]
     public void Candidate_workflow_builds_all_three_candidates_and_invokes_c03_candidate_with_identity_binding()
     {
@@ -36,9 +37,11 @@ public sealed class ReleaseWorkflowContractTests
         Assert.DoesNotContain("test-windows-singlefile.ps1 -ResultsDirectory .\\TestResults\\release\\windows-singlefile -DevelopmentOnly", workflow, StringComparison.Ordinal);
         Assert.Contains(".\\scripts\\test-windows-zip.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains(".\\scripts\\test-windows-msix-unsigned.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("python .\\scripts\\release_test_selection.py", workflow, StringComparison.Ordinal);
+        Assert.Contains("--filter \"$filter\"", workflow, StringComparison.Ordinal);
         Assert.Contains(
-            "FullyQualifiedName!~StudyReportEvaluator.App.Tests.Packaging.WindowsSingleFilePackageTests",
-            workflow,
+            "StudyReportEvaluator.App.Tests.Packaging.WindowsSingleFilePackageTests",
+            ReadScript("release_test_selection.py"),
             StringComparison.Ordinal);
         Assert.Contains("-Mode Candidate", workflow, StringComparison.Ordinal);
         Assert.Contains("-ExpectedRepository $env:GITHUB_REPOSITORY", workflow, StringComparison.Ordinal);

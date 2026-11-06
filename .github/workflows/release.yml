@@ -125,15 +125,19 @@ jobs:
       - name: Run deterministic release tests
         id: release-tests
         shell: pwsh
-        run: >-
-          dotnet test .\StudyReportEvaluator.slnx
-          --configuration Release
-          --no-build
-          --no-restore
-          --filter "FullyQualifiedName!~StudyReportEvaluator.App.Tests.E2E.SampleWorkbookStructuralTests&FullyQualifiedName!~StudyReportEvaluator.App.Tests.Packaging.WindowsPublishPackageTests&FullyQualifiedName!~StudyReportEvaluator.App.Tests.Packaging.WindowsSingleFilePackageTests"
-          --results-directory .\TestResults\release
-          --logger "trx"
-          --logger "console;verbosity=minimal"
+        run: |
+          $filter = & python .\scripts\release_test_selection.py
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($filter)) {
+            throw 'Required release test selection failed.'
+          }
+          dotnet test .\StudyReportEvaluator.slnx `
+            --configuration Release `
+            --no-build `
+            --no-restore `
+            --filter "$filter" `
+            --results-directory .\TestResults\release `
+            --logger "trx" `
+            --logger "console;verbosity=minimal"
 
       - name: Build and validate Windows ZIP regression
         shell: pwsh

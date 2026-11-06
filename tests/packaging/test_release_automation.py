@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 import release_automation as driver
 import prepare_release_automation as adapter
+import release_test_selection as selection
 
 
 @pytest.fixture
@@ -115,6 +116,94 @@ def test_production_trx_gate_refuses_missing_or_nonpassing_groups(tmp_path, bad)
         f"<TestDefinitions>{definitions}</TestDefinitions><Results>{results}</Results></TestRun>")
     with pytest.raises(driver.Stop, match="Core/App"):
         adapter.deterministic_results(tmp_path)
+
+
+def write_workflow_trx(directory, tests):
+    """Use TRX TestMethod identity, not display names (which may have arguments)."""
+    import xml.etree.ElementTree as ET
+    root = ET.Element("TestRun", xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010")
+    definitions = ET.SubElement(root, "TestDefinitions")
+    results = ET.SubElement(root, "Results")
+    for index, (qualified_name, outcome) in enumerate(tests):
+        class_name, method_name = qualified_name.rsplit(".", 1)
+        test = ET.SubElement(definitions, "UnitTest", id=str(index), name=qualified_name)
+        ET.SubElement(test, "TestMethod", className=class_name, name=method_name,
+                      adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp")
+        ET.SubElement(results, "UnitTestResult", testId=str(index), outcome=outcome,
+                      testName=qualified_name + "(value: 1)")
+    ET.ElementTree(root).write(directory / "workflow.trx", encoding="utf-8")
+
+
+# FR-121 AC-028: optional skips in workflow-equivalent aggregate TRX are not
+# required evidence, and never replace an executed App/Core result.
+@pytest.mark.parametrize("required_outcome", ["Passed", "NotExecuted", "Failed"])
+def test_workflow_trx_separates_opt_in_from_required_siblings(tmp_path, required_outcome):
+    sibling = ("StudyReportEvaluator.App.Tests.Copilot.SystemCopilotCliPathResolverTests."
+               "Cancellation_prevents_discovery_AC023")
+    write_workflow_trx(tmp_path, [
+        ("StudyReportEvaluator.Core.Tests.Required.Executes", "Passed"),
+        (sibling, required_outcome),
+        *((name, "NotExecuted") for name in selection.EXCLUDED_METHODS),
+    ])
+    if required_outcome == "Passed":
+        adapter.deterministic_results(tmp_path)
+    else:
+        with pytest.raises(driver.Stop, match="Core/App"):
+            adapter.deterministic_results(tmp_path)
+
+
+# FR-121 AC-028: optional-only App observations do not satisfy required App PASS.
+def test_opt_in_skip_cannot_supply_required_app_evidence(tmp_path):
+    write_workflow_trx(tmp_path, [
+        ("StudyReportEvaluator.Core.Tests.Required.Executes", "Passed"),
+        *((name, "NotExecuted") for name in selection.EXCLUDED_METHODS),
+    ])
+    with pytest.raises(driver.Stop, match="Core/App"):
+        adapter.deterministic_results(tmp_path)
+
+
+# FR-121 AC-028: skip reasons/names alone never grant a new opt-in exemption.
+def test_unmapped_opt_in_skip_remains_required(tmp_path):
+    write_workflow_trx(tmp_path, [
+        ("StudyReportEvaluator.Core.Tests.Required.Executes", "Passed"),
+        ("StudyReportEvaluator.App.Tests.Required.Executes", "Passed"),
+        (selection.EXCLUDED_METHODS[0] + "_new", "NotExecuted"),
+    ])
+    with pytest.raises(driver.Stop, match="Core/App"):
+        adapter.deterministic_results(tmp_path)
+
+
+# FR-121 AC-028: workflow execution and production evidence share one mapping.
+def test_workflow_and_trx_gate_use_the_same_explicit_selection():
+    import yaml
+    workflow = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
+    step = next(step for step in workflow["jobs"]["candidate"]["steps"]
+                if step.get("id") == "release-tests")
+    assert r"python .\scripts\release_test_selection.py" in step["run"]
+    assert '--filter "$filter"' in step["run"]
+    process = subprocess.run([sys.executable, str(ROOT / "scripts/release_test_selection.py")],
+                             capture_output=True, text=True, check=True)
+    clauses = process.stdout.strip().split("&")
+    names = [*(name + ".Executes" for name in selection.EXCLUDED_CLASSES),
+             *selection.EXCLUDED_METHODS,
+             *(name + "_new" for name in selection.EXCLUDED_METHODS),
+             "StudyReportEvaluator.Core.Tests.Required.Executes",
+             "StudyReportEvaluator.App.Tests.Copilot.SystemCopilotCliPathResolverTests."
+             "Cancellation_prevents_discovery_AC023"]
+    for name in names:
+        selected = True
+        for clause in clauses:
+            if "!~" in clause:
+                selected &= clause.split("!~", 1)[1] not in name
+            else:
+                selected &= clause.split("!=", 1)[1] != name
+        assert selected == (selection.required_group(*name.rsplit(".", 1)) is not None)
+    # Guard the two exact opt-in mappings against renames in the actual App tests.
+    for name in selection.EXCLUDED_METHODS:
+        class_name, method_name = name.rsplit(".", 1)
+        relative = class_name.removeprefix("StudyReportEvaluator.App.Tests.").replace(".", "/")
+        source = (ROOT / "tests/StudyReportEvaluator.App.Tests" / (relative + ".cs")).read_text()
+        assert f"Task {method_name}(" in source
 
 
 # FR-121 AC-100/AC-102: relocation never rewrites candidate identity or evidence.

@@ -15,6 +15,7 @@ import xml.etree.ElementTree as ET
 
 from release_automation import (CH, EXE, ZIP, PUBLIC, REQUIRED, WORKFLOW, GitHub,
                                 descriptor, read_json, require, write_json)
+from release_test_selection import GROUPS, required_group
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -54,17 +55,17 @@ def validate_controls(root, identity, final=False):
 
 def deterministic_results(directory):
     """Require actual passing Core/App executions, not a workflow-input flag."""
-    groups = {"Core.Tests": [], "App.Tests": []}
+    groups = {group: [] for group in GROUPS}
     for path in directory.rglob("*.trx"):
         root = ET.parse(path).getroot()
         ns = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
-        methods = {v.attrib["id"]: v.find("t:TestMethod", ns).attrib["className"]
+        methods = {v.attrib["id"]: v.find("t:TestMethod", ns).attrib
                    for v in root.findall(".//t:UnitTest", ns)}
         for result in root.findall(".//t:UnitTestResult", ns):
-            name = methods.get(result.attrib["testId"], "")
-            for group, outcomes in groups.items():
-                if group in name:
-                    outcomes.append(result.attrib["outcome"])
+            method = methods.get(result.attrib["testId"], {})
+            group = required_group(method.get("className", ""), method.get("name", ""))
+            if group is not None:
+                groups[group].append(result.attrib["outcome"])
     for outcomes in groups.values():
         require(outcomes and all(value == "Passed" for value in outcomes),
                 "Core/App required tests missing, skipped or failed")
