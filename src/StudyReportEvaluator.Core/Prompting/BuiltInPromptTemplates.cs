@@ -46,7 +46,7 @@ public static class BuiltInPromptTemplates
     public const string StructuredOutputInstruction = """
         [APP-OWNED STRUCTURED OUTPUT CONTRACT]
         Call the submit_quantification tool exactly once and do not substitute normal assistant text.
-        Return only the requested evaluator ID and every expected criterion exactly once.
+        Return every expected criterion exactly once.
         For each criterion return only its raw score, a short reason, exact contiguous evidence, evidence source kind, and source column ID.
         Never return an evaluator score, question score, overall score, weight, pass/fail decision, or additional field.
         Evidence must come from the identified same-row primary or supporting source. If no evidence exists, return an empty evidence string, NONE, and an empty source column ID.

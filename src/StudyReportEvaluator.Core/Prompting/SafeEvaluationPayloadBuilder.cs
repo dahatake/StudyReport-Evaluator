@@ -76,7 +76,7 @@ public sealed class SafeEvaluationPayloadBuilder
             _ => throw new PromptConfigurationException("INVALID_EVALUATOR_TYPE", "The evaluator type is not supported."),
         };
         string rendered = _renderer.Render(template, context);
-        string completePrompt = AppendAppOwnedContract(rendered, evaluator.Id, primary, supporting, criteria);
+        string completePrompt = AppendAppOwnedContract(rendered, primary, supporting, criteria);
 
         return new SafeEvaluationPayload(
             question.Id,
@@ -241,7 +241,6 @@ public sealed class SafeEvaluationPayloadBuilder
 
     private static string AppendAppOwnedContract(
         string rendered,
-        string evaluatorId,
         EvaluationSourceCell primary,
         ImmutableArray<EvaluationSourceCell> supporting,
         ImmutableArray<ExpectedCriterion> criteria)
@@ -250,7 +249,6 @@ public sealed class SafeEvaluationPayloadBuilder
         builder.AppendLine(rendered.TrimEnd());
         builder.AppendLine();
         builder.AppendLine(BuiltInPromptTemplates.StructuredOutputInstruction.Trim());
-        builder.Append("ExpectedEvaluatorId: ").AppendLine(evaluatorId);
         builder.Append("PrimarySourceColumnId: ").AppendLine(primary.SourceColumnId);
         builder.Append("AllowedSupportingSourceColumnIds: ")
             .AppendLine(supporting.IsEmpty ? "(none)" : string.Join(",", supporting.Select(item => item.SourceColumnId)));
