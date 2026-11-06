@@ -31,7 +31,11 @@
     "AC-090": "sha256:f6ab18f4f90b2b62",
     "AC-092": "sha256:0d8ada5e34e80265",
     "AC-096": "sha256:a3a4363b2f743abe",
-    "AC-007": "sha256:f02465452d03d14f"
+    "AC-007": "sha256:f02465452d03d14f",
+    "AC-028": "sha256:1a32a49d79cd1b78",
+    "AC-100": "sha256:d0918272d2e80373",
+    "AC-101": "sha256:fc73e5ba9a15a8b6",
+    "AC-102": "sha256:6089c944bdbc5b15"
   },
   "cases": [
     {
@@ -590,6 +594,148 @@
           "by": "test-designer",
           "change": "blocked",
           "reason": "AC-007 は検証レベル=integration で System Test 台帳の対象外（CHK-10）。テスト本体 tests/system/integration/RequestBoundEvaluatorIdTests.cs は残し、dotnet test tests/system/integration --filter FullyQualifiedName~RequestBoundEvaluatorIdTests で直接実行する。検証レベルが system に変われば update で not_run に戻す"
+        }
+      ]
+    },
+    {
+      "id": "IT-006",
+      "requirement_ids": [
+        "FR-121"
+      ],
+      "ac_ids": [
+        "AC-028"
+      ],
+      "title": "FR-121 AC-028 exact bytes and required release gate",
+      "layer": "contract",
+      "command": "python -m pytest tests/system/fr121/test_ac028_gate.py -q",
+      "canary": true,
+      "status": "blocked",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-06T23:43:13+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-06T23:44:42+09:00",
+          "by": "test-designer",
+          "change": "blocked",
+          "reason": "CONFLICT CHK-10: approved AC-028 is integration, not system; rd-author/conductor must resolve verification-level policy before activation (test design collected successfully)"
+        }
+      ]
+    },
+    {
+      "id": "IT-007",
+      "requirement_ids": [
+        "FR-121"
+      ],
+      "ac_ids": [
+        "AC-100"
+      ],
+      "title": "FR-121 AC-100 candidate-start identity and immutable publish bytes",
+      "layer": "contract",
+      "command": "python -m pytest tests/system/fr121/test_ac100_identity.py -q",
+      "canary": false,
+      "status": "blocked",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-06T23:43:14+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-06T23:43:14+09:00",
+          "by": "test-designer",
+          "change": "同じ要求・同じ層の既存ケースと別に追加",
+          "reason": "AC-100 identity snapshot is independently executable from AC-028 publication gate; separate test file"
+        },
+        {
+          "at": "2026-11-06T23:44:42+09:00",
+          "by": "test-designer",
+          "change": "blocked",
+          "reason": "CONFLICT CHK-10: approved AC-100 is integration, not system; rd-author/conductor must resolve verification-level policy before activation (test design collected successfully)"
+        }
+      ]
+    },
+    {
+      "id": "IT-008",
+      "requirement_ids": [
+        "FR-121"
+      ],
+      "ac_ids": [
+        "AC-101"
+      ],
+      "title": "FR-121 AC-101 workflow least authority and input boundary",
+      "layer": "contract",
+      "command": "python -m pytest tests/system/fr121/test_ac101_authority.py -q",
+      "canary": false,
+      "status": "blocked",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-06T23:43:15+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-06T23:43:15+09:00",
+          "by": "test-designer",
+          "change": "同じ要求・同じ層の既存ケースと別に追加",
+          "reason": "AC-101 static workflow authority and injection contract is independent of artifact gate and identity; separate file"
+        },
+        {
+          "at": "2026-11-06T23:44:42+09:00",
+          "by": "test-designer",
+          "change": "blocked",
+          "reason": "CONFLICT CHK-10: approved AC-101 is integration, not system; rd-author/conductor must resolve verification-level policy before activation (test design collected successfully)"
+        }
+      ]
+    },
+    {
+      "id": "IT-009",
+      "requirement_ids": [
+        "FR-121"
+      ],
+      "ac_ids": [
+        "AC-102"
+      ],
+      "title": "FR-121 AC-102 replay concurrency and immutable existing release",
+      "layer": "contract",
+      "command": "python -m pytest tests/system/fr121/test_ac102_idempotency.py -q",
+      "canary": false,
+      "status": "blocked",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-06T23:43:16+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-06T23:43:16+09:00",
+          "by": "test-designer",
+          "change": "同じ要求・同じ層の既存ケースと別に追加",
+          "reason": "AC-102 independently executes mutable fake GitHub state races and retries; separate file"
+        },
+        {
+          "at": "2026-11-06T23:44:42+09:00",
+          "by": "test-designer",
+          "change": "blocked",
+          "reason": "CONFLICT CHK-10: approved AC-102 is integration, not system; rd-author/conductor must resolve verification-level policy before activation (test design collected successfully)"
         }
       ]
     }
