@@ -51,9 +51,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
       "status": "pass",
-      "last_commit": "da81e66",
-      "last_run_at": "2026-11-06T17:52:34+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/E2E-001-202611061751.log",
+      "last_commit": "29dd148",
+      "last_run_at": "2026-11-07T01:08:11+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-001-202611070107.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
@@ -88,9 +88,9 @@
       "command": "python -m pytest tests/system/test_fr002_output_folder.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "da81e66",
-      "last_run_at": "2026-11-06T17:52:34+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/E2E-002-202611061751.log",
+      "last_commit": "29dd148",
+      "last_run_at": "2026-11-07T01:08:11+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-002-202611070107.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
@@ -381,9 +381,9 @@
       "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC011_AC012",
       "canary": true,
       "status": "pass",
-      "last_commit": "da81e66",
-      "last_run_at": "2026-11-06T17:52:34+09:00",
-      "evidence": "work/runs/202611060630/logs/system-test/E2E-008-202611061751.log",
+      "last_commit": "29dd148",
+      "last_run_at": "2026-11-07T01:08:11+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/E2E-008-202611070107.log",
       "history": [
         {
           "at": "2026-11-04T09:06:39+09:00",
@@ -609,10 +609,10 @@
       "layer": "contract",
       "command": "python -m pytest tests/system/fr121/test_ac028_gate.py -q",
       "canary": true,
-      "status": "not_run",
-      "last_commit": null,
-      "last_run_at": null,
-      "evidence": null,
+      "status": "pass",
+      "last_commit": "29dd148",
+      "last_run_at": "2026-11-07T01:08:11+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/IT-006-202611070107.log",
       "history": [
         {
           "at": "2026-11-06T23:43:13+09:00",
@@ -646,10 +646,10 @@
       "layer": "contract",
       "command": "python -m pytest tests/system/fr121/test_ac100_identity.py -q",
       "canary": false,
-      "status": "not_run",
-      "last_commit": null,
-      "last_run_at": null,
-      "evidence": null,
+      "status": "pass",
+      "last_commit": "29dd148",
+      "last_run_at": "2026-11-07T01:08:11+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/IT-007-202611070107.log",
       "history": [
         {
           "at": "2026-11-06T23:43:14+09:00",
@@ -689,10 +689,10 @@
       "layer": "contract",
       "command": "python -m pytest tests/system/fr121/test_ac101_authority.py -q",
       "canary": false,
-      "status": "not_run",
-      "last_commit": null,
-      "last_run_at": null,
-      "evidence": null,
+      "status": "pass",
+      "last_commit": "29dd148",
+      "last_run_at": "2026-11-07T01:08:11+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/IT-008-202611070107.log",
       "history": [
         {
           "at": "2026-11-06T23:43:15+09:00",
@@ -732,10 +732,10 @@
       "layer": "contract",
       "command": "python -m pytest tests/system/fr121/test_ac102_idempotency.py -q",
       "canary": false,
-      "status": "not_run",
-      "last_commit": null,
-      "last_run_at": null,
-      "evidence": null,
+      "status": "pass",
+      "last_commit": "29dd148",
+      "last_run_at": "2026-11-07T01:08:11+09:00",
+      "evidence": "work/runs/202611062322/logs/system-test/IT-009-202611070107.log",
       "history": [
         {
           "at": "2026-11-06T23:43:16+09:00",
