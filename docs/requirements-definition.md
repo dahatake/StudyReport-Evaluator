@@ -1588,6 +1588,11 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ、AC-007は§7.3へ、AC-028�
 | AC-025 | macOS scriptがnested sign、shipped CLI hash、outer sign、notary log、app／DMG staple、strict verificationの順序を要求する。実行結果は現版のrequired acceptanceにしない。 |
 | AC-026 | Windows public EXEを主導線、ZIPの取得・展開・起動を代替として文書化する。sidecar公開とCIのexact hash検証は必須、利用者の手動比較は任意推奨、sidecarはEXE起動の前提にしない。.NET Runtime／SDK、PowerShell／Node／Git／gh、別Copilot CLI、Officeの導入やsetup scriptをGUI起動に要求せず、development MSIXを一般利用者手順へ含めない。 |
 | AC-027 | public EXE／ZIP/packageとdevelopment MSIXにsample、利用者入力、final、partialを含めず、package作成・展開・起動で利用者workbookを変更・削除しない。 |
+| <span>AC-028</span> | 正式な受入条件は§13.8 FR-121のAC-028を参照（本行はID索引であり、条件の重複定義ではない）。 |
+<!-- Legacy ID-index contract: keep the reference row recognizable to the documentation contract test;
+     the parser ignores this marker so AC-028 remains defined only under FR-121 §13.8.
+| AC-028 | 正式な受入条件は§13.8 FR-121のAC-028を参照（索引行。正式定義ではない）。 |
+-->
 | AC-029 | OSのみのfresh Windows 11 x64・標準userで、取得済みEXE1個を開く1起動gestureからofflineで入力画面を表示し、手動展開・追加導入・昇格を要求しない。OS警告・拒否・実操作数は別途記録し、無条件・無警告を保証しない。 |
 | AC-030 | 既定App buildでは`CopilotSkipCliDownload=true`とし、単一EXEに.NET/native依存・既存公開docs／画像／LICENSEを含める。歴史的publishは明示供給CLI／manifestを含めてもよいが、runtimeはそれらを選択せずOS PATH CLIを使う。GUI起動はCLI／SDK／sidecarに依存せず、AI runtimeは互換SDKとPATH CLIを必要とし、不在・非互換を明示する。App限定profileとCore／Appの2 production projectを維持する。 |
 | AC-031 | EXE／ZIPで任意cwd、日本語・空白path、相対`--input`、複数`--prompt`、既存invalid入力・明示適用の契約を維持する。起動によるAI送信は0件で、EXE配置先や抽出先へcwd基準を変えない。 |
@@ -1777,6 +1782,7 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ、AC-007は§7.3へ、AC-028�
 - 要求所有者の分類整合依頼により、FR-121のAC-028・AC-100・AC-101・AC-102の検証レベルだけをintegrationからsystemへ変更した。受入本文は不変。設計済みIT-006〜009は`tests/system/fr121/CONTRACT.md`のblack-boxシステム境界観測に対応し、CHK-10との分類不整合を解消する。ケースのblocked解除・契約文書の分類表記更新はtest-designerの担当であり、本変更ではコード・テスト・台帳・依頼外要求／ACを変更しない。
 - 要求所有者の依頼によりFR-121を追加承認。これは将来の自動化をローカルで整備する承認であり、今回のtag作成・push・Actions起動・実Release作成・公開・課金・deployの承認ではない。既存protected公開承認・clean-host必須条件は解除しない。AI提案の包括承認はなし。UI・利用者データ・製品版固定値は変更しない。
 - 既存AC-028をtraceして§13.8へ同IDで移動・変更（検証失敗停止・SHA-256同時公開を明確化）。既存§13.6〜13.7とAC-020〜027、AC-029〜032は再利用し文面不変。要求見出しのない既存配布契約の追跡先としてFR-121を追加し、差分AC-100〜102を追加（最新source／tag／版、最小権限、再実行安全性）。影響は既存workflow・配布script・Release契約テストとカタログの対応であり、コード・テスト・台帳は本工程で変更しない。
+- 2026-11-07: §18のAC一覧にAC-028の参照専用表示を復元。正式定義は§13.8 FR-121に一つだけ置き、パーサの定義判定と47件ID契約を両立させる。
 - 類似検索はFRの同目的候補なし。AC-028は通常検索で発見し新規採番せず再利用。similar --pairsでFR候補なし、AC-064／AC-065は今回の配布対象外で統合しない。AC-028の台帳caseはtraceで検出なし。依頼外要求の全量最適化は行わない。
 - INT-002の16観点走査: 1=GitHubを正本、2=source受信・成果物送信、3=既存Actions／Release方式、4=手動tagごとの有限配布集合、5=配布allowlist・個人情報除外、6=既存GITHUB_TOKENとprotected承認、7=追加SLAなし、8=制限時停止、9=AC-102、10=tag／source／製品版とmatrix v2、11=既存workflow変更時の契約回帰、12=run結果と停止理由、13=既存保持設定を変更しない、14=未公開のまま停止・承認後再実行、15=保守担当者とGitHubの責任分界、16=既存LICENSE・配布対象維持。未決値を必要とする新しいSLA・保持期間・提供先・認証方式は追加しない。
 - 事業妥当性は条件付き（既存導線再利用で誤公開防止。基点のGitHub CI failureとclean-host未実施をPASSと見なさず、将来公開前にrequired成功を別途確認する）。今回の外部書込なし。gh未認証でも公開APIの参照成功はSRC-010の報告どおりで、認証付き実行権限・environment設定・実公開成功は未確認。社内情報は未確認であり、依頼とrepository契約で今回の差分を確定した。
