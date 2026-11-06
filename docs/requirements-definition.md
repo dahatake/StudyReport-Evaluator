@@ -1440,13 +1440,13 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 - 対象エンティティ: Release候補　関係する状態: 未生成→検証中→draft→公開済み、拒否　参照パラメータ: なし
 - 関連する既存資産: INT-002。`.github/workflows/ci.yml`、`release.yml`、`publish-release.yml`、`scripts/publish-windows.ps1`、`package-windows-singlefile.ps1`、`test-windows-singlefile.ps1`、既存ReleaseWorkflowContractTests・ReleaseMatrixContractTests。§13.6のZIP・非公開development MSIX・clean-host契約を維持する。
 - 受入基準 AC-028: 事前条件: 同一candidateのEXE／ZIP・sidecar・package evidenceとclean-host evidence。起点: draft添付とprotected publish。結果: candidateのpackage／mechanism required testsを満たした§13.6のasset集合だけをdraftへ添付し、exact EXEの必須clean-host結果を照合してclosed matrix v2を確定し、`publish=true`かつrequired statusを満たすartifactだけを公開する。最終配布bytesから計算したSHA-256とsidecarが一致し、EXE／ZIPと各sidecarが揃った状態でのみpublic化する。required検証のFAIL・欠落・未実施・cancel・skip、別candidate／hashの証跡、sidecar欠損・不一致のいずれでもpublic化を呼び出さず失敗理由を残す。development MSIX本体・secret・未実測claimは公開しない。
-  - 検証レベル: integration
+  - 検証レベル: system
 - 受入基準 AC-100: 事前条件: candidate開始時のmain先端と一致する既存stable annotated tag、および不一致のtag／source／製品版の組。起点: candidate生成とpublish直前のidentity照合。結果: 「最新」はcandidate開始時に解決・記録したmain先端commitとし、当該tagのcommit・checkout・candidate evidence・製品版・配布EXEの版が一致する場合のみ先へ進む。tagの`v`を除いた版を製品版と照合し、既存version／CHANGELOG検証を維持する。古いsource、tag差替え、別repository／run、版不一致を拒否する。検証後のmain更新で既存candidateを黙って再buildせず、公開時も検証済みbytesだけを使う。
-  - 検証レベル: integration
+  - 検証レベル: system
 - 受入基準 AC-101: 事前条件: 通常CI／PR検証、candidate生成、protected publishのworkflow定義とfake GitHub応答。起点: 各経路の実行。結果: 通常CI／PR検証とbuild・検証処理にRelease書込権限を渡さず、Release変更処理に限って必要な`contents: write`、他runの証跡参照に限って`actions: read`を付与し、不要なwrite権限・新規PATを要求しない。公開承認は既存protected environmentで行い、失敗・未承認時にpublic化しない。tag等の外部入力をshell本文へ直接展開せず、secret値を成果物・logへ残さない。今回のローカル実装検証は実Release作成・push・Actions起動・公開を行わず成立する。
-  - 検証レベル: integration
+  - 検証レベル: system
 - 受入基準 AC-102: 事前条件: 同tagのdraft／公開済みRelease、部分添付、同名異bytes、同時実行、同一run再実行を含むfake GitHub状態。起点: candidate／publishの再実行。結果: 同tagへの変更を競合させず、既存Release／同名assetを無条件削除・上書きしない。同一source・版・検証済みbytes・証跡が揃う既存結果は無変更の成功、欠損・不一致・由来不明は理由付き停止とし、自動修復で既存assetを置換しない。公開済みReleaseはdraftへ戻さず変更しない。途中失敗・通信失敗で未確認の状態を公開成功と報告せず、対象tag・commit・candidate runと停止段階を記録する。
-  - 検証レベル: integration
+  - 検証レベル: system
 
 ## 14. privacy・security・安全境界
 
@@ -1769,6 +1769,7 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ、AC-007は§7.3へ、AC-028�
 
 ### 決定記録・変更履歴（2026-11-06、run 202611062322）
 
+- 要求所有者の分類整合依頼により、FR-121のAC-028・AC-100・AC-101・AC-102の検証レベルだけをintegrationからsystemへ変更した。受入本文は不変。設計済みIT-006〜009は`tests/system/fr121/CONTRACT.md`のblack-boxシステム境界観測に対応し、CHK-10との分類不整合を解消する。ケースのblocked解除・契約文書の分類表記更新はtest-designerの担当であり、本変更ではコード・テスト・台帳・依頼外要求／ACを変更しない。
 - 要求所有者の依頼によりFR-121を追加承認。これは将来の自動化をローカルで整備する承認であり、今回のtag作成・push・Actions起動・実Release作成・公開・課金・deployの承認ではない。既存protected公開承認・clean-host必須条件は解除しない。AI提案の包括承認はなし。UI・利用者データ・製品版固定値は変更しない。
 - 既存AC-028をtraceして§13.8へ同IDで移動・変更（検証失敗停止・SHA-256同時公開を明確化）。既存§13.6〜13.7とAC-020〜027、AC-029〜032は再利用し文面不変。要求見出しのない既存配布契約の追跡先としてFR-121を追加し、差分AC-100〜102を追加（最新source／tag／版、最小権限、再実行安全性）。影響は既存workflow・配布script・Release契約テストとカタログの対応であり、コード・テスト・台帳は本工程で変更しない。
 - 類似検索はFRの同目的候補なし。AC-028は通常検索で発見し新規採番せず再利用。similar --pairsでFR候補なし、AC-064／AC-065は今回の配布対象外で統合しない。AC-028の台帳caseはtraceで検出なし。依頼外要求の全量最適化は行わない。

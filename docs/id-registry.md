@@ -220,10 +220,14 @@
 | SRC-009 | SRC | 使用中 | 2026-11-06T06:35:51+09:00 | run/202611060630@6483f87 |  |
 | FR-120 | FR | 使用中 | 2026-11-06T06:36:15+09:00 | run/202611060630@6483f87 |  |
 | IT-005 | IT | 使用中 | 2026-11-06T06:52:32+09:00 | run/202611060630@9c88945 | 通常評価のrequest-bound evaluator ID: Prompt・ |
-| FR-121 | FR | 採番済み | 2026-11-06T23:31:25+09:00 | run/202611062322@f203254 | 202611062322 Release automation scoped requirement |
-| AC-100 | AC | 採番済み | 2026-11-06T23:31:27+09:00 | run/202611062322@f203254 | 202611062322 identity permissions rerun |
-| AC-101 | AC | 採番済み | 2026-11-06T23:31:27+09:00 | run/202611062322@f203254 | 202611062322 identity permissions rerun |
-| AC-102 | AC | 採番済み | 2026-11-06T23:31:27+09:00 | run/202611062322@f203254 | 202611062322 identity permissions rerun |
-| SRC-010 | SRC | 採番済み | 2026-11-06T23:31:29+09:00 | run/202611062322@f203254 | 202611062322 request repository and official artifact documentation |
-| SRC-011 | SRC | 採番済み | 2026-11-06T23:31:29+09:00 | run/202611062322@f203254 | 202611062322 request repository and official artifact documentation |
-| INT-002 | INT | 採番済み | 2026-11-06T23:31:32+09:00 | run/202611062322@f203254 | 202611062322 existing GitHub Actions Releases integration |
+| FR-121 | FR | 使用中 | 2026-11-06T23:31:25+09:00 | run/202611062322@f203254 | 202611062322 Release automation scoped requirement |
+| AC-100 | AC | 使用中 | 2026-11-06T23:31:27+09:00 | run/202611062322@f203254 | 202611062322 identity permissions rerun |
+| AC-101 | AC | 使用中 | 2026-11-06T23:31:27+09:00 | run/202611062322@f203254 | 202611062322 identity permissions rerun |
+| AC-102 | AC | 使用中 | 2026-11-06T23:31:27+09:00 | run/202611062322@f203254 | 202611062322 identity permissions rerun |
+| SRC-010 | SRC | 使用中 | 2026-11-06T23:31:29+09:00 | run/202611062322@f203254 | 202611062322 request repository and official artifact documentation |
+| SRC-011 | SRC | 使用中 | 2026-11-06T23:31:29+09:00 | run/202611062322@f203254 | 202611062322 request repository and official artifact documentation |
+| INT-002 | INT | 使用中 | 2026-11-06T23:31:32+09:00 | run/202611062322@f203254 | 202611062322 existing GitHub Actions Releases integration |
+| IT-006 | IT | 使用中 | 2026-11-06T23:43:13+09:00 | run/202611062322@8649899 | FR-121 AC-028 exact bytes and required r |
+| IT-007 | IT | 使用中 | 2026-11-06T23:43:14+09:00 | run/202611062322@8649899 | FR-121 AC-100 candidate-start identity a |
+| IT-008 | IT | 使用中 | 2026-11-06T23:43:15+09:00 | run/202611062322@8649899 | FR-121 AC-101 workflow least authority a |
+| IT-009 | IT | 使用中 | 2026-11-06T23:43:16+09:00 | run/202611062322@8649899 | FR-121 AC-102 replay concurrency and imm |
