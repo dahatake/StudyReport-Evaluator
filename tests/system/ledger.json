@@ -609,7 +609,7 @@
       "layer": "contract",
       "command": "python -m pytest tests/system/fr121/test_ac028_gate.py -q",
       "canary": true,
-      "status": "blocked",
+      "status": "not_run",
       "last_commit": null,
       "last_run_at": null,
       "evidence": null,
@@ -625,6 +625,12 @@
           "by": "test-designer",
           "change": "blocked",
           "reason": "CONFLICT CHK-10: approved AC-028 is integration, not system; rd-author/conductor must resolve verification-level policy before activation (test design collected successfully)"
+        },
+        {
+          "at": "2026-11-07T00:10:32+09:00",
+          "by": "conductor",
+          "change": "status -> not_run",
+          "reason": "正本427eb1aで検証レベルsystemへ整合済み、先行設計の管理上blockを解除"
         }
       ]
     },
@@ -640,7 +646,7 @@
       "layer": "contract",
       "command": "python -m pytest tests/system/fr121/test_ac100_identity.py -q",
       "canary": false,
-      "status": "blocked",
+      "status": "not_run",
       "last_commit": null,
       "last_run_at": null,
       "evidence": null,
@@ -662,6 +668,12 @@
           "by": "test-designer",
           "change": "blocked",
           "reason": "CONFLICT CHK-10: approved AC-100 is integration, not system; rd-author/conductor must resolve verification-level policy before activation (test design collected successfully)"
+        },
+        {
+          "at": "2026-11-07T00:10:32+09:00",
+          "by": "conductor",
+          "change": "status -> not_run",
+          "reason": "正本427eb1aで検証レベルsystemへ整合済み、先行設計の管理上blockを解除"
         }
       ]
     },
@@ -677,7 +689,7 @@
       "layer": "contract",
       "command": "python -m pytest tests/system/fr121/test_ac101_authority.py -q",
       "canary": false,
-      "status": "blocked",
+      "status": "not_run",
       "last_commit": null,
       "last_run_at": null,
       "evidence": null,
@@ -699,6 +711,12 @@
           "by": "test-designer",
           "change": "blocked",
           "reason": "CONFLICT CHK-10: approved AC-101 is integration, not system; rd-author/conductor must resolve verification-level policy before activation (test design collected successfully)"
+        },
+        {
+          "at": "2026-11-07T00:10:33+09:00",
+          "by": "conductor",
+          "change": "status -> not_run",
+          "reason": "正本427eb1aで検証レベルsystemへ整合済み、先行設計の管理上blockを解除"
         }
       ]
     },
@@ -714,7 +732,7 @@
       "layer": "contract",
       "command": "python -m pytest tests/system/fr121/test_ac102_idempotency.py -q",
       "canary": false,
-      "status": "blocked",
+      "status": "not_run",
       "last_commit": null,
       "last_run_at": null,
       "evidence": null,
@@ -736,6 +754,12 @@
           "by": "test-designer",
           "change": "blocked",
           "reason": "CONFLICT CHK-10: approved AC-102 is integration, not system; rd-author/conductor must resolve verification-level policy before activation (test design collected successfully)"
+        },
+        {
+          "at": "2026-11-07T00:10:33+09:00",
+          "by": "conductor",
+          "change": "status -> not_run",
+          "reason": "正本427eb1aで検証レベルsystemへ整合済み、先行設計の管理上blockを解除"
         }
       ]
     }
