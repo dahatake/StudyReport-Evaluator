@@ -35,7 +35,8 @@
     "AC-028": "sha256:1a32a49d79cd1b78",
     "AC-100": "sha256:d0918272d2e80373",
     "AC-101": "sha256:fc73e5ba9a15a8b6",
-    "AC-102": "sha256:6089c944bdbc5b15"
+    "AC-102": "sha256:6089c944bdbc5b15",
+    "AC-103": "sha256:43ff775435f55670"
   },
   "cases": [
     {
@@ -760,6 +761,37 @@
           "by": "conductor",
           "change": "status -> not_run",
           "reason": "正本427eb1aで検証レベルsystemへ整合済み、先行設計の管理上blockを解除"
+        }
+      ]
+    },
+    {
+      "id": "IT-010",
+      "requirement_ids": [
+        "FR-121"
+      ],
+      "ac_ids": [
+        "AC-103"
+      ],
+      "title": "FR-121 AC-103 native host gate and unexecuted x64 publication refusal",
+      "layer": "contract",
+      "command": "python -m pytest tests/system/fr121/test_ac103_host_gate.py -q",
+      "canary": true,
+      "status": "not_run",
+      "last_commit": null,
+      "last_run_at": null,
+      "evidence": null,
+      "history": [
+        {
+          "at": "2026-11-07T08:52:53+09:00",
+          "by": "test-designer",
+          "change": "追加",
+          "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-07T08:52:53+09:00",
+          "by": "test-designer",
+          "change": "同じ要求・同じ層の既存ケースと別に追加",
+          "reason": "AC-103 independently executes the existing app-unit verify entry and native-host TRX/report boundary; existing AC-028/100/101/102 cases remain unchanged in separate files"
         }
       ]
     }
