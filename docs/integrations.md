@@ -40,9 +40,32 @@
 
 | ID | 名前 | 連携先 | 方向 | 状態 | 関連する要求 |
 |---|---|---|---|---|---|
+| INT-002 | 既存GitHub Actions／Releases配布 | GitHubの当該repository | 双方向 | 運用中 | FR-121 |
 | INT-001 | 既存Copilot参照回答生成 | GitHub Copilot SDK／OS利用者がPATHに導入したCopilot CLI | 双方向 | 運用中 | FR-115、FR-120、FR-AL-01〜08 |
 
 ## 項目
+
+#### INT-002 既存GitHub Actions／Releases配布
+- 連携先: GitHubのdahatake/StudyReport-Evaluator。source・tag・Release metadataは当該repositoryが正本。対象はFR-121、出典は要求定義書SRC-010・SRC-011。
+- 方向: 双方向
+- 方式: 既存GitHub ActionsのCI・手動candidate・protected publishとGitHub ReleasesのAPI／ファイル配布。今回外部書込は行わない。
+- 頻度と量: 既存の手動stable tag指定ごと。配布集合は要求定義書§13.6のclosed setで、新しい自動定期実行・配布対象は追加しない。
+- データ分類: 公開予定のEXE／ZIPとSHA-256 sidecar、内部control evidence。sample・学生本文・利用者workbook・secret・MSIX本体は公開しない。
+- 個人情報: なし
+- 認証認可: 既存GITHUB_TOKENとprotected environment公開承認。通常CI／PR・build検証にRelease書込権限を付与しない。Release変更／他run証跡参照だけへ必要権限を限定する（AC-101）。新規PATは要求しない。
+- 秘密の保管場所: GitHub Actionsの既存token管理。値をdocs・log・成果物へ転記しない。
+- 可用性・SLA: なし（既存以上の可用性保証を追加しない。失敗時は非公開で停止）。
+- レート制限: 追加の数値契約なし。GitHubの拒否・制限・通信失敗を公開成功へ変換せず停止理由を記録する。
+- エラー・再試行・冪等性: AC-028・AC-102。同tag競合、既存asset不一致、部分失敗では上書きせず停止。同一検証済み結果は無変更成功。公開済みReleaseをdraftへ戻さない。
+- 契約・バージョン: 既存stable annotated tag、source commit、製品版、最終bytesとmatrix v2の拘束（AC-100）。公開前のclean-host必須条件を維持する。
+- 変更通知: 保守担当者が既存workflow／配布script変更時に既存Release契約テストの回帰を確認。新規の通知期限・通知基盤は追加しない。
+- 監視: Actions run結果、tag・source commit・candidate run・停止段階を保守担当者が確認。新規監視サービス・secret出力は追加しない。
+- データ保持: 公開assetと内部control artifactを区別し、既存の保持設定を変更しない。今回新しい保持期限・自動削除を追加しない。
+- 障害時の代替: 公開せず停止。原因解消後、既存candidate／protected publishを承認範囲内で再実行する。検証・公開承認の迂回は禁止。
+- 責任分界: GitHubはActions／Releaseサービス、保守担当者はsource・検証結果・公開承認・障害対応を管理。人のclean-host証跡をhashだけで実施済みと認定しない。
+- 法務・ライセンス: 既存LICENSEと配布allowlistを維持し、新しい契約・再配布対象・公開先を追加しない。今回の公開は禁止。
+- 状態: 運用中
+- 関連する要求: FR-121
 
 #### INT-001 既存Copilot参照回答生成
 - 連携先: GitHub Copilot SDK／OS利用者がPATHに導入したCopilot CLI。質問の正本は入力workbookとrun snapshot、比較用参照回答の正本は保存済みrun集合。

@@ -93,6 +93,7 @@
 | 参照回答集合 | 同一設問・同一runの比較条件に固定された参照回答と各生成状態の集合 | なし |
 | ローカル対照評価 | ラベル付きの合成対照回答で行うオフラインの再現評価。実学生のAI使用の正解データではない | なし |
 | 通常評価要求 | 回答行・設問・enabled evaluatorに束縛された通常評価の送信単位。識別子の正本はアプリのrun snapshotであり、モデルの生成値ではない | なし |
+| Release候補 | 当該repositoryのsource commit・製品版・candidate runと最終配布bytesに拘束されたWindows x64配布候補 | なし |
 
 | 対象エンティティ | 状態 | 遷移の条件 |
 |---|---|---|
@@ -100,6 +101,7 @@
 | 参照回答集合 | 生成中、完了、一部失敗、失敗、旧形式 | 有限生成、atomic保存、中断・再開、旧データ読込 |
 | ローカル対照評価 | 未実行、評価済み、保留 | 固定データ・条件による評価、欠損・不正・未定義条件による保留 |
 | 通常評価要求 | 未送信、評価中、受理、技術的失敗 | 固定した要求の送信、結果の厳密検証、既存の有限retryを経た確定 |
+| Release候補 | 未生成、検証中、draft、公開済み、拒否 | 最新sourceの固定、required検証、draft添付、clean-host照合とprotected公開承認、不一致時の停止 |
 
 ### 3.1 必須入力
 
@@ -1429,6 +1431,23 @@ fresh Windows 11 x64実機またはVMの標準userでexact EXEを試験する。
 
 fake／help／process終了だけの成功はCH-06の本人認証に代用しない。必須試験未実施は公開を拒否するが、ADV-01／02のNOT_RUNを必須試験の失敗へ変換しない。
 
+### 13.8 GitHub Actionsの既存Release導線の安全な自動化（run 202611062322）
+
+#### FR-121 検証済みWindows配布候補のRelease自動化
+- 要求: 保守担当者は、既存CI・candidate・protected publish導線を再利用し、最新コードからWindows x64 self-contained単一EXEを生成し、タグ・source・製品版と検証結果が一致する成果物だけをSHA-256 sidecarとともにReleasesへ公開できる。最小権限で検証失敗時は公開を停止し、再実行・同時実行で重複や既存成果物の上書きを起こさない。
+- 決定状態: 承認済み（依頼 2026-11-06）　出自: 依頼原文　優先度: MUST（未検証・別sourceの成果物の誤公開を防ぐ）
+- 上位: 既定制約（§13.1、§13.6〜13.7の配布・検証・公開承認境界）　出典: SRC-010、SRC-011
+- 対象エンティティ: Release候補　関係する状態: 未生成→検証中→draft→公開済み、拒否　参照パラメータ: なし
+- 関連する既存資産: INT-002。`.github/workflows/ci.yml`、`release.yml`、`publish-release.yml`、`scripts/publish-windows.ps1`、`package-windows-singlefile.ps1`、`test-windows-singlefile.ps1`、既存ReleaseWorkflowContractTests・ReleaseMatrixContractTests。§13.6のZIP・非公開development MSIX・clean-host契約を維持する。
+- 受入基準 AC-028: 事前条件: 同一candidateのEXE／ZIP・sidecar・package evidenceとclean-host evidence。起点: draft添付とprotected publish。結果: candidateのpackage／mechanism required testsを満たした§13.6のasset集合だけをdraftへ添付し、exact EXEの必須clean-host結果を照合してclosed matrix v2を確定し、`publish=true`かつrequired statusを満たすartifactだけを公開する。最終配布bytesから計算したSHA-256とsidecarが一致し、EXE／ZIPと各sidecarが揃った状態でのみpublic化する。required検証のFAIL・欠落・未実施・cancel・skip、別candidate／hashの証跡、sidecar欠損・不一致のいずれでもpublic化を呼び出さず失敗理由を残す。development MSIX本体・secret・未実測claimは公開しない。
+  - 検証レベル: integration
+- 受入基準 AC-100: 事前条件: candidate開始時のmain先端と一致する既存stable annotated tag、および不一致のtag／source／製品版の組。起点: candidate生成とpublish直前のidentity照合。結果: 「最新」はcandidate開始時に解決・記録したmain先端commitとし、当該tagのcommit・checkout・candidate evidence・製品版・配布EXEの版が一致する場合のみ先へ進む。tagの`v`を除いた版を製品版と照合し、既存version／CHANGELOG検証を維持する。古いsource、tag差替え、別repository／run、版不一致を拒否する。検証後のmain更新で既存candidateを黙って再buildせず、公開時も検証済みbytesだけを使う。
+  - 検証レベル: integration
+- 受入基準 AC-101: 事前条件: 通常CI／PR検証、candidate生成、protected publishのworkflow定義とfake GitHub応答。起点: 各経路の実行。結果: 通常CI／PR検証とbuild・検証処理にRelease書込権限を渡さず、Release変更処理に限って必要な`contents: write`、他runの証跡参照に限って`actions: read`を付与し、不要なwrite権限・新規PATを要求しない。公開承認は既存protected environmentで行い、失敗・未承認時にpublic化しない。tag等の外部入力をshell本文へ直接展開せず、secret値を成果物・logへ残さない。今回のローカル実装検証は実Release作成・push・Actions起動・公開を行わず成立する。
+  - 検証レベル: integration
+- 受入基準 AC-102: 事前条件: 同tagのdraft／公開済みRelease、部分添付、同名異bytes、同時実行、同一run再実行を含むfake GitHub状態。起点: candidate／publishの再実行。結果: 同tagへの変更を競合させず、既存Release／同名assetを無条件削除・上書きしない。同一source・版・検証済みbytes・証跡が揃う既存結果は無変更の成功、欠損・不一致・由来不明は理由付き停止とし、自動修復で既存assetを置換しない。公開済みReleaseはdraftへ戻さず変更しない。途中失敗・通信失敗で未確認の状態を公開成功と報告せず、対象tag・commit・candidate runと停止段階を記録する。
+  - 検証レベル: integration
+
 ## 14. privacy・security・安全境界
 
 - AIへ送るworkbook由来の値は、現在行の選択済みprimary/supporting/special sourceだけとする。
@@ -1544,7 +1563,7 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 
 ## 18. Acceptance criteria
 
-AC-004・AC-009〜012は同じIDのまま§7.7へ、AC-007は§7.3へ構造化して移動した。他の既存ACの表形式は維持する。
+AC-004・AC-009〜012は同じIDのまま§7.7へ、AC-007は§7.3へ、AC-028は§13.8へ構造化して移動した。他の既存ACの表形式は維持する。
 
 | ID | 条件 |
 |---|---|
@@ -1569,7 +1588,6 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ、AC-007は§7.3へ構造化�
 | AC-025 | macOS scriptがnested sign、shipped CLI hash、outer sign、notary log、app／DMG staple、strict verificationの順序を要求する。実行結果は現版のrequired acceptanceにしない。 |
 | AC-026 | Windows public EXEを主導線、ZIPの取得・展開・起動を代替として文書化する。sidecar公開とCIのexact hash検証は必須、利用者の手動比較は任意推奨、sidecarはEXE起動の前提にしない。.NET Runtime／SDK、PowerShell／Node／Git／gh、別Copilot CLI、Officeの導入やsetup scriptをGUI起動に要求せず、development MSIXを一般利用者手順へ含めない。 |
 | AC-027 | public EXE／ZIP/packageとdevelopment MSIXにsample、利用者入力、final、partialを含めず、package作成・展開・起動で利用者workbookを変更・削除しない。 |
-| AC-028 | release workflowはcandidateのpackage／mechanism required testsを満たしたEXE／ZIPと各sidecarの4 assetだけをdraftへ添付する。exact EXEの必須clean-host結果を照合したprotected publish時にEXE／ZIP／non-public development MSIXのclosed 3行でmatrix v2を確定し、`publish=true`かつrequired statusを満たすartifactだけを公開する。development MSIX本体・secret・未実測claimを漏らさない。 |
 | AC-029 | OSのみのfresh Windows 11 x64・標準userで、取得済みEXE1個を開く1起動gestureからofflineで入力画面を表示し、手動展開・追加導入・昇格を要求しない。OS警告・拒否・実操作数は別途記録し、無条件・無警告を保証しない。 |
 | AC-030 | 既定App buildでは`CopilotSkipCliDownload=true`とし、単一EXEに.NET/native依存・既存公開docs／画像／LICENSEを含める。歴史的publishは明示供給CLI／manifestを含めてもよいが、runtimeはそれらを選択せずOS PATH CLIを使う。GUI起動はCLI／SDK／sidecarに依存せず、AI runtimeは互換SDKとPATH CLIを必要とし、不在・非互換を明示する。App限定profileとCore／Appの2 production projectを維持する。 |
 | AC-031 | EXE／ZIPで任意cwd、日本語・空白path、相対`--input`、複数`--prompt`、既存invalid入力・明示適用の契約を維持する。起動によるAI送信は0件で、EXE配置先や抽出先へcwd基準を変えない。 |
@@ -1674,6 +1692,8 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ、AC-007は§7.3へ構造化�
 
 | ID | 資料名・位置 | 版・日付 | 確認日 | 取得・確認範囲 |
 |---|---|---|---|---|
+| SRC-010 | 要求所有者・conductorの依頼と追加一次事実（run 202611062322）、既存Release導線 | 2026-11-06、基点f203254 | 2026-11-06 | 依頼本文と参照workflow・publish/package/test scripts・ReleaseWorkflowContractTests・ReleaseMatrixContractTestsの関連範囲を確認。既存の手動stable annotated tag candidate、draft添付、protected公開・clean-host必須契約を再利用。公開REST API確認はconductor報告（本担当は未再照会）: latest v0.8.6、2026-10-01公開、EXE／ZIPと各sidecarの4 asset。現HEADのCI run42219732810はfailure（job: Windows development-host deterministic and package validation、step: Run deterministic tests）、ebak-verify42219732654はfailure、ebak-data-layer42219732665はsuccess。これは基点の観測済み失敗でありgh未認証による未確認とは区別する。原因解析・修正は今回対象外。worktreeのverify --quickとcanary全3件PASSもconductor報告でありGitHub CI成功の代用ではない。実Actions／Release変更・clean-host再試験は本担当未実施。 |
+| SRC-011 | actions/upload-artifact公式docs/MIGRATION.md（https://github.com/actions/upload-artifact/blob/main/docs/MIGRATION.md） | 取得blob SHA 55ddd010efd03673e28f4891bdeb323e899a65c1 | 2026-11-06 | GitHub MCP get_file_contentsで本文取得。v4以降のartifactは削除されない限りimmutable、同名複数uploadとoverwriteの意味は旧版と異なる。Actions artifactとRelease assetは別物であり、この資料だけでRelease再実行の安全性は保証しない。 |
 | SRC-009 | 要求所有者・conductorからの依頼と追加調査（run 202611060630）、通常評価の既存契約 | 2026-11-06、HEAD 6483f87 | 2026-11-06 | 依頼・追加調査の要旨を確認。提供ログ`202611060610-log.txt`:5004–5006と結果Excel`Quantification_Results!BW271`はsource row／record ID 271の同じ評価単位で、初回とschema retryが`EVALUATOR_ID_MISMATCH`、最終`AI_OUTPUT_INVALID`との報告。申告389行はrecord ID 389で別レコード、入力内容は同じとの報告。ログ・Excel本文とハッシュは本担当による独立再読・再計算は未実施。提供SHA256: 原本`018e16baec0afa98376373292b4e373a3353dfa72eca698543a38a0c6bcc8229`、結果`a33bf56cdf7707c880e25b73f774c27cf5c727e8fd0ccd8c1df94a6c8c5307bf`。viewで`App/Copilot/EvaluationSchemaFactory.cs`:19–65（optional＋singleton enum）、`SubmitQuantificationTool.cs`:278–320（省略だけ補完）、`Core/Prompting/BuiltInPromptTemplates.cs`:46–55（ID返却指示）を確認。実AI・外部送信なし。モデルが誤ったIDを生成した内部理由までは未確定であり、要求は冗長なID生成依存の除去と厳密拒否の維持に限定する。 |
 | SRC-002 | 要求所有者の依頼原文（conductorからの引継ぎ、run 202611032044） | 2026-11-03 | 2026-11-03 | 本文確認。「設定画面の指定出力先と実行出力先は、1つのファイルの出力先に」「フォルダーピッカーの画面コンポーネントを使って、入力じゃなくて、画面操作のみで選択」。添付画像そのものは未取得、指定出力先と読取専用の実効出力先の二欄という要旨を確認。既存の出力workbookのフォルダーを単一欄にする変更として扱い、設定保存fileやcheckpointを統合する意味にはしない。 |
 | SRC-004 | 要求所有者の依頼原文（conductorからの引継ぎ、run 202611040007）と結果workbookの既存構造（Workbooks/Writing、docs/result-excel-description.md §3・§5） | 2026-11-04 | 2026-11-04 | 依頼本文と背景の確認。シート`採点結果`の見出し例（ID・質問Nの評価・質問NのPromptの評価・合計）。 |
@@ -1746,6 +1766,14 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ、AC-007は§7.3へ構造化�
 | 共通設定のCopilot login操作 | `SettingsView`の共通設定タブの`SettingsCopilotLoginPanel`と、入力画面と共有する`ExecutionViewModel`のcommand（AC-047、TR-49、FR-SETLOGIN-01〜03）。headless UI試験で局所検証。実CLI・実ブラウザーでの本人loginは未実施（CH-06） |
 
 ## 22. Approval record
+
+### 決定記録・変更履歴（2026-11-06、run 202611062322）
+
+- 要求所有者の依頼によりFR-121を追加承認。これは将来の自動化をローカルで整備する承認であり、今回のtag作成・push・Actions起動・実Release作成・公開・課金・deployの承認ではない。既存protected公開承認・clean-host必須条件は解除しない。AI提案の包括承認はなし。UI・利用者データ・製品版固定値は変更しない。
+- 既存AC-028をtraceして§13.8へ同IDで移動・変更（検証失敗停止・SHA-256同時公開を明確化）。既存§13.6〜13.7とAC-020〜027、AC-029〜032は再利用し文面不変。要求見出しのない既存配布契約の追跡先としてFR-121を追加し、差分AC-100〜102を追加（最新source／tag／版、最小権限、再実行安全性）。影響は既存workflow・配布script・Release契約テストとカタログの対応であり、コード・テスト・台帳は本工程で変更しない。
+- 類似検索はFRの同目的候補なし。AC-028は通常検索で発見し新規採番せず再利用。similar --pairsでFR候補なし、AC-064／AC-065は今回の配布対象外で統合しない。AC-028の台帳caseはtraceで検出なし。依頼外要求の全量最適化は行わない。
+- INT-002の16観点走査: 1=GitHubを正本、2=source受信・成果物送信、3=既存Actions／Release方式、4=手動tagごとの有限配布集合、5=配布allowlist・個人情報除外、6=既存GITHUB_TOKENとprotected承認、7=追加SLAなし、8=制限時停止、9=AC-102、10=tag／source／製品版とmatrix v2、11=既存workflow変更時の契約回帰、12=run結果と停止理由、13=既存保持設定を変更しない、14=未公開のまま停止・承認後再実行、15=保守担当者とGitHubの責任分界、16=既存LICENSE・配布対象維持。未決値を必要とする新しいSLA・保持期間・提供先・認証方式は追加しない。
+- 事業妥当性は条件付き（既存導線再利用で誤公開防止。基点のGitHub CI failureとclean-host未実施をPASSと見なさず、将来公開前にrequired成功を別途確認する）。今回の外部書込なし。gh未認証でも公開APIの参照成功はSRC-010の報告どおりで、認証付き実行権限・environment設定・実公開成功は未確認。社内情報は未確認であり、依頼とrepository契約で今回の差分を確定した。
 
 ### 決定記録・変更履歴（2026-11-04、run 202611040836）
 
