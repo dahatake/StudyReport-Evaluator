@@ -31,7 +31,7 @@
 
 ## API・イベント
 
-通常評価の既存契約（要求定義書§7.3）をFR-120として構造化し、AC-007を変更して再利用した（run 202611060630）。既存資産は`src/StudyReportEvaluator.App/Copilot/EvaluationSchemaFactory.cs`、`src/StudyReportEvaluator.App/Copilot/SubmitQuantificationTool.cs`、`src/StudyReportEvaluator.Core/Prompting/BuiltInPromptTemplates.cs`。ID省略時の補完は既存実装にあるが、モデル向け契約からの生成依存除去と回帰検証は未実装・未検証。INT-001の連携先・認証・データ境界は変更しない。
+通常評価の既存契約（要求定義書§7.3）をFR-120として構造化し、AC-007を変更して再利用した（run 202611060630）。既存資産は`src/StudyReportEvaluator.App/Copilot/EvaluationSchemaFactory.cs`、`src/StudyReportEvaluator.App/Copilot/SubmitQuantificationTool.cs`、`src/StudyReportEvaluator.Core/Prompting/BuiltInPromptTemplates.cs`。2026-11-06に実装・統合済み: モデル向けのPrompt・schemaからevaluator IDの生成・返却を除去し、省略時は送信時の要求へ束縛、互換受信（parser `SubmitQuantificationTool`）は一致する明示IDだけを受理し不一致は`EVALUATOR_ID_MISMATCH`で拒否。通常評価の3種類（KNOWLEDGE_COVERAGE・PROMPT_ANALYSIS・CUSTOM_PROMPT）のPromptを`tests/StudyReportEvaluator.Core.Tests/Prompting/Fr120RequestBoundEvaluatorIdPromptTests.cs`で、受理・拒否を`tests/system/integration/RequestBoundEvaluatorIdTests.cs`ほかで検証。台帳IT-005の扱いはtest-designerが決める（要求定義書§25 FC-A13）。INT-001の連携先・認証・データ境界は変更しない。
 
 | 名前 | 定義ファイル | 関連する要求 ID |
 |---|---|---|
