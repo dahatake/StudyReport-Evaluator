@@ -79,15 +79,14 @@ public sealed class ReleaseWorkflowContractTests
         Assert.Contains("compression-level: 0", publicUpload, StringComparison.Ordinal);
 
         string releaseCreate = SliceSection(normalized, "Create the draft GitHub Release");
-        Assert.Equal(
-            new[]
-            {
-                ".\\artifacts\\package\\matrix\\StudyReportEvaluator-win-x64.exe",
-                ".\\artifacts\\package\\matrix\\StudyReportEvaluator-win-x64.exe.sha256",
-                ".\\artifacts\\package\\matrix\\StudyReportEvaluator-win-x64.zip",
-                ".\\artifacts\\package\\matrix\\StudyReportEvaluator-win-x64.zip.sha256",
-            },
-            ExtractReleaseCreatePaths(releaseCreate));
+        // FR-121 AC-028/AC-102: mutations now use the same byte-verifying driver as
+        // the independent HTTP contracts, rather than a second gh upload path.
+        Assert.Contains("invoke-release-automation.ps1", releaseCreate, StringComparison.Ordinal);
+        string driver = ReadScript("release_automation.py");
+        Assert.Contains("PUBLIC = (EXE, EXE + \".sha256\", ZIP, ZIP + \".sha256\")", driver, StringComparison.Ordinal);
+        Assert.Contains("for name in PUBLIC:", driver, StringComparison.Ordinal);
+        Assert.Contains("api.call(\"POST\", upload", driver, StringComparison.Ordinal);
+        Assert.DoesNotContain("gh release", driver, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -122,7 +121,10 @@ public sealed class ReleaseWorkflowContractTests
         Assert.Contains("[string]$run.conclusion -cne 'success'", workflow, StringComparison.Ordinal);
         Assert.Contains("[string]$run.head_sha -cne $tagCommit", workflow, StringComparison.Ordinal);
         Assert.Contains("if ($LASTEXITCODE -ne 0 -or $runJson.Count -eq 0)", workflow, StringComparison.Ordinal);
-        Assert.Contains("if ($LASTEXITCODE -ne 0 -or $artifactJson.Count -eq 0)", workflow, StringComparison.Ordinal);
+        // FR-121 AC-100: the typed Actions download now binds the original run.
+        Assert.Contains("run-id: ${{ inputs.candidate_run_id }}", workflow, StringComparison.Ordinal);
+        Assert.Contains("name: release-candidate-${{ inputs.tag }}-${{ inputs.candidate_run_id }}", workflow, StringComparison.Ordinal);
+        Assert.Contains("[string]$run.status -cne 'completed'", workflow, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -136,84 +138,70 @@ public sealed class ReleaseWorkflowContractTests
         Assert.Contains("StudyReportEvaluator-win-x64.evidence.json", workflow, StringComparison.Ordinal);
         Assert.Contains("StudyReportEvaluator-win-x64.unsigned.test.msix.sha256", workflow, StringComparison.Ordinal);
         Assert.Contains("StudyReportEvaluator-win-x64.unsigned.test.evidence.json", workflow, StringComparison.Ordinal);
-        Assert.Contains("must not contain the MSIX binary", workflow, StringComparison.Ordinal);
-        Assert.Contains("Candidate control evidence must contain exactly candidate record, EXE/ZIP evidence, and MSIX sidecar/evidence.", workflow, StringComparison.Ordinal);
-
-        Assert.Contains("The draft must carry exactly EXE/ZIP assets and sidecars, with no MSIX assets.", workflow, StringComparison.Ordinal);
-        Assert.Contains("Downloaded draft assets must be exactly EXE/ZIP assets and sidecars with no extras.", workflow, StringComparison.Ordinal);
+        // FR-121 AC-028: C03 retains the exact private sets; the shared driver
+        // independently rejects missing/extra public names and verifies downloads.
+        string driver = ReadScript("release_automation.py");
+        string builder = ReadScript("build-platform-release-matrix.ps1");
+        Assert.Contains("Assert-C03ExactFileSet", builder, StringComparison.Ordinal);
+        Assert.Contains("-WithoutArtifact", builder, StringComparison.Ordinal);
+        Assert.Contains("len(listing) == 4", driver, StringComparison.Ordinal);
+        Assert.Contains("{v[\"name\"] for v in listing} == set(PUBLIC)", driver, StringComparison.Ordinal);
+        Assert.Contains("downloaded == assets[value[\"name\"]]", driver, StringComparison.Ordinal);
         Assert.Contains("-Mode Final", workflow, StringComparison.Ordinal);
         Assert.Contains("-ExpectedRepository $env:GITHUB_REPOSITORY", workflow, StringComparison.Ordinal);
         Assert.Contains("-CandidateRunId $env:CANDIDATE_RUN_ID", workflow, StringComparison.Ordinal);
         Assert.Contains("-CandidateRecordPath (Join-Path $candidateRoot 'release-candidate-record.json')", workflow, StringComparison.Ordinal);
-        Assert.Contains("-CleanHostEvidencePath $env:CLEAN_HOST_EVIDENCE_PATH", workflow, StringComparison.Ordinal);
+        Assert.Contains("-CleanHostEvidencePath (Join-Path $env:RUNNER_TEMP 'windows-singlefile-clean-host.evidence.json')", workflow, StringComparison.Ordinal);
 
         int uploadIndex = normalized.IndexOf("- name: Upload final publish control evidence", StringComparison.Ordinal);
         int publishIndex = normalized.IndexOf("- name: Revalidate exact draft bytes and publish", StringComparison.Ordinal);
-        int draftFalseIndex = normalized.IndexOf("--draft=false", StringComparison.Ordinal);
         Assert.True(uploadIndex > 0 && publishIndex > uploadIndex);
-        Assert.True(draftFalseIndex > publishIndex);
-        Assert.Contains("The release asset set changed during publication.", workflow, StringComparison.Ordinal);
+        Assert.Contains("invoke-release-automation.ps1", normalized[publishIndex..], StringComparison.Ordinal);
+        Assert.Contains("needs: validate", workflow, StringComparison.Ordinal);
+        Assert.Contains("existing release bytes differ", driver, StringComparison.Ordinal);
 
         string finalControlUpload = SliceSection(normalized, "Upload final publish control evidence");
         Assert.Equal(
             new[]
             {
-                "${{ env.FINAL_CONTROL_ROOT }}/StudyReportEvaluator-win-x64.evidence.json",
-                "${{ env.FINAL_CONTROL_ROOT }}/StudyReportEvaluator-win-x64.exe.evidence.json",
-                "${{ env.FINAL_CONTROL_ROOT }}/StudyReportEvaluator-win-x64.unsigned.test.evidence.json",
-                "${{ env.FINAL_CONTROL_ROOT }}/StudyReportEvaluator-win-x64.unsigned.test.msix.sha256",
-                "${{ env.FINAL_CONTROL_ROOT }}/platform-release-matrix.json",
-                "${{ env.FINAL_CONTROL_ROOT }}/release-candidate-record.json",
-                "${{ env.FINAL_CONTROL_ROOT }}/windows-singlefile-clean-host.evidence.json",
+                "${{ runner.temp }}/final-control/StudyReportEvaluator-win-x64.evidence.json",
+                "${{ runner.temp }}/final-control/StudyReportEvaluator-win-x64.exe.evidence.json",
+                "${{ runner.temp }}/final-control/StudyReportEvaluator-win-x64.unsigned.test.evidence.json",
+                "${{ runner.temp }}/final-control/StudyReportEvaluator-win-x64.unsigned.test.msix.sha256",
+                "${{ runner.temp }}/final-control/platform-release-matrix.json",
+                "${{ runner.temp }}/final-control/release-candidate-record.json",
+                "${{ runner.temp }}/final-control/windows-singlefile-clean-host.evidence.json",
             },
             ExtractUploadPaths(finalControlUpload));
     }
 
     [Fact]
-    public void Publish_workflow_revalidates_current_draft_bytes_and_asset_identity_in_the_publish_step()
+    public void Publish_workflow_revalidates_current_bytes_without_resetting_public_release_to_draft()
     {
         string workflow = NormalizeNewlines(ReadWorkflow("publish-release.yml"));
         string publishStep = SliceSection(workflow, "Revalidate exact draft bytes and publish");
 
-        Assert.Contains("$downloadSnapshot = @(Get-ReleaseAssetIdentity", publishStep, StringComparison.Ordinal);
-        Assert.Contains("prepublish-revalidation", publishStep, StringComparison.Ordinal);
-        Assert.Contains("gh release download", publishStep, StringComparison.Ordinal);
-        Assert.Contains(".\\scripts\\validate-platform-release-matrix.ps1", publishStep, StringComparison.Ordinal);
-        Assert.Contains("Pre-publication C02 validation did not bind the expected candidate.", publishStep, StringComparison.Ordinal);
-        Assert.Contains("$prePublishSnapshot = @(Get-ReleaseAssetIdentity", publishStep, StringComparison.Ordinal);
-        Assert.Contains("Draft asset identity changed during byte revalidation.", publishStep, StringComparison.Ordinal);
-        Assert.Contains("$publishedSnapshot = @(Get-ReleaseAssetIdentity", publishStep, StringComparison.Ordinal);
-        Assert.Contains("--draft=true", publishStep, StringComparison.Ordinal);
-        Assert.Contains("catch {", publishStep, StringComparison.Ordinal);
-        Assert.Contains(
-            "Post-publication verification failed; the release was restored to draft state.",
-            publishStep,
-            StringComparison.Ordinal);
-
-        int validationIndex = publishStep.IndexOf(
-            ".\\scripts\\validate-platform-release-matrix.ps1",
-            StringComparison.Ordinal);
-        int prePublishIdentityIndex = publishStep.IndexOf(
-            "$prePublishSnapshot = @(Get-ReleaseAssetIdentity",
-            StringComparison.Ordinal);
-        int publishIndex = publishStep.IndexOf("--draft=false", StringComparison.Ordinal);
-        int postPublishIdentityIndex = publishStep.IndexOf(
-            "$publishedSnapshot = @(Get-ReleaseAssetIdentity",
-            StringComparison.Ordinal);
-        int postPublishCatchIndex = publishStep.IndexOf(
-            "catch {",
-            postPublishIdentityIndex,
-            StringComparison.Ordinal);
-        int restoreDraftIndex = publishStep.IndexOf(
-            "--draft=true",
-            postPublishIdentityIndex,
-            StringComparison.Ordinal);
-        Assert.True(validationIndex >= 0 && prePublishIdentityIndex > validationIndex);
-        Assert.True(publishIndex > prePublishIdentityIndex);
-        Assert.True(postPublishIdentityIndex > publishIndex);
-        Assert.True(postPublishCatchIndex > postPublishIdentityIndex);
-        Assert.True(restoreDraftIndex > postPublishCatchIndex);
-        Assert.Equal(1, CountOccurrences(publishStep, "--draft=false"));
+        // FR-121 AC-102 explicitly forbids the former rollback-to-draft policy.
+        // Byte validation and post-transition confirmation remain mandatory,
+        // now in the production driver exercised by the independent HTTP tests.
+        Assert.Contains("invoke-release-automation.ps1", publishStep, StringComparison.Ordinal);
+        string driver = ReadScript("release_automation.py");
+        string adapter = ReadScript("prepare_release_automation.py");
+        Assert.Contains("scripts/validate-platform-release-matrix.ps1", adapter, StringComparison.Ordinal);
+        Assert.Contains("validate_controls(root, identity, final=True)", adapter, StringComparison.Ordinal);
+        Assert.Contains("binary=True", driver, StringComparison.Ordinal);
+        Assert.Contains("downloaded == assets[value[\"name\"]]", driver, StringComparison.Ordinal);
+        int before = driver.IndexOf("result[\"stage\"] = \"pre-publication-identity\"", StringComparison.Ordinal);
+        int publish = driver.IndexOf("api.call(\"PATCH\"", StringComparison.Ordinal);
+        int after = driver.IndexOf("result[\"stage\"] = \"confirm-public\"", StringComparison.Ordinal);
+        Assert.True(before >= 0 && publish > before && after > publish);
+        Assert.Contains("verify_release(api, request, assets, release)", driver[after..], StringComparison.Ordinal);
+        Assert.Contains("require(release[\"draft\"] is False", driver[after..], StringComparison.Ordinal);
+        Assert.Equal(1, CountOccurrences(driver, "api.call(\"PATCH\""));
+        Assert.DoesNotContain("--draft=true", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("{\"draft\": True}", driver, StringComparison.Ordinal);
+        Assert.DoesNotContain("api.call(\"DELETE\"", driver, StringComparison.Ordinal);
+        Assert.Contains("etag=etag", driver, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -253,6 +241,9 @@ public sealed class ReleaseWorkflowContractTests
         int next = yaml.IndexOf("\n      - name: ", start + marker.Length, StringComparison.Ordinal);
         return next < 0 ? yaml[start..] : yaml[start..next];
     }
+
+    private static string ReadScript(string name) =>
+        File.ReadAllText(Path.Combine(FindRepositoryRoot(), "scripts", name));
 
     private static string[] ExtractUploadPaths(string step)
     {

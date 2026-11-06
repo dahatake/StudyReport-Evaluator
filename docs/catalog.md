@@ -8,7 +8,7 @@
 
 | 要求 ID | 題名 | 決定状態 | 実装ファイル | テスト | 使っている共通部品 |
 |---|---|---|---|---|---|
-| FR-121 | 検証済みWindows配布候補のRelease自動化 | 承認済み | 未実装 | 未実装 | なし |
+| FR-121 | 検証済みWindows配布候補のRelease自動化 | 承認済み | .github/workflows/release.yml, .github/workflows/publish-release.yml, scripts/invoke-release-automation.ps1, scripts/prepare-release-automation.ps1, scripts/release_automation.py, scripts/prepare_release_automation.py, docs/release-automation.md | tests/packaging/test_release_automation.py, tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseWorkflowContractTests.cs, tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseMatrixContractTests.cs, tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseMatrixBuilderTests.cs, tests/system/fr121/test_ac028_gate.py, tests/system/fr121/test_ac100_identity.py, tests/system/fr121/test_ac101_authority.py, tests/system/fr121/test_ac102_idempotency.py | Release変更トランザクション, Windows包装・closed matrix |
 | FR-120 | 通常評価のrequest-bound識別子と厳密な結果受理 | 承認済み | src/StudyReportEvaluator.Core/Prompting/BuiltInPromptTemplates.cs, src/StudyReportEvaluator.Core/Prompting/SafeEvaluationPayloadBuilder.cs, src/StudyReportEvaluator.App/Copilot/EvaluationSchemaFactory.cs, src/StudyReportEvaluator.App/Copilot/SubmitQuantificationTool.cs, src/StudyReportEvaluator.Core/Validation/QuantificationResultValidator.cs | tests/system/integration/RequestBoundEvaluatorIdTests.cs, tests/StudyReportEvaluator.Core.Tests/Prompting/Fr120RequestBoundEvaluatorIdPromptTests.cs, tests/StudyReportEvaluator.App.Tests/Copilot/EvaluationSchemaFactoryTests.cs, tests/StudyReportEvaluator.App.Tests/Copilot/SubmitQuantificationToolTests.cs | - |
 | FR-001 | 採点配分と通常評価の統合画面 | 承認済み | src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml, src/StudyReportEvaluator.App/Views/QuantificationDesignView.axaml.cs | tests/system/ui/IntegratedDesignAndSettingsTests.cs | - |
 | FR-002 | 共通設定と出力フォルダー選択の統一 | 承認済み | src/StudyReportEvaluator.App/Views/SettingsView.axaml, src/StudyReportEvaluator.App/Views/SettingsView.axaml.cs, src/StudyReportEvaluator.App/ViewModels/SettingsViewModel.cs, src/StudyReportEvaluator.App/ViewModels/ExecutionViewModel.cs, src/StudyReportEvaluator.App/ViewModels/MainWindowViewModel.cs, src/StudyReportEvaluator.App/Views/NativeOutputFolderPicker.cs | tests/system/ui/IntegratedDesignAndSettingsTests.cs, tests/system/ui/OutputFolderSelectionTests.cs, tests/system/test_fr002_output_folder.py, tests/StudyReportEvaluator.App.Tests/UI/SettingsViewTests.cs, tests/StudyReportEvaluator.App.Tests/UI/SettingsViewModelTests.cs, tests/StudyReportEvaluator.App.Tests/UI/SettingsAccessibilityTests.cs, tests/StudyReportEvaluator.App.Tests/E2E/SettingsWorkflowSystemTests.cs | デザイン基盤, 設定保存, ネイティブ出力フォルダー選択 |
@@ -36,6 +36,7 @@
 
 | 名前 | 定義ファイル | 関連する要求 ID |
 |---|---|---|
+| invoke-release-automation（内部RequestPath/ResultPath/GitHubApiUrl境界。GitHub Releases REST） | scripts/invoke-release-automation.ps1, scripts/release_automation.py, docs/release-automation.md | FR-121 |
 | DurableQuantificationOrchestrator.RerunRowsAsync（選んだ行だけの再実行） | src/StudyReportEvaluator.App/Workflow/DurableQuantificationOrchestrator.cs | FR-112 |
 | ResultsOutputViewModel.RerunRequested（対象行の確定イベント） | src/StudyReportEvaluator.App/ViewModels/ResultsOutputViewModel.Rerun.cs | FR-112 |
 
@@ -48,6 +49,8 @@
 
 | 部品名 | ファイル | 用途 | 使っている要求 ID |
 |---|---|---|---|
+| Release変更トランザクション | scripts/invoke-release-automation.ps1, scripts/release_automation.py, scripts/prepare-release-automation.ps1, scripts/prepare_release_automation.py | candidate/publish共通の由来・exact bytes・sidecar照合、同一結果noop、不完全状態停止。実測済み包装証跡からのみ内部要求を導出 | FR-121 |
+| Windows包装・closed matrix | scripts/build-platform-release-matrix.ps1, scripts/validate-platform-release-matrix.ps1, scripts/test-windows-singlefile.ps1, scripts/test-windows-zip.ps1, scripts/test-windows-msix-unsigned.ps1 | 既存P07/C02/C03とZIP/clean-host契約を変更せず再利用。MSIXは内部descriptorのみ、candidateは非公開、Final v2のみ公開可能 | FR-121 |
 | デザイン基盤 | src/StudyReportEvaluator.App/App.axaml, src/StudyReportEvaluator.App/Styles/Accessibility.axaml, src/StudyReportEvaluator.App/Resources/WorkflowIcons.axaml | 既存Avalonia FluentTheme、共通brush・フォーカス・44 DIP操作対象・アイコンを再利用。今回独自テーマは追加しない | FR-002, FR-112, FR-114, FR-117, FR-118 |
 | 設定保存 | src/StudyReportEvaluator.App/Settings/SettingsFileStore.cs, src/StudyReportEvaluator.App/Settings/ApplicationSettings.cs | 既存schemaの絶対出力先/nullと次回設定を明示保存・復元。run snapshotとモデルcache自動保存契約は維持 | FR-002 |
 | ネイティブ出力フォルダー選択 | src/StudyReportEvaluator.App/Views/NativeOutputFolderPicker.cs | 入力選択と同じTopLevel.StorageProviderで単一フォルダーを選択。取消はnull、非local/利用不可は理由つき失敗。IO作成なし | FR-002 |
