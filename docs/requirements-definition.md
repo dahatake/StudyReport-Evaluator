@@ -1434,9 +1434,9 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 ### 13.8 GitHub Actionsの既存Release導線の安全な自動化（run 202611062322）
 
 #### FR-121 検証済みWindows配布候補のRelease自動化
-- 要求: 保守担当者は、既存CI・candidate・protected publish導線を再利用し、最新コードからWindows x64 self-contained単一EXEを生成し、タグ・source・製品版と検証結果が一致する成果物だけをSHA-256 sidecarとともにReleasesへ公開できる。最小権限で検証失敗時は公開を停止し、再実行・同時実行で重複や既存成果物の上書きを起こさない。
-- 決定状態: 承認済み（依頼 2026-11-06）　出自: 依頼原文　優先度: MUST（未検証・別sourceの成果物の誤公開を防ぐ）
-- 上位: 既定制約（§13.1、§13.6〜13.7の配布・検証・公開承認境界）　出典: SRC-010、SRC-011
+- 要求: 保守担当者は、既存CI・candidate・protected publish導線を再利用し、最新コードからWindows x64 self-contained単一EXEを生成し、タグ・source・製品版と検証結果が一致する成果物だけをSHA-256 sidecarとともにReleasesへ公開できる。最小権限で検証失敗時は公開を停止し、再実行・同時実行で重複や既存成果物の上書きを起こさない。ARM64開発ホストでは実行可能なホスト非依存契約を実行し、実x64環境を要する検証は未実行と区別する。未実行のx64検証をPASSまたは正式公開可能な証跡へ昇格させず、Windows 11 x64向け配布とx64必須CI・公開検証を維持する（ARM64版配布は追加しない）。
+- 決定状態: 承認済み（依頼 2026-11-07）　出自: 依頼原文　優先度: MUST（未検証・別sourceの成果物の誤公開を防ぐ）
+- 上位: 既定制約（§13.1、§13.6〜13.7の配布・検証・公開承認境界）　出典: SRC-010、SRC-011、依頼原文（run 202611070839）、`work/runs/202611062322/run-report.md`、`work/runs/202611062322/logs/verify-20261107-011039-app-unit.log`、`.github/workflows/ci.yml`、`.github/workflows/release.yml`、`.github/workflows/publish-release.yml`
 - 対象エンティティ: Release候補　関係する状態: 未生成→検証中→draft→公開済み、拒否　参照パラメータ: なし
 - 関連する既存資産: INT-002。`.github/workflows/ci.yml`、`release.yml`、`publish-release.yml`、`scripts/publish-windows.ps1`、`package-windows-singlefile.ps1`、`test-windows-singlefile.ps1`、既存ReleaseWorkflowContractTests・ReleaseMatrixContractTests。§13.6のZIP・非公開development MSIX・clean-host契約を維持する。
 - 受入基準 AC-028: 事前条件: 同一candidateのEXE／ZIP・sidecar・package evidenceとclean-host evidence。起点: draft添付とprotected publish。結果: candidateのpackage／mechanism required testsを満たした§13.6のasset集合だけをdraftへ添付し、exact EXEの必須clean-host結果を照合してclosed matrix v2を確定し、`publish=true`かつrequired statusを満たすartifactだけを公開する。最終配布bytesから計算したSHA-256とsidecarが一致し、EXE／ZIPと各sidecarが揃った状態でのみpublic化する。required検証のFAIL・欠落・未実施・cancel・skip、別candidate／hashの証跡、sidecar欠損・不一致のいずれでもpublic化を呼び出さず失敗理由を残す。development MSIX本体・secret・未実測claimは公開しない。
@@ -1446,6 +1446,8 @@ fake／help／process終了だけの成功はCH-06の本人認証に代用しな
 - 受入基準 AC-101: 事前条件: 通常CI／PR検証、candidate生成、protected publishのworkflow定義とfake GitHub応答。起点: 各経路の実行。結果: 通常CI／PR検証とbuild・検証処理にRelease書込権限を渡さず、Release変更処理に限って必要な`contents: write`、他runの証跡参照に限って`actions: read`を付与し、不要なwrite権限・新規PATを要求しない。公開承認は既存protected environmentで行い、失敗・未承認時にpublic化しない。tag等の外部入力をshell本文へ直接展開せず、secret値を成果物・logへ残さない。今回のローカル実装検証は実Release作成・push・Actions起動・公開を行わず成立する。
   - 検証レベル: system
 - 受入基準 AC-102: 事前条件: 同tagのdraft／公開済みRelease、部分添付、同名異bytes、同時実行、同一run再実行を含むfake GitHub状態。起点: candidate／publishの再実行。結果: 同tagへの変更を競合させず、既存Release／同名assetを無条件削除・上書きしない。同一source・版・検証済みbytes・証跡が揃う既存結果は無変更の成功、欠損・不一致・由来不明は理由付き停止とし、自動修復で既存assetを置換しない。公開済みReleaseはdraftへ戻さず変更しない。途中失敗・通信失敗で未確認の状態を公開成功と報告せず、対象tag・commit・candidate runと停止段階を記録する。
+  - 検証レベル: system
+- 受入基準 AC-103: 事前条件: ARM64開発ホスト、ホスト非依存のRelease契約、およびWindows 11 x64実機を要する包装・起動・性能等の必須検証。起点: ARM64ローカル最終ゲートとx64 CI／candidate／protected publish。結果: ARM64ローカルゲートは実行可能なホスト非依存契約を実行し、それらが成功し、x64環境依存試験を未実行として明示的に区別した場合に成立する。x64依存試験を一括skip・省略して成功扱いせず、未実行をPASSまたは正式公開可能証跡にしない。必須の包装・起動・性能等のx64検証は実x64環境上のCI・公開ゲートで引き続き実行・成功を要し、その必須証跡が揃わなければ公開しない。配布対象はWindows 11 x64のままとし、ARM64版を配布対象に追加しない。AC-028・AC-100〜102の既存条件も維持する。
   - 検証レベル: system
 
 ## 14. privacy・security・安全境界
@@ -1786,6 +1788,12 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ、AC-007は§7.3へ、AC-028�
 - 類似検索はFRの同目的候補なし。AC-028は通常検索で発見し新規採番せず再利用。similar --pairsでFR候補なし、AC-064／AC-065は今回の配布対象外で統合しない。AC-028の台帳caseはtraceで検出なし。依頼外要求の全量最適化は行わない。
 - INT-002の16観点走査: 1=GitHubを正本、2=source受信・成果物送信、3=既存Actions／Release方式、4=手動tagごとの有限配布集合、5=配布allowlist・個人情報除外、6=既存GITHUB_TOKENとprotected承認、7=追加SLAなし、8=制限時停止、9=AC-102、10=tag／source／製品版とmatrix v2、11=既存workflow変更時の契約回帰、12=run結果と停止理由、13=既存保持設定を変更しない、14=未公開のまま停止・承認後再実行、15=保守担当者とGitHubの責任分界、16=既存LICENSE・配布対象維持。未決値を必要とする新しいSLA・保持期間・提供先・認証方式は追加しない。
 - 事業妥当性は条件付き（既存導線再利用で誤公開防止。基点のGitHub CI failureとclean-host未実施をPASSと見なさず、将来公開前にrequired成功を別途確認する）。今回の外部書込なし。gh未認証でも公開APIの参照成功はSRC-010の報告どおりで、認証付き実行権限・environment設定・実公開成功は未確認。社内情報は未確認であり、依頼とrepository契約で今回の差分を確定した。
+
+### 決定記録・変更履歴（2026-11-07、run 202611070839）
+
+- 利用者依頼により既存FR-121を変更し、AC-103を1件追加した。前runの記録ではARM64上でWindows 11 x64前提の既存8試験が未成立となり最終受入が保留されていたため、ARM64ローカルでは実行可能なホスト非依存契約を実行し、実x64環境を要する試験は未実行と区別する境界を明記した。未実行x64検証のPASS／公開可能証跡への昇格は禁止し、x64上の必須CI・公開ゲート、Windows 11 x64配布、AC-028・AC-100〜102の既存条件を維持する。ARM64配布は追加しない。
+- 根拠は `work/runs/202611062322/run-report.md`、`work/runs/202611062322/logs/verify-20261107-011039-app-unit.log`、既存CI・release・publish workflow。ログの文書契約試験失敗1件はx64依存8件とは別の既存事象として扱い、今回の変更根拠に混同しない。AC-103はSystem Testで検証するblack-box契約として `system` を指定した。対応する台帳ケースは許可範囲外のため未作成で、CHK-10 warningとして残り、test-designerが追加する。既存の要求名・決定状態は変わらないためカタログは変更せず、コード・テスト・台帳も変更しない。
+- `rdcheck.py similar` では同目的・同対象の既存AC候補なし。`similar --pairs` のAC-064／AC-065は今回の対象外のため統合しない。新規要求、質問票、包括承認、競合はなし。
 
 ### 決定記録・変更履歴（2026-11-04、run 202611040836）
 
