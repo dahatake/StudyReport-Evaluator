@@ -315,7 +315,7 @@ def test_private_sample_precondition_matches_worktree_search(tmp_path, monkeypat
 # FR-121 AC-103: x64 CI uses mandatory native execution, not the local profile.
 def test_native_workflows_fail_closed_on_os_and_process_architecture():
     import yaml
-    for filename in ("ci.yml", "release.yml", "publish-release.yml"):
+    for filename in ("ci.yml", "release.yml", "publish-release.yml", "ebak-verify.yml"):
         workflow = yaml.safe_load((ROOT / ".github/workflows" / filename).read_text())
         jobs = [job for job in workflow["jobs"].values()
                 if job.get("runs-on") == "windows-latest"]
@@ -329,6 +329,18 @@ def test_native_workflows_fail_closed_on_os_and_process_architecture():
                 if "::OSArchitecture" in step.get("run", ""):
                     assert not step.get("continue-on-error")
                     assert "if" not in step
+
+
+# FR-121 AC-103: the independent verifier runs the same Windows tests with its dependencies.
+def test_ebak_ci_installs_verification_dependencies_and_runs_full_gate():
+    import yaml
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ebak-verify.yml").read_text())
+    job = workflow["jobs"]["verify"]
+    assert job["runs-on"] == "windows-latest"
+    commands = [step.get("run", "") for step in job["steps"]]
+    assert any("pip install pytest PyYAML" in command for command in commands)
+    assert "python scripts/verify.py --show-warnings" in commands
+    assert any(step.get("uses", "").startswith("actions/setup-dotnet@") for step in job["steps"])
 
 
 # FR-121 AC-100/AC-102: relocation never rewrites candidate identity or evidence.

@@ -35,11 +35,13 @@ public sealed class DocumentationScreenshotTests
         "STUDY_REPORT_EVALUATOR_GENERATE_EXECUTION_DOC_IMAGE";
     private const string SafeInputPath = @"C:\Synthetic\StudyReport-100x2.xlsx";
     private const string SafeOutputDirectory = @"C:\Synthetic\result";
-    private const string SafeFinalPath = @"C:\Synthetic\result\eval-20260902-1200.xlsx";
-    private const string SafeReviewedPath = @"C:\Synthetic\result\eval-20260902-1200-reviewed.xlsx";
     private const int ScreenshotWidth = 1440;
     private const int ScreenshotHeight = 1050;
     private static readonly DateTimeOffset ScreenshotUtc = new(2026, 9, 2, 3, 0, 0, TimeSpan.Zero);
+    // The real results view proposes a name from the host-local end time.
+    private static readonly string ScreenshotStamp = ScreenshotUtc.ToLocalTime().ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
+    private static readonly string SafeFinalPath = $@"C:\Synthetic\result\eval-{ScreenshotStamp}.xlsx";
+    private static readonly string SafeReviewedPath = $@"C:\Synthetic\result\eval-{ScreenshotStamp}-reviewed.xlsx";
     private static readonly string[] QuestionIds = ["documentation-question-1", "documentation-question-2"];
 
     // T28 caption contract for T29: these are real views with synthetic content,
@@ -792,7 +794,7 @@ public sealed class DocumentationScreenshotTests
             Assert.Equal(ScreenshotUtc, localTime);
             return OutputPathReservation.Create(
                 SafeOutputDirectory, SafeFinalPath,
-                @"C:\Synthetic\result\eval-20260902-1200.partial.xlsx");
+                $@"C:\Synthetic\result\eval-{ScreenshotStamp}.partial.xlsx");
         }
     }
 
