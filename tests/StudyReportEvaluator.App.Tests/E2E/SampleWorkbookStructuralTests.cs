@@ -10,6 +10,7 @@ using StudyReportEvaluator.App.Workbooks.Mapping;
 using StudyReportEvaluator.App.Workbooks.Reading;
 using StudyReportEvaluator.App.Workbooks.Validation;
 using StudyReportEvaluator.App.Workbooks.Writing;
+using StudyReportEvaluator.App.Tests.Workbooks.Mapping;
 using StudyReportEvaluator.Core.Domain;
 using Xunit;
 
@@ -20,8 +21,33 @@ public sealed class SampleWorkbookStructuralTests
     [Fact]
     public async Task Repository_sample_is_opened_read_only_and_only_structural_metadata_drives_mapping()
     {
-        E02RepositoryLayout.RequireWindowsX64();
+        // FR-121 AC-103: workbook structure and read-only identity are host-independent.
         string samplePath = E02RepositoryLayout.GetRequiredSamplePath();
+        await AssertReadOnlyStructuralMappingAsync(samplePath);
+    }
+
+    // FR-121 AC-103: the same complete structural assertions execute without
+    // private input; this is not repository-sample or x64 performance evidence.
+    [Fact]
+    public async Task Synthetic_sample_structure_is_opened_read_only_and_drives_mapping()
+    {
+        using X02TemporaryWorkbook workbook = X02SyntheticWorkbookFactory.CreateSingleSheet(
+            "Original", 1, 531, 10,
+            new X02Header(1, "回答 ID"),
+            new X02Header(2, "電子メール"),
+            new X02Header(3, "氏名"),
+            new X02Header(4, "質問 1 のレポート回答"),
+            new X02Header(5, "質問 1 の学生プロンプト"),
+            new X02Header(6, "Prompt 作成時の工夫"),
+            new X02Header(7, "質問 2 のレポート回答"),
+            new X02Header(8, "質問 2 の学生 Prompt"),
+            new X02Header(9, "Prompt 作成時の工夫・観点・論点"),
+            new X02Header(10, "PBL feedback"));
+        await AssertReadOnlyStructuralMappingAsync(workbook.Path);
+    }
+
+    private static async Task AssertReadOnlyStructuralMappingAsync(string samplePath)
+    {
         InputSnapshotService snapshots = new();
         InputSnapshot before = snapshots.Capture(samplePath);
 
@@ -176,6 +202,14 @@ public sealed class WindowsX64PerformanceEvidenceTests
 {
     private const int MeasurementCount = 3;
     private const decimal ThresholdSeconds = 30m;
+
+    // FR-121 AC-103: execute the real workbook pipeline on every development host,
+    // without writing or certifying Windows x64 performance evidence.
+    [Fact]
+    public void Synthetic_531_row_read_write_validation_contract_is_host_independent()
+    {
+        Assert.True(MeasureSyntheticReadWriteValidation() > 0);
+    }
 
     [Fact]
     public void Synthetic_531_row_read_write_validation_median_is_recorded_and_within_target()

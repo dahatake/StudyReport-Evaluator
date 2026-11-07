@@ -46,9 +46,8 @@ public sealed class WindowsLocalApplicationTests
             outputDirectory,
             "StudyReportEvaluator.App.deps.json");
 
-        // The Release GATE-APP build output is a precondition, not the behavior under test.
-        // Skip (never pass) when it has not been built; once it exists every check below runs.
-        Assert.SkipUnless(
+        // FR-121 AC-103: the native x64 profile must fail closed on missing output.
+        Assert.True(
             Directory.Exists(outputDirectory),
             "Requires the normal Release GATE-APP build output (dotnet build -c Release src/StudyReportEvaluator.App).");
         Assert.True(File.Exists(executablePath));

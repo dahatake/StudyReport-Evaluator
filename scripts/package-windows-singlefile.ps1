@@ -504,7 +504,6 @@ function Invoke-SingleFilePackaging {
         [string] $OutputDirectory
     )
 
-    Assert-SupportedHost
     $paths = Resolve-SingleFilePackagePaths -RepositoryRoot $RepositoryRoot -PublishedDirectory $PublishedDirectory -OutputDirectory $OutputDirectory
     $inputPath = Get-SingleFilePackageInput -Directory $paths.PublishedDirectory
     $version = Get-SingleFilePackageVersion -RepositoryRoot $paths.RepositoryRoot
@@ -513,6 +512,9 @@ function Invoke-SingleFilePackaging {
     try {
         Assert-Amd64PortableExecutable -Path $inputPath
         Assert-SingleFileBinaryVersion -Path $inputPath -ProductVersion $version.ProductVersion -FileVersion $version.FileVersion
+        # FR-121 AC-103: portable read-only admission precedes host admission.
+        # Actual packaging still requires the real x64 host, before any writes.
+        Assert-SupportedHost
         [void](Write-SingleFileArtifactPair -SourceStream $source -OutputDirectory $paths.OutputDirectory)
     }
     finally { $source.Dispose() }

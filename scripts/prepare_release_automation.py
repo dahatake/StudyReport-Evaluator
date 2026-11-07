@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 
 from release_automation import (CH, EXE, ZIP, PUBLIC, REQUIRED, WORKFLOW, GitHub,
                                 descriptor, read_json, require, write_json)
-from release_test_selection import GROUPS, required_group
+from release_test_selection import GROUPS, REQUIRED_X64_METHODS, required_group
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -56,6 +56,7 @@ def validate_controls(root, identity, final=False):
 def deterministic_results(directory):
     """Require actual passing Core/App executions, not a workflow-input flag."""
     groups = {group: [] for group in GROUPS}
+    native = {name: [] for name in REQUIRED_X64_METHODS}
     for path in directory.rglob("*.trx"):
         root = ET.parse(path).getroot()
         ns = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
@@ -64,11 +65,17 @@ def deterministic_results(directory):
         for result in root.findall(".//t:UnitTestResult", ns):
             method = methods.get(result.attrib["testId"], {})
             group = required_group(method.get("className", ""), method.get("name", ""))
+            name = f"{method.get('className', '')}.{method.get('name', '')}"
+            if name in native:
+                native[name].append(result.attrib["outcome"])
             if group is not None:
                 groups[group].append(result.attrib["outcome"])
     for outcomes in groups.values():
         require(outcomes and all(value == "Passed" for value in outcomes),
                 "Core/App required tests missing, skipped or failed")
+    for outcomes in native.values():
+        require(outcomes and all(value == "Passed" for value in outcomes),
+                "Required real x64 startup/performance TRX evidence missing, skipped or failed")
 
 
 def copy_public(source, destination):
