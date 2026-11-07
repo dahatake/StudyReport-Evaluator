@@ -1,5 +1,16 @@
 # Documentation screenshots
 
+## 先生向けの操作・判断の図
+
+2026-11-07に、実装と公開版の違いを確認して作成した説明図です。画面の写真や実行成功の証拠ではありません。SVG内の文章と同じ内容を利用者ガイドにも記載しています。外部画像・スクリプト・外部フォントは使いません。
+
+| File | 内容 |
+|---|---|
+| [`teacher-workflow.svg`](teacher-workflow.svg) | 学校の許可から、入力・設計・実行・結果・先生の確認まで |
+| [`teacher-result-review.svg`](teacher-result-review.svg) | 空欄を0点と区別し、回答・理由・引用を確認して別名保存する順番 |
+
+最初に読む方は[先生のための利用ガイド](../docs/README.md)へ進んでください。以下は古い画面画像と技術図の来歴です。PNGは現行ソース`0.8.8`の配置と一致する保証はありません。
+
 このフォルダーは、StudyReport Evaluatorの操作説明に使う実際のAvalonia viewのPNGを保存します。
 
 > **対象版:** この画像一覧は公開`v0.8.6`のUI説明用です。**8枚のPNGは`0.8.6`のsourceから2026-09-27に再生成**したもので、旧`0.8.1`の画面を示すものではありません。旧公開版`0.8.1`は変更していません。設問text同期・固定表示の採点計算式・幅に応じたカード配置を`0.8.1`の機能として扱わないでください。既存PNGは生成後のcode/UI変更の検証証跡ではなく、clean-host試験CH-01〜06や本人loginの証跡でもありません。
@@ -8,7 +19,7 @@ F02は版metadataと文書表記の更新で、その時点ではPNGを再生成
 
 ## Architecture diagrams
 
-次のSVGは2026-09-15時点のproduction sourceと、公式のGitHub Copilot SDK／Avalonia／Open XML資料を照合して作成した論理図です。実行時に自動収集したtopology、性能測定、live認証・AI評価、GitHub内部構成の証跡ではありません。外部画像、script、remote fontを参照しない自己完結SVGです。
+次のSVGは2026-11-07時点の現行ソースに合わせて更新した論理図です。公式のGitHub Copilot SDK／Avalonia／Open XML資料の初回照合日は2026-09-15です。実行時に自動収集したtopology、性能測定、live認証・AI評価、GitHub内部構成の証跡ではありません。外部画像、script、remote fontを参照しない自己完結SVGです。
 
 | File | 対象読者 | 内容 |
 |---|---|---|

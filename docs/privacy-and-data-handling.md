@@ -1,6 +1,26 @@
-# データとprivacy
+# データと個人情報の扱い
 
 このガイドは、StudyReport Evaluatorが扱う情報と保存先を説明します。法的助言、組織承認、教育的妥当性の証明ではありません。
+
+## 先生が利用前に確認すること
+
+**確認日：2026-11-07。本文のデータ処理は現行ソース`0.8.8`に基づきます。** 公開`v0.8.6`との差（参照回答数、画面配置など）は別に表示します。どちらも、学校の利用許可をアプリが代わりに判断するものではありません。
+
+1. **学生の回答をGitHub Copilotへ送ってよいか**、学校の管理者に確認します。必要な学生・保護者への説明等は学校の方針に従います。
+2. 最初は架空の回答で試します。本番では氏名・メールアドレスなど採点に不要な情報を評価対象の列や指示文に含めないでください。回答本文に個人情報が書かれている場合も確認します。
+3. **入力Excel全体が結果・途中経過へコピーされる**ことを確認します。「AIへ選択列だけを送る」と「PCに選択列だけを保存する」は違います。
+4. 学校が許可した保存先を使います。結果・途中経過・設定はアプリ独自の暗号化をしません。共有フォルダーの閲覧権限、保管期間、廃棄方法を確認してください。
+5. 問い合わせや画面共有の前に、回答・氏名・AIの引用・ファイル名などが写らないか確認します。実データを公開Issueやチャットへ貼り付けないでください。
+
+| 情報の行き先 | 主な内容 | 先生の注意 |
+|---|---|---|
+| GitHub Copilot | 設問・評価指示・現在の学生行の選択済み回答と補助列 | 送信してよい内容だけを選ぶ。学校とGitHubの利用条件を確認 |
+| 結果Excel／途中経過 | 元のExcel全体、採点条件、参照回答、AIの点・理由・引用等 | 元の回答と同等以上に慎重に保管 |
+| `setting.txt` | モデル・出力先・任意の採点定義1件 | 定義に貼り付けた個人情報も平文で残り得る |
+| アプリ画面 | 学生の回答、AIの理由・引用、速報値 | スクリーンショットや授業での画面共有に注意 |
+| ジョブコストログ | 利用量・処理状態の数値やコード | 回答・秘密情報を追記しない。請求確定額ではない |
+
+以下は管理者が確認するための詳細です。
 
 > **対象版と確認範囲:** 単一EXE、「GitHubにログイン」button、`setting.txt`への設定保存・適用の説明は、公開`v0.8.6`向けです。旧`v0.8.1`はZIP配布で、単一EXE、login button、本頁の設定保存・適用機能はありません。`v0.8.6`は公開済みですが、**clean-host試験CH-01〜06と本人loginは公開前に実施しておらず`NOT_RUN`**です。OS-only環境での動作、実認証、T39完了を示すものではありません。配布状況は[README](../README.md)、起動・login手順は[はじめに](getting-started.md)を確認してください。
 >
@@ -11,7 +31,7 @@
 ```mermaid
 flowchart LR
     IN[入力 .xlsx\n全sheet・全data] -->|local read-only| APP[StudyReport Evaluator]
-    APP -->|必要なcurrent-row source\n+ definition/schema| CLI[OSのCopilot CLI]
+    APP -->|必要なcurrent-row source\n+ definition/schema| CLI[Copilot CLI\n配布: 同梱 / 開発: OS]
     CLI --> GH[GitHub Copilot]
     GH -->|raw/reason/evidence/status| APP
     APP --> PARTIAL[partial .xlsx]
@@ -35,9 +55,9 @@ GUI起動、Excel読込、mapping、採点設計は、本人loginやAI利用と�
 | Reference | なし | Question text、closed output schema |
 | Normal | current rowの選択済み主回答・補助列 | Question、Prompt、criterion metadata、許可source IDs、closed schema |
 | Special | current rowの選択済み固有評価主値・補助列 | Question、利用者Prompt、closed schema |
-| Similarity | current rowの主回答 | 同じQuestionの保存済みReference、closed schema |
+| Similarity | **外部送信なし** | アプリ内で学生の回答と保存済み参照回答を比較。参照回答の生成自体はAIへ設問文を送信 |
 
-workbook由来で送る値は、現在処理しているrowの選択済みsourceだけです。他row、非選択列、workbook pathは通常payloadへ含めません。
+workbook由来でAIへ送る値は、現在処理しているrowの選択済みsourceだけです。他row、非選択列、workbook pathは通常payloadへ含めません。他学生との類似度比較もローカルで行い、その比較のための追加AI送信はありません。
 
 「選択済みcellだけを送る」はworkbook由来の値についての説明です。Question text、利用者Prompt、criterion、Reference、schema metadataも処理に必要な範囲で送ります。
 
@@ -143,7 +163,7 @@ EXE配置先や抽出cacheを既定の出力先にせず、配布・展開・起
 
 失敗・取消では現在のmetadata・draft・Designと保存fileを変更しません。成功時は保存したID・順序・質問文・Prompt・配点を保持し、候補の作り直しや新しいheader値への暗黙置換をしません。その後に利用者が主回答列を変更すると、既存どおり交差セルの値へ質問文を更新します。起動時の`--prompt`の内容は取り込みません。
 
-run中の一括適用はできません。別Excelのsheet・列が存在しても授業内容の一致やcheckpoint再開可能性は保証せず、利用者の確認と既存の再開検証が必要です。認証・一覧の自動再確認は起動時とlogin正常終了後に限り、設定の明示再読込・保存・適用からは開始しません。login・AI評価も自動開始しません。
+run中の一括適用はできません。別Excelのsheet・列が存在しても授業内容の一致やcheckpoint再開可能性は保証せず、利用者の確認と既存の再開検証が必要です。設定の明示再読込・保存・適用から認証確認・login・AI評価は開始しません。別の起動時処理による自動認証確認・未認証時のブラウザー認証と区別してください。
 
 障害時は[設定のトラブルシューティング](troubleshooting.md#設定を保存読み込めないv086)を確認してください。詳細な操作は[設定ガイド](settings.md)を参照してください。
 
@@ -195,11 +215,11 @@ finalも入力を匿名化・縮小したfileではありません。入力の�
 
 ### loginの開始と再確認
 
-1. 利用者が**GitHubにログイン**を選んだ場合、または起動時の自動確認で利用できるログインが見つからなかった場合に1回だけ自動で開始します（環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`が`0`／`false`なら自動開始しません。取消・失敗後は自動で再試行しません）。現行sourceはOSのPATHから解決したnative CLIの絶対pathを使い、同梱CLIへfallbackしません。CLI版・SHA-256は診断・checkpoint互換性に使いますが、同梱manifestとの一致や発行者の真正性の証明ではありません。公開`v0.8.6`の既存assetは従来の同梱CLI検証を維持します。
+1. 利用者が**GitHubにログイン**を選んだ場合、または起動時の自動確認で利用できるログインが見つからなかった場合に1回だけ自動で開始します（環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`が`0`／`false`なら自動開始しません。取消・失敗後は自動で再試行しません）。現行ソースのWindows配布候補は検証済み同梱CLI、通常の開発ビルドはOSのPATHから解決したnative CLIを使います。開発ビルドのCLI版・SHA-256は診断・checkpoint互換性に使い、同梱manifestとの一致を確認するものではありません。Windows配布候補では同梱manifestを検証しますが、hash一致は発行者の真正性の証明とは別です。公開`v0.8.6`の既存assetは従来の同梱CLI検証を維持します。
 2. shell、PowerShell、`cmd /c`を介さず、固定引数`--no-auto-update`、`--log-level none`、`login --web-flow`で直接子processを起動します。token等を引数・標準入力へ渡さず、標準入力／標準出力／標準errorをredirectせず、CLIの出力もcapture・解析しません。本人の対話はCLI／ブラウザー上で完了します。
 3. login processの正常終了後は認証状態とmodel一覧を自動再確認します。取消・失敗後や再確認失敗時は、利用者が**Copilot 状態を確認**で再試行します。processの開始・終了codeだけを認証成功とせず、実効modelは再確認結果に従って反映します。AI評価は自動開始しません。
 
-loginの二重開始と評価中のlogin開始を防ぎます。login processの終了を確認できない場合は、新しいloginやAI処理を開始せず、旧処理の終了を確認してください。アプリの再起動や認証確認成功だけでは旧処理の終了を保証しません。確認不能なら[トラブルシューティング](troubleshooting.md#loginの失敗取消終了処理)に従って問い合わせてください。現行sourceのCLI欠落時はOSのCLI導入・PATH・アプリ再起動を確認します。既存公開版の同梱物不一致は正式配布物で復旧し、hash検証の緩和で回避しません。
+loginの二重開始と評価中のlogin開始を防ぎます。login processの終了を確認できない場合は、新しいloginやAI処理を開始せず、旧処理の終了を確認してください。アプリの再起動や認証確認成功だけでは旧処理の終了を保証しません。確認不能なら[トラブルシューティング](troubleshooting.md#loginの失敗取消終了処理)に従って問い合わせてください。開発ビルドのCLI欠落時はOSのCLI導入・PATH・アプリ再起動を確認します。Windows配布候補の同梱物欠落・破損は正式な配布物で復旧し、PATHのCLIへ切り替えて回避しません。既存公開版の同梱物不一致は正式配布物で復旧し、hash検証の緩和で回避しません。
 
 旧`v0.8.1`にはlogin buttonがないため、同梱CLIで本人の対話loginを行い、既存の状態確認buttonで確認します。従来の対処は[トラブルシューティング](troubleshooting.md#copilotを利用できない)、候補版のlogin手順は[はじめに](getting-started.md#githubにログインv086)を参照してください。
 

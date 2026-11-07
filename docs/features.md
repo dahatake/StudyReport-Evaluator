@@ -1,8 +1,23 @@
 # 機能と点数
 
-このガイドでは、StudyReport Evaluatorの評価単位、配点、status、出力workbookを説明します。
+このガイドでは、先生が決める採点基準と、AIの値から最終点が計算される仕組みを説明します。
 
-> **対象版:** このガイドの新しい画面配置、主回答列から設問textへの即時同期、設定の保存・明示適用は、公開`v0.8.6`を対象とします。旧`v0.8.1`（ZIP）の機能・画面配置とは区別してください。`v0.8.6`は公開済みですが、clean-host試験CH-01〜06と本人loginは公開前に実施していません。
+> **確認日：2026-11-07。** 本文は現行ソース`0.8.8`に基づき、公開`v0.8.6`との違いを明示します。候補の機能は公開版に追加されたわけではありません。旧`v0.8.1`や公開版の検証状況は[はじめに](getting-started.md#v086の検証範囲)を参照してください。
+
+## 先生が決めること・AIが返すこと
+
+| 担当 | 決める／返すもの |
+|---|---|
+| 先生 | どの回答を評価するか、評価項目、点数の範囲、重み、基礎点・設問配点・固有配点、類似度の扱い |
+| AI | 評価項目ごとの元の点、理由、回答からの引用とその場所、参照回答 |
+| アプリ・Excelの数式 | 点数の幅をそろえ、重みに応じて平均し、配点に換算して最終点を計算 |
+| 先生（最後） | 回答と根拠の照合、修正、成績の確定と学生への説明 |
+
+**最終点＝基礎点＋設問で得た点＋固有評価で得た点−類似度減点**です。基礎配点・固有配点・全有効設問の配点を、合わせてちょうど100にします。たとえば基礎60、固有0、設問20点を2つなら100です。基礎点は回答の内容によらず加算されるため、授業の方針に合わせて変更してください。
+
+**類似度は「確認指標・未検証」で、不正の確率ではありません。** 現行ソースの新規定義では減点係数を0にしています。公開`v0.8.6`の新規定義・係数が省略された旧形式では0.1です。保存済みの値は変えずに使うので、開始前に実際の係数を確認してください。
+
+失敗で点が出なかった**空欄・`—`は0点ではありません**。[結果確認の図と手順](getting-started.md#4-結果出力)も参照してください。
 
 ## 画面で確認・変更する場所
 
@@ -21,14 +36,14 @@
 
 ## 評価定義
 
-1つの定義は、Base points、Special points、Similarity penalty weight、丸め桁数と、1件以上のQuestionを持ちます。
+採点定義は、基礎配点、固有配点、類似度減点係数、丸め桁数、1件以上の設問をまとめたものです。以下では、Excelや内部記録に合わせた英語名も併記します。
 
 各Questionは次を持てます。
 
 - 設問text
 - 1つの主回答列
 - 0件以上の補助列
-- 1件以上のKnowledgeまたはCustom evaluator
+- 1件以上のKnowledge／Prompt／Custom evaluator（Promptは現行ソースのみ）
 - evaluator内の1件以上のcriterion
 - 0件以上の固有評価
 - Question points
@@ -41,7 +56,7 @@
 
 ## 設定の保存・再読込・明示適用
 
-候補版では、共通設定と**任意の採点定義1件**を、利用者別の`setting.txt`（UTF-8 JSON）へ保存できます。複数profileの管理や、完成済みfinal workbookから定義をimportする機能ではありません。
+公開`v0.8.6`と現行ソースでは、共通設定と**任意の採点定義1件**を、利用者別の`setting.txt`（UTF-8 JSON）へ保存できます。複数profileの管理や、完成済みfinal workbookから定義をimportする機能ではありません。
 
 1. **設定を保存**で共通設定と現在の採点定義を明示保存します。編集・画面移動・Prompt適用だけでは自動保存しません。初回はこの操作までfileを作りません。不正な設定や保存失敗では、既存fileと現在の編集を保持し、保存済みとは表示しません。
 2. 起動時の読込、または**設定を再読込**で保存済み共通設定を復元します。採点定義は保存定義として保持するだけで、現在のInput／Designへ自動適用しません。
@@ -60,7 +75,9 @@
 | Special | 同じrowの固有評価主値・選択済み補助列 | 利用者選択 | 0〜1、reason、evidence、source |
 | Similarity | 同じrowの主回答と同じ設問の参照回答 | ローカル決定的計算 | 0〜1の表層類似度と機械生成reason |
 
-Referenceは1Questionにつき1runで1回生成し、同じrunの全rowで共有します。checkpointから再開すると保存済みReferenceを再利用します。
+現行ソースの新規実行では、設問ごとに参照回答を**5件**生成し、同じ実行の全学生行で共有します。公開`v0.8.6`は設問ごとに1件です。中断から再開すると保存済み参照回答を再利用します。旧形式の途中経過を、新しい5件の実行だったことにはしません。
+
+5件すべて生成できた場合に、各参照回答との類似度の**最大値**を採点計算へ使います。一部が失敗した場合は成功分の集計を「暫定」として示しますが、採点用の類似度は空欄です。同じ本文の参照回答が重複しても、独立した裏付けとは扱いません。
 
 Reference、Normal、Specialの「利用者選択」には`auto`も選べます。`auto`はrouterのためSDKがtoken上限を公開せず、その場合はmodel相対の容量検査を行いません。実際にroutingされたmodelは通常の実行記録には保存されません。コスト内訳でSDKが報告したモデルは匿名化した識別子だけを表示・記録します。
 
@@ -107,7 +124,7 @@ $$
 
 ## 通常評価
 
-Knowledge／Custom、criterionのdescription・range・weight・有効状態は**設定 → 通常評価**で対象を選択して編集します。Knowledgeのsemantic instructionは読取専用、CustomのPromptは編集可能です。詳細は[Custom evaluator](custom-evaluator-guide.md)を参照してください。
+現行ソースでは、**2 採点設計**内でKnowledge／Prompt／Custom、評価項目の説明・点数範囲・重み・有効状態を編集します。公開`v0.8.6`では**設定 → 通常評価**にあり、Knowledge／Customの2種類です。Knowledge・Promptの組込み指示は読取専用、Customの指示文は編集可能です。[独自の評価指示を書く](custom-evaluator-guide.md)を参照してください。
 
 criterion rawをrange内で0〜100へ正規化します。criterion個別rangeがない場合は親evaluator rangeを使います。
 
@@ -217,6 +234,7 @@ partial削除だけが失敗した場合、validなfinalは無効になりませ
 | `Quantification_References` | 設問、参照回答、model、reasoning effort、status、時刻 |
 | `Quantification_Results` | row別raw、reason、evidence、status、formula、Final score |
 | `Quantification_Run` | input/definition/runtime identity、model、reasoning effort、時刻、件数、観測usage |
+| `採点結果`（現行ソースの完成版のみ） | 設問別の評価点と総合点の一覧。元の学生行に対応するIDを表示 |
 
 入力に同名sheetがある場合、既存sheetを保持して新しいsheetに` (2)`等を付けます。各sheetの列の意味は[実行結果Excelの見方](result-excel-description.md)にまとめています。formula cellにはapp previewのcached valueを保存し、formula対応spreadsheetで開いた際にfull calculationを要求する設定を入れます。
 
@@ -238,4 +256,3 @@ partial削除だけが失敗した場合、validなfinalは無効になりませ
 - 未実測の処理時間、token数、費用
 
 最終的な評点と利用判断は利用者が行います。
-

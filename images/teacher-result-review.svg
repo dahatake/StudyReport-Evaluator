@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 490" role="img" aria-labelledby="title desc">
+  <title id="title">採点結果を安全に確認する順番</title>
+  <desc id="desc">結果を開いたら状態を確認する。技術エラーや未処理で点が空欄なら0点にせず原因を調べる。数値がある場合も元の回答と評価項目、AIの理由と引用を照合する。必要なら通常評価項目の点を修正し別名保存する。類似度だけで不正と判断しない。</desc>
+  <rect width="960" height="490" fill="#f8fafc"/>
+  <g font-family="Meiryo, Yu Gothic, sans-serif" fill="#172b4d">
+    <text x="30" y="42" font-size="25" font-weight="bold">結果が出たら、点数の転記より先に確認</text>
+    <g stroke="#325a87" fill="#fff" stroke-width="2">
+      <rect x="30" y="72" width="900" height="60" rx="12"/>
+      <rect x="30" y="180" width="420" height="104" rx="12"/>
+      <rect x="510" y="180" width="420" height="104" rx="12"/>
+      <rect x="30" y="330" width="900" height="126" rx="12"/>
+    </g>
+    <text x="50" y="110" font-size="21" font-weight="bold">1. 「状態」と点数の有無を見る</text>
+    <text x="50" y="211" font-size="19" font-weight="bold">空欄・技術エラー・未処理</text>
+    <text x="50" y="241" font-size="17">0点にしない。原因を調べて対応する。</text>
+    <text x="50" y="267" font-size="17">回答空欄が確認済みの場合とは別です。</text>
+    <text x="530" y="211" font-size="19" font-weight="bold">数値がある場合も確認が必要</text>
+    <text x="530" y="241" font-size="17">元の回答と評価項目を読む。</text>
+    <text x="530" y="267" font-size="17">AIの理由・引用が回答と一致するか見る。</text>
+    <text x="50" y="366" font-size="20" font-weight="bold">2. 先生が判断し、必要な修正を別名で保存</text>
+    <text x="50" y="398" font-size="18">通常評価の項目は「任意override」で修正できます。AIの元の値は残ります。</text>
+    <text x="50" y="429" font-size="18">類似度は確認のきっかけです。高い値だけで不正と決めつけないでください。</text>
+  </g>
+  <g stroke="#325a87" stroke-width="3" fill="none">
+    <path d="M480 132v20H240v20m240-20h240v20"/>
+    <path d="M240 284v36m480-36v36"/>
+  </g>
+  <g fill="#325a87">
+    <path d="M231 165l9 13 9-13z"/><path d="M711 165l9 13 9-13z"/>
+    <path d="M231 314l9 13 9-13z"/><path d="M711 314l9 13 9-13z"/>
+  </g>
+</svg>

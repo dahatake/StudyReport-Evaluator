@@ -1,29 +1,39 @@
-# Custom evaluator
+# 独自の評価指示を書く（Custom evaluator）
 
-このガイドでは、利用者が編集できる通常Custom evaluatorと固有評価のPromptを説明します。
+このガイドでは、先生の採点基準をAIへの指示文（Prompt）にする方法を説明します。まず評価項目を決め、それから指示文を書きます。AIに最終成績を決めさせるためのものではありません。
 
-> **対象版:** 以下の編集場所と設定保存は公開`v0.8.6`の新UIです。旧`v0.8.1`（ZIP）の旧Design画面とは配置が異なります。6個のplaceholderと採点契約は変更していません。`v0.8.6`は公開済みですが、clean-host試験CH-01〜06と本人loginは公開前に実施していません。
+> **確認日：2026-11-07。** 以下の編集場所は現行ソース`0.8.8`です。公開`v0.8.6`では通常評価を設定画面で編集します。旧`v0.8.1`とは配置が異なります。6個の置換用の記号（placeholder）の規則は同じです。公開版の検証状況は[はじめに](getting-started.md#v086の検証範囲)を参照してください。
+
+## 最初に書くなら
+
+1. **2 採点設計**で設問を選び、評価方法をCustom（独自）にします。公開版は**通常評価 → 設定 → 通常評価**を開きます。
+2. 評価項目に「主張と根拠の対応」など観点を書き、説明欄に「回答に書かれた根拠だけを評価する」のように具体的な基準を入れます。点数範囲と重みも確認します。
+3. 下の[通常Customの例](#通常custom-evaluator)をPrompt欄へ貼り、必要な説明を足します。`{回答}`と`{評価項目}`は消さないでください。アプリが実行時の回答と評価項目に置き換えます。
+4. プレビューで置換の形を確認します。これは仮の値であり、試し採点ではありません。
+5. 架空の少数回答で実行し、理由・引用が採点基準に合うか確認します。次回も使う場合は**設定を保存**します。
+
+「よい回答を高く評価する」だけでは判断が揺れます。回答中の何を確認するか、書かれていない内容を補わないことを明示してください。
 
 ## Knowledge、Custom、固有評価
 
 | 種別 | 用途 | AI出力 |
 |---|---|---|
 | Knowledge (`KNOWLEDGE_COVERAGE`) | 知識の説明、関係、具体的適用 | criterion別raw、reason、evidence、source |
-| Prompt (`PROMPT_ANALYSIS`) | 学生のPromptをベストプラクティスの観点で評価（組込みPrompt、編集不可） | criterion別raw、reason、evidence、source |
+| Prompt (`PROMPT_ANALYSIS`、現行ソースのみ) | 学生のPromptをベストプラクティスの観点で評価（組込みPrompt、編集不可） | criterion別raw、reason、evidence、source |
 | Custom (`CUSTOM_PROMPT`) | 論理性、具体性、調査、文章等の独自観点 | criterion別raw、reason、evidence、source |
 | 固有評価 | 学生Prompt等、通常回答とは別sourceの評価 | 0〜1、reason、evidence、source |
 
 Knowledge・Promptのsemantic instructionとstructured result schemaはapp-ownedです。利用者はcriterion、description、range、weightを編集できますが、app-owned instruction自体は編集しません。評価項目のdescriptionの既定値は種類ごとに異なります。
 
-Customと固有評価では利用者がPrompt templateを編集します。AIへ配点、Question earned、Final score、合否を要求しないでください。
+Customでは利用者がPrompt templateを編集します。固有評価の例は既存の採点定義を保守する人向けで、現行画面からの編集手順ではありません。AIへ配点、Question earned、Final score、合否を要求しないでください。
 
 ## 編集する場所
 
 ### 通常評価の設定
 
-採点設計で設問を選び、**通常評価**から**設定 → 通常評価**を1操作で開きます。同じ設問ID（`questionId`）を保つため、別ページの同名設問へ移ることはありません。設定上部の**設問 → 評価方法 → 評価項目**で対象を切り替えます。
+現行ソースでは、採点設計画面内の通常評価の編集領域で、**設問 → 評価方法 → 評価項目**を選びます。公開`v0.8.6`では採点設計の**通常評価**から**設定 → 通常評価**を開きます。
 
-- **基本**: Knowledge／Customの追加・複製・並替え・削除、有効状態、名前、evaluatorのrange・weight、criterionの名前・description・個別range・weightを編集します。全件の編集カードを並べず、選択対象の詳細を表示します。
+- **基本**: Knowledge／Prompt／Customの追加・複製・並替え・削除、有効状態、名前、評価方法の点数範囲・重み、評価項目の名前・説明・個別範囲・重みを編集します。全件ではなく、選択した対象の詳細を表示します。Promptは現行ソースのみです。
 - **Prompt**: Knowledgeはapp-owned instructionとstructured output instructionの全文を読取専用で確認します。Customはtemplate全文を編集し、読取専用previewで展開を確認します。
 - Customのpreviewは安全な仮値を使います。実際の学生回答やAIによる試し採点ではありません。Knowledgeへの種類変更ではCustom本文を消去するため、保存したい本文がある場合は変更前に確認してください。
 
@@ -109,7 +119,7 @@ literal object: {{"source":"selected-row-only"}}
 
 ## range、criterion、weight
 
-- **設定 → 通常評価 → 基本**で、適用されるrangeと親内の割合を確認します。
+- 現行ソースは採点設計内の通常評価の**基本**、公開版は**設定 → 通常評価 → 基本**で、点数範囲と重みを確認します。
 - evaluator minimumはmaximumより小さくします。
 - criterionは個別rangeを省略でき、その場合は親evaluator rangeを使います。
 - criterion/evaluator weightはenabledなら0より大きくします。
@@ -119,7 +129,7 @@ literal object: {{"source":"selected-row-only"}}
 
 ## Promptファイルの起動引数
 
-`--prompt`は受理されますが、読み込んだ内容は画面に表示せず、どの評価にも適用しません。通常Custom evaluatorのPromptは**採点設計 → 通常評価 → Prompt**で直接編集します。詳しくは[Promptファイルから起動](prompt-launch.md)を参照してください。
+現行ソースの`--prompt`は受理されますが、読み込んだ内容は画面に表示せず、どの評価にも適用しません。通常Custom evaluatorのPromptは**採点設計 → 通常評価の編集領域 → Prompt**で直接編集します。公開版との違いは[起動引数のガイド](prompt-launch.md)を参照してください。
 
 ## 主なvalidation
 

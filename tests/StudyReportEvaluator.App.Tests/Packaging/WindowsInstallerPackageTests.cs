@@ -26,6 +26,8 @@ public sealed class WindowsInstallerPackageTests
         "images/architecture-overview.svg",
         "images/technical-architecture.svg",
         "images/evaluation-message-flow.svg",
+        "images/teacher-workflow.svg",
+        "images/teacher-result-review.svg",
         "images/01-input-workbook.png",
         "images/02-input-mapping.png",
         "images/03-design-knowledge.png",
@@ -287,8 +289,8 @@ public sealed class WindowsInstallerPackageTests
             .Select(capture => capture.Value.Replace('\\', '/'))
             .ToArray();
 
-        Assert.Equal(25, ExpectedPublicPayloadPaths.Length);
-        Assert.Equal(25, actualPaths.Length);
+        Assert.Equal(27, ExpectedPublicPayloadPaths.Length);
+        Assert.Equal(27, actualPaths.Length);
         HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
         foreach (string path in actualPaths)
         {

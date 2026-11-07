@@ -65,6 +65,8 @@ public sealed class WindowsPublishPackageTests
         "images/architecture-overview.svg",
         "images/technical-architecture.svg",
         "images/evaluation-message-flow.svg",
+        "images/teacher-workflow.svg",
+        "images/teacher-result-review.svg",
         "images/01-input-workbook.png",
         "images/02-input-mapping.png",
         "images/03-design-knowledge.png",
@@ -613,8 +615,8 @@ public sealed class WindowsPublishPackageTests
                 path.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
-        Assert.Equal(25, RequiredDocumentationFiles.Length);
-        Assert.Equal(25, documentationEntries.Length);
+        Assert.Equal(27, RequiredDocumentationFiles.Length);
+        Assert.Equal(27, documentationEntries.Length);
         Assert.Equal(
             RequiredDocumentationFiles.OrderBy(path => path, StringComparer.Ordinal).ToArray(),
             documentationEntries,

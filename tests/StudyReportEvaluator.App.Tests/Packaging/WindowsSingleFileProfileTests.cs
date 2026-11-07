@@ -28,6 +28,8 @@ public sealed class WindowsSingleFileProfileTests
         "images/architecture-overview.svg",
         "images/technical-architecture.svg",
         "images/evaluation-message-flow.svg",
+        "images/teacher-workflow.svg",
+        "images/teacher-result-review.svg",
         "images/01-input-workbook.png",
         "images/02-input-mapping.png",
         "images/03-design-knowledge.png",
@@ -130,8 +132,8 @@ public sealed class WindowsSingleFileProfileTests
         string repositoryRoot = FindRepositoryRoot();
         XElement[] contentItems = LoadContentItemGroup(LoadProfile()).Elements().ToArray();
 
-        Assert.Equal(25, RequiredDocumentationFiles.Length);
-        Assert.Equal(25, contentItems.Length);
+        Assert.Equal(27, RequiredDocumentationFiles.Length);
+        Assert.Equal(27, contentItems.Length);
         Assert.All(contentItems, item => Assert.Equal("Content", item.Name.ToString()));
 
         foreach (string requiredFile in RequiredDocumentationFiles)
@@ -183,7 +185,7 @@ public sealed class WindowsSingleFileProfileTests
             .Select(entry => entry.TrimEnd(',').Trim('\'').Replace('\\', '/'))
             .ToArray();
 
-        Assert.Equal(25, paths.Length);
+        Assert.Equal(27, paths.Length);
         Assert.Equal(
             RequiredDocumentationFiles.OrderBy(path => path, StringComparer.Ordinal).ToArray(),
             paths.OrderBy(path => path, StringComparer.Ordinal).ToArray());

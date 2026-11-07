@@ -645,6 +645,8 @@ function Get-SingleFileDocumentationPaths {
         'images/architecture-overview.svg',
         'images/technical-architecture.svg',
         'images/evaluation-message-flow.svg',
+        'images/teacher-workflow.svg',
+        'images/teacher-result-review.svg',
         'images/01-input-workbook.png',
         'images/02-input-mapping.png',
         'images/03-design-knowledge.png',

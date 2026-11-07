@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 510" role="img" aria-labelledby="title desc">
+  <title id="title">先生が最初の採点を行う流れ</title>
+  <desc id="desc">学校の利用許可を確認し、架空の少数回答で試す。入力、採点設計、実行、結果の4ステップを進み、先生が回答と理由と根拠を確認して必要な修正を別名で保存する。元のExcelは変更しない。AI評価は開始ボタンを押すまで始まらない。</desc>
+  <rect width="1000" height="510" fill="#f8fafc"/>
+  <g font-family="Meiryo, Yu Gothic, sans-serif" fill="#172b4d">
+    <text x="30" y="42" font-size="25" font-weight="bold">最初の採点：結果のあとに、先生の確認が必要です</text>
+    <rect x="30" y="65" width="940" height="76" rx="12" fill="#fff4d6" stroke="#946200"/>
+    <text x="50" y="96" font-size="19" font-weight="bold">準備：学校の許可・送信してよい情報を確認</text>
+    <text x="50" y="124" font-size="17">最初は架空の回答を少数使う。氏名など不要な情報を評価する列に含めない。</text>
+    <g fill="#ffffff" stroke="#325a87" stroke-width="2">
+      <rect x="30" y="180" width="210" height="160" rx="12"/>
+      <rect x="275" y="180" width="210" height="160" rx="12"/>
+      <rect x="520" y="180" width="210" height="160" rx="12"/>
+      <rect x="765" y="180" width="205" height="160" rx="12"/>
+    </g>
+    <g font-size="21" font-weight="bold">
+      <text x="48" y="217">1 入力</text><text x="293" y="217">2 採点設計</text>
+      <text x="538" y="217">3 実行</text><text x="783" y="217">4 結果</text>
+    </g>
+    <g font-size="17">
+      <text x="48" y="252">回答Excelを読む</text><text x="48" y="280">行・列・設問を確認</text><text x="48" y="311">元のExcelは変えない</text>
+      <text x="293" y="252">評価項目を決める</text><text x="293" y="280">配点合計を100に</text><text x="293" y="311">類似度は確認用</text>
+      <text x="538" y="252">ログイン・モデル確認</text><text x="538" y="280">出力先を確認して開始</text><text x="538" y="311">途中経過は保持</text>
+      <text x="783" y="252">回答と根拠を照合</text><text x="783" y="280">空欄は0点と区別</text><text x="783" y="311">修正は別名で保存</text>
+    </g>
+    <rect x="30" y="385" width="940" height="90" rx="12" fill="#e8f3eb" stroke="#356344"/>
+    <text x="50" y="419" font-size="20" font-weight="bold">成績の確定・学生への説明は先生が行います</text>
+    <text x="50" y="450" font-size="17">AI評価は開始ボタンまで始まりません。ただし起動時のログイン確認・ブラウザー認証は別です。</text>
+  </g>
+  <g fill="#325a87">
+    <path d="M247 247h14v-7l10 16-10 16v-7h-14z"/>
+    <path d="M492 247h14v-7l10 16-10 16v-7h-14z"/>
+    <path d="M737 247h14v-7l10 16-10 16v-7h-14z"/>
+    <path d="M854 350h16v15h9l-17 14-17-14h9z"/>
+  </g>
+</svg>

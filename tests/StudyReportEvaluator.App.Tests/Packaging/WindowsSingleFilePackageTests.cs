@@ -38,6 +38,7 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
         "docs/settings.md", "docs/third-party-notices.md", "docs/result-excel-description.md", "docs/technical-guid.md", "images/README.md",
         "images/architecture-overview.svg", "images/technical-architecture.svg",
         "images/evaluation-message-flow.svg",
+        "images/teacher-workflow.svg", "images/teacher-result-review.svg",
         "images/01-input-workbook.png", "images/02-input-mapping.png",
         "images/03-design-knowledge.png", "images/04-design-custom-prompt.png",
         "images/05-execution-auto.png", "images/06-results-review.png", "images/07-output-export.png",
@@ -442,9 +443,9 @@ public sealed class WindowsSingleFilePackageTests(ITestOutputHelper output)
                 $expectedDocs = @({{string.Join(",", DocumentationFiles.Select(Quote))}})
                 $actualDocs = @(Get-SingleFileDocumentationPaths)
                 $actualDocSet = [Collections.Generic.HashSet[string]]::new([string[]]$actualDocs, [StringComparer]::Ordinal)
-                if ($expectedDocs.Count -ne 25 -or $actualDocs.Count -ne 25 -or $actualDocSet.Count -ne 25 -or
+                if ($expectedDocs.Count -ne 27 -or $actualDocs.Count -ne 27 -or $actualDocSet.Count -ne 27 -or
                     -not $actualDocSet.SetEquals([string[]]$expectedDocs)) {
-                    throw 'P01 public documentation allowlist must contain exactly the 25 approved paths without duplicates.'
+                    throw 'P01 public documentation allowlist must contain exactly the 27 approved paths without duplicates.'
                 }
                 foreach ($relative in $expectedDocs) {
                     if ($relative -cnotin $actualDocs -or

@@ -1,11 +1,35 @@
 # StudyReport Evaluator
 
-標準`.xlsx`のレポート回答をGitHub Copilotで定量化し、入力を変更せず別の`.xlsx`へ結果を作成するWindowsデスクトップアプリです。
+Excelにまとめた学生のレポート回答をGitHub Copilotで評価し、**元のExcelを変更せず、結果を別のExcelに保存する**Windowsデスクトップアプリです。
 
 > [!WARNING]
 > 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません
 
 AIが作る値は確認対象です。最終的な評点と利用判断は、授業目的や所属組織の方針に基づいて利用者が行ってください。Similarityは不正行為の証明ではなく、低いSimilarityも回答品質を保証しません。
+
+## 初めて使う先生へ
+
+まず[先生のための利用ガイド](docs/README.md)からお読みください。技術用語を覚えなくても、次の順に進められます。
+
+1. **準備**：学校のAI利用ルールと、学生の回答を外部へ送ってよいか確認します。最初は架空の回答を少数使って試してください。
+2. **入力**：標準Office Open XML `.xlsx`を選び、回答のシート・行・列を確認します。
+3. **採点設計**：評価項目と配点を決め、合計を100点に合わせます。
+4. **実行**：ログイン・モデル・保存先を確認し、**定量化を開始**を押します。
+5. **結果**：回答とAIの理由・引用を照合し、必要なら先生の点に修正して別名保存します。空欄は0点ではありません。
+
+![先生の初回利用の流れ。準備から4ステップを経て先生が確認する](images/teacher-workflow.svg)
+
+**文書確認日：2026-11-07。公開版は`v0.8.6`、現行ソースは未公開の候補`0.8.8`です。** 以下の入手手順は公開版向けです。現行ソースだけの変更（通常評価を採点設計内へ移動、Prompt評価、新規の類似度減点係数0、参照回答5件、選択行の再実行）は公開版に追加されたとは扱いません。
+
+| 目的 | 案内 |
+|---|---|
+| 最初の結果を作る | [はじめに](docs/getting-started.md) |
+| 次回も同じ設定を使う | [設定ガイド](docs/settings.md) |
+| 点数を確認・修正する | [実行結果Excelの見方](docs/result-excel-description.md) |
+| 止まった・空欄がある | [トラブルシューティング](docs/troubleshooting.md) |
+| 学生の情報を安全に扱う | [データと個人情報の扱い](docs/privacy-and-data-handling.md) |
+
+以下の内部構成・配布検証・開発手順は、学校の管理者や開発者向けの詳細情報です。通常利用ではコマンド入力は不要です。
 
 ## できること
 
@@ -21,7 +45,7 @@ AIが作る値は確認対象です。最終的な評点と利用判断は、授
 
 StudyReport EvaluatorはAI modelを内蔵していません。Windows EXE／ZIP候補ではmanifest検証済みの同梱GitHub Copilot CLIを、開発build／UnixではPATHのCLIを使用し、アプリ内のGitHub Copilot SDKがその絶対pathを起動します。CLIがGitHub Copilotサービスとの通信を担当し、アプリは入力Excelのread-only読込、採点条件、AIへ渡す範囲、結果検証、checkpoint、別Excelへの出力を管理します。
 
-1回のrunではOSのCLIを1つの共有Copilot clientとして起動し、AI処理ごとに一時sessionを作ります。各sessionにはその処理専用の結果提出toolだけを公開し、shell、filesystem、Web、GitHub write、MCP toolは評価sessionへ公開しません。認証・model確認・AI評価にはnetworkが必要ですが、Excel読込と採点設計はAI処理を開始せずローカルで行えます。
+1回のrunでは配布・開発方式に応じたCLIを1つの共有Copilot clientとして起動し、AI処理ごとに一時sessionを作ります。各sessionにはその処理専用の結果提出toolだけを公開し、shell、filesystem、Web、GitHub write、MCP toolは評価sessionへ公開しません。認証・model確認・AI評価にはnetworkが必要ですが、Excel読込と採点設計はAI処理を開始せずローカルで行えます。
 
 Component図、認証から出力までのmessage flow、変更時に同期すべき実装とtestは[ソフトウェアエンジニア向け技術ガイド](docs/technical-guid.md)を参照してください。
 
@@ -176,11 +200,11 @@ private sampleがなければその実ファイル試験も別に未実行と表
 ローカル成功は公開資格ではなく、実x64 CI/candidateとclean-host・公開ゲートの
 必須証跡を代替しません。詳細は[Release自動化](https://github.com/dahatake/StudyReport-Evaluator/blob/main/docs/release-automation.md)。
 
-## 5分クイックスタート
+## 操作の概要
 
-> **対象版:** 以下は公開`v0.8.6`の操作です。旧公開`v0.8.1`で追加UIや設定保存を前提にしないでください。画像は合成データ・fake結果による説明用で、実認証・実保存・clean-host動作の証拠ではありません。生成時の製品版と来歴は[画像一覧](images/README.md)を参照してください。
+> **対象版:** 以下は公開`v0.8.6`と現行ソース`0.8.8`の共通の流れです。異なる操作は版を付けて説明します。旧公開`v0.8.1`で追加UIや設定保存を前提にしないでください。画像は合成データ・fake結果による説明用で、実認証・実保存・clean-host動作の証拠ではありません。生成時の製品版と来歴は[画像一覧](images/README.md)を参照してください。
 
-主画面は**入力 → 採点設計 → 実行 → 結果・出力**の4ステップです。詳細編集は同じウィンドウの**設定**へ移っています。設定は第5ステップではなく、**共通**だけです。
+主画面は**入力 → 採点設計 → 実行 → 結果・出力**の4ステップです。設定は第5ステップではありません。現行ソースは設定の**共通**でモデルや保存先を変更し、通常評価は採点設計内で編集します。公開版の通常評価の詳細は設定画面です。
 
 設問・結果はコンパクトな一覧のページ切替や対象選択で全件へ到達でき、詳細は選択対象だけを表示します。全件の編集カードを同時に並べる方式ではありません。**設定から戻る**で元ステップへ戻り、同一起動中の編集・選択対象・表示ページを保持します。画面移動は保存やAI実行ではなく、「設定済み」も準備完了・処理成功を意味しません。
 
@@ -199,16 +223,16 @@ mapping候補は確定値ではありません。見出しと授業設計に合�
 
 ### 2. 採点設計
 
-- **基礎配点**（Base、既定60）、**固有配点**（Special、既定0）、**類似度減点係数**（0〜1、既定0.1）を設定します。
+- **基礎配点**（Base、既定60）、**固有配点**（Special、既定0）、**類似度減点係数**（0〜1）を設定します。係数は公開`v0.8.6`の新規定義で0.1、現行ソースの新規定義で0です。保存済み定義の値は維持するため、実際の係数を確認します。
 - 主画面で選択設問の**有効／配点**を編集し、通常評価・固有評価と計算式の概要を確認します。設問配点は絶対配点で、ページ切替だけでは編集中の設問を変更しません。
 - ページ外を含む**全enabled（有効）設問**について、`Base + Special + enabled Question points = 100`を**丸めず正確に**満たします。合計・過不足を確認し、手動配点の再配分は**設問配点を均等化**を選んだ場合だけ行います。
-- Knowledge／Custom、評価項目（criterion）のrange・weight・Promptの詳細は**設定 → 通常評価**へ、別sourceを扱う固有評価は**設定 → 固有評価**へ進みます。定義名・revision・丸め桁数は**共通**で編集します。
+- 公開`v0.8.6`のKnowledge／Custom、評価項目の範囲・重み・指示文は**設定 → 通常評価**で編集します。現行ソース`0.8.8`では**2 採点設計**内にあり、Knowledge／Prompt／Customを選べます。固有評価項目は現行ソースでは画面から編集できず、読み込んだ定義を保持します。定義名・revision・丸め桁数は**共通**で編集します。
 
 Knowledgeの固定Promptは読取専用、Custom Promptは編集可能です。通常Customでは`{回答}`と`{評価項目}`、固有評価では`{回答}`が必須です。全文編集と合成値のプレビューでAI評価は開始しません。詳しくは[設定ガイド](docs/settings.md)を参照してください。
 
 ### 3. 実行
 
-実行画面の**モデル・並列度・実効出力先は読取専用**です。編集は**変更 → 設定の共通**で行います。認証確認・login、checkpointからの再開の準備は**入力画面**の「実行の準備を開く」へ移り、開始・cancelは実行画面に残っています。
+実行画面の**モデル・並列度・実効出力先は読取専用**です。編集は**変更 → 設定の共通**で行います。現行ソースの認証確認・login、checkpointからの再開の準備は**入力画面**の「実行の準備を開く」にあります（公開版は実行画面）。開始・cancelは実行画面です。
 
 1. 候補版は起動直後に、このPCで利用中のGitHubアカウント（同梱CLIが解決する環境変数`COPILOT_GITHUB_TOKEN`／`GH_TOKEN`／`GITHUB_TOKEN`、OSの資格情報ストア、GitHub CLI `gh`のログインの順）で自動的にログインを確認します。利用できるログインがなければ、同梱native CLIのブラウザー認証を1回だけ自動で開始するので、ブラウザーで承認してください。自動処理は**Copilot 状態を確認**・**GitHubにログイン**と同じ処理で、取消・失敗後は自動では再試行しません。手動の**Copilot 状態を確認**・**GitHubにログイン**も使えます。環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`を`0`または`false`にすると自動のブラウザー認証だけを止められます（既存ログインの確認は行います）。processの起動・終了だけを認証成功とは扱いません。
 2. **変更 → 共通**で、ログイン後に利用できる全通常モデル、**思考レベル**、**Context Size**、並列度（1〜16、既定8）、指定出力先を確認・変更します。思考レベルは選択モデルの対応値だけ、Context SizeはSDKが公開した入力token枠（既定と、対応モデルのみ拡張）を表示します。未編集時は希望`low`・既定context、非対応の思考レベルは未指定です。高い思考レベルや拡張contextでは使用量が変わり得ます。選択だけではAIを呼びません。modelごとの選択を次回起動へ残すには**設定を保存**します。保存希望model・選択値が利用不可なら自動fallbackせず、選び直しを求めます。Reference／通常評価／固有評価は同じ選択値を使い、Similarityはローカル計算でLLMを呼びません。
@@ -296,13 +320,15 @@ finalは入力workbookの全sheetを保持し、次を追加します。
 - `Quantification_Results`
 - `Quantification_Run`
 
+現行ソース`0.8.8`の完成版には**採点結果**も追加します。公開`v0.8.6`では4シートです。
+
 同名sheetが入力にある場合は既存sheetを変更せず、` (2)`等の一意名を使います。partialは入力全体と`Quantification_Checkpoint`を含みます。
 
 **結果Excelの各sheet・各列の意味**（`Final_Score`の見方、`Override`欄、空欄と0の違い、状態コード、計算例）は、ITに詳しくない先生向けに[実行結果Excelの見方](docs/result-excel-description.md)へまとめています。
 
 ## データとprivacy
 
-回答データとしてAIへ送るのは、処理に必要なcurrent rowの選択済みprimary／supporting／special sourceだけです。処理に応じてQuestion text、Prompt、criterion metadata、Reference、closed schema metadataも送ります。他row、非選択列、workbook pathは通常payloadへ含めません。
+回答データとしてAIへ送るのは、処理に必要なcurrent rowの選択済みprimary／supporting／special sourceだけです。処理に応じてQuestion text、Prompt、criterion metadata、closed schema metadataも送ります。他row、非選択列、workbook pathは通常payloadへ含めません。現行ソースの類似度は参照回答と学生回答をローカルで比較し、比較そのもののためにAIを呼びません。
 
 application logは回答、Prompt、Reference、reason、evidence、credentialを受け取るfree-text surfaceを持ちません。
 

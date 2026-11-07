@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 980" role="img" aria-labelledby="title desc">
   <title id="title">StudyReport Evaluatorの技術アーキテクチャ</title>
-  <desc id="desc">StudyReportEvaluator.AppとStudyReportEvaluator.Coreのproject境界、Avalonia UI、workflow、Open XML workbook adapter、Copilot SDK adapter、設定、ローカルファイル、OSのCLI、GitHub Copilotサービスの依存関係を示す。</desc>
+  <desc id="desc">現行ソース0.8.8ローカル候補の論理図。AppとCoreの境界、採点設計内の通常評価編集、共通設定、workbook処理、Copilot SDK、配布では同梱・開発ではPATHのCLI、GitHub Copilotを示す。Coreに決定的なローカル表層類似度計算を持ち、完成Excelには採点結果を含む5つのsheetを追加する。候補の公開や実機検証の証跡ではない。</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0L10 5L0 10z" fill="#334155"/>
@@ -39,7 +39,7 @@
 
   <rect width="1440" height="980" fill="#ffffff"/>
   <text x="34" y="42" class="title">技術アーキテクチャ：UI・採点契約・Excel・Copilotの境界</text>
-  <text x="34" y="69" class="subtitle">矢印は主な依存またはデータ移動。CoreからAppへの逆参照はありません。</text>
+  <text x="34" y="69" class="subtitle">現行ソース0.8.8候補の論理図。矢印は主な依存またはデータ移動。CoreからAppへの逆参照はありません。</text>
 
   <rect x="25" y="95" width="960" height="805" rx="22" class="project"/>
   <text x="48" y="127" class="label">StudyReportEvaluator.App（Avalonia / Open XML / Copilot adapter）</text>
@@ -53,7 +53,7 @@
   <rect x="300" y="150" width="250" height="110" rx="14" class="ui"/>
   <text x="425" y="180" text-anchor="middle" class="heading">Avalonia Views</text>
   <text x="425" y="205" text-anchor="middle" class="mono">*.axaml / *.axaml.cs</text>
-  <text x="425" y="228" text-anchor="middle" class="body">4工程＋設定5カテゴリ</text>
+  <text x="425" y="228" text-anchor="middle" class="body">4工程＋共通設定</text>
   <text x="425" y="248" text-anchor="middle" class="body">compiled binding</text>
 
   <rect x="590" y="150" width="345" height="110" rx="14" class="ui"/>
@@ -107,10 +107,10 @@
   <text x="495" y="820" text-anchor="middle" class="body">選択済み同一行からpayload生成</text>
 
   <rect x="665" y="720" width="250" height="115" rx="13" class="core-card"/>
-  <text x="790" y="751" text-anchor="middle" class="heading">Scoring / formulas</text>
+  <text x="790" y="751" text-anchor="middle" class="heading">Scoring / Similarity</text>
   <text x="790" y="776" text-anchor="middle" class="mono">WeightedScoreCalculator</text>
-  <text x="790" y="798" text-anchor="middle" class="mono">FormulaExpression / Serializer</text>
-  <text x="790" y="820" text-anchor="middle" class="body">previewとExcel数式の共通契約</text>
+  <text x="790" y="798" text-anchor="middle" class="mono">SurfaceTextSimilarityCalculator</text>
+  <text x="790" y="820" text-anchor="middle" class="body">Excel数式契約・ローカル文字列比較</text>
 
   <rect x="1015" y="95" width="400" height="805" rx="22" class="external"/>
   <text x="1038" y="127" class="label">process外・永続化先</text>
@@ -122,14 +122,14 @@
   <text x="1080" y="250" class="mono">*.partial.xlsx</text>
   <text x="1295" y="250" text-anchor="end" class="body">checkpoint</text>
   <text x="1080" y="277" class="mono">final.xlsx</text>
-  <text x="1295" y="277" text-anchor="end" class="body">4 app-owned sheets</text>
+  <text x="1360" y="277" text-anchor="end" class="body">5追加sheet</text>
   <text x="1080" y="304" class="mono">setting.txt</text>
   <text x="1295" y="304" text-anchor="end" class="body">user setting</text>
 
   <rect x="1050" y="400" width="330" height="140" rx="16" class="cli"/>
-  <text x="1215" y="432" text-anchor="middle" class="heading">OSのCopilot CLI</text>
-  <text x="1215" y="459" text-anchor="middle" class="mono">copilot-runtime.json</text>
-  <text x="1215" y="482" text-anchor="middle" class="mono">runtimes/win-x64/native/copilot.exe</text>
+  <text x="1215" y="432" text-anchor="middle" class="heading">配布／開発別Copilot CLI</text>
+  <text x="1215" y="459" text-anchor="middle" class="body">Windows配布：同梱manifest・版・hash検証</text>
+  <text x="1215" y="482" text-anchor="middle" class="body">開発／Unix：PATH（相互fallbackなし）</text>
   <text x="1215" y="513" text-anchor="middle" class="body">SDK child process / stdio JSON-RPC</text>
 
   <rect x="1050" y="615" width="330" height="130" rx="22" class="cloud"/>
@@ -149,7 +149,7 @@
   <path d="M497 490V645H495V720" class="dependency"/>
   <path d="M800 490V645H790V720" class="dependency"/>
   <path d="M330 575H1015" class="dashed"/>
-  <text x="600" y="564" class="arrow-label">明示save / load</text>
+  <text x="600" y="564" class="arrow-label">起動時load / 明示save / model一覧自動保存</text>
   <path d="M635 402H665" class="arrow"/>
   <path d="M635 445C810 580 970 310 1050 250" class="io"/>
   <text x="783" y="557" class="arrow-label">partial / final</text>

@@ -1,5 +1,15 @@
 # Windows Release自動化（FR-121 / INT-002）
 
+本書はリリースを保守する担当者向けです。アプリを使うだけの教員は[利用開始ガイド](getting-started.md)を参照してください。下記の公開手順は権限と承認を持つ担当者だけが実行するものです。
+
+## 現在の版と検証の区別
+
+2026-11-07時点で、公開済み最新版は`v0.8.6`（2026-10-01公開）、現行ソースは`0.8.8`ローカル候補です。本書の手順やローカル証跡の存在は、候補版の公開済み宣言ではありません。既存公開assetを更新したことにもなりません。
+
+現行ソースの通常開発buildは`CopilotSkipCliDownload=true`でPATHのCLIを使います。Windows配布scriptは`false`で同梱CLIを取得し、Appの`BUNDLED_COPILOT_RUNTIME`をコンパイル時に有効にします。配布runtimeはmanifest・RID・SDK／CLI版・相対path・SHA-256を検証し、不一致時にPATHへfallbackしません。開発buildでの起動成功は、この配布経路の検証になりません。
+
+同梱CLI修正後のexact bytesについて、実CH-03、本人CH-06、実AI ADV-01の再検証はfake system回帰とは独立です。ローカル候補の確認記録を、正式clean-host検証の完了や公開許可へ読み替えないでください。ADV項目は下記の公開ゲートでは任意ですが、実施・未実施を正確に記録します。
+
 ## 実行前の条件
 
 - リポジトリの `publish` environment に必須reviewerを設定し、自己承認と
@@ -35,6 +45,9 @@
 1. 元candidate runのEXEを対象clean hostで人が検証し、既存の
    `windows-singlefile-clean-host` 証跡を用意する。CH-01–06必須、ADV-01/02は任意。
    Windows hosted runnerやfixtureの合格はclean-host実測の代わりにならない。
+   同梱CLIを含む最終EXEそのものを検証し、開発PATHのCLIでの成功を代用しない。
+   起動時は既存認証の確認、必要時だけ1回のloginが起こり得る。login process終了と
+   認証／model一覧取得の成功、実AI評価の成功は分けて記録する。
 2. `publish-release.yml` にtag、元candidate run ID、clean-host JSONを渡す。
    JSONは環境変数経由で64 KiB以下のUTF-8ファイルにし、shellへ展開しない。
 3. read-onlyの `validate` ジョブが元runの成功・repository/workflow/sourceを確認し、

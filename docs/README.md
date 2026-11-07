@@ -1,70 +1,60 @@
-# StudyReport Evaluator 利用者ガイド
+# 先生のための利用ガイド
 
-StudyReport Evaluatorは、標準`.xlsx`の回答をGitHub Copilotで定量化し、入力を変更せず別の`.xlsx`へ結果を作成するWindowsデスクトップアプリです。
-
-現在の公開版は`0.8.6`です。[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6)で取得できる配布物は、`v0.8.6`の`StudyReportEvaluator-win-x64.exe`、`StudyReportEvaluator-win-x64.exe.sha256`、`StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`の4件です。単一EXEが主導線で、ZIPは代替経路として維持します。旧`v0.8.1`は前回公開版です。
-
-`v0.8.6`は公開済みですが、repository ownerの明示判断によりfresh Windows 11 x64のclean-host試験CH-01〜06と本人loginを実施しないまま公開しました。追加native UI確認FAIL、Narrator／本人walkthrough／隔離利用者設定保存の未実施、T39 BLOCKED、CH-01〜06 `NOT_RUN`は維持します。
+StudyReport Evaluatorは、Excelにまとめた学生の回答をAIで評価し、**元のExcelを変えずに、結果を別のExcelに保存する**Windowsアプリです。AIの点数・理由を先生が確認するための補助ツールであり、成績や不正行為を自動で確定するものではありません。
 
 > [!WARNING]
 > 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません
 
-**対象版の注意:** 4ステップの簡素化、全設問へのコンパクト一覧・ページ切替、設定5カテゴリ、明示保存・適用の説明は公開`v0.8.6`向けです。旧`v0.8.1`にはこれらの新UI・設定保存を追加していません。要求文書は**v4.6**で、製品版とは別です。
+## 最初に読む順番
 
-操作説明の画像は**8枚（01〜08）**で、synthetic／fake状態です。実認証・実結果出力・設定保存・native表示の成功証拠ではありません。製品`0.8.4`の時点で生成したPNGを維持しており、版表記の更新は新たなUI検証を意味しません。既存の検証履歴と未完了の確認範囲は[はじめに](getting-started.md#v086の検証範囲)を参照してください。
+1. [はじめに](getting-started.md)で、必要なもの、入手方法、最初の採点の流れを確認します。
+2. [データと個人情報の扱い](privacy-and-data-handling.md)で、学校の許可と回答を送ってよい範囲を確認します。最初は架空の回答を少数使って試してください。
+3. [機能と点数](features.md)で、授業に合う配点・評価項目を決めます。
+4. [実行結果Excelの見方](result-excel-description.md)で、点数だけでなく回答・理由・根拠を確認します。
 
-## 読者別ガイド
+![準備、入力、採点設計、実行、先生による確認の流れ](../images/teacher-workflow.svg)
 
-利用開始と詳細設定の手順を分けています。公開`v0.8.6`と旧`v0.8.1`を区別し、配布・起動条件は製品READMEの「公開状況・SHA-256確認・起動」も参照してください。文書・版の変更を配布物へ取り込む場合は、最終EXE／ZIPとsidecarを再生成・再検証し、変更後のexact EXEでclean-host公開条件を満たす必要があります。
+図の読み方：学校の利用許可を確認してから、**1 入力 → 2 採点設計 → 3 実行 → 4 結果**へ進みます。最後は先生が確認・必要な修正を行います。「結果が出た」は「成績を確定してよい」と同じではありません。
 
-| 読者 | ガイド | 内容 |
-|---|---|---|
-| 配布・起動条件を確認する人 | [製品README](../README.md) | 公開ZIP、今後のEXE主導線、任意のSHA-256確認、Windowsの警告 |
-| 初めて利用する教員・採点者 | [はじめに](getting-started.md) | 準備、起動、メイン4step、ページ切替、実行・再開、結果一覧／詳細・override |
-| 詳細設定を編集・再利用する人 | [設定ガイド](settings.md) | 5カテゴリ、元画面への復帰、`setting.txt`への明示保存、保存定義の明示適用、平文保存の注意 |
-| 評価方法を設計する人 | [機能と点数](features.md) | 配点、4つのAI処理、status、Excel出力 |
-| 結果のExcelを読む教員・採点者 | [実行結果Excelの見方](result-excel-description.md) | 4つのsheetと各列の意味、最終点、Override欄、空欄と0、状態コード、計算例 |
-| 独自の評価観点を作る人 | [Custom evaluator](custom-evaluator-guide.md) | 通常Custom評価と固有評価のPrompt |
-| Promptファイルで準備する人 | [Promptファイルから起動](prompt-launch.md) | `--input`、複数`--prompt`、明示適用 |
-| 情報管理・運用担当 | [データとprivacy](privacy-and-data-handling.md) | AIへ送る情報、log、final/partialの機密性 |
-| 問題を解決したい人 | [トラブルシューティング](troubleshooting.md) | 入力、設計、Copilot、checkpoint、出力 |
-| 保守・拡張するソフトウェアエンジニア | [技術ガイド](technical-guid.md) | Architecture図、Core／App境界、Copilot SDK／CLI、Excel、カスタマイズとtest |
-| 画面を確認したい人 | [画面一覧](../images/README.md) | synthetic／fake画面8枚の生成時点・対象版と各画像の限界 |
+## 使っている版を確認してください
 
-## 対応範囲
+**確認日：2026-11-07。現在の公開版は`0.8.6`です。** [GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6)には、`v0.8.6`の`StudyReportEvaluator-win-x64.exe`、`StudyReportEvaluator-win-x64.exe.sha256`、`StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`があります。
 
-- **OS:** Windows 11 x64
-- **配布:** .NET 10 self-contained。公開EXE／ZIPともunsignedで、各形式にSHA-256 sidecar
-- **入力:** 標準Office Open XML `.xlsx` 1file
-- **出力:** 入力を保持した別の標準`.xlsx`
-- **設定（v0.8.6）:** 共通設定＋任意の採点定義1件を、利用者別`setting.txt`へ明示保存。起動時は共通値を読み込み、採点定義はExcel読込後の明示操作で適用
-- **AI runtime:** 現行sourceはOSにインストールしたGitHub Copilot CLIをPATHから解決します。同梱CLIへfallbackしません。公開`v0.8.6`の既存assetは従来の同梱方式です
-- **GUI起動:** .NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI（`gh`）、別Copilot CLI、Microsoft Excel／Office／LibreOffice、IDEの追加導入を要求しない設計
+| 対象 | このガイドでの扱い |
+|---|---|
+| 公開`v0.8.6` | 通常の入手先。EXEを優先し、ZIPは代替。通常評価の詳細は**設定 → 通常評価**で編集します |
+| 現行ソース`0.8.8` | 未公開のローカル候補。通常評価を**2 採点設計**内で編集するなど、公開版とは異なります。文書では変更点に版を付けます |
+| 旧`v0.8.1` | 過去のZIP版。ログインボタンや本頁の設定保存・適用を前提にしないでください |
 
-単一EXEの目標は、標準userがofflineで**取得済みEXEをダブルクリック → 入力画面**へ進む1起動gestureです。download、任意の手動hash比較、SmartScreen等の警告への操作、本人loginは含めません。手動hash比較は任意・推奨で、sidecarは起動の前提ではありません。
+公開済みであることと動作確認が完了していることは別です。`v0.8.6`の公開前のCH-01〜06 `NOT_RUN`は維持します（追加ソフトのない新しいWindows環境での確認・本人ログインは未実施）。その後の候補版の確認結果を公開版に流用しません。[検証範囲](getting-started.md#v086の検証範囲)を参照してください。
 
-SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行拒否があり得ます。無警告・無条件の起動を保証せず、拒否時に保護機能を回避しません。
+画面画像8枚は合成データ・仮のAI応答による説明用です。2026-09-27の生成時点の画面であり、現行ソースの画面と一致する保証はありません。[画像一覧](../images/README.md)で対象と限界を確認できます。
 
-development MSIXは検証専用で、一般配布しません。
+## やりたいことから探す
 
-**「GitHubにログイン」は公開`v0.8.6`の機能です。**現行sourceではOSのnative CLIのconsole／ブラウザーへ本人認証を委譲します。公開`v0.8.6`の既存assetは同梱CLIを使います。旧`v0.8.1`にはこのbuttonがなく、従来の同梱CLIで本人loginを行います。完了後は既存の「Copilot 状態を確認」で再確認します。
+| やりたいこと | 読む文書 |
+|---|---|
+| 入手して、最初の結果を作りたい | [はじめに](getting-started.md) |
+| モデル・出力先を変えたい／採点条件を次回も使いたい | [設定ガイド](settings.md) |
+| 基礎点・設問配点・類似度の意味を知りたい | [機能と点数](features.md) |
+| 点数・根拠を確認して、先生の点に修正したい | [実行結果Excelの見方](result-excel-description.md) |
+| 自分の採点基準をAIへの指示文にしたい | [独自の評価指示を書く](custom-evaluator-guide.md) |
+| 止まった／空欄がある／保存できない | [トラブルシューティング](troubleshooting.md) |
+| どこに何が保存され、何が外部へ送られるか知りたい | [データと個人情報の扱い](privacy-and-data-handling.md) |
 
-AI処理には、本人loginに加え、利用可能なGitHub Copilot account／model、network接続、組織policy上の許可が別途必要です。GUI起動や状態確認からlogin・AI評価を自動開始しません。アプリの認証処理はPAT、password、client secret、token、device codeを入力・収集・保存・log出力しません。未認証でもアプリ起動、workbook読込、mapping、設計編集は利用できますが、新しいAI処理は開始できません。
+## 学校の管理者・開発者向け
 
-設定の読込・保存・適用から認証確認・login・AI評価は自動開始しません。`setting.txt`はUTF-8 JSONの平文で、見出し由来の設問textや利用者が貼り付けた内容も明示保存時に含まれ得ます。秘密情報を貼り付けず、[保存範囲と注意](settings.md#保存しない情報と平文保存の注意)を確認してください。環境変数・API key・`.env`の設定は不要です。
+先生が最初の採点を行うために、ソースコードのビルドやコマンド入力は必要ありません。
 
-## 対応しないもの
+- [製品README](../README.md)：配布形式、動作環境、任意のSHA-256確認、Windowsの警告
+- [技術ガイド](technical-guid.md)：内部構成、変更・拡張時の注意
+- [起動引数のガイド](prompt-launch.md)：任意のコマンド起動。現行ソースでは`--prompt`を採点に使いません
+- [Release自動化](release-automation.md)：配布物の作成・公開前の検証
 
-- `.xls`、`.xlsb`、CSV、PDF、`.xlsm`等のmacro-enabled file
-- password、暗号化、rights-protected、unsafe relationshipを含むworkbook
-- macOS、Linux、Windows Arm64
-- installer、code signing、notarization、development MSIXの一般利用
-- 保存済みfinal workbookのアプリへの再import
-- 複数のdefinition profileの管理・切替（採点定義1件の明示保存・適用とは別）
-- AI品質、公平性、法的・組織policy適合性、不正行為の判定
+対応は**Windows 11 x64、標準`.xlsx`**です。公開EXE／ZIPともunsigned（電子署名なし）で、Windowsや学校の端末管理により起動を拒否される場合があります。保護機能を無効にせず、管理者へ相談してください。macOS、Linux、Windows Arm64、暗号化Excel、マクロ付きExcelは対象外です。development MSIXは検証専用で、一般配布しません。
 
-類似度は不正行為の証明ではなく、低い類似度も回答品質を保証しません。最終的な評点と利用判断は利用者が行います。
+アプリの起動にはExcel／Officeや追加の.NETを要求しない設計（.NET 10 self-contained）です。AIには本人のGitHub Copilot利用権限、インターネット接続、利用可能なモデル、学校の許可が必要です。結果Excelを表計算ソフトで開く場合は、そのソフトが別途必要です。
 
-## ライセンス
+設定は利用者別の`setting.txt`に平文で保存します。回答Excel、結果Excel、途中経過、設定、画面の共有は学校のルールに従ってください。
 
 本ソフトウェアは[MIT License](../LICENSE)で提供されます。

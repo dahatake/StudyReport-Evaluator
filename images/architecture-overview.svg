@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
   <title id="title">StudyReport EvaluatorとGitHub Copilot CLIの関係</title>
-  <desc id="desc">Windows PC上の利用者、入力Excel、StudyReport Evaluator、OSにインストールされたGitHub Copilot CLI、CLIが管理するログイン情報、GitHub Copilotサービス、別ファイルとして保存される結果Excelの関係を示す。根拠はCopilotClientFactory、DurableQuantificationOrchestrator、GitHub Copilot SDK公式Architecture。</desc>
+  <desc id="desc">現行ソース0.8.8ローカル候補の論理図。Windows PC上の利用者、入力Excel、StudyReport Evaluator、Windows配布では検証済み同梱CLI・開発ではPATHのCLI、CLIが管理するログイン情報、GitHub Copilotサービス、別の結果Excelを示す。表層類似度はアプリ内のローカル計算。候補版の公開や実認証成功の証跡ではない。</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
@@ -35,7 +35,7 @@
 
   <rect width="1280" height="720" fill="#ffffff"/>
   <text x="40" y="44" class="title">StudyReport Evaluatorは、Copilotを安全な採点処理へつなぐデスクトップアプリです</text>
-  <text x="40" y="72" class="subtitle">元のExcelは変更せず、アプリ内のSDKがOSのCLIを通じてGitHub Copilotへ依頼し、結果を別のExcelへ保存します。</text>
+  <text x="40" y="72" class="subtitle">現行ソース0.8.8候補：元のExcelを保持し、SDKとCLIでCopilotへ依頼。類似度の比較自体はPC内で計算します。</text>
 
   <rect x="25" y="105" width="845" height="560" rx="20" class="boundary"/>
   <text x="48" y="135" class="boundary-label">利用者のWindows 11 PC</text>
@@ -62,19 +62,20 @@
   <rect x="365" y="245" width="230" height="38" rx="19" class="pill"/>
   <text x="480" y="269" text-anchor="middle" class="pill-text">Avalonia UI（入力・設定・確認）</text>
   <rect x="365" y="296" width="230" height="38" rx="19" class="pill"/>
-  <text x="480" y="320" text-anchor="middle" class="pill-text">Excel処理・検証・checkpoint</text>
+  <text x="480" y="320" text-anchor="middle" class="pill-text">Excel・checkpoint・ローカル類似度</text>
   <rect x="365" y="347" width="230" height="38" rx="19" class="pill"/>
   <text x="480" y="371" text-anchor="middle" class="pill-text">GitHub Copilot SDK</text>
   <text x="480" y="410" text-anchor="middle" class="small">AIそのものを内蔵するのではなく、</text>
   <text x="480" y="429" text-anchor="middle" class="small">処理順序と入出力の境界を管理</text>
 
-  <rect x="675" y="185" width="165" height="190" rx="20" class="cli"/>
-  <text x="757.5" y="222" text-anchor="middle" class="heading">OSのCLI</text>
+  <rect x="675" y="185" width="165" height="210" rx="20" class="cli"/>
+  <text x="757.5" y="222" text-anchor="middle" class="heading">利用するCLI</text>
   <text x="757.5" y="248" text-anchor="middle" class="body">GitHub Copilot</text>
   <text x="757.5" y="269" text-anchor="middle" class="body">CLI</text>
   <path d="M712 299h91v44h-91z" fill="#ffffff" stroke="#16a34a" stroke-width="1.5"/>
   <text x="722" y="326" class="small">&gt; copilot</text>
-  <text x="757.5" y="362" text-anchor="middle" class="small">manifest・版・hashを検証</text>
+  <text x="757.5" y="359" text-anchor="middle" class="small">Windows配布：同梱</text>
+  <text x="757.5" y="378" text-anchor="middle" class="small">開発／Unix：PATH</text>
 
   <rect x="675" y="475" width="165" height="105" rx="16" class="store"/>
   <text x="757.5" y="508" text-anchor="middle" class="heading">ログイン情報</text>
@@ -92,7 +93,7 @@
   <path d="M985 302c0-20 17-36 37-36 5-24 26-41 51-41 29 0 53 22 56 51 18 3 31 18 31 37 0 21-17 38-38 38H1018c-18 0-33-15-33-33 0-6 1-11 4-16z" fill="#ffffff" opacity="0.92"/>
   <text x="1075" y="312" text-anchor="middle" class="heading">GitHub Copilot</text>
   <text x="1075" y="339" text-anchor="middle" class="body">modelによる生成・評価</text>
-  <text x="1075" y="382" text-anchor="middle" class="small">login・状態確認・AI評価時に</text>
+  <text x="1075" y="382" text-anchor="middle" class="small">起動時確認・login・AI評価時に</text>
   <text x="1075" y="401" text-anchor="middle" class="small">network接続</text>
 
   <path d="M265 214 H330" class="arrow"/>
@@ -115,9 +116,9 @@
   <rect x="844" y="247" width="93" height="22" rx="5" class="label-bg"/>
   <text x="890" y="262" text-anchor="middle" class="label">依頼・応答</text>
 
-  <path d="M757 375 V475" class="dashed"/>
+  <path d="M757 395 V475" class="dashed"/>
   <rect x="768" y="415" width="70" height="22" rx="5" class="label-bg"/>
   <text x="803" y="430" text-anchor="middle" class="label">本人login</text>
 
-  <text x="40" y="692" class="footer">論理図。根拠: src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs、Workflow/DurableQuantificationOrchestrator.cs、Workbooks/Checkpoint/CheckpointStore.cs、GitHub Copilot SDK公式Architecture。</text>
+  <text x="40" y="692" class="footer">論理図（公開版の証跡ではありません）。同梱CLIはmanifest・版・SHA-256を検証しPATHへfallbackしません。根拠: CopilotClientFactory / DurableQuantificationOrchestrator / SurfaceTextSimilarityCalculator。</text>
 </svg>

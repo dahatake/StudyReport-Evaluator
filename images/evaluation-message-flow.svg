@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1280" role="img" aria-labelledby="title desc">
   <title id="title">StudyReport Evaluatorの認証・評価・checkpoint・final出力message flow</title>
-  <desc id="desc">利用者、Avalonia UIとworkflow、Coreとworkbook処理、GitHub Copilot SDK、OSのCopilot CLI、GitHub Copilotサービス間の時系列を示す。明示loginまたは状態確認、run準備、各一時session、closed tool callback、結果検証、checkpoint、final workbook検証と保存を含む。</desc>
+  <desc id="desc">現行ソース0.8.8ローカル候補の時系列。起動時に認証状態を確認し、AuthRequiredの場合だけ既定でCLI loginを1回開始する。利用者の開始操作後、Reference・Normal・Specialは選択modelで一時sessionを作る。Similarityはローカル計算でSDK sessionを作らない。checkpoint、5つの追加sheetを持つfinal workbookの検証と保存を示す。公開や実認証成功の証跡ではない。</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0 0L10 5L0 10z" fill="#334155"/>
@@ -38,8 +38,8 @@
   </defs>
 
   <rect width="1500" height="1280" fill="#ffffff"/>
-  <text x="30" y="40" class="title">Message flow：明示認証から一時session、checkpoint、final出力まで</text>
-  <text x="30" y="67" class="subtitle">時間は上から下へ進みます。破線は応答、青はnetwork、緑はworkbook永続化です。</text>
+  <text x="30" y="40" class="title">Message flow：起動時の認証確認から一時session、checkpoint、final出力まで</text>
+  <text x="30" y="67" class="subtitle">現行ソース0.8.8候補の論理図。時間は上から下へ。破線は応答、青はnetwork、緑はworkbook永続化です。</text>
 
   <rect x="20" y="90" width="210" height="1130" class="lane-a"/>
   <rect x="245" y="90" width="255" height="1130" class="lane-b"/>
@@ -63,7 +63,7 @@
   <text x="650" y="141" text-anchor="middle" class="lane-sub">validation / Open XML</text>
   <text x="905" y="118" text-anchor="middle" class="lane-title">Copilot SDK</text>
   <text x="905" y="141" text-anchor="middle" class="lane-sub">GitHub.Copilot.SDK</text>
-  <text x="1127" y="118" text-anchor="middle" class="lane-title">OSのCLI</text>
+  <text x="1127" y="118" text-anchor="middle" class="lane-title">配布／開発別CLI</text>
   <text x="1127" y="141" text-anchor="middle" class="lane-sub">copilot.exe / stdio</text>
   <text x="1362" y="118" text-anchor="middle" class="lane-title">GitHub Copilot</text>
   <text x="1362" y="141" text-anchor="middle" class="lane-sub">remote service</text>
@@ -76,24 +76,23 @@
   <line x1="1362" y1="160" x2="1362" y2="1200" class="life"/>
 
   <rect x="32" y="174" width="1436" height="210" rx="10" class="phase-auth" opacity="0.45"/>
-  <text x="47" y="198" class="phase-title">A. 本人login（必要時）と状態確認は別の明示操作</text>
+  <text x="47" y="198" class="phase-title">A. 起動時に状態確認 → AuthRequiredの場合だけloginを1回（手動再試行も可能）</text>
 
   <path d="M125 225H372" class="arrow"/>
-  <text x="248" y="216" text-anchor="middle" class="message">「GitHubにログイン」</text>
-  <path d="M372 250H1127" class="arrow"/>
-  <text x="750" y="241" text-anchor="middle" class="message">OSのCLIを固定引数で直接起動</text>
-  <text x="750" y="264" text-anchor="middle" class="detail">--no-auto-update --log-level none login --web-flow</text>
-  <path d="M1127 282H1362" class="network"/>
-  <text x="1245" y="274" text-anchor="middle" class="message">本人認証</text>
-  <path d="M125 315H372" class="arrow"/>
-  <text x="248" y="306" text-anchor="middle" class="message">「Copilot状態を確認」</text>
-  <path d="M372 338H905" class="arrow"/>
-  <text x="638" y="329" text-anchor="middle" class="message">Start → Ping → GetAuthStatus → ListModels</text>
-  <path d="M905 358H1127" class="arrow"/>
-  <text x="1016" y="350" text-anchor="middle" class="detail">stdio JSON-RPC</text>
-  <path d="M1127 374H1362" class="network"/>
-  <path d="M1362 379H372" class="return"/>
-  <text x="867" y="372" text-anchor="middle" class="detail">認証状態・利用可能model・上限 → UI（login終了だけでは成功扱いにしない）</text>
+  <text x="248" y="216" text-anchor="middle" class="message">表示後に自動確認／手動再試行</text>
+  <path d="M372 250H905" class="arrow"/>
+  <text x="638" y="241" text-anchor="middle" class="message">Start → Ping → GetAuthStatus → ListModels（認証済み時）</text>
+  <path d="M905 276H1127" class="arrow"/>
+  <text x="1016" y="268" text-anchor="middle" class="detail">stdio JSON-RPC</text>
+  <path d="M1127 300H1362" class="network"/>
+  <text x="1245" y="292" text-anchor="middle" class="message">状態・model一覧</text>
+  <path d="M1362 321H372" class="return"/>
+  <text x="867" y="314" text-anchor="middle" class="detail">認証状態・利用可能model・入力上限 → UI</text>
+  <path d="M372 347H1127" class="arrow"/>
+  <text x="750" y="339" text-anchor="middle" class="message">未認証時のみlogin --web-flow（または「GitHubにログイン」）</text>
+  <path d="M1127 371H1362" class="network"/>
+  <text x="1245" y="363" text-anchor="middle" class="message">本人認証</text>
+  <text x="400" y="377" class="detail">正常終了後はSDKで再確認（終了code 0だけでは認証成功扱いにしない）</text>
 
   <rect x="32" y="402" width="1436" height="145" rx="10" class="phase-run" opacity="0.65"/>
   <text x="47" y="426" class="phase-title">B. run準備</text>
@@ -106,7 +105,7 @@
   <text x="511" y="512" text-anchor="middle" class="message">final / partial path予約・initial partial作成</text>
 
   <rect x="32" y="565" width="1436" height="430" rx="10" class="phase-loop" opacity="0.38"/>
-  <text x="47" y="590" class="phase-title">C. Referenceと各student rowのAI operation</text>
+  <text x="47" y="590" class="phase-title">C. Reference（新規runは設問ごと5件）と各student rowのNormal / Special AI operation</text>
   <path d="M68 620h-17v338h17" class="loop"/>
   <text x="76" y="644" class="loop-text">operationごとに新規session</text>
   <text x="76" y="665" class="loop-text">row完了単位でcheckpoint</text>
@@ -119,7 +118,7 @@
 
   <path d="M372 703H905" class="arrow"/>
   <text x="638" y="694" text-anchor="middle" class="message">CreateSessionAsync(SessionConfig)</text>
-  <text x="638" y="717" text-anchor="middle" class="detail">model＋該当submit tool 1件／permission reject／MCP・memory・skills・file・git無効</text>
+  <text x="638" y="717" text-anchor="middle" class="detail">選択model・effort・tier＋submit tool 1件／権限拒否／MCP・memory・skills・file・git無効</text>
   <path d="M905 742H1127" class="arrow"/>
   <text x="1016" y="734" text-anchor="middle" class="message">session.create / send</text>
   <path d="M1127 770H1362" class="network"/>
@@ -137,12 +136,12 @@
   <path d="M372 949H905" class="arrow"/>
   <text x="638" y="941" text-anchor="middle" class="message">Abort（cancel時）/ Dispose / DeleteSession / Stop</text>
   <path d="M372 977H650" class="storage"/>
-  <text x="511" y="969" text-anchor="middle" class="message">Reference完了後・completed row後にpartial更新</text>
+  <text x="511" y="969" text-anchor="middle" class="message">row内でローカル類似度計算／参照・row完了後partial更新</text>
 
   <rect x="32" y="1015" width="1436" height="175" rx="10" class="phase-final" opacity="0.55"/>
   <text x="47" y="1039" class="phase-title">D. final化</text>
   <path d="M372 1070H650" class="storage"/>
-  <text x="511" y="1061" text-anchor="middle" class="message">入力copyへConfig / References / Results / Runを追加</text>
+  <text x="511" y="1061" text-anchor="middle" class="message">入力copyへConfig / References / Results / Run / 採点結果を追加</text>
   <path d="M650 1102H372" class="return"/>
   <text x="511" y="1093" text-anchor="middle" class="detail">close → read-only reopen → schema/formula/cache/元parts/input identity検証</text>
   <path d="M372 1133H650" class="storage"/>
@@ -151,8 +150,8 @@
   <text x="248" y="1158" text-anchor="middle" class="message">結果・path・警告を表示</text>
 
   <rect x="1037" y="925" width="420" height="58" rx="9" class="note"/>
-  <text x="1052" y="947" class="note-text">Reference / Similarity model: auto</text>
-  <text x="1052" y="967" class="note-text">Normal / Special model: UIで確認済みの選択model</text>
+  <text x="1052" y="947" class="note-text">Reference / Normal / Special：同じ選択model・effort・tier</text>
+  <text x="1052" y="967" class="note-text">Similarity：ローカル計算のみ（model・sessionなし）</text>
 
   <text x="30" y="1243" class="footer">実装根拠: CopilotAuthenticationService.cs / BundledCopilotLoginService.cs / EphemeralEvaluationRunner.cs / AuxiliaryEvaluationRunner.cs / EvaluationSchemaFactory.cs</text>
   <text x="30" y="1262" class="footer">SafeEvaluationPayloadBuilder.cs / DurableQuantificationOrchestrator.cs / DurableEvaluationScheduler.cs / CheckpointStore.cs / DurableRunFinalizer.cs</text>

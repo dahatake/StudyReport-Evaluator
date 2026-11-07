@@ -559,7 +559,8 @@ public sealed class DocumentationContractTests
             "| Reference | なし |",
             "| Normal | current rowの選択済み主回答・補助列 |",
             "| Special | current rowの選択済み固有評価主値・補助列 |",
-            "| Similarity | current rowの主回答 |",
+            "| Similarity | **外部送信なし** |",
+            "その比較のための追加AI送信はありません",
             "shell、filesystem、Web、GitHub write、MCP toolを公開しません",
             "partialは暗号化containerではありません");
     }
@@ -614,7 +615,8 @@ public sealed class DocumentationContractTests
             "UTF-8 JSON、設定schemaは整数`1`",
             "BOMあり／なしを受け付けます",
             "保存定義は保持するだけで自動適用しません。login・AI評価も開始しません",
-            "認証・一覧の自動再確認は前述のキャッシュがある場合だけ",
+            "別の起動時処理はキャッシュのない初回にも認証を確認します",
+            "未認証ならブラウザー認証を1回だけ自動開始します",
             "明示保存または認証・一覧取得成功後のキャッシュ自動保存で初めてfileを作ります",
             "設定読込の完了前は、未読の保存定義を消さないため明示保存できません",
             "編集した共通設定・採点定義の永続化には**設定を保存**が必要",
@@ -821,6 +823,8 @@ public sealed class DocumentationContractTests
         [
             "architecture-overview.svg",
             "evaluation-message-flow.svg",
+            "teacher-result-review.svg",
+            "teacher-workflow.svg",
             "technical-architecture.svg",
         ];
         string imageDirectory = Resolve(FindRepositoryRoot(), "images");
@@ -849,7 +853,7 @@ public sealed class DocumentationContractTests
             Read("README.md"),
             StringComparison.Ordinal);
         string guide = Read("docs/technical-guid.md");
-        foreach (string fileName in expectedFiles)
+        foreach (string fileName in expectedFiles.Where(name => !name.StartsWith("teacher-", StringComparison.Ordinal)))
         {
             Assert.Contains($"(../images/{fileName})", guide, StringComparison.Ordinal);
         }
@@ -868,12 +872,12 @@ public sealed class DocumentationContractTests
                      ("docs/README.md", "現在の公開版は`0.8.6`です", "CH-01〜06 `NOT_RUN`は維持します"),
                      ("docs/getting-started.md", "現在の公開版は`v0.8.6`です", "clean-host試験CH-01〜06と本人loginを実施しないまま公開"),
                      ("docs/settings.md", "公開`v0.8.6`", "旧`v0.8.1`はZIP配布で、本頁の設定保存・適用機能はありません"),
-                     ("docs/features.md", "公開`v0.8.6`", "旧`v0.8.1`（ZIP）の機能・画面配置とは区別"),
-                     ("docs/custom-evaluator-guide.md", "公開`v0.8.6`", "旧`v0.8.1`（ZIP）の旧Design画面とは配置が異なります"),
-                     ("docs/prompt-launch.md", "公開`v0.8.6`（単一EXE）", "公開`v0.8.6`（ZIP代替経路）"),
+                     ("docs/features.md", "公開`v0.8.6`", "現行ソース`0.8.8`"),
+                     ("docs/custom-evaluator-guide.md", "公開`v0.8.6`", "現行ソース`0.8.8`"),
+                     ("docs/prompt-launch.md", "公開`v0.8.6`", "現行ソース`0.8.8`"),
                      ("docs/privacy-and-data-handling.md", "公開`v0.8.6`向け", "旧`v0.8.1`はZIP配布"),
                      ("docs/troubleshooting.md", "公開`v0.8.6`向け", "旧`v0.8.1`はZIP配布"),
-                     ("docs/result-excel-description.md", "公開`v0.8.6`の出力", "clean-host試験CH-01〜06と本人loginは公開前に実施していません"),
+                     ("docs/result-excel-description.md", "現行ソース`0.8.8`の出力", "clean-host試験CH-01〜06と本人loginは公開前に実施していません"),
                      ("images/README.md", "公開`v0.8.6`のUI説明用", "旧`0.8.1`の画面を示すものではありません"),
                  })
         {
@@ -890,6 +894,49 @@ public sealed class DocumentationContractTests
             "確認のためだけにPowerShell等を導入する必要はありません",
             "certutil",
             "clean-host試験CH-01〜06と本人loginを実施しないまま公開");
+    }
+
+    [Fact]
+    public void Teacher_guides_distinguish_first_use_human_review_and_current_source_changes()
+    {
+        AssertContainsAll(
+            Read("docs/README.md"),
+            "確認日：2026-11-07",
+            "現行ソース`0.8.8`",
+            "未公開のローカル候補",
+            "(getting-started.md)",
+            "(privacy-and-data-handling.md)",
+            "(../images/teacher-workflow.svg)");
+        AssertContainsAll(
+            Read("docs/getting-started.md"),
+            "架空の回答を少数",
+            "キャッシュの有無にかかわらず",
+            "公開`v0.8.6`の新規定義で0.1",
+            "現行ソース`0.8.8`の新規定義では0",
+            "空欄・`—`の行は0点として転記しません",
+            "(../images/teacher-result-review.svg)");
+        AssertContainsAll(
+            Read("docs/features.md"),
+            "参照回答を**5件**",
+            "公開`v0.8.6`は設問ごとに1件",
+            "一部が失敗した場合",
+            "採点用の類似度は空欄");
+        AssertContainsAll(
+            Read("docs/result-excel-description.md"),
+            "現行ソース`0.8.8`の出力",
+            "公開`v0.8.6`の出力には",
+            "必要な類似度が失敗で空欄の場合、0に置き換えません",
+            "元のファイルを保管");
+        AssertContainsAll(
+            Read("docs/privacy-and-data-handling.md"),
+            "入力Excel全体が結果・途中経過へコピーされる",
+            "回答本文に個人情報が書かれている場合も確認",
+            "学校の利用許可");
+        AssertContainsAll(
+            Read("docs/prompt-launch.md"),
+            "引数・ファイルを検証して受理",
+            "どの評価にも適用しません",
+            "未認証ならブラウザー認証を1回だけ自動開始します");
     }
 
     [Fact]
@@ -1347,6 +1394,8 @@ public sealed class DocumentationContractTests
             "images/architecture-overview.svg",
             "images/technical-architecture.svg",
             "images/evaluation-message-flow.svg",
+            "images/teacher-workflow.svg",
+            "images/teacher-result-review.svg",
             "images/01-input-workbook.png",
             "images/02-input-mapping.png",
             "images/03-design-knowledge.png",
@@ -1356,15 +1405,15 @@ public sealed class DocumentationContractTests
             "images/07-output-export.png",
             "images/08-settings.png",
         ];
-        Assert.Equal(25, expected.Length);
-        Assert.Equal(25, expected.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Equal(27, expected.Length);
+        Assert.Equal(27, expected.Distinct(StringComparer.OrdinalIgnoreCase).Count());
         Assert.Equal(13, PublicDocumentPaths.Length);
         Assert.Equal(
             PublicDocumentPaths.Order(StringComparer.Ordinal),
             expected.Where(path => path.EndsWith(".md", StringComparison.Ordinal)).Order(StringComparer.Ordinal));
         Assert.Equal(8, expected.Count(path => path.StartsWith("images/", StringComparison.Ordinal)
             && path.EndsWith(".png", StringComparison.Ordinal)));
-        Assert.Equal(3, expected.Count(path => path.StartsWith("images/", StringComparison.Ordinal)
+        Assert.Equal(5, expected.Count(path => path.StartsWith("images/", StringComparison.Ordinal)
             && path.EndsWith(".svg", StringComparison.Ordinal)));
 
         const RegexOptions options = RegexOptions.Multiline | RegexOptions.CultureInvariant;
@@ -1424,8 +1473,8 @@ public sealed class DocumentationContractTests
         void AssertPublicPaths(IEnumerable<string> paths)
         {
             string[] actual = paths.Select(path => path.Replace('\\', '/')).ToArray();
-            Assert.Equal(25, actual.Length);
-            Assert.Equal(25, actual.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.Equal(27, actual.Length);
+            Assert.Equal(27, actual.Distinct(StringComparer.OrdinalIgnoreCase).Count());
             Assert.DoesNotContain(actual, path => string.Equals(
                 Path.GetFileName(path), "setting.txt", StringComparison.OrdinalIgnoreCase));
             Assert.DoesNotContain(actual, path => path.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase));
