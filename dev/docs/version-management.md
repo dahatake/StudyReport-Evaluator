@@ -84,7 +84,7 @@ T01〜T38はREVIEWED、T39は追加native 3試行のFAILと本人／Narrator／�
 
 | Version | 現在値 | 更新条件 | Source |
 |---|---:|---|---|
-| 製品版 | `0.8.6`（published） | 本手順と要求所有者の明示指示 | [`Directory.Build.props`](../../Directory.Build.props) |
+| 製品版 | `0.8.7`（公開準備中。0.8.6は公開済み） | 本手順と要求所有者の明示指示 | [`Directory.Build.props`](../../Directory.Build.props) |
 | 要求文書版 | `4.6` | 要求baseline変更 | [`requirements-definition.md`](../../docs/requirements-definition.md) |
 | QuantificationDefinition schema | `4.0` | canonical definition format変更 | [`CanonicalDefinitionSerializer.cs`](../../src/StudyReportEvaluator.Core/Serialization/CanonicalDefinitionSerializer.cs) |
 | checkpoint schema | `1` | checkpoint payload format変更 | [`CheckpointEnvelope.cs`](../../src/StudyReportEvaluator.App/Workbooks/Checkpoint/CheckpointEnvelope.cs) |

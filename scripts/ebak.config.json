@@ -18,6 +18,10 @@
     "timeout_sec": 1800,
     "commands": [
       {
+        "name": "release-automation-unit",
+        "run": "python -m pytest -q tests/packaging/test_release_automation.py"
+      },
+      {
         "name": "toolkit-unit",
         "run": "python -m pytest -q tests/toolkit/test_clean_work.py"
       },
@@ -31,7 +35,7 @@
       },
       {
         "name": "app-unit",
-        "run": "dotnet test tests/StudyReportEvaluator.App.Tests -c Debug",
+        "run": "python scripts/release_test_selection.py --run-local",
         "slow": true
       }
     ]

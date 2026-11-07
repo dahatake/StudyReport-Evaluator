@@ -162,6 +162,18 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\publish-windows.ps1
 - unsignedのため、SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行拒否は配布物と同様に起こり得ます。保護機能の無効化、MOTW除去、execution policy変更、UAC回避は案内しません。
 - ローカルビルドの成功は、fresh Windowsのclean-host試験、本人login、公開判定の完了を意味しません。
 
+### ARM64開発ホストでの検証
+
+配布対象は引き続きWindows 11 x64です。ARM64版の配布は追加しません。
+ローカル検証は `python scripts/release_test_selection.py --run-local` を使用します
+（`verify.py` の既存`app-unit`と同一。標準の`--results-directory`、`--logger`を転送）。
+ARM64でもRelease契約・入力拒否・Workbook処理を実行しますが、
+実x64の包装・起動・性能3試験は **x64 NOT_RUN（未実行）** と表示します。
+private sampleがなければその実ファイル試験も別に未実行と表示し、
+同じ構造assertを合成Workbookで実行します。これは実ファイルの合格ではありません。
+ローカル成功は公開資格ではなく、実x64 CI/candidateとclean-host・公開ゲートの
+必須証跡を代替しません。詳細は[Release自動化](https://github.com/dahatake/StudyReport-Evaluator/blob/main/docs/release-automation.md)。
+
 ## 5分クイックスタート
 
 > **対象版:** 以下は公開`v0.8.6`の操作です。旧公開`v0.8.1`で追加UIや設定保存を前提にしないでください。画像は合成データ・fake結果による説明用で、実認証・実保存・clean-host動作の証拠ではありません。生成時の製品版と来歴は[画像一覧](images/README.md)を参照してください。
