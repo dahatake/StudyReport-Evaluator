@@ -277,7 +277,8 @@ public sealed class WindowsPublishPackageTests
     [Fact]
     public async Task Package_rejects_a_zero_byte_required_file_without_replacing_outputs()
     {
-        RequireWindows11X64();
+        // FR-121 AC-103: read-only admission must reject input even on ARM64.
+        RequireWindows11();
         string repositoryRoot = FindRepositoryRoot();
         string packageScript = Path.Combine(repositoryRoot, "scripts", "package-windows.ps1");
         string powerShellPath = FindPowerShellCoreExecutable();
@@ -320,7 +321,8 @@ public sealed class WindowsPublishPackageTests
     [Fact]
     public async Task Package_rejects_a_reparse_point_without_replacing_outputs()
     {
-        RequireWindows11X64();
+        // FR-121 AC-103: filesystem safety is independent of the CPU architecture.
+        RequireWindows11();
         string repositoryRoot = FindRepositoryRoot();
         string packageScript = Path.Combine(repositoryRoot, "scripts", "package-windows.ps1");
         string powerShellPath = FindPowerShellCoreExecutable();
@@ -1174,10 +1176,15 @@ public sealed class WindowsPublishPackageTests
 
     private static void RequireWindows11X64()
     {
-        Assert.True(OperatingSystem.IsWindows());
-        Assert.True(OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22_000));
+        RequireWindows11();
         Assert.Equal(Architecture.X64, RuntimeInformation.OSArchitecture);
         Assert.Equal(Architecture.X64, RuntimeInformation.ProcessArchitecture);
+    }
+
+    private static void RequireWindows11()
+    {
+        Assert.True(OperatingSystem.IsWindows());
+        Assert.True(OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22_000));
     }
 
     private static string FindRepositoryRoot()

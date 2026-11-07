@@ -87,6 +87,19 @@ public sealed class WindowsSingleFileArtifactTests
             """);
     }
 
+    // FR-121 AC-103: portable admission never relaxes the real packaging host gate.
+    [Fact]
+    public async Task Host_admission_still_refuses_ARM64_including_x64_emulation()
+    {
+        await AssertFunctionsSucceedAsync("""
+            if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne 'X64' -or
+                [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -ne 'X64') {
+                Assert-Rejected { Assert-SupportedHost } 'requires Windows 11 x64'
+            }
+            else { Assert-SupportedHost }
+            """);
+    }
+
     [Fact]
     public async Task Defaults_are_final_singlefile_publish_and_owned_artifacts_with_repository_relative_overrides()
     {

@@ -374,8 +374,6 @@ function Assert-Archive {
     }
 }
 
-Assert-SupportedHost
-
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $packageDirectory = Join-Path $repositoryRoot 'artifacts\package'
 $defaultPublishDirectory = Join-Path $packageDirectory 'publish\win-x64'
@@ -384,6 +382,7 @@ $zipPath = Join-Path $packageDirectory $ZipFileName
 $hashPath = Join-Path $packageDirectory $HashFileName
 
 if ([string]::IsNullOrWhiteSpace($PublishedDirectory)) {
+    Assert-SupportedHost
     & $publishScriptPath
     $PublishedDirectory = $defaultPublishDirectory
 }
@@ -394,6 +393,10 @@ else {
     $PublishedDirectory = [System.IO.Path]::GetFullPath($PublishedDirectory)
 }
 
+# FR-121 AC-103: read-only admission is independent of the packaging host.
+# Reject invalid input before host admission or any output mutation.
+Assert-PublishInput -Directory $PublishedDirectory
+Assert-SupportedHost
 [void][System.IO.Directory]::CreateDirectory($packageDirectory)
 $packageDirectoryItem = Get-Item -LiteralPath $packageDirectory -Force
 Assert-NotReparsePoint -Item $packageDirectoryItem
