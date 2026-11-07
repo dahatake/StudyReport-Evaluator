@@ -792,8 +792,15 @@
           "by": "test-designer",
           "change": "同じ要求・同じ層の既存ケースと別に追加",
           "reason": "AC-103 independently executes the existing app-unit verify entry and native-host TRX/report boundary; existing AC-028/100/101/102 cases remain unchanged in separate files"
+        },
+        {
+          "at": "2026-11-07T09:53:59+09:00",
+          "by": "conductor",
+          "change": "serial: False -> True",
+          "reason": "app-unit全試験を起動し他System Testのdotnet buildと同じbin/objを使用するため排他実行"
         }
-      ]
+      ],
+      "serial": true
     }
   ]
 }
