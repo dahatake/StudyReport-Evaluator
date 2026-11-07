@@ -172,7 +172,7 @@ ARM64でもRelease契約・入力拒否・Workbook処理を実行しますが、
 private sampleがなければその実ファイル試験も別に未実行と表示し、
 同じ構造assertを合成Workbookで実行します。これは実ファイルの合格ではありません。
 ローカル成功は公開資格ではなく、実x64 CI/candidateとclean-host・公開ゲートの
-必須証跡を代替しません。詳細は[Release自動化](docs/release-automation.md)。
+必須証跡を代替しません。詳細は[Release自動化](https://github.com/dahatake/StudyReport-Evaluator/blob/main/docs/release-automation.md)。
 
 ## 5分クイックスタート
 
