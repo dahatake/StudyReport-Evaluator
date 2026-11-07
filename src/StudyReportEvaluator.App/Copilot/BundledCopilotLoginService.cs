@@ -80,7 +80,7 @@ public sealed class BundledCopilotLoginService : IDisposable
     private bool _disposed;
 
     public BundledCopilotLoginService()
-        : this(new SystemCopilotCliPathResolver())
+        : this(CopilotClientFactory.CreateDefaultPathResolver())
     {
     }
 

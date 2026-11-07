@@ -55,7 +55,7 @@ public sealed class CopilotClientFactoryTests
     }
 
     [Fact]
-    public async Task Missing_bundled_manifest_does_not_fall_back_to_path()
+    public async Task FR121_AC030_Missing_bundled_manifest_is_runtime_failure_without_PATH_fallback()
     {
         string directory = Path.Combine(Path.GetTempPath(), "StudyReportEvaluator-A01-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -67,16 +67,52 @@ public sealed class CopilotClientFactoryTests
 
             CopilotClientCreationResult result = await factory.CreateAsync(TestContext.Current.CancellationToken);
 
-            Assert.Equal(CopilotClientCreationStatus.CliUnavailable, result.Status);
+            Assert.Equal(CopilotClientCreationStatus.RuntimeFailed, result.Status);
+            Assert.Null(result.Client);
+            Assert.Null(result.Identity);
         }
+
         finally
         {
             Directory.Delete(directory, recursive: true);
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FR121_AC030_AC033_Missing_or_empty_bundled_cli_rejects_SDK_and_login(bool empty)
+    {
+        using TemporaryBundledCli bundle = TemporaryBundledCli.Create();
+        if (empty)
+        {
+            File.WriteAllBytes(bundle.CliPath, []);
+        }
+        else
+        {
+            File.Delete(bundle.CliPath);
+        }
+
+        BundledCopilotCliPathResolver resolver = new(bundle.Directory);
+        CopilotClientCreationResult result = await new CopilotClientFactory(resolver)
+            .CreateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(CopilotClientCreationStatus.RuntimeFailed, result.Status);
+        Assert.Null(result.Client);
+        Assert.Null(result.Identity);
+        int starts = 0;
+        using BundledCopilotLoginService login = new(resolver, _ =>
+        {
+            starts++;
+            throw new InvalidOperationException("An invalid bundle must not start login.");
+        });
+        CopilotLoginResult loginResult = await login.LoginAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(CopilotLoginStatus.CliUnavailable, loginResult.Status);
+        Assert.Equal(CopilotLoginErrorCategory.CliValidationFailed, loginResult.ErrorCategory);
+        Assert.Equal(0, starts);
+    }
+
     [Fact]
-    public void Default_factory_uses_the_system_runtime_resolver()
+    public void FR121_AC030_Development_default_factory_preserves_the_system_runtime_resolver()
     {
         CopilotClientFactory factory = new();
         FieldInfo field = typeof(CopilotClientFactory).GetField(

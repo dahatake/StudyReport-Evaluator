@@ -19,18 +19,18 @@
 - 評価対象の標準`.xlsx`
 - AI処理を行う場合だけ、利用可能なGitHub Copilot account、本人の対話login、network接続、利用可能model、組織policy上の利用許可
 
-GUI起動に.NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI（`gh`）、別Copilot CLI、Microsoft Excel／Office／LibreOffice、IDEの導入を要求しないself-contained設計です。GUI起動とAI利用の前提は別です。公開`v0.8.6`の既存配布物はCLI同梱方式ですが、現行sourceではOSにインストールしたGitHub Copilot CLIを使用します。
+GUI起動に.NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI（`gh`）、別Copilot CLI、Microsoft Excel／Office／LibreOffice、IDEの導入を要求しないself-contained設計です。GUI起動とAI利用の前提は別です。Windows EXE／ZIP候補では検証済み同梱CLIを使用し、外部CLIは不要です。開発build／UnixはOSにインストールしたGitHub Copilot CLIを使用します。修正版`0.8.8`は未公開のローカル候補で、新bytesのclean-host／本人login／実AI検証を旧版の結果で代替しません。
 
-### 現行sourceのCLIセットアップ
+### 開発build／UnixのCLIセットアップ
 
-Windowsでは次を実行します（既にCLIが導入されていれば再installは不要です）。
+Windowsの開発buildでは次を実行します（既にCLIが導入されていれば再installは不要です。EXE／ZIP候補では不要です）。
 
 ```powershell
 winget install --id GitHub.Copilot --exact
 copilot --version
 ```
 
-導入後はterminal／VS Codeとアプリを再起動してPATHを反映します。アプリはPATHから`copilot.exe`を解決し、認証・モデル一覧取得・評価に同じCLIを使います。既存のCLI loginを再利用し、未認証なら**GitHubにログイン**から認証します。同梱CLIやmanifestは不要で、アプリによるCLIの自動install／更新は行いません。未導入やPATH不足は明示表示します。接続失敗時はCLIとSDKの互換性、network、本人loginを確認してください。CLIの版・SHA-256は診断・checkpoint互換性のために記録し、固定版の承認リストとしては使用しません。
+導入後はterminal／VS Codeとアプリを再起動してPATHを反映します。開発buildはPATHから`copilot.exe`を解決し、認証・モデル一覧取得・評価に同じCLIを使います。既存のCLI loginを再利用し、未認証なら**GitHubにログイン**から認証します。開発buildでは同梱CLIやmanifestは不要で、アプリによるCLIの自動install／更新は行いません。未導入やPATH不足は明示表示します。接続失敗時はCLIとSDKの互換性、network、本人loginを確認してください。CLIの版・SHA-256は診断・checkpoint互換性のために記録します。Windows配布候補は別契約で、固定manifestのRID・SDK版・CLI版・相対path・hashを検証し、欠損・破損時はPATHへfallbackせず配布runtime errorで拒否します。GUI・Excel読込・採点設計はofflineで維持します。
 
 以下の公開版の入手・配布説明は公開済みassetの履歴であり、現行sourceの再公開を意味しません。
 

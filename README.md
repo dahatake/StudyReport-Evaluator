@@ -19,7 +19,7 @@ AIが作る値は確認対象です。最終的な評点と利用判断は、授
 
 ![利用者、入力Excel、StudyReport Evaluator、OSのGitHub Copilot CLI、GitHub Copilotサービス、結果Excelの関係](images/architecture-overview.svg)
 
-StudyReport EvaluatorはAI modelを内蔵していません。現行sourceではOSにインストールしたGitHub Copilot CLIを使用します。WindowsではPATHから`copilot.exe`を解決し、アプリ内のGitHub Copilot SDKがその絶対pathを起動します。CLIがGitHub Copilotサービスとの通信を担当し、アプリは入力Excelのread-only読込、採点条件、AIへ渡す範囲、結果検証、checkpoint、別Excelへの出力を管理します。
+StudyReport EvaluatorはAI modelを内蔵していません。Windows EXE／ZIP候補ではmanifest検証済みの同梱GitHub Copilot CLIを、開発build／UnixではPATHのCLIを使用し、アプリ内のGitHub Copilot SDKがその絶対pathを起動します。CLIがGitHub Copilotサービスとの通信を担当し、アプリは入力Excelのread-only読込、採点条件、AIへ渡す範囲、結果検証、checkpoint、別Excelへの出力を管理します。
 
 1回のrunではOSのCLIを1つの共有Copilot clientとして起動し、AI処理ごとに一時sessionを作ります。各sessionにはその処理専用の結果提出toolだけを公開し、shell、filesystem、Web、GitHub write、MCP toolは評価sessionへ公開しません。認証・model確認・AI評価にはnetworkが必要ですが、Excel読込と採点設計はAI処理を開始せずローカルで行えます。
 
@@ -32,15 +32,17 @@ Component図、認証から出力までのmessage flow、変更時に同期す�
 | OS / architecture | Windows 11 x64 |
 | 配布 | .NET 10 self-contained。公開`v0.8.6`はunsigned単一EXEを主導線とし、unsigned ZIPも提供。各形式にSHA-256 sidecar |
 | 入力 | 標準Office Open XML `.xlsx` 1file |
-| AI runtime | 現行sourceはOSにインストールしたGitHub Copilot CLI。PATHのnative executableを使い、同梱CLIへfallbackしません。公開`v0.8.6`の既存配布物は従来の同梱方式です |
+| AI runtime | Windows EXE／ZIP候補は検証済み同梱CLIのみ使用し、欠損・破損時もPATHへfallbackしません。開発build／Unixは従来のPATH契約を維持します。既存公開assetは変更しません |
 | AI login | GitHub Copilotのlogin。公開`v0.8.6`は起動時にこのPCの既存GitHubログインを自動確認し、なければブラウザー認証を自動で開始します。GUI起動とは別条件です |
 | Spreadsheet runtime | Microsoft Excel、Office、LibreOfficeはアプリ実行に不要 |
 
 `.xls`、`.xlsb`、CSV、PDF、`.xlsm`等のmacro-enabled file、password／rights-protected／暗号化workbook、安全境界に違反するpackageは対象外です。
 
-### 現行sourceのCopilot CLI準備
+### 開発build／UnixのCopilot CLI準備
 
-Windowsでは`winget install --id GitHub.Copilot --exact`でCLIを導入し、`copilot --version`を確認してください。導入後はterminal／VS Codeとアプリを再起動してPATHを反映します。既存CLIの本人loginを再利用し、未認証ならアプリの**GitHubにログイン**からCLI／ブラウザーで認証します。CLIの自動install／更新や同梱manifest検証は行いません。CLIの版・SHA-256は診断とcheckpoint互換性のために記録し、SDK互換性は接続時に確認します。公開済みassetの挙動は変更されません。
+Windowsの開発buildでは`winget install --id GitHub.Copilot --exact`でCLIを導入し、`copilot --version`を確認してください。導入後はterminal／VS Codeとアプリを再起動してPATHを反映します。既存CLIの本人loginを再利用し、未認証ならアプリの**GitHubにログイン**からCLI／ブラウザーで認証します。開発buildはCLIの自動install／更新や同梱manifest検証を行いません。CLIの版・SHA-256は診断とcheckpoint互換性のために記録し、SDK互換性は接続時に確認します。
+
+Windows配布候補は既存publish scriptの`CopilotSkipCliDownload=false`で同梱方式をビルド時に固定します。manifestの有無でモードは変わらず、同梱物の欠損・破損は拒否し、外部CLIの導入では回避できません。修正版`0.8.8`はローカル候補のみで、新bytes固有のCH-01〜06・ADV-01は別途実施が必要です。既存`0.8.7`のasset／tag／Releaseは変更せず、今回公開しません。
 
 ## 公開状況・SHA-256確認・起動
 
@@ -130,7 +132,7 @@ dotnet run --project .\src\StudyReportEvaluator.App\StudyReportEvaluator.App.csp
 
 ビルド後に「StudyReport Evaluator」ウィンドウが開き、入力 → 採点設計 → 実行 → 結果・出力の4ステップを操作できます。
 
-**この方法はGitHub Copilot CLIを同梱しません。** `RuntimeIdentifier`を指定しないビルドでは`CopilotSkipCliDownload`が`true`となり（[`StudyReportEvaluator.App.csproj`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj)）、同梱manifest`copilot-runtime.json`を出力しません。manifestが無い場合、アプリは同梱CLIを解決できず、PATH上の別CLIへfallbackもしません（[`CopilotClientFactory.cs`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/src/StudyReportEvaluator.App/Copilot/CopilotClientFactory.cs)）。したがって実行画面の認証確認・login・AI評価は利用できず、Excel読込、mapping、採点設計、設定の操作までが対象です。
+**この方法はGitHub Copilot CLIを同梱しません。** 通常の開発ビルドは`CopilotSkipCliDownload=true`（[`StudyReportEvaluator.App.csproj`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/src/StudyReportEvaluator.App/StudyReportEvaluator.App.csproj)）で、PATHのCLIを使います。CLIが未導入でもExcel読込、mapping、採点設計、設定は利用可能です。認証確認・login・AI評価には上記の開発用CLI準備が必要です。これはWindows配布候補の同梱CLI欠損時にPATHへfallbackする契約ではありません。
 
 この`bin`出力はself-containedではなく、起動端末に.NETが必要です。配布物と同じ前提ではありません。
 

@@ -4,6 +4,11 @@ StudyReport Evaluatorの利用者に影響する変更をこのファイルへ�
 
 ## [Unreleased]
 
+## [0.8.8] - 2026-11-07
+
+- Windows EXE／ZIP候補のSDK・login・全AI処理で、既存resolverがmanifestと照合した同梱CLIを一貫使用するよう修正。欠損・破損時はPATHへfallbackせず拒否します。開発／UnixのPATH利用は維持します。
+- ローカル候補のみ。新bytesのclean-host CH-01〜06と実AI ADV-01は別途検証が必要で、旧0.8.7の結果・本人login申告は転記しません。既存tag／assetは変更せず、今回公開しません。
+
 ## [0.8.7] - 2026-11-07
 
 - Windows x64 配布候補の identity・検証証跡・公開を自動化し、検証されていない成果物の公開を防ぎます。

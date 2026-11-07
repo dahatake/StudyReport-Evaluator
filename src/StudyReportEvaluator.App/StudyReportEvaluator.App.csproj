@@ -9,6 +9,11 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(CopilotSkipCliDownload)' != 'true'">
+    <!-- Distribution intent is compiled in, never inferred from a missing manifest.
+         Unix/source runs retain their existing PATH contract. -->
+    <DefineConstants>$(DefineConstants);BUNDLED_COPILOT_RUNTIME</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
     <ProjectReference Include="..\StudyReportEvaluator.Core\StudyReportEvaluator.Core.csproj" />
