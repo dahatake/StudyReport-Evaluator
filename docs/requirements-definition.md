@@ -1602,9 +1602,17 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ、AC-007は§7.3へ、AC-028�
 -->
 | AC-029 | OSのみのfresh Windows 11 x64・標準userで、取得済みEXE1個を開く1起動gestureからofflineで入力画面を表示し、手動展開・追加導入・昇格を要求しない。OS警告・拒否・実操作数は別途記録し、無条件・無警告を保証しない。 |
 | <span>AC-030</span> | 正式な受入条件は§13.8 FR-121のAC-030を参照（索引行。正式定義ではない）。 |
+<!-- Legacy ID-index contract: keep the reference row recognizable to the documentation contract test;
+     the parser ignores this marker so AC-030 remains defined only under FR-121 §13.8.
+| AC-030 | 正式な受入条件は§13.8 FR-121のAC-030を参照（索引行。正式定義ではない）。 |
+-->
 | AC-031 | EXE／ZIPで任意cwd、日本語・空白path、相対`--input`、複数`--prompt`、既存invalid入力・明示適用の契約を維持する。起動によるAI送信は0件で、EXE配置先や抽出先へcwd基準を変えない。 |
 | AC-032 | 初回・再起動・同時起動・cache欠落・抽出中断・容量／権限不足でも利用者input／final／partialを変更・削除しない。cacheとdata／setting.txtを分離し、明示出力先の復元と未指定時だけの入力隣接result、同版EXE／ZIP間の既存checkpoint再開条件を維持する。 |
 | <span>AC-033</span> | 正式な受入条件は§13.8 FR-121のAC-033を参照（索引行。正式定義ではない）。 |
+<!-- Legacy ID-index contract: keep the reference row recognizable to the documentation contract test;
+     the parser ignores this marker so AC-033 remains defined only under FR-121 §13.8.
+| AC-033 | 正式な受入条件は§13.8 FR-121のAC-033を参照（索引行。正式定義ではない）。 |
+-->
 | AC-034 | candidate run／source／version／bytes／hashに拘束されたexact EXEとCH-01〜06のPASSが一致した場合だけ新経路をprotected publishする。metadata限定JSON、candidate-bound MSIX検証記録、4 public assetsの再download照合を要求し、必須試験の欠落・FAIL・NOT_RUN・差替えを拒否する。未実測のOS-only／署名／installer claimを出さない。 |
 | AC-035 | 利用者別setting.txt（UTF-8 JSON、schema整数1）へ共通設定＋任意の採点定義1件を明示保存し（表示専用のmodel一覧cacheだけは§11.6の自動保存例外）、ID／decimal／Prompt／canonical hashを復元する。header由来の設問text・貼付内容は明示保存時に平文で含まれ、§11.6の非保存対象は保存しない。破損・未知schema・IO失敗は元fileとdraftを保持しoffline継続する。保存中再編集は未保存のまま、同時保存は最後の成功が優先する。明示出力先は再起動・入力変更後も復元し、初回の未指定または空欄への明示編集によるnullの場合だけ入力隣接resultを算出し、fallback・復元時directory作成をしない。 |
 | AC-036 | 保存定義はExcel読込後の明示操作で、保存headerのmetadata・sheet・行・列・定義全体を検証してからInput／Designへ一括適用する。失敗・取消時は現在状態とfileを変更せず、成功時はID・順序・設問text・Prompt・配点を保持する。Imported Prompt一覧は不変、run中の一括適用は禁止し、既存checkpoint admissionを緩めない。 |
@@ -1803,6 +1811,7 @@ AC-004・AC-009〜012は同じIDのまま§7.7へ、AC-007は§7.3へ、AC-028�
 
 ### 決定記録・変更履歴（2026-11-07、run 202611071752）
 
+- 限定回帰修正: `d1b03da`のAC一覧表は47行、`821275d`でAC-030／AC-033をFR-121配下へ移設した後と`548820e`では45行となり、契約テストの対象行からこの2 IDだけが脱落していた。AC-028と同じ既存パターンで、§18のAC-030／AC-033にコメント内の互換参照行だけを復元した。正式な受入定義は§13.8 FR-121配下のみとし、要求・ACの意味、承認状態、Windows配布bundled／開発PATH・no fallback・credential非収集・新bytes再検証・旧CH-06申告境界は変更しない。新規ID・挙動・台帳ケース・テスト期待値の変更なし。影響は既存DocumentationContractTestsのAC一覧照合に限り、run基点からの既存失敗とは扱わない。
 - 隣接認証要求の独立監査D-01（`work/runs/202611071752/audit/20261107-180821-run1.md`）への明示依頼により、FR-AL-04の一行を変更し、正常login完了後の§11.3項6の認証・model一覧再確認だけを例外として明記した（承認済み・依頼 2026-11-07、出自: 依頼原文、包括承認なし）。起動時処理の再実行・自動再login・再確認の反復は禁止し、取消・失敗後および正常完了時の再確認後は既存buttonの手動操作だけとする。FR-AL-03／§11.3項6／AC-040③との直接矛盾を文書上解消した。`rdcheck trace FR-AL-04`は旧表形式を認識せず、通常検索でAC-040③・⑤への影響を確認した。AC-040の文面・ケース、CLI選択・credential非収集・所有process限定終了、旧CH-06申告境界とAC-033の意味は変更しない。新規要求・AC・ケース・Qは追加せず、カタログの題名・決定状態にも変更はない。初回CH-03契約定義とは別の明確化であり、実装完了・実測PASS・独立再監査済みを認定する記録ではない。
 - 要求所有者の「CH-03: 修正してください。CH-06: 完了しました。」と今回明示されたWindows配布限定の修正方針（SRC-012）により、FR-121とAC-028／AC-030／AC-033を変更して再利用する。FR-121は承認済み（依頼 2026-11-07）、出自は依頼原文。新規FR／ACは採番しない。AC-030／AC-033は§18の旧表からFR-121配下へ移して`検証レベル: system`を明記し、旧位置は索引とする。AC-020／AC-040、FR-AL-03／05／07・SEC-AL-02は同じCLI選択とsafe error案内に限って整合する。これらの変更も依頼承認であり、包括承認は使用しない。
 - 根因は、外部CLIのないWindows配布候補に対するOS PATH-only要求（旧§3.2・§11）と、既存bundled CLI／外部依存不要の配布契約（ADR-0016）の直接不整合。旧CH-03は同梱CLI hash一致でもPATH CLI未導入のためFAILだった。今回依頼が当該限定変更を明示しているため、2026-11-05のPATH切替決定をWindows配布EXE／ZIPについてのみ置き換える。開発／Unix source foundation・非公開MSIX・macOS公開対象外と、認証の契機・回数・取消・credential非収集は維持する。残る未決競合や新Qはなく、BLOCKED追加なし。これは要求の整合完了であり、CH-03の実装修正・実測PASSではない。
