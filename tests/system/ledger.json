@@ -52,9 +52,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
       "status": "pass",
-      "last_commit": "b4ff422",
-      "last_run_at": "2026-11-07T14:12:57+09:00",
-      "evidence": "work/runs/202611071319/logs/system-test/E2E-001-202611071400.log",
+      "last_commit": "2e4695d",
+      "last_run_at": "2026-11-07T14:39:03+09:00",
+      "evidence": "work/runs/202611071319/logs/system-test/E2E-001-202611071430.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
@@ -89,9 +89,9 @@
       "command": "python -m pytest tests/system/test_fr002_output_folder.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "b4ff422",
-      "last_run_at": "2026-11-07T14:12:57+09:00",
-      "evidence": "work/runs/202611071319/logs/system-test/E2E-002-202611071400.log",
+      "last_commit": "2e4695d",
+      "last_run_at": "2026-11-07T14:39:03+09:00",
+      "evidence": "work/runs/202611071319/logs/system-test/E2E-002-202611071430.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
@@ -382,9 +382,9 @@
       "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC011_AC012",
       "canary": true,
       "status": "pass",
-      "last_commit": "b4ff422",
-      "last_run_at": "2026-11-07T14:12:57+09:00",
-      "evidence": "work/runs/202611071319/logs/system-test/E2E-008-202611071401.log",
+      "last_commit": "2e4695d",
+      "last_run_at": "2026-11-07T14:39:03+09:00",
+      "evidence": "work/runs/202611071319/logs/system-test/E2E-008-202611071430.log",
       "history": [
         {
           "at": "2026-11-04T09:06:39+09:00",
@@ -611,9 +611,9 @@
       "command": "python -m pytest tests/system/fr121/test_ac028_gate.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "b4ff422",
-      "last_run_at": "2026-11-07T14:12:57+09:00",
-      "evidence": "work/runs/202611071319/logs/system-test/IT-006-202611071401.log",
+      "last_commit": "2e4695d",
+      "last_run_at": "2026-11-07T14:39:03+09:00",
+      "evidence": "work/runs/202611071319/logs/system-test/IT-006-202611071430.log",
       "history": [
         {
           "at": "2026-11-06T23:43:13+09:00",
@@ -777,9 +777,9 @@
       "command": "python -m pytest tests/system/fr121/test_ac103_host_gate.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "b4ff422",
-      "last_run_at": "2026-11-07T14:12:57+09:00",
-      "evidence": "work/runs/202611071319/logs/system-test/IT-010-202611071402.log",
+      "last_commit": "2e4695d",
+      "last_run_at": "2026-11-07T14:39:03+09:00",
+      "evidence": "work/runs/202611071319/logs/system-test/IT-010-202611071431.log",
       "history": [
         {
           "at": "2026-11-07T08:52:53+09:00",
