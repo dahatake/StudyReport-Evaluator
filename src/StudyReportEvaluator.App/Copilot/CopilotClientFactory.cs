@@ -52,7 +52,7 @@ public sealed class BundledCopilotCliPathResolver : ICopilotCliPathResolver
         string manifestPath = Path.Combine(applicationBaseDirectory, ManifestFileName);
         if (!File.Exists(manifestPath))
         {
-            return null;
+            throw new InvalidDataException("The bundled Copilot manifest is missing.");
         }
 
         FileInfo manifestInfo = new(manifestPath);
@@ -123,7 +123,7 @@ public sealed class BundledCopilotCliPathResolver : ICopilotCliPathResolver
         before.Refresh();
         if (!before.Exists || before.Length == 0)
         {
-            return null;
+            throw new InvalidDataException("The bundled Copilot runtime is missing or empty.");
         }
 
         byte[] hash;
@@ -342,7 +342,7 @@ public sealed class CopilotClientFactory : ICopilotClientFactory
     private readonly ICopilotCliPathResolver _pathResolver;
 
     public CopilotClientFactory()
-        : this(new SystemCopilotCliPathResolver())
+        : this(CreateDefaultPathResolver())
     {
     }
 
@@ -350,6 +350,19 @@ public sealed class CopilotClientFactory : ICopilotClientFactory
     {
         ArgumentNullException.ThrowIfNull(pathResolver);
         _pathResolver = pathResolver;
+    }
+
+    // FR-121 AC-030/033: one build-time selection for SDK, login and all AI callers.
+    // A missing/corrupt distribution payload must never enable PATH fallback.
+    internal static ICopilotCliPathResolver CreateDefaultPathResolver()
+    {
+#if BUNDLED_COPILOT_RUNTIME
+        if (OperatingSystem.IsWindows())
+        {
+            return new BundledCopilotCliPathResolver();
+        }
+#endif
+        return new SystemCopilotCliPathResolver();
     }
 
     public async ValueTask<CopilotClientCreationResult> CreateAsync(CancellationToken cancellationToken)

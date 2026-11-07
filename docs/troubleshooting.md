@@ -166,14 +166,14 @@ Windowsのフォルダーの**ReadOnly属性だけでは書込拒否を保証し
 
 ## Copilotを利用できない
 
-現行sourceはOSにインストールしたGitHub Copilot CLIを使います。WindowsではPATHから`copilot.exe`を解決し、同梱manifestとの照合や同梱CLIへのfallbackは行いません。GUI起動とAI利用は別条件で、AIにはCLI、network、本人login、利用可能なCopilot account／model、組織policy上の許可が必要です。公開`v0.8.6`の既存assetだけは従来の同梱方式です。
+Windows EXE／ZIP候補は既存resolverがmanifestと照合した同梱CLIをSDK・login・全AIで使います。欠損・破損時もPATHの別CLIへfallbackしません。開発build（`CopilotSkipCliDownload=true`）／Unixだけは従来のPATH契約です。GUI起動とAI利用は別条件で、AIにはnetwork、本人login、利用可能なCopilot account／model、組織policy上の許可が必要です。修正版`0.8.8`はローカル候補で、既存公開assetを変更しません。
 
 | 表示 | 確認 |
 |---|---|
-| CLI unavailable | 現行sourceは`winget install --id GitHub.Copilot --exact`でCLIを導入し、`copilot --version`を確認。terminal／VS Codeとアプリを再起動してPATHを反映。既存公開版は下記の再取得・再展開で復旧 |
-| runtime確認失敗 | Start／Ping、SDK互換性、認証・model取得、timeout、終了処理でも発生する。`copilot --version`とCLI／SDKの互換性、network・現在の処理状態・組織policyを確認し、所有CLIの終了後に**Copilot 状態を確認**を明示的に再実行 |
+| CLI unavailable | 開発buildのみ`winget install --id GitHub.Copilot --exact`でCLIを導入し、`copilot --version`を確認。terminal／VS Codeとアプリを再起動してPATHを反映。Windows配布候補は同梱物の検証失敗もloginを拒否するため、配布元に同じ候補の再取得・再展開を確認 |
+| runtime確認失敗 | Windows配布候補のmanifest／CLI欠損・不一致は拒否される。配布元に同じ候補の再取得・再展開を確認し、PATH導入やhash緩和で回避しない。Start／Ping、SDK互換性、認証・model取得、timeout、終了処理でも発生する。network・現在の処理状態・組織policyを確認し、所有CLIの終了後に**Copilot 状態を確認**を明示的に再実行 |
 | checkpointのCLI hash／版が一致しない | OSのCLI更新でruntime identityが変わる場合もある。checkpoint互換性と実行時のCLI探索は別。旧CLIを無断でcopyしたりcheckpointを改変せず、新規runか互換性の確認を行う |
-| loginが必要 | OSのCLIで本人対話loginを完了。login buttonでは正常終了後に自動再確認し、失敗時は**Copilot 状態を確認**で再試行。旧公開版は当該版の同梱CLI手順に従う |
+| loginが必要 | Windows配布候補は検証済み同梱CLI、開発build／UnixはPATHのCLIで本人対話loginを完了。login buttonでは正常終了後に自動再確認し、失敗時は**Copilot 状態を確認**で再試行。Start／Ping失敗・timeout・不正応答・取消をlogin要求とは扱わない |
 | modelがない | accountで利用できるmodelを確認。model IDを推測入力しない |
 | 保存したmodelが選択されない／`MODEL_SELECTION_REQUIRED` | 保存する希望IDと実効選択は別。明示または自動の認証・一覧再確認に成功し、希望IDが候補に存在するときだけ選択へ反映する。不在なら未選択・no fallbackなので、候補を確認し**設定 → 共通**で明示的に選び直す。認証確認の失敗だけでは希望IDを消さない |
 | model容量を取得できない（上限が「SDK未公開」） | `auto`などのrouterでは正常な状態。runは開始できるが、model相対の容量検査を行わない。上限を推測して回避せず、事前検査が必要なら上限を公開しているmodelを選ぶ |
@@ -182,7 +182,7 @@ Windowsのフォルダーの**ReadOnly属性だけでは書込拒否を保証し
 
 公開`v0.8.6`以前の既存assetでCLI欠落・不一致時は処理を止め、利用中と**同じ製品版の正式配布物を再取得**してください。ZIP版はpackage全体を新しいdirectoryへ展開します。.NET標準抽出は書換え済みcacheの完全性を保証せず、再取得したEXEでも同じcacheを再利用し得ます。不一致が続く場合は、提供元が同じ製品版・runtime identityのZIPを提供していれば新しいdirectoryへ全体を展開し、なければ提供元へ確認してください。公開`v0.8.6`の代わりに旧公開`v0.8.1`を使ってcheckpoint互換を推測しないでください。
 
-現行sourceではOSのCLIのinstallとPATH設定が必要です。アプリは自動install／更新しません。既存公開版の同梱物検証をmanifest変更やhash検証緩和で回避しないでください。
+開発build／UnixだけはOSのCLIのinstallとPATH設定が必要です。アプリは自動install／更新しません。Windows配布候補・既存公開版の同梱物検証をmanifest変更やhash検証緩和で回避しないでください。`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN=0`による自動login抑止は変更していません。
 
 ### 本人loginと完了後の再確認
 

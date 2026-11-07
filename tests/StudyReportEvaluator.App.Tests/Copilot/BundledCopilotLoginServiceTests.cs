@@ -13,7 +13,7 @@ public sealed class BundledCopilotLoginServiceTests
     private const string SensitiveFailure = "synthetic-token device-code C:\\private\\copilot.exe";
 
     [Fact]
-    public void Default_service_uses_the_system_resolver_and_does_not_start_login()
+    public void FR121_AC033_Development_default_login_and_SDK_share_system_resolution_without_starting()
     {
         using BundledCopilotLoginService service = new();
         FieldInfo resolver = typeof(BundledCopilotLoginService).GetField(
@@ -22,6 +22,10 @@ public sealed class BundledCopilotLoginServiceTests
             "_ownedProcess", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
         Assert.IsType<SystemCopilotCliPathResolver>(resolver.GetValue(service));
+        CopilotClientFactory factory = new();
+        FieldInfo sdkResolver = typeof(CopilotClientFactory).GetField(
+            "_pathResolver", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        Assert.Equal(sdkResolver.GetValue(factory)!.GetType(), resolver.GetValue(service)!.GetType());
         Assert.Null(process.GetValue(service));
     }
 
@@ -156,7 +160,7 @@ public sealed class BundledCopilotLoginServiceTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Real_bundled_resolver_missing_manifest_or_wrong_hash_never_launches(bool wrongHash)
+    public async Task FR121_AC030_AC033_Bundled_missing_manifest_or_wrong_hash_is_validation_failure_without_launch(bool wrongHash)
     {
         using TemporaryBundle bundle = new(wrongHash);
         FakeProcessFactory factory = new(new FakeLoginProcess());
@@ -165,8 +169,7 @@ public sealed class BundledCopilotLoginServiceTests
         CopilotLoginResult result = await service.LoginAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(CopilotLoginStatus.CliUnavailable, result.Status);
-        Assert.Equal(wrongHash ? CopilotLoginErrorCategory.CliValidationFailed : CopilotLoginErrorCategory.CliUnavailable,
-            result.ErrorCategory);
+        Assert.Equal(CopilotLoginErrorCategory.CliValidationFailed, result.ErrorCategory);
         Assert.Empty(factory.StartInfos);
         Assert.DoesNotContain(bundle.Directory, result.ToString(), StringComparison.OrdinalIgnoreCase);
     }
