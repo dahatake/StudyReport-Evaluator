@@ -116,7 +116,13 @@ jobs:
 
       - name: Restore locked dependencies
         shell: pwsh
-        run: dotnet restore .\StudyReportEvaluator.slnx --locked-mode
+        run: |
+          # FR-121 AC-103: no local host-profile exclusion in the x64 candidate.
+          if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne 'X64' -or
+              [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -ne 'X64') {
+              throw 'Required validation needs a real x64 OS and x64 process.'
+          }
+          dotnet restore .\StudyReportEvaluator.slnx --locked-mode
 
       - name: Build Release
         shell: pwsh

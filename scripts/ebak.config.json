@@ -35,7 +35,7 @@
       },
       {
         "name": "app-unit",
-        "run": "dotnet test tests/StudyReportEvaluator.App.Tests -c Debug",
+        "run": "python scripts/release_test_selection.py --run-local",
         "slow": true
       }
     ]

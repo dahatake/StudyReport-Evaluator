@@ -74,7 +74,7 @@ read-onlyジョブにはRelease書込権限を与えず、run metadata/artifact�
 
 ```powershell
 python -m pytest -q tests/packaging/test_release_automation.py
-python scripts/ledger.py run --cases IT-006,IT-007,IT-008,IT-009 --no-record
+python scripts/ledger.py run --cases IT-006,IT-007,IT-008,IT-009,IT-010 --no-record
 python scripts/verify.py --quick
 ```
 
@@ -84,3 +84,35 @@ driverにghフォールバックはなく、GitHubへの全呼出しは注入し
 normalized requestは既存validatorの観測境界であって新しい公開証跡schemaではない。
 fixtureは合成bytesを実行せず、正式x64包装・clean-host実測・GitHubのenvironment設定・
 実Actions実行の証明にはならない。実環境での承認設定とrunner実行は別途必要。
+
+### ARM64と実x64の検証境界（AC-103）
+
+既存`app-unit`は次の既存selectorのローカル実行モードを使う。
+新たな証跡schemaや配布RIDは導入しない。
+
+```powershell
+python scripts/release_test_selection.py --run-local --results-directory work/local-trx --logger "trx;LogFileName=local.trx"
+```
+
+- native OSアーキテクチャを選び、エミュレートされたプロセスのx64を
+  実x64ホストと取り違えない。ARM64では本物のApp単体・結合試験を実行する。
+  子プロセスの失敗はそのまま非0とし、標準TRX引数をそのまま転送する。
+- 従来の8環境失敗のうち、ZIP入力のzero-byte/reparse拒否2件と
+  single-fileの不正入力・reparse/hardlink拒否2件は、
+  実スクリプトの読み取り専用admissionをホスト制約より先に実行する。
+  書込み直前のx64制約は維持する。assertや入力拒否条件は省略しない。
+- sample構造検証はCPU非依存。private `SampleReport.xlsx`があれば実行する。
+  探索先はworktreeの`sample/`、`STUDYREPORT_SAMPLE_DIR`、主worktreeの`sample/`。
+  不在なら`Private input NOT_RUN`と試験名を表示する。同じ完全な構造assertは
+  既存合成Workbook基盤でも常に実行し、実sample合格とは区別する。
+- 実x64専用は既存の性能中央値証跡、通常Release起動、
+  ZIP publish/起動/再現性の3試験。ARM64では各試験名を`x64 NOT_RUN`と列挙する。
+  性能試験の実Workbook read/write/validation処理は別のportable試験で実行するが、
+  x64性能JSONやx64合格結果は生成しない。未実行をPASSとは記録しない。
+- x64ローカルプロファイルは3試験を除外せず、通常起動に必要なReleaseを先にbuildする。
+  CIとcandidateはローカルモードを使わず、既存の`dotnet test`と包装・起動検証を維持する。
+  CI/candidate/publishはOSとプロセス両方のx64を要求し、ARM64上のx64エミュレーションも拒否する。
+- candidate adapterはCore/App全必須観測の合格に加え、実x64起動・性能の
+  **名前付きTRX結果の存在とPassed**を必須にする。欠落・NotExecuted・NOT_RUN・Failedは停止する。
+  ZIP/single-file包装、clean-host検証、Final matrixの既存必須条件も維持する。
+  ローカルのportable成功や合成bytesから正式publishable証跡を作ることはできない。

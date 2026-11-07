@@ -143,6 +143,7 @@ def test_workflow_trx_separates_opt_in_from_required_siblings(tmp_path, required
     write_workflow_trx(tmp_path, [
         ("StudyReportEvaluator.Core.Tests.Required.Executes", "Passed"),
         (sibling, required_outcome),
+        *((name, "Passed") for name in selection.REQUIRED_X64_METHODS),
         *((name, "NotExecuted") for name in selection.EXCLUDED_METHODS),
     ])
     if required_outcome == "Passed":
@@ -204,6 +205,130 @@ def test_workflow_and_trx_gate_use_the_same_explicit_selection():
         relative = class_name.removeprefix("StudyReportEvaluator.App.Tests.").replace(".", "/")
         source = (ROOT / "tests/StudyReportEvaluator.App.Tests" / (relative + ".cs")).read_text()
         assert f"Task {method_name}(" in source
+
+
+# FR-121 AC-103: a portable pass, skip, or absent x64 observation is never
+# promoted to deterministic candidate evidence.
+@pytest.mark.parametrize("outcome", [None, "NotExecuted", "NOT_RUN", "Failed"])
+@pytest.mark.parametrize("missing", selection.REQUIRED_X64_METHODS)
+def test_local_success_cannot_replace_required_native_x64_trx(tmp_path, outcome, missing):
+    observations = [
+        ("StudyReportEvaluator.Core.Tests.Required.Executes", "Passed"),
+        ("StudyReportEvaluator.App.Tests.Required.Executes", "Passed"),
+        *((name, "Passed") for name in selection.REQUIRED_X64_METHODS if name != missing),
+    ]
+    if outcome is not None:
+        observations.append((missing, outcome))
+    write_workflow_trx(tmp_path, observations)
+    with pytest.raises(driver.Stop, match="Core/App|real x64"):
+        adapter.deterministic_results(tmp_path)
+
+
+# FR-121 AC-103: explicit local profile; five formerly failing contracts still run.
+def test_local_profile_excludes_only_native_execution_not_portable_contracts():
+    assert selection.local_filter("x64") is None
+    assert selection.local_filter("amd64") is None
+    clauses = selection.local_filter("arm64").split("&")
+    assert clauses == [f"FullyQualifiedName!={name}" for name in selection.NATIVE_X64_METHODS]
+    for name in selection.REQUIRED_X64_METHODS:
+        assert selection.required_group(*name.rsplit(".", 1)) == selection.GROUPS[1]
+        assert name not in selection.test_filter()
+    with pytest.raises(ValueError, match="Unsupported"):
+        selection.local_filter("x86")
+
+
+# FR-121 AC-103: process emulation does not override the native OS profile;
+# standard dotnet TRX arguments reach the real runner unchanged.
+def test_local_command_forwards_trx_and_reports_not_run(monkeypatch, capsys):
+    monkeypatch.setenv("PROCESSOR_ARCHITECTURE", "AMD64")
+    monkeypatch.setenv("PROCESSOR_ARCHITEW6432", "ARM64")
+    calls = []
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 7)
+    monkeypatch.setattr(selection.subprocess, "run", run)
+    arguments = ["--results-directory", "path with spaces", "--logger", "trx;LogFileName=local.trx"]
+    assert selection.run_local(arguments) == 7
+    assert len(calls) == 1
+    assert calls[0][0][-len(arguments):] == arguments
+    assert "--filter" in calls[0][0]
+    output = capsys.readouterr().out
+    assert "arm64" in output
+    assert output.count("x64 NOT_RUN") == len(selection.NATIVE_X64_METHODS)
+    assert "publishable" not in output
+
+
+# FR-121 AC-103: callers cannot replace the owned profile before execution.
+@pytest.mark.parametrize("argument", ["--filter", "--filter=FullyQualifiedName~Nothing"])
+def test_local_profile_filter_cannot_be_overridden(monkeypatch, argument):
+    def forbidden(*args, **kwargs):
+        pytest.fail("No build/test may run with a caller-replaced profile")
+    monkeypatch.setattr(selection.subprocess, "run", forbidden)
+    with pytest.raises(ValueError, match="owns its host profile"):
+        selection.run_local([argument])
+
+
+# FR-121 AC-103: native x64 local mode executes all native tests, builds the
+# required Release output first, and cannot turn a build failure into success.
+@pytest.mark.parametrize("build_code", [0, 3])
+def test_native_local_mode_retains_x64_execution(monkeypatch, capsys, build_code):
+    monkeypatch.delenv("PROCESSOR_ARCHITEW6432", raising=False)
+    monkeypatch.setenv("PROCESSOR_ARCHITECTURE", "AMD64")
+    monkeypatch.setattr(selection, "private_sample_available", lambda _: True)
+    calls = []
+    def run(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, build_code if "build" in command else 0)
+    monkeypatch.setattr(selection.subprocess, "run", run)
+    assert selection.run_local(["--logger", "trx"]) == build_code
+    assert calls[0] == ["dotnet", "build", "src/StudyReportEvaluator.App", "-c", "Release"]
+    if build_code == 0:
+        assert len(calls) == 2 and "--filter" not in calls[1]
+    else:
+        assert len(calls) == 1
+    assert "NOT_RUN" not in capsys.readouterr().out
+
+
+# FR-121 AC-103: absent private data is distinct from CPU-dependent execution;
+# available repository, configured, or main-worktree input is never excluded.
+def test_private_sample_precondition_matches_worktree_search(tmp_path, monkeypatch):
+    monkeypatch.delenv("STUDYREPORT_SAMPLE_DIR", raising=False)
+    assert not selection.private_sample_available(tmp_path)
+    sample = tmp_path / "sample"
+    sample.mkdir()
+    (sample / "SampleReport.xlsx").write_bytes(b"presence-only; not execution evidence")
+    assert selection.private_sample_available(tmp_path)
+    (sample / "SampleReport.xlsx").unlink()
+    monkeypatch.setenv("STUDYREPORT_SAMPLE_DIR", f'"{sample}"')
+    (sample / "SampleReport.xlsx").write_bytes(b"presence-only")
+    assert selection.private_sample_available(tmp_path / "other")
+    monkeypatch.delenv("STUDYREPORT_SAMPLE_DIR")
+    pool = tmp_path / "pool"
+    pool.mkdir()
+    gitdir = tmp_path / ".git/worktrees/pool"
+    gitdir.mkdir(parents=True)
+    (pool / ".git").write_text(f"gitdir: {gitdir.as_posix()}")
+    (gitdir / "commondir").write_text("../..")
+    assert selection.private_sample_available(pool)
+
+
+# FR-121 AC-103: x64 CI uses mandatory native execution, not the local profile.
+def test_native_workflows_fail_closed_on_os_and_process_architecture():
+    import yaml
+    for filename in ("ci.yml", "release.yml", "publish-release.yml"):
+        workflow = yaml.safe_load((ROOT / ".github/workflows" / filename).read_text())
+        jobs = [job for job in workflow["jobs"].values()
+                if job.get("runs-on") == "windows-latest"]
+        runs = "\n".join(step.get("run", "") for job in jobs for step in job["steps"])
+        assert "::OSArchitecture -ne 'X64'" in runs
+        assert "::ProcessArchitecture -ne 'X64'" in runs
+        assert "throw 'Required validation needs a real x64 OS and x64 process.'" in runs
+        assert "--run-local" not in runs
+        for job in jobs:
+            for step in job["steps"]:
+                if "::OSArchitecture" in step.get("run", ""):
+                    assert not step.get("continue-on-error")
+                    assert "if" not in step
 
 
 # FR-121 AC-100/AC-102: relocation never rewrites candidate identity or evidence.
