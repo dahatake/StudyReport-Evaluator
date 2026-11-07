@@ -32,11 +32,13 @@
     "AC-092": "sha256:0d8ada5e34e80265",
     "AC-096": "sha256:a3a4363b2f743abe",
     "AC-007": "sha256:f02465452d03d14f",
-    "AC-028": "sha256:1a32a49d79cd1b78",
+    "AC-028": "sha256:d7be864fa2fccf57",
     "AC-100": "sha256:d0918272d2e80373",
     "AC-101": "sha256:fc73e5ba9a15a8b6",
     "AC-102": "sha256:6089c944bdbc5b15",
-    "AC-103": "sha256:43ff775435f55670"
+    "AC-103": "sha256:43ff775435f55670",
+    "AC-030": "sha256:8e5b1ce6d0ae50cf",
+    "AC-033": "sha256:f3a58744d0d2c64a"
   },
   "cases": [
     {
@@ -52,9 +54,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR001_AC054\"",
       "canary": true,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/E2E-001-202611071006.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\E2E-001-202611071928.log",
       "history": [
         {
           "at": "2026-11-02T11:38:39+09:00",
@@ -89,9 +91,9 @@
       "command": "python -m pytest tests/system/test_fr002_output_folder.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/E2E-002-202611071006.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\E2E-002-202611071928.log",
       "history": [
         {
           "at": "2026-11-02T11:38:41+09:00",
@@ -132,9 +134,9 @@
       "command": "dotnet test tests/system/ui --no-build --filter \"FullyQualifiedName~FR003_AC057\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/E2E-003-202611071015.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\E2E-003-202611071940.log",
       "history": [
         {
           "at": "2026-11-02T15:00:42+09:00",
@@ -227,9 +229,9 @@
       "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR112_AC072\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/IT-001-202611071015.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\IT-001-202611071940.log",
       "history": [
         {
           "at": "2026-11-03T23:59:54+09:00",
@@ -252,9 +254,9 @@
       "command": "dotnet test tests/system/integration --filter \"FullyQualifiedName~FR113_AC074\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/E2E-006-202611071016.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\E2E-006-202611071940.log",
       "history": [
         {
           "at": "2026-11-04T00:15:51+09:00",
@@ -278,9 +280,9 @@
       "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR115_Generation\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/IT-002-202611071016.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\IT-002-202611071940.log",
       "history": [
         {
           "at": "2026-11-04T09:03:24+09:00",
@@ -305,9 +307,9 @@
       "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR115_Conditions\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/IT-003-202611071016.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\IT-003-202611071940.log",
       "history": [
         {
           "at": "2026-11-04T09:03:25+09:00",
@@ -331,9 +333,9 @@
       "command": "dotnet test tests/system/integration --no-build --filter \"FullyQualifiedName~FR115_Resume\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/IT-004-202611071016.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\IT-004-202611071940.log",
       "history": [
         {
           "at": "2026-11-04T09:03:25+09:00",
@@ -356,9 +358,9 @@
       "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC004",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/E2E-007-202611071016.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\E2E-007-202611071941.log",
       "history": [
         {
           "at": "2026-11-04T09:06:38+09:00",
@@ -382,9 +384,9 @@
       "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC011_AC012",
       "canary": true,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/E2E-008-202611071007.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\E2E-008-202611071929.log",
       "history": [
         {
           "at": "2026-11-04T09:06:39+09:00",
@@ -414,9 +416,9 @@
       "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC010_AC077",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/E2E-009-202611071016.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\E2E-009-202611071941.log",
       "history": [
         {
           "at": "2026-11-04T09:06:40+09:00",
@@ -440,9 +442,9 @@
       "command": "dotnet test tests/system/integration --filter FullyQualifiedName~SimilarityIndicatorTests.FR114_AC078_AC079",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/E2E-010-202611071016.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\E2E-010-202611071941.log",
       "history": [
         {
           "at": "2026-11-04T09:06:41+09:00",
@@ -460,22 +462,30 @@
       "ac_ids": [
         "AC-086",
         "AC-087",
-        "AC-088"
+        "AC-088",
+        "AC-089",
+        "AC-090"
       ],
-      "title": "FR-116 ラベル付き対照データ・設問単位holdout分割（不成立条件）・誤検知／見逃し／保留の集計を独立oracleで照合",
+      "title": "FR-116 ラベル付き対照データ・設問単位holdout分割（不成立条件）・誤検知／見逃し／保留の集計を独立oracleで照合（ほか 1 件を統合）",
       "layer": "e2e",
-      "command": "python -m pytest tests/system/fr116/test_fr116_control_evaluation.py -q -k core",
+      "command": "python -m pytest tests/system/fr116/test_fr116_control_evaluation.py -k \"(core) or (record)\" -q",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/E2E-011-202611071016.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\E2E-011-202611071941.log",
       "history": [
         {
           "at": "2026-11-04T09:06:42+09:00",
           "by": "test-designer",
           "change": "追加",
           "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-07T18:18:30+09:00",
+          "by": "test-designer",
+          "change": "command, ac_ids: E2E-012 を統合",
+          "reason": "CHK-34 detected during run 202611071752 pre-commit verification: preserve FR-116 AC union in E2E-011, block duplicate E2E-012 without changing its test source"
         }
       ]
     },
@@ -492,18 +502,25 @@
       "layer": "e2e",
       "command": "python -m pytest tests/system/fr116/test_fr116_control_evaluation.py -q -k record",
       "canary": false,
-      "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/E2E-012-202611071016.log",
+      "status": "blocked",
+      "last_commit": "b4ff422",
+      "last_run_at": "2026-11-07T14:12:57+09:00",
+      "evidence": "work/runs/202611071319/logs/system-test/E2E-012-202611071411.log",
       "history": [
         {
           "at": "2026-11-04T09:06:43+09:00",
           "by": "test-designer",
           "change": "追加",
           "reason": "受入基準からケースを作成"
+        },
+        {
+          "at": "2026-11-07T18:18:30+09:00",
+          "by": "test-designer",
+          "change": "blocked",
+          "reason": "E2E-011 に統合（CHK-34 detected during run 202611071752 pre-commit verification: preserve FR-116 AC union in E2E-011, block duplicate E2E-012 without changing its test source）"
         }
-      ]
+      ],
+      "merged_into": "E2E-011"
     },
     {
       "id": "E2E-013",
@@ -549,9 +566,9 @@
       "command": "dotnet test tests/system/ui --filter \"FullyQualifiedName~FR118_\"",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/E2E-014-202611071016.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\E2E-014-202611071941.log",
       "history": [
         {
           "at": "2026-11-05T01:06:40+09:00",
@@ -604,16 +621,18 @@
         "FR-121"
       ],
       "ac_ids": [
-        "AC-028"
+        "AC-028",
+        "AC-030",
+        "AC-033"
       ],
-      "title": "FR-121 AC-028 exact bytes and required release gate",
+      "title": "FR-121 exact-byte release gate and bundled CLI authentication system regression",
       "layer": "contract",
       "command": "python -m pytest tests/system/fr121/test_ac028_gate.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/IT-006-202611071007.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\IT-006-202611071929.log",
       "history": [
         {
           "at": "2026-11-06T23:43:13+09:00",
@@ -632,6 +651,12 @@
           "by": "conductor",
           "change": "status -> not_run",
           "reason": "正本427eb1aで検証レベルsystemへ整合済み、先行設計の管理上blockを解除"
+        },
+        {
+          "at": "2026-11-07T18:15:27+09:00",
+          "by": "test-designer",
+          "change": "title: 'FR-121 AC-028 exact bytes and required release gate' -> 'FR-121 exact-byte release gate and bundled CLI authentication system regression'; ac_ids: ['AC-028'] -> ['AC-028', 'AC-030', 'AC-033']",
+          "reason": "run 202611071752: extend existing canary with source/EXE/ZIP stale-proof refusal, distribution missing-manifest plus fake PATH, integrity and authentication failure matrix; fake evidence never replaces real CH/ADV; retain not_run"
         }
       ]
     },
@@ -648,9 +673,9 @@
       "command": "python -m pytest tests/system/fr121/test_ac100_identity.py -q",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/IT-007-202611071016.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\IT-007-202611071941.log",
       "history": [
         {
           "at": "2026-11-06T23:43:14+09:00",
@@ -691,9 +716,9 @@
       "command": "python -m pytest tests/system/fr121/test_ac101_authority.py -q",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/IT-008-202611071016.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\IT-008-202611071941.log",
       "history": [
         {
           "at": "2026-11-06T23:43:15+09:00",
@@ -734,9 +759,9 @@
       "command": "python -m pytest tests/system/fr121/test_ac102_idempotency.py -q",
       "canary": false,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/IT-009-202611071016.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\IT-009-202611071941.log",
       "history": [
         {
           "at": "2026-11-06T23:43:16+09:00",
@@ -777,9 +802,9 @@
       "command": "python -m pytest tests/system/fr121/test_ac103_host_gate.py -q",
       "canary": true,
       "status": "pass",
-      "last_commit": "504da24",
-      "last_run_at": "2026-11-07T10:17:55+09:00",
-      "evidence": "work/runs/202611070839/logs/system-test/IT-010-202611071008.log",
+      "last_commit": "56d0144",
+      "last_run_at": "2026-11-07T19:42:35+09:00",
+      "evidence": "work\\runs\\202611071752\\logs\\system-test\\IT-010-202611071931.log",
       "history": [
         {
           "at": "2026-11-07T08:52:53+09:00",

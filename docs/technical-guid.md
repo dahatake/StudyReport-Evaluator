@@ -77,7 +77,7 @@ CoreはAvalonia、Open XML、Copilot SDK、filesystemを参照しません。変
 
 Avaloniaの一般的なMVVMでは、ViewをAXAML、ViewModelをUI frameworkへ依存しないclassとして分離し、bindingで接続します。本アプリもこの構造を採りますが、ViewModelはApp project内にあり、workbook／Copilot境界をinterface経由で置換できる箇所と直接compositionする箇所が混在します。
 
-## GitHub Copilot SDKとOSのCLI
+## GitHub Copilot SDKとCLIの解決
 
 ### Processとtransport
 
@@ -87,11 +87,11 @@ GitHubの公式説明では、Copilot SDKの基本構成は「application → SD
 - `CopilotClientMode.CopilotCli`
 - `UseLoggedInUser = true`、Appからの`GitHubToken`注入なし
 - remote session、SDK telemetry、runtime logを無効化
-- PATHで見つかったOSのnative CLIを使用し、同梱CLIや外部serverへfallbackしない
+- Windows配布は検証済み同梱CLIのみ、開発build／UnixはPATHのnative CLIを使用し、別方式や外部serverへfallbackしない
 
-`SystemCopilotCliPathResolver`は起動時のPATHを順に調べ、Windowsは`copilot.exe`、Unix source buildは実行権限のある`copilot`を探します。空・相対PATHは無視し、作業directoryや同梱CLIを探索しません。SDKとlogin serviceはこのresolverの絶対pathを使います。未導入時はinstall／PATH／再起動を案内し、起動・RPC・認証・モデル取得失敗はSDK互換性を含むruntime failureとして明示します。
+開発build／Unixの`SystemCopilotCliPathResolver`は起動時のPATHを順に調べ、Windowsは`copilot.exe`、Unix source buildは実行権限のある`copilot`を探します。空・相対PATHは無視し、作業directoryや同梱CLIを探索しません。Windows配布では既存`BundledCopilotCliPathResolver`がmanifest・RID・SDK版・CLI版・相対path・SHA-256を検証し、成功した絶対pathだけをSDKとlogin serviceへ返します。全AIも同じfactoryを使用します。起動・RPC・認証・モデル取得失敗はSDK互換性を含むruntime failureとして明示します。
 
-通常ビルドは`CopilotSkipCliDownload=true`でCLIを取得しません。`copilot-runtime.json`との固定版・SHA-256照合は実行時の前提ではありません。実際のCLI版・SHA-256とSDK版は引き続き診断とcheckpoint互換性に使用します。旧`BundledCopilotCliPathResolver`と既存publishの同梱物検証は過去の配布形式の検査用に保持しますが、default runtimeには使用しません。公開`v0.8.6`の既存assetは従来の同梱方式です。
+通常の開発ビルドは`CopilotSkipCliDownload=true`でCLIを取得せず、PATHを使用します。Windows配布scriptは`CopilotSkipCliDownload=false`を渡し、Appだけの`BUNDLED_COPILOT_RUNTIME`コンパイル定数で既定resolverを固定します（UnixはPATHを維持）。manifestの存在ではモードを切り替えず、欠損・破損はruntime failureで拒否し、PATHへfallbackしません。実際のCLI版・SHA-256とSDK版は引き続き診断とcheckpoint互換性に使用します。修正版`0.8.8`はローカル候補のみで、実CH-03・本人CH-06・実AI ADV-01はfake system回帰とは独立してexact bytesで再検証が必要です。既存公開assetは変更しません。
 
 > [!IMPORTANT]
 > 公式SDKの認証優先順位では、明示token、Copilot API用token、対応する環境変数token、保存済みCopilot CLI credential、GitHub CLI credentialの順です。現行Appはtokenを注入しませんが、子process環境を全面的には消去しません。UIは本人のCLI loginを主導線としています。認証方式を変更する場合は、`UseLoggedInUser`だけでなく、子process環境、credential優先順位、multi-user isolation、logとtest fixtureを一緒に設計してください。
@@ -319,7 +319,7 @@ GitHub.Copilot.SDK、CLI、Avalonia、Open XML、.NET runtimeはpackage／配布
 5. folder publish、単一EXE抽出、ZIP／MSIX allowlist、起動境界を再検証
 6. README、第三者通知、release文書を更新
 
-`.NET`単一fileはOS／architecture固有です。現行profileはnative libraryだけでなく全contentをdiskへ展開する互換modeを使うため、`AppContext.BaseDirectory`と抽出cacheの挙動を維持する必要があります。現行runtimeのCLI探索は抽出先ではなくOSのPATHを使用します。
+`.NET`単一fileはOS／architecture固有です。現行profileはnative libraryだけでなく全contentをdiskへ展開する互換modeを使うため、`AppContext.BaseDirectory`と抽出cacheの挙動を維持する必要があります。Windows配布runtimeのCLI探索は抽出先のmanifestと既存相対配置を使い、OSのPATHへfallbackしません。
 
 ## Test strategy
 

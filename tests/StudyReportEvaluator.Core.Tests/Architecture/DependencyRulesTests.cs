@@ -6,17 +6,18 @@ namespace StudyReportEvaluator.Core.Tests.Architecture;
 public sealed class DependencyRulesTests
 {
     [Fact]
-    public void Solution_has_exactly_two_production_and_two_test_projects()
+    public void Repository_has_exactly_three_production_and_five_test_projects()
     {
         string root = FindRepositoryRoot();
         string[] production = FindProjects(Path.Combine(root, "src"));
         string[] tests = FindProjects(Path.Combine(root, "tests"));
 
         Assert.Equal(
-            ["StudyReportEvaluator.App.csproj", "StudyReportEvaluator.Core.csproj"],
+            ["StudyReportEvaluator.App.csproj", "StudyReportEvaluator.ControlEvaluation.csproj", "StudyReportEvaluator.Core.csproj"],
             production.Select(Path.GetFileName).Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["StudyReportEvaluator.App.Tests.csproj", "StudyReportEvaluator.Core.Tests.csproj"],
+            ["StudyReportEvaluator.App.Tests.csproj", "StudyReportEvaluator.ControlEvaluation.Tests.csproj", "StudyReportEvaluator.Core.Tests.csproj",
+                "StudyReportEvaluator.SystemTests.Integration.csproj", "StudyReportEvaluator.SystemTests.Ui.csproj"],
             tests.Select(Path.GetFileName).Order(StringComparer.Ordinal));
     }
 

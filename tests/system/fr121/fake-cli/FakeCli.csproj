@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>copilot</AssemblyName>
+    <!-- CLI fixture version, not the product/candidate version. -->
+    <Version>1.0.79</Version>
+    <InformationalVersion>1.0.79</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>

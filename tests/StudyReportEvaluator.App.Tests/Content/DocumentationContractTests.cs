@@ -858,9 +858,10 @@ public sealed class DocumentationContractTests
     [Fact]
     public void Published_0_8_6_ui_and_screenshots_are_explicitly_distinguished_from_historical_0_8_1()
     {
-        // Literal current public release expectations are deliberate: synchronized after publication,
-        // not by reading a version back from the documents being checked. Public 0.8.6 is current; 0.8.1 is historical.
-        Assert.Contains("<VersionPrefix>0.8.6</VersionPrefix>", Read("Directory.Build.props"), StringComparison.Ordinal);
+        // FR-121 AC-028/100: the local source candidate is 0.8.8; public documentation
+        // remains on 0.8.6 until publication, with 0.8.1 historical.
+        Assert.Contains("<VersionPrefix>0.8.8</VersionPrefix>", Read("Directory.Build.props"), StringComparison.Ordinal);
+        AssertContainsAll(Read("README.md"), "修正版`0.8.8`はローカル候補のみ", "今回公開しません");
         foreach ((string path, string candidate, string published) in new[]
                  {
                      ("README.md", "現在の公開版は`0.8.6`です", "fresh Windows 11 x64でのclean-host試験CH-01〜06と本人loginを実施しないまま公開"),
@@ -883,7 +884,7 @@ public sealed class DocumentationContractTests
 
         AssertContainsAll(Read("images/README.md"), "一時directoryへ描画", "2回生成の一致", "finally",
             "生成時の製品版: `0.8.6`", "その時点ではPNGを再生成していません");
-        AssertContainsAll(Read("CHANGELOG.md"), "## [Unreleased]", "## [0.8.6] - 2026-10-01");
+        AssertContainsAll(Read("CHANGELOG.md"), "## [Unreleased]", "## [0.8.8] - 2026-11-07", "## [0.8.7] - 2026-11-07", "## [0.8.6] - 2026-10-01");
         AssertContainsAll(
             Read("docs/getting-started.md"),
             "確認のためだけにPowerShell等を導入する必要はありません",
