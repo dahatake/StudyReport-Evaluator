@@ -6,6 +6,7 @@ from pathlib import Path
 
 from harness import (CH, EXE, KINDS, PUBLIC, REQUIRED, GitHub, digest, fixture, invoke,
                      downloaded_names, no_destructive_calls, stopped, success)
+from runtime_harness import runtime_contract
 
 
 def test_FR121_AC028_exact_bytes_and_closed_required_gate(tmp_path):
@@ -26,6 +27,39 @@ def test_FR121_AC028_exact_bytes_and_closed_required_gate(tmp_path):
             assert row["publish"] is (not msix)
             assert row["status"] == ("PASS_MECHANISM" if msix else "PASS_REQUIRED")
         no_destructive_calls(gh)
+
+    # FR-121 AC-028: a new local candidate may share a policy-selected product
+    # version, but cannot reuse clean-host proof for an older source/EXE/ZIP.
+    # Only the local fake GitHub is mutated. No real candidate is published.
+    for index, change in enumerate(("source", "exe-bytes", "zip-bytes", "CH06-claim-only")):
+        fresh = copy.deepcopy(request)
+        remote = copy.deepcopy(assets)
+        if change == "source":
+            fresh["clean_host"]["identity"]["commit"] = "e" * 40
+        elif change == "CH06-claim-only":
+            fresh["clean_host"]["tests"] = dict.fromkeys(CH, "NOT_RUN")
+            fresh["clean_host"]["tests"]["CH-06"] = "PASS"
+        else:
+            name = EXE if change == "exe-bytes" else next(n for n in PUBLIC if n.endswith(".zip"))
+            remote[name] += b"new candidate bytes"
+            remote[name + ".sha256"] = f"{digest(remote[name])}  {name}\n".encode()
+            if change == "exe-bytes":
+                for artifact in fresh["package"]["assets"]:
+                    if artifact["fileName"] in (name, name + ".sha256"):
+                        value = remote[artifact["fileName"]]
+                        artifact.update(bytes=len(value), sha256=digest(value))
+            # EXE has matching new packaging proof but stale CH proof; ZIP has
+            # stale packaging proof. Neither kind of old proof may be reused.
+            for filename, value in remote.items():
+                path = tmp_path / f"revised-{index}" / filename
+                path.parent.mkdir(exist_ok=True)
+                path.write_bytes(value)
+                fresh["asset_paths"][filename] = str(path)
+        with GitHub(fresh, remote) as gh:
+            before = gh.snapshot()
+            stopped(invoke(tmp_path / f"stale-proof-{index}", fresh, gh))
+            assert not gh.public_calls()
+            assert gh.snapshot() == before
 
     # Every required group/CH ID is fail-closed, not just one representative flag.
     mutations = []
@@ -87,3 +121,8 @@ def test_FR121_AC028_exact_bytes_and_closed_required_gate(tmp_path):
             assert not gh.public_calls()
             assert gh.snapshot() == before
             no_destructive_calls(gh)
+
+
+def test_FR121_AC030_AC033_bundled_runtime_and_authentication_system_boundary(tmp_path):
+    # One build/session per profile. Never real login/AI/CH proof.
+    runtime_contract(tmp_path / "runtime")

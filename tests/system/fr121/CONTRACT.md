@@ -1,15 +1,54 @@
-# FR-121 AC-028 / AC-100 / AC-101 / AC-102 — implementation handoff
+# FR-121 System Test — implementation handoff
 
-Oracle: approved FR-121 and §13.1, 13.6, 13.7 (run `202611062322`).
-These are integration-level ACs; the ledger layer is `contract`. They are not
-reclassified as system-level ACs. No existing ledger case covered AC-028 at design
-time. Existing `ReleaseWorkflowContractTests` / `ReleaseMatrixContractTests` remain
+Oracle: approved FR-121 and §3.2, 11.10, 13.1, 13.6, 13.7
+(current revision: run `202611071752`). These ACs are now explicitly system-level;
+the original verification-level activation conflict has already been resolved.
+Existing `ReleaseWorkflowContractTests` / `ReleaseMatrixContractTests` remain
 regressions; this suite adds observable orchestration, not another matrix validator.
 
-**Activation conflict:** strict rdcheck CHK-10 rejects integration-level ACs in
-the System Test ledger. IT-006–IT-009 were collected successfully, then blocked
-with that reason. The conductor/rd-author must resolve the level/policy conflict;
-the test designer does not silently reclassify ACs or weaken strict verification.
+## CH03 correction increment: AC-028 / AC-030 / AC-033
+
+IT-006 is reused, retaining its command and canary flag, and extending its AC set
+to AC-028/030/033. No duplicate ledger case is added. Both pytest functions in
+`test_ac028_gate.py` must pass; C# test discovery/results must be nonempty and all
+three named system methods must have Passed TRX results (skip is not success).
+
+`runtime_harness.py` builds a local tripwire CLI once and the existing UI test
+project once per compilation profile, in private temporary artifact directories.
+`CopilotCliBinaryPath` supplies only that local executable; no CLI download,
+credential read, real login, browser launch, real SDK Start/Ping or AI is needed.
+Distribution compilation uses `CopilotSkipCliDownload=false`, development uses
+`true`. This exercises the existing App/SDK build-property seam, not a new
+production CLI abstraction. The tripwire's version is CLI 1.0.79, **not** a
+constraint on the policy-selected product/candidate version. Public NuGet restore
+is permitted during compilation; runtime processes get refusal proxies and no
+ambient token variables. This is not an OS network sandbox.
+
+Coverage within the existing case:
+
+| AC | Observations and negative boundaries |
+|---|---|
+| AC-028 | Existing closed required gates retained. Same product version with changed EXE bytes and stale CH proof; changed ZIP bytes with stale package proof; mismatched source; CH-06 PASS claim with CH-01–05 NOT_RUN all stop without public mutation. |
+| AC-030 | Default SDK/login composition chooses validated absolute bundled path, not fake PATH; distribution manifest deletion with fake PATH still rejects through **both** default consumers. Choice must be compiled/configured independently of manifest existence. Explicit real resolver rejects missing/corrupt CLI/manifest and RID/SDK/CLI-version/path/hash mismatch before SDK creation or login start. Development with a manifest still uses PATH. |
+| AC-033 | Observe default authentication/normal/reference/special SDK consumer factories against the same CLI path/hash, without creating sessions. Real authentication service → execution boundary → startup state handles available/valid unauthenticated/Start/Ping failure/timeout/incompatibility/invalid auth/cancellation. Only valid unauthenticated auto-starts login; suppression leaves manual command usable. Process exit is not authentication; normal completion rechecks auth/models, manual check can observe later authentication. One-shot startup cannot restart login. Owned-process cancellation and overlapping-login refusal; no AI run. One headless GUI remains usable and loads synthetic Excel/navigates design after cancellation. |
+
+Private field reflection only finds the **existing** login resolver and SDK
+factory wiring; expected paths, refusal and states come from the ACs. It does not
+assert private field names or introduce an alternative resolver policy.
+
+### Real candidate acceptance — still required, never certified by fake PASS
+
+After implementation, build a **new local** candidate using the existing ADR
+version policy, keeping the old v0.8.7/6AF… candidate untouched. Record actual
+source, chosen product version, final EXE/ZIP bytes, sizes, SHA-256 and sidecars.
+Run existing real packaging checks plus IT-006 against that source. Record all
+CH-01–06 against the exact new EXE; a historical PASS or user CH-06 statement is
+not new evidence. Real Start/Ping is CH-03, user authentication is CH-06, real AI
+is ADV-01. The current-native synthetic fixture (including ARM64 hosts) proves
+none of those real-x64 outcomes. Missing/failed/cancelled/skipped CH remains
+NOT_RUN/failed in the actual evidence; fake TRX must never populate it. The
+run's product version is intentionally not pinned here. No actual Release,
+push, deployment or publication is authorized by this test design.
 
 ## Production entry point (to implement)
 
@@ -105,8 +144,9 @@ python -m pytest tests/system/fr121/test_ac101_authority.py -q
 python -m pytest tests/system/fr121/test_ac102_idempotency.py -q
 ```
 
-One pytest function and one ledger case per AC. Decision-table rows loop inside
-that case, avoiding a ledger explosion. Files are separate because the four
+One ledger case per independently executable boundary; IT-006 groups three
+related ACs. Decision-table rows loop inside each case, avoiding a ledger
+explosion. Files are separate because the four
 independently executable contracts isolate gate, identity, authority and mutable
 remote-state failures. AC-028 is the canary. All scenarios use private temporary
 data and ephemeral loopback ports; no serial execution is required.
