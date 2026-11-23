@@ -169,9 +169,10 @@ public sealed class SurfaceTextSimilarityCalculator
                 answer.QuestionId ?? string.Empty,
                 answer.Answer))
             .ToImmutableArray();
-        ImmutableArray<SimilarityPeerResult>.Builder results = ImmutableArray.CreateBuilder<SimilarityPeerResult>(prepared.Length);
-        foreach (PreparedPeerAnswer answer in prepared)
+        SimilarityPeerResult[] results = new SimilarityPeerResult[prepared.Length];
+        Parallel.For(0, prepared.Length, index =>
         {
+            PreparedPeerAnswer answer = prepared[index];
             decimal best = 0m;
             int? bestRow = null;
             if (answer.Normalized.Length > 0)
@@ -194,10 +195,10 @@ public sealed class SurfaceTextSimilarityCalculator
                 }
             }
 
-            results.Add(new SimilarityPeerResult(answer.SourceRowNumber, answer.QuestionId, best, bestRow));
-        }
+            results[index] = new SimilarityPeerResult(answer.SourceRowNumber, answer.QuestionId, best, bestRow);
+        });
 
-        return new SimilarityPeerAnalysisResult(results.ToImmutable());
+        return new SimilarityPeerAnalysisResult(ImmutableArray.Create(results));
     }
 
     public static string NormalizeForComparison(string? value)
@@ -231,9 +232,9 @@ public sealed class SurfaceTextSimilarityCalculator
             sourceRowNumber,
             questionId,
             normalized,
-            BuildNGramSet(normalized, 1),
-            BuildNGramSet(normalized, 2),
-            BuildNGramSet(normalized, 3),
+            BuildPackedNGrams(normalized, 1),
+            BuildPackedNGrams(normalized, 2),
+            BuildPackedNGrams(normalized, 3),
             normalized.Length == 0 ? null : new SuffixAutomaton(normalized));
     }
 
@@ -253,12 +254,12 @@ public sealed class SurfaceTextSimilarityCalculator
         }
 
         int n = SelectNGramSize(student.Normalized.Length, reference.Normalized.Length);
-        HashSet<string> studentNGrams = student.NGrams(n);
-        HashSet<string> referenceNGrams = reference.NGrams(n);
-        int intersection = CountIntersection(studentNGrams, referenceNGrams);
-        decimal containment = Ratio(intersection, studentNGrams.Count, roundingDigits);
-        decimal dice = Ratio(2 * intersection, studentNGrams.Count + referenceNGrams.Count, roundingDigits);
-        decimal jaccard = Ratio(intersection, studentNGrams.Count + referenceNGrams.Count - intersection, roundingDigits);
+        long[] studentNGrams = student.NGrams(n);
+        long[] referenceNGrams = reference.NGrams(n);
+        int intersection = CountSortedIntersection(studentNGrams, referenceNGrams);
+        decimal containment = Ratio(intersection, studentNGrams.Length, roundingDigits);
+        decimal dice = Ratio(2 * intersection, studentNGrams.Length + referenceNGrams.Length, roundingDigits);
+        decimal jaccard = Ratio(intersection, studentNGrams.Length + referenceNGrams.Length - intersection, roundingDigits);
         int lcs = reference.Automaton?.LongestCommonSubstringLength(student.Normalized) ?? 0;
         decimal lcsCoverage = lcs < n ? 0m : Ratio(lcs, student.Normalized.Length, roundingDigits);
         return Round(Math.Max(Round((containment * 0.70m) + (dice * 0.20m) + (jaccard * 0.10m), roundingDigits), lcsCoverage), roundingDigits);
@@ -286,6 +287,65 @@ public sealed class SurfaceTextSimilarityCalculator
         }
 
         return grams;
+    }
+
+    // n <= 3 の n-gram を 16bit 文字単位で詰めた、重複なし昇順の配列。
+    private static long[] BuildPackedNGrams(string value, int n)
+    {
+        if (n <= 0 || value.Length < n)
+        {
+            return [];
+        }
+
+        long[] grams = new long[value.Length - n + 1];
+        for (int index = 0; index < grams.Length; index++)
+        {
+            long key = 0;
+            for (int offset = 0; offset < n; offset++)
+            {
+                key = (key << 16) | value[index + offset];
+            }
+
+            grams[index] = key;
+        }
+
+        Array.Sort(grams);
+        int unique = 0;
+        for (int index = 0; index < grams.Length; index++)
+        {
+            if (index == 0 || grams[index] != grams[index - 1])
+            {
+                grams[unique++] = grams[index];
+            }
+        }
+
+        return unique == grams.Length ? grams : grams[..unique];
+    }
+
+    private static int CountSortedIntersection(long[] first, long[] second)
+    {
+        int i = 0;
+        int j = 0;
+        int count = 0;
+        while (i < first.Length && j < second.Length)
+        {
+            if (first[i] < second[j])
+            {
+                i++;
+            }
+            else if (first[i] > second[j])
+            {
+                j++;
+            }
+            else
+            {
+                count++;
+                i++;
+                j++;
+            }
+        }
+
+        return count;
     }
 
     private static int CountIntersection(HashSet<string> first, HashSet<string> second)
@@ -381,12 +441,12 @@ public sealed class SurfaceTextSimilarityCalculator
         int SourceRowNumber,
         string QuestionId,
         string Normalized,
-        HashSet<string> NGrams1,
-        HashSet<string> NGrams2,
-        HashSet<string> NGrams3,
+        long[] NGrams1,
+        long[] NGrams2,
+        long[] NGrams3,
         SuffixAutomaton? Automaton)
     {
-        internal HashSet<string> NGrams(int n) => n switch
+        internal long[] NGrams(int n) => n switch
         {
             1 => NGrams1,
             2 => NGrams2,

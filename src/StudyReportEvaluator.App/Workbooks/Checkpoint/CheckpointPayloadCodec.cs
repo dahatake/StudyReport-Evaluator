@@ -51,6 +51,39 @@ internal static class CheckpointPayloadCodec
             throw new CheckpointFormatException(CheckpointStatusCodes.HashMismatch);
         }
 
+        // A checkpoint is decoded several times per save and the result depends only on the
+        // hash-verified payload, so only successful decodes are reused (failures are never cached).
+        lock (DecodedLock)
+        {
+            if (DecodedEnvelopes.TryGetValue(expectedSha256, out CheckpointEnvelope? cached))
+            {
+                return cached;
+            }
+        }
+
+        CheckpointEnvelope decoded = DecodeVerified(payload);
+        lock (DecodedLock)
+        {
+            if (DecodedEnvelopes.TryAdd(expectedSha256, decoded))
+            {
+                DecodedOrder.Enqueue(expectedSha256);
+                while (DecodedOrder.Count > DecodedCacheCapacity)
+                {
+                    DecodedEnvelopes.Remove(DecodedOrder.Dequeue());
+                }
+            }
+        }
+
+        return decoded;
+    }
+
+    private const int DecodedCacheCapacity = 8;
+    private static readonly object DecodedLock = new();
+    private static readonly Queue<string> DecodedOrder = new();
+    private static readonly Dictionary<string, CheckpointEnvelope> DecodedEnvelopes = new(StringComparer.Ordinal);
+
+    private static CheckpointEnvelope DecodeVerified(string payload)
+    {
         CheckpointEnvelope envelope;
         try
         {

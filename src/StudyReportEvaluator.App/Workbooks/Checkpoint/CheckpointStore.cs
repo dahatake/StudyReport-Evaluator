@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -715,7 +715,7 @@ public sealed class CheckpointStore : ICheckpointStore
         // Only a passing verdict for identical bytes is reused; failures are never cached.
         if (!WasValidated(packageSha256))
         {
-            if (new OpenXmlValidator().Validate(document, cancellationToken).Any())
+            if (!ValidatePartsWithCache(document, cancellationToken))
             {
                 throw new CheckpointFormatException(CheckpointStatusCodes.Invalid);
             }
@@ -728,6 +728,54 @@ public sealed class CheckpointStore : ICheckpointStore
             envelope,
             payloadSha256);
     }
+
+    // Each checkpoint package re-contains the byte-identical input parts, so schema validation is
+    // done per part and a passing verdict is reused only for the same URI, content type and bytes.
+    private static bool ValidatePartsWithCache(SpreadsheetDocument document, CancellationToken cancellationToken)
+    {
+        OpenXmlValidator validator = new();
+        foreach (OpenXmlPart part in document.GetAllParts())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string key = part.Uri + "|" + part.ContentType + "|" + HashPart(part);
+            lock (ValidatedPartLock)
+            {
+                if (ValidatedPartHashes.Contains(key))
+                {
+                    continue;
+                }
+            }
+
+            if (part.RootElement is null)
+            {
+                continue;
+            }
+
+            if (validator.Validate(part, cancellationToken).Any())
+            {
+                return false;
+            }
+
+            lock (ValidatedPartLock)
+            {
+                if (ValidatedPartHashes.Add(key))
+                {
+                    ValidatedPartOrder.Enqueue(key);
+                    while (ValidatedPartOrder.Count > ValidatedPartCacheCapacity)
+                    {
+                        ValidatedPartHashes.Remove(ValidatedPartOrder.Dequeue());
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private const int ValidatedPartCacheCapacity = 256;
+    private static readonly object ValidatedPartLock = new();
+    private static readonly Queue<string> ValidatedPartOrder = new();
+    private static readonly HashSet<string> ValidatedPartHashes = new(StringComparer.Ordinal);
 
     private const int ValidatedCacheCapacity = 16;
     private static readonly object ValidatedLock = new();
