@@ -9,7 +9,7 @@ UI = "tests/system/ui"
 APP = "tests/StudyReportEvaluator.App.Tests"
 UI_NAMES = (
     "FR002_AC055_Settings_has_only_common_category_and_common_controls_remain",
-    "FR002_AC055_Design_entry_buttons_never_point_to_removed_settings_categories",
+    "FR003_AC057_Removed_three_features_are_unreachable_from_every_screen",
     "FR002_AC055_Native_selection_cancel_failure_save_restore_and_default_are_one_journey",
     "FR002_AC055_Picker_and_reset_during_run_preserve_snapshot_and_reserved_paths",
 )

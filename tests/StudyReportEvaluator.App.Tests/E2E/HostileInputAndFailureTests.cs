@@ -20,81 +20,42 @@ public sealed class HostileInputAndFailureTests
 {
     private static readonly TimeSpan CleanupTimeout = TimeSpan.FromSeconds(1);
 
-    [Fact]
-    public void Corrupt_zip_payload_is_rejected_without_content_disclosure()
+    [Theory]
+    [InlineData("truncated_header", FileFormatClassification.CorruptPackage)]
+    [InlineData("truncated_zip", FileFormatClassification.CorruptPackage)]
+    [InlineData("legacy_cfb_xls", FileFormatClassification.LegacyBinaryWorkbook)]
+    [InlineData("protected_cfb_xlsx", FileFormatClassification.EncryptedOrRightsProtected)]
+    [InlineData("macro_package", FileFormatClassification.MacroEnabledWorkbook)]
+    [InlineData("zip_bomb", FileFormatClassification.UnsafePackage)]
+    public void Hostile_package_is_rejected_fail_closed_without_content_disclosure(
+        string scenario,
+        FileFormatClassification expected)
     {
-        using TemporaryWorkbook file = X01SyntheticWorkbookFactory.CreateRaw(
-            ".xlsx",
-            [0x50, 0x4B, 0x03, 0x04, 0x45, 0x30, 0x32]);
+        using TemporaryWorkbook file = scenario switch
+        {
+            "truncated_header" => X01SyntheticWorkbookFactory.CreateRaw(
+                ".xlsx",
+                [0x50, 0x4B, 0x03, 0x04, 0x45, 0x30, 0x32]),
+            "legacy_cfb_xls" => X01SyntheticWorkbookFactory.CreateRaw(".xls", CompoundFileBytes()),
+            "protected_cfb_xlsx" => X01SyntheticWorkbookFactory.CreateRaw(".xlsx", CompoundFileBytes()),
+            "macro_package" => X01SyntheticWorkbookFactory.Create(
+                documentType: SpreadsheetDocumentType.MacroEnabledWorkbook),
+            "zip_bomb" => X01SyntheticWorkbookFactory.CreateZipBombLike(),
+            _ => CreateTruncatedZip(),
+        };
 
         FileFormatClassificationResult result = new FileFormatClassifier().Classify(file.Path);
 
-        Assert.Equal(FileFormatClassification.CorruptPackage, result.Classification);
+        Assert.Equal(expected, result.Classification);
         AssertRedacted(result.ToString());
     }
 
-    [Fact]
-    public void Truncated_valid_zip_is_rejected_as_one_corruption_cause()
+    private static TemporaryWorkbook CreateTruncatedZip()
     {
-        using TemporaryWorkbook workbook = X01SyntheticWorkbookFactory.Create();
+        TemporaryWorkbook workbook = X01SyntheticWorkbookFactory.Create();
         byte[] bytes = File.ReadAllBytes(workbook.Path);
         File.WriteAllBytes(workbook.Path, bytes[..^22]);
-
-        FileFormatClassificationResult result = new FileFormatClassifier().Classify(workbook.Path);
-
-        Assert.Equal(FileFormatClassification.CorruptPackage, result.Classification);
-        AssertRedacted(result.ToString());
-    }
-
-    [Fact]
-    public void Legacy_CFB_workbook_extension_is_rejected_before_content_processing()
-    {
-        using TemporaryWorkbook file = X01SyntheticWorkbookFactory.CreateRaw(
-            ".xls",
-            CompoundFileBytes());
-
-        FileFormatClassificationResult result = new FileFormatClassifier().Classify(file.Path);
-
-        Assert.Equal(FileFormatClassification.LegacyBinaryWorkbook, result.Classification);
-        AssertRedacted(result.ToString());
-    }
-
-    [Fact]
-    public void Protected_CFB_container_masquerading_as_xlsx_is_rejected_fail_closed()
-    {
-        using TemporaryWorkbook file = X01SyntheticWorkbookFactory.CreateRaw(
-            ".xlsx",
-            CompoundFileBytes());
-
-        FileFormatClassificationResult result = new FileFormatClassifier().Classify(file.Path);
-
-        Assert.Equal(
-            FileFormatClassification.EncryptedOrRightsProtected,
-            result.Classification);
-        AssertRedacted(result.ToString());
-    }
-
-    [Fact]
-    public void Macro_enabled_package_masquerading_as_xlsx_is_rejected()
-    {
-        using TemporaryWorkbook workbook = X01SyntheticWorkbookFactory.Create(
-            documentType: SpreadsheetDocumentType.MacroEnabledWorkbook);
-
-        FileFormatClassificationResult result = new FileFormatClassifier().Classify(workbook.Path);
-
-        Assert.Equal(FileFormatClassification.MacroEnabledWorkbook, result.Classification);
-        AssertRedacted(result.ToString());
-    }
-
-    [Fact]
-    public void Unsafe_high_expansion_ratio_zip_is_rejected_before_package_processing()
-    {
-        using TemporaryWorkbook workbook = X01SyntheticWorkbookFactory.CreateZipBombLike();
-
-        FileFormatClassificationResult result = new FileFormatClassifier().Classify(workbook.Path);
-
-        Assert.Equal(FileFormatClassification.UnsafePackage, result.Classification);
-        AssertRedacted(result.ToString());
+        return workbook;
     }
 
     [Fact]

@@ -210,13 +210,8 @@ public sealed class IntegratedDesignAndSettingsTests
         Assert.NotNull(Find<Control>(window, "EvaluatorSettingsQuestions"));
         Assert.NotNull(Find<Control>(window, "EvaluatorSettingsEvaluators"));
         Assert.NotNull(Find<Control>(window, "EvaluatorSettingsCriteria"));
-    }
 
-    // FR-002 AC-055: 2 採点設計から旧設定への入口は、存在するカテゴリだけを指す。
-    [AvaloniaFact]
-    public void FR002_AC055_Design_entry_buttons_never_point_to_removed_settings_categories()
-    {
-        MainWindow window = OpenWindow(1024, 720);
+        // FR-002 AC-055: 採点設計から設定への入口は、存在するカテゴリ（共通）だけを指す。
         window.ViewModel.Navigator.NavigateTo(WorkflowStep.Design);
         Render();
 

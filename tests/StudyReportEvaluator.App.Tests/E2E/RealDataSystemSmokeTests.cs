@@ -425,18 +425,13 @@ public sealed partial class RealDataSystemSmokeTests
     }
 
     [Fact]
-    public void Evidence_path_matching_input_path_is_rejected_before_smoke_writes()
+    public void Evidence_path_is_rejected_only_when_it_matches_the_input_path()
     {
         string inputPath = Path.GetFullPath(Path.Combine("sample", "SampleReport.xlsx"));
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
             () => AssertEvidencePathDoesNotOverwriteInput(inputPath, inputPath.ToUpperInvariant()));
         Assert.Contains("must not be the input workbook path", exception.Message, StringComparison.Ordinal);
-    }
 
-    [Fact]
-    public void Evidence_path_may_share_input_directory_when_file_name_differs()
-    {
-        string inputPath = Path.GetFullPath(Path.Combine("sample", "SampleReport.xlsx"));
         string evidencePath = Path.Combine(
             Path.GetDirectoryName(inputPath)!,
             "real-data-evidence.json");
