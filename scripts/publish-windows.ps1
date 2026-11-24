@@ -1163,6 +1163,7 @@ function Assert-ApplicationLaunch {
     $startInfo.Environment['DOTNET_ROOT'] = Join-Path $PublishDirectory '__no-installed-dotnet__'
     $startInfo.Environment['DOTNET_ROOT_X64'] = Join-Path $PublishDirectory '__no-installed-dotnet-x64__'
     $startInfo.Environment['DOTNET_MULTILEVEL_LOOKUP'] = '0'
+    $startInfo.Environment['STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN'] = '0'
 
     if (-not [string]::IsNullOrWhiteSpace($SingleFileProbeDirectory)) {
         Set-SingleFileProbeEnvironment -StartInfo $startInfo -ProbeDirectory $SingleFileProbeDirectory

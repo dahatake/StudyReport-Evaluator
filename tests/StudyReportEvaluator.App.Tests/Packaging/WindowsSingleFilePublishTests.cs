@@ -141,6 +141,22 @@ public sealed class WindowsSingleFilePublishTests
     }
 
     [Fact]
+    public async Task Folder_publish_launch_disables_automatic_copilot_login()
+    {
+        await AssertFunctionsSucceedAsync("""
+            $definition = @($ast.EndBlock.Statements | Where-Object {
+                $_ -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                $_.Name -ceq 'Assert-ApplicationLaunch'
+            })
+            if ($definition.Count -ne 1 -or
+                -not $definition[0].Body.Extent.Text.Contains('STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN') -or
+                -not $definition[0].Body.Extent.Text.Contains("= '0'")) {
+                throw 'Folder publish launch must not start automatic Copilot login.'
+            }
+            """);
+    }
+
+    [Fact]
     public async Task Publish_mode_uses_the_full_app_profile_only_when_opted_in()
     {
         await AssertFunctionsSucceedAsync("""
