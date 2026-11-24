@@ -49,7 +49,7 @@ StudyReport Evaluatorは、Excelにまとめた学生の回答をAIで評価し�
 - [製品README](../README.md)：配布形式、動作環境、任意のSHA-256確認、Windowsの警告
 - [技術ガイド](technical-guid.md)：内部構成、変更・拡張時の注意
 - [起動引数のガイド](prompt-launch.md)：任意のコマンド起動。現行ソースでは`--prompt`を採点に使いません
-- [Release自動化](release-automation.md)：配布物の作成・公開前の検証
+- [Release自動化](https://github.com/dahatake/StudyReport-Evaluator/blob/main/docs/release-automation.md)：配布物の作成・公開前の検証
 
 対応は**Windows 11 x64、標準`.xlsx`**です。公開EXE／ZIPともunsigned（電子署名なし）で、Windowsや学校の端末管理により起動を拒否される場合があります。保護機能を無効にせず、管理者へ相談してください。macOS、Linux、Windows Arm64、暗号化Excel、マクロ付きExcelは対象外です。development MSIXは検証専用で、一般配布しません。
 

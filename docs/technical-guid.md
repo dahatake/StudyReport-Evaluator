@@ -384,7 +384,7 @@ pwsh.exe -NoLogo -NoProfile -Command "dotnet build .\StudyReportEvaluator.slnx -
 pwsh.exe -NoLogo -NoProfile -Command "dotnet test .\StudyReportEvaluator.slnx --no-restore -c Release"
 ```
 
-これは開発・テスト用のbuildで、Windows同梱CLI配布物の生成ではありません。ARM64など実x64ではないホストでは[Release自動化](release-automation.md)のローカルselectorとNOT_RUNの扱いを確認してください。正式配布の包装・起動・clean-host証跡は別に必要です。
+これは開発・テスト用のbuildで、Windows同梱CLI配布物の生成ではありません。ARM64など実x64ではないホストでは[Release自動化](https://github.com/dahatake/StudyReport-Evaluator/blob/main/docs/release-automation.md)のローカルselectorとNOT_RUNの扱いを確認してください。正式配布の包装・起動・clean-host証跡は別に必要です。
 
 live Copilot、本人login、実データ、repository画像更新、package実物の生成は通常unit testの代替ではなく、明示opt-inと別証跡が必要です。fake transportの成功をlive AI品質や本人認証成功へ拡張しないでください。
 
