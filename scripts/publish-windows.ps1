@@ -1063,7 +1063,7 @@ function Assert-NoStartupChildProcesses {
     $children = @(Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = $ProcessId" `
         -Property ProcessId -OperationTimeoutSec 5 -ErrorAction Stop)
     if ($children.Count -ne 0) {
-        throw 'Single-file startup unexpectedly has child processes; CLI, login and AI must not start automatically.'
+        throw 'Application startup unexpectedly has child processes; CLI, login and AI must not remain active.'
     }
 }
 
@@ -1100,8 +1100,8 @@ function Wait-OwnedProbeProcessesExit {
         [int] $TimeoutSeconds = 30
     )
 
-    # The bundled CLI started by the startup status check can outlive the app briefly and keeps
-    # inherited probe handles (host trace) open; only processes running from this probe are awaited.
+    # The bundled CLI started by the startup status check can outlive the app briefly; only
+    # processes running from this probe are awaited.
     $prefix = [System.IO.Path]::TrimEndingDirectorySeparator([System.IO.Path]::GetFullPath($ProbeDirectory)) +
         [System.IO.Path]::DirectorySeparatorChar
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
@@ -1190,8 +1190,8 @@ function Assert-ApplicationLaunch {
             throw "The self-contained application exited during startup with code $($process.ExitCode)."
         }
 
+        Wait-NoStartupChildProcesses -ProcessId $process.Id
         if (-not [string]::IsNullOrWhiteSpace($SingleFileProbeDirectory)) {
-            Wait-NoStartupChildProcesses -ProcessId $process.Id
             # No nonzero window handle requirement on headless CI; this proves liveness, not UI readiness.
             Write-Verbose 'Single-file startup liveness checked with an isolated environment; not GUI or clean-host evidence.'
         }

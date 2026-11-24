@@ -141,17 +141,29 @@ public sealed class WindowsSingleFilePublishTests
     }
 
     [Fact]
-    public async Task Folder_publish_launch_disables_automatic_copilot_login()
+    public async Task Publish_launch_disables_login_and_waits_for_startup_child_processes()
     {
         await AssertFunctionsSucceedAsync("""
             $definition = @($ast.EndBlock.Statements | Where-Object {
                 $_ -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
                 $_.Name -ceq 'Assert-ApplicationLaunch'
             })
-            if ($definition.Count -ne 1 -or
-                -not $definition[0].Body.Extent.Text.Contains('STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN') -or
-                -not $definition[0].Body.Extent.Text.Contains("= '0'")) {
-                throw 'Folder publish launch must not start automatic Copilot login.'
+            if ($definition.Count -ne 1) { throw 'Expected one application launch function.' }
+            $body = $definition[0].Body.Extent.Text
+            $wait = $body.IndexOf('Wait-NoStartupChildProcesses -ProcessId $process.Id', [StringComparison]::Ordinal)
+            $probeBranch = if ($wait -ge 0) {
+                $body.IndexOf(
+                    'if (-not [string]::IsNullOrWhiteSpace($SingleFileProbeDirectory))',
+                    $wait,
+                    [StringComparison]::Ordinal)
+            }
+            else { -1 }
+            $close = $body.IndexOf('$process.CloseMainWindow()', [StringComparison]::Ordinal)
+            if (-not $body.Contains('STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN', [StringComparison]::Ordinal) -or
+                -not $body.Contains("= '0'", [StringComparison]::Ordinal) -or
+                $wait -lt 0 -or $probeBranch -lt 0 -or $wait -gt $probeBranch -or
+                $close -lt 0 -or $wait -gt $close) {
+                throw "Publish launch contract failed (wait=$wait, probe=$probeBranch, close=$close)."
             }
             """);
     }
