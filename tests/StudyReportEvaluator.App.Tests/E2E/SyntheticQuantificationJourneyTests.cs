@@ -357,7 +357,23 @@ public sealed class SyntheticQuantificationJourneyTests
         Assert.Equal(0, baselineStore.LoadCount);
 
         AssertDurableSuccess(resumed, expectedEmptyCount, expectedResumed: true, dataRowCount);
-        Assert.Equal(expectedNormalCalls - interruptedNormal.Calls.Length, resumedNormal.Calls.Length);
+        HashSet<int> checkpointedRows = interrupted.CompletedRows
+            .Select(row => row.SourceRowNumber)
+            .ToHashSet();
+        (int SourceRowNumber, string QuestionId, string EvaluatorId)[] expectedResumedCalls = baselineNormal.Calls
+            .Where(call => !checkpointedRows.Contains(call.SourceRowNumber))
+            .Select(call => (call.SourceRowNumber, call.QuestionId, call.EvaluatorId))
+            .OrderBy(call => call.SourceRowNumber)
+            .ThenBy(call => call.QuestionId, StringComparer.Ordinal)
+            .ThenBy(call => call.EvaluatorId, StringComparer.Ordinal)
+            .ToArray();
+        (int SourceRowNumber, string QuestionId, string EvaluatorId)[] actualResumedCalls = resumedNormal.Calls
+            .Select(call => (call.SourceRowNumber, call.QuestionId, call.EvaluatorId))
+            .OrderBy(call => call.SourceRowNumber)
+            .ThenBy(call => call.QuestionId, StringComparer.Ordinal)
+            .ThenBy(call => call.EvaluatorId, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(expectedResumedCalls, actualResumedCalls);
         Assert.Equal(0, resumedReferences.CallCount);
         Assert.Equal(expectedSpecialCalls - interruptedSpecials.CallCount, resumedSpecials.CallCount);
         Assert.Equal(0, resumedStore.CreateCount);
