@@ -200,7 +200,8 @@ if (Test-Path -LiteralPath $evidencePath) {
 
 $statusBefore = @(git -C $repositoryRoot status --porcelain=v1 --untracked-files=all)
 if ($LASTEXITCODE -ne 0 -or $statusBefore.Count -ne 0) {
-    throw 'Windows ZIP required evidence must be generated from a clean source checkout.'
+    $changedPaths = $statusBefore -join [Environment]::NewLine
+    throw "Windows ZIP required evidence must be generated from a clean source checkout. Changed paths:`n$changedPaths"
 }
 
 $sourceCommit = ([string](@(git -C $repositoryRoot rev-parse HEAD) -join '')).Trim()
