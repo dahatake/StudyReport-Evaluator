@@ -4,7 +4,7 @@
 
 ## 先生が利用前に確認すること
 
-**確認日：2026-11-07。本文のデータ処理は現行ソース`0.8.8`に基づきます。** 公開`v0.8.6`との差（参照回答数、画面配置など）は別に表示します。どちらも、学校の利用許可をアプリが代わりに判断するものではありません。
+**確認日：2026-11-25。本文のデータ処理は現行ソース`0.8.8`に基づきます。** 公開`v0.8.6`との差（参照回答数、画面配置など）は別に表示します。どちらも、学校の利用許可をアプリが代わりに判断するものではありません。
 
 1. **学生の回答をGitHub Copilotへ送ってよいか**、学校の管理者に確認します。必要な学生・保護者への説明等は学校の方針に従います。
 2. 最初は架空の回答で試します。本番では氏名・メールアドレスなど採点に不要な情報を評価対象の列や指示文に含めないでください。回答本文に個人情報が書かれている場合も確認します。
@@ -24,7 +24,7 @@
 
 > **対象版と確認範囲:** 単一EXE、「GitHubにログイン」button、`setting.txt`への設定保存・適用の説明は、公開`v0.8.6`向けです。旧`v0.8.1`はZIP配布で、単一EXE、login button、本頁の設定保存・適用機能はありません。`v0.8.6`は公開済みですが、**clean-host試験CH-01〜06と本人loginは公開前に実施しておらず`NOT_RUN`**です。OS-only環境での動作、実認証、T39完了を示すものではありません。配布状況は[README](../README.md)、起動・login手順は[はじめに](getting-started.md)を確認してください。
 >
-> 設定の説明は現行productionコードに基づきます。一時保存先の実設定fileとfake AI境界を使うdeterministic E2Eの成功は、native WindowsのUI／DPI／Narrator確認・本人walkthroughやrelease完了の証拠ではありません。版更新前の実EXE確認には実測がありますが、追加native確認は**NOT COMPLETE（FAIL）**です。Space／Narrator、本人walkthrough、隔離利用者環境のnative保存は`NOT_RUN`です。[確認範囲](getting-started.md#v086の検証範囲)を参照し、部分的な観測を全native確認や公開の成功へ読み替えないでください。
+> 設定の説明は現行productionコードに基づきます。一時保存先の実設定fileとfake AI境界を使うdeterministic E2Eの成功は、native WindowsのUI／DPI／Narrator確認・本人walkthroughやrelease完了の証拠ではありません。版更新前の実EXE確認には実測がありますが、追加native確認は**NOT COMPLETE（FAIL）**です。Space／Narrator、本人walkthrough、隔離利用者環境のnative保存は`NOT_RUN`です。[確認範囲](getting-started.md#公開版の確認状況)を参照し、部分的な観測を全native確認や公開の成功へ読み替えないでください。
 
 ## 全体像
 

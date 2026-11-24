@@ -4,7 +4,7 @@
 
 ## 先生向け：症状から探す
 
-**確認日：2026-11-07。** 公開版は`v0.8.6`、現行ソース`0.8.8`は未公開の候補です。候補だけの操作は下で区別します。
+**確認日：2026-11-25。** 公開版は`v0.8.6`、現行ソース`0.8.8`は未公開の候補です。候補だけの操作は下で区別します。
 
 | 困っていること | まず行うこと | 詳細 |
 |---|---|---|
@@ -23,7 +23,7 @@
 >
 > 版更新前の製品`0.8.4`では、P06の実EXE試験は開発hostで**7件すべてPASS・独立レビュー指摘0**です。この履歴を版更新後の最終成果物の検証結果へ流用しません。一方、**clean-host（MOTW／Windows保護の実測を含む）と本人loginは`NOT_RUN`**です。`v0.8.6`は公開済みですが、最終成果物のCH-01〜06を実施しないままrepository ownerの明示判断で公開されました。同梱文書や製品版の変更でEXEのbytesが変われば、再package・当該EXEの再検証が必要です。
 >
-> 一時保存先の実設定fileとfake AI境界を使うdeterministic E2Eの成功は、native WindowsのUI／DPI／Narrator確認・本人walkthroughやrelease完了の証拠ではありません。追加native確認は**NOT COMPLETE（FAIL）**で、Space／Narrator、本人walkthrough、隔離利用者環境のnative保存は`NOT_RUN`です。UIAの行特定段階の失敗をアプリ不具合と断定せず、P06の実測と追加probeの到達範囲は[検証範囲](getting-started.md#v086の検証範囲)で区別してください。
+> 一時保存先の実設定fileとfake AI境界を使うdeterministic E2Eの成功は、native WindowsのUI／DPI／Narrator確認・本人walkthroughやrelease完了の証拠ではありません。追加native確認は**NOT COMPLETE（FAIL）**で、Space／Narrator、本人walkthrough、隔離利用者環境のnative保存は`NOT_RUN`です。UIAの行特定段階の失敗をアプリ不具合と断定せず、P06の実測と追加probeの到達範囲は[検証範囲](getting-started.md#公開版の確認状況)で区別してください。
 
 以下は症状を切り分けるための確認事項です。列挙した症状すべてを、再現済みの製品不具合として扱うものではありません。
 

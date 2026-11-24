@@ -430,7 +430,7 @@ public sealed class DocumentationContractTests
             Read("docs/getting-started.md"),
             "現在の公開版は`v0.8.6`です",
             "https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6",
-            "clean-host試験CH-01〜06と本人loginを実施しないまま公開",
+            "（clean-host試験CH-01〜06）と、本人のGitHubログインでの確認を実施しないまま公開",
             "development MSIXは非公開の開発検証専用");
         AssertContainsAll(
             publishScript,
@@ -870,7 +870,7 @@ public sealed class DocumentationContractTests
                  {
                      ("README.md", "現在の公開版は`0.8.6`です", "fresh Windows 11 x64でのclean-host試験CH-01〜06と本人loginを実施しないまま公開"),
                      ("docs/README.md", "現在の公開版は`0.8.6`です", "CH-01〜06 `NOT_RUN`は維持します"),
-                     ("docs/getting-started.md", "現在の公開版は`v0.8.6`です", "clean-host試験CH-01〜06と本人loginを実施しないまま公開"),
+                     ("docs/getting-started.md", "現在の公開版は`v0.8.6`です", "（clean-host試験CH-01〜06）と、本人のGitHubログインでの確認を実施しないまま公開"),
                      ("docs/settings.md", "公開`v0.8.6`", "旧`v0.8.1`はZIP配布で、本頁の設定保存・適用機能はありません"),
                      ("docs/features.md", "公開`v0.8.6`", "現行ソース`0.8.8`"),
                      ("docs/custom-evaluator-guide.md", "公開`v0.8.6`", "現行ソース`0.8.8`"),
@@ -893,7 +893,15 @@ public sealed class DocumentationContractTests
             Read("docs/getting-started.md"),
             "確認のためだけにPowerShell等を導入する必要はありません",
             "certutil",
-            "clean-host試験CH-01〜06と本人loginを実施しないまま公開");
+            "（clean-host試験CH-01〜06）と、本人のGitHubログインでの確認を実施しないまま公開",
+            "dev/docs/release/verification-scope-0.8.6.md");
+        AssertContainsAll(
+            Read("dev/docs/release/verification-scope-0.8.6.md"),
+            "clean-host試験CH-01〜06と本人loginを実施しないまま公開",
+            "T01〜T38は対象範囲でREVIEWED",
+            "T39全体は`BLOCKED`です",
+            "fresh Windows 11 x64のclean-host試験CH-01〜06／本人login | **NOT_RUN**");
+        Assert.DoesNotContain("T39", Read("docs/getting-started.md"), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -901,7 +909,7 @@ public sealed class DocumentationContractTests
     {
         AssertContainsAll(
             Read("docs/README.md"),
-            "確認日：2026-11-07",
+            "確認日：2026-11-25",
             "現行ソース`0.8.8`",
             "未公開のローカル候補",
             "(getting-started.md)",

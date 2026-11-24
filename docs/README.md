@@ -7,8 +7,8 @@ StudyReport Evaluatorは、Excelにまとめた学生の回答をAIで評価し�
 
 ## 最初に読む順番
 
-1. [はじめに](getting-started.md)で、必要なもの、入手方法、最初の採点の流れを確認します。
-2. [データと個人情報の扱い](privacy-and-data-handling.md)で、学校の許可と回答を送ってよい範囲を確認します。最初は架空の回答を少数使って試してください。
+1. [データと個人情報の扱い](privacy-and-data-handling.md)で、学校の許可と回答を送ってよい範囲を確認します。最初は架空の回答を少数使って試してください。
+2. [はじめに](getting-started.md#最短で始める3ステップ)の「最短で始める（3ステップ）」で、ダウンロード、ダブルクリック、ログインまで済ませます（インストール作業やスクリプトは不要です）。続けて、最初の採点の流れを確認します。
 3. [機能と点数](features.md)で、授業に合う配点・評価項目を決めます。
 4. [実行結果Excelの見方](result-excel-description.md)で、点数だけでなく回答・理由・根拠を確認します。
 
@@ -18,7 +18,7 @@ StudyReport Evaluatorは、Excelにまとめた学生の回答をAIで評価し�
 
 ## 使っている版を確認してください
 
-**確認日：2026-11-07。現在の公開版は`0.8.6`です。** [GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6)には、`v0.8.6`の`StudyReportEvaluator-win-x64.exe`、`StudyReportEvaluator-win-x64.exe.sha256`、`StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`があります。
+**確認日：2026-11-25。現在の公開版は`0.8.6`です。** 確認日は、公開状況・版・入手手順を実際に確かめた日です（2026-11-25に、公開ファイルの取得とSHA-256の照合、起動までを確かめました。ログインやAI評価までは確かめていません）。 [GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6)には、`v0.8.6`の`StudyReportEvaluator-win-x64.exe`、`StudyReportEvaluator-win-x64.exe.sha256`、`StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`があります。
 
 | 対象 | このガイドでの扱い |
 |---|---|
@@ -26,7 +26,7 @@ StudyReport Evaluatorは、Excelにまとめた学生の回答をAIで評価し�
 | 現行ソース`0.8.8` | 未公開のローカル候補。通常評価を**2 採点設計**内で編集するなど、公開版とは異なります。文書では変更点に版を付けます |
 | 旧`v0.8.1` | 過去のZIP版。ログインボタンや本頁の設定保存・適用を前提にしないでください |
 
-公開済みであることと動作確認が完了していることは別です。`v0.8.6`の公開前のCH-01〜06 `NOT_RUN`は維持します（追加ソフトのない新しいWindows環境での確認・本人ログインは未実施）。その後の候補版の確認結果を公開版に流用しません。[検証範囲](getting-started.md#v086の検証範囲)を参照してください。
+公開済みであることと動作確認が完了していることは別です。`v0.8.6`の公開前のCH-01〜06 `NOT_RUN`は維持します（追加ソフトのない新しいWindows環境での確認・本人ログインは未実施）。その後の候補版の確認結果を公開版に流用しません。[検証範囲](getting-started.md#公開版の確認状況)を参照してください。
 
 画面画像8枚は合成データ・仮のAI応答による説明用です。2026-09-27の生成時点の画面であり、現行ソースの画面と一致する保証はありません。[画像一覧](../images/README.md)で対象と限界を確認できます。
 

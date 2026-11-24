@@ -1,0 +1,112 @@
+<main id="main">
+<section class="hero" aria-labelledby="hero-title">
+  <canvas id="hero-canvas" aria-hidden="true"></canvas>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <p class="eyebrow reveal">学習レポートの採点支援 ・ Windows 11 x64</p>
+    <h1 id="hero-title" class="reveal"><span class="grad">回答を、観点ごとに。</span><br>理由と根拠つきで。</h1>
+    <p class="lead reveal">Excelにまとめた学生の回答をAIで評価し、<strong>元のExcelは変えずに</strong>、結果を別のExcelへ保存します。AIは下書き、決めるのは先生です。</p>
+    <div class="cta reveal">
+      <a class="btn" href="{{REPO}}/releases/latest" rel="noopener">最新版をダウンロード</a>
+      <a class="btn btn-ghost" href="{{BASE}}/teachers/getting-started/">はじめかたを見る</a>
+    </div>
+    <ul class="badges reveal" aria-label="特長">
+      <li>元のExcelを変更しない</li><li>Excel / Office不要で起動</li><li>最終判断は先生</li><li>MIT License</li>
+    </ul>
+  </div>
+  <figure class="hero-shot" data-tilt>
+    <img src="{{BASE}}/images/06-results-review.png" width="1440" height="1050" alt="結果確認画面。評価項目ごとの点数、理由、回答からの引用を並べて確認できる（合成データの説明用画像）" fetchpriority="high">
+  </figure>
+  <a class="scroll-cue" href="#audience" aria-label="下へスクロール"><span></span></a>
+</section>
+
+<section id="audience" class="wrap audience" aria-labelledby="aud-title">
+  <h2 id="aud-title" class="reveal">あなたはどちらですか？</h2>
+  <div class="aud-grid">
+    <a class="aud-card reveal" href="{{BASE}}/teachers/">
+      <span class="tag">先生・学校の管理者</span>
+      <h3>すぐに使う</h3>
+      <p>入手、最初の採点、結果の見方、データの扱い。ソースコードやコマンドは不要です。</p>
+      <span class="more">先生向けガイドへ →</span>
+    </a>
+    <a class="aud-card alt reveal" href="{{BASE}}/developers/">
+      <span class="tag">ソフトウェアエンジニア</span>
+      <h3>理解して拡張する</h3>
+      <p>アーキテクチャ、Excelの契約、設計判断（ADR）、リリース自動化。</p>
+      <span class="more">開発者向けドキュメントへ →</span>
+    </a>
+  </div>
+</section>
+
+<section id="flow" class="flow" aria-labelledby="flow-title" data-steps>
+  <div class="wrap">
+    <h2 id="flow-title" class="reveal">4つのステップで、結果まで</h2>
+    <div class="flow-grid">
+      <ol class="steps">
+        <li class="step is-active" data-step="0" tabindex="0"><span class="num">1</span><div><h3>入力</h3><p>回答のExcelを選び、評価する回答の範囲を指定します。</p></div></li>
+        <li class="step" data-step="1" tabindex="0"><span class="num">2</span><div><h3>採点設計</h3><p>評価項目、点数の範囲、重み、独自の評価指示を決めます。</p></div></li>
+        <li class="step" data-step="2" tabindex="0"><span class="num">3</span><div><h3>実行</h3><p>AIが回答を評価します。止まっても途中から再開できます。</p></div></li>
+        <li class="step" data-step="3" tabindex="0"><span class="num">4</span><div><h3>結果</h3><p>点数・理由・引用を確認し、必要なら先生の点に修正して出力します。</p></div></li>
+      </ol>
+      <div class="stage" aria-live="polite">
+        <img class="shot is-active" src="{{BASE}}/images/01-input-workbook.png" width="1440" height="1050" alt="入力画面。回答Excelを選ぶ（合成データ）" loading="lazy">
+        <img class="shot" src="{{BASE}}/images/03-design-knowledge.png" width="1440" height="1050" alt="採点設計画面。評価項目と知識を設定する（合成データ）" loading="lazy">
+        <img class="shot" src="{{BASE}}/images/05-execution-auto.png" width="1440" height="1050" alt="実行画面。AIによる評価の進行状況（合成データ）" loading="lazy">
+        <img class="shot" src="{{BASE}}/images/06-results-review.png" width="1440" height="1050" alt="結果画面。点数・理由・引用を確認する（合成データ）" loading="lazy">
+      </div>
+    </div>
+    <p class="muted small">画面画像は合成データ・仮のAI応答による説明用で、現行バージョンの画面と一致する保証はありません。</p>
+  </div>
+</section>
+
+<section class="wrap teacher-decides" aria-labelledby="td-title">
+  <div class="split">
+    <div class="reveal">
+      <h2 id="td-title">AIは下書き。<br>決めるのは先生。</h2>
+      <p>AIが返すのは、評価項目ごとの点数、理由、回答からの引用です。生成AIの評価には正確性が欠ける可能性があるため、必ず先生が確認し、責任をもって評点してください。</p>
+      <a class="more" href="{{BASE}}/teachers/result-excel/">結果Excelの見方 →</a>
+    </div>
+    <figure class="reveal"><img src="{{BASE}}/images/teacher-result-review.svg" width="960" height="490" alt="AIの点数と理由を先生が確認し、必要に応じて修正する流れの図" loading="lazy"></figure>
+  </div>
+</section>
+
+<section class="wrap trust" aria-labelledby="trust-title">
+  <h2 id="trust-title" class="reveal">安心して試すために</h2>
+  <div class="cards">
+    <a class="card reveal" href="{{BASE}}/teachers/privacy/"><h3>学校の許可を先に</h3><p>回答を送ってよい範囲を確認してから。最初は架空の回答で少数だけ試します。</p><span class="more">データと個人情報の扱い →</span></a>
+    <a class="card reveal" href="{{BASE}}/teachers/getting-started/"><h3>元のExcelは不変</h3><p>結果は別のExcelに保存されます。回答の原本はそのまま残ります。</p><span class="more">はじめに →</span></a>
+    <a class="card reveal" href="{{BASE}}/teachers/features/"><h3>点数の根拠が見える</h3><p>配点・類似度の扱いを先生が決め、どう計算されたかを確認できます。</p><span class="more">機能と点数 →</span></a>
+    <a class="card reveal" href="{{BASE}}/teachers/troubleshooting/"><h3>困ったときの切り分け</h3><p>症状から探せます。回答や氏名は問い合わせに貼り付けないでください。</p><span class="more">トラブルシューティング →</span></a>
+  </div>
+</section>
+
+<section class="wrap dev" aria-labelledby="dev-title">
+  <div class="split rev">
+    <figure class="reveal"><img src="{{BASE}}/images/technical-architecture.svg" width="1440" height="980" alt="Appプロジェクト、Coreプロジェクト、AI境界の関係を示す技術アーキテクチャ図" loading="lazy"></figure>
+    <div class="reveal">
+      <h2 id="dev-title">拡張する人のための<br>設計資料</h2>
+      <ul class="checks">
+        <li><a href="{{BASE}}/developers/architecture/">プロジェクト境界、実行データの流れ、AI境界</a></li>
+        <li><a href="{{BASE}}/developers/excel-contract/">入出力Excelの契約</a></li>
+        <li><a href="{{BASE}}/developers/release-automation/">配布物の作成と公開前の検証</a></li>
+        <li><a href="{{BASE}}/developers/">設計判断の記録（ADR）</a></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="wrap faq" aria-labelledby="faq-title">
+  <h2 id="faq-title" class="reveal">よくある質問</h2>
+  <div class="faq-list">{{FAQ}}</div>
+</section>
+
+<section class="wrap closing">
+  <div class="closing-card reveal">
+    <h2>まずは架空の回答を、少数だけ試す。</h2>
+    <div class="cta">
+      <a class="btn" href="{{REPO}}/releases/latest" rel="noopener">最新版をダウンロード</a>
+      <a class="btn btn-ghost" href="{{BASE}}/teachers/guide/">利用ガイドを読む</a>
+    </div>
+  </div>
+</section>
+</main>

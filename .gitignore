@@ -173,7 +173,6 @@ venv.bak/
 .ropeproject
 
 # mkdocs documentation
-/site
 
 # mypy
 .mypy_cache/
@@ -227,3 +226,6 @@ __marimo__/
 
 # Local sample files
 /sample/
+
+# Generated GitHub Pages output
+/_site/

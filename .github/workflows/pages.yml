@@ -1,0 +1,81 @@
+name: Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "dev/docs/**"
+      - "images/**"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "site/**"
+      - "scripts/build_site.py"
+      - "src/StudyReportEvaluator.App/Assets/AppIcon.png"
+      - ".github/workflows/pages.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "dev/docs/**"
+      - "images/**"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "site/**"
+      - "scripts/build_site.py"
+      - "tests/site/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # sitemap lastmod comes from git history
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: site/requirements.txt
+
+      - run: pip install -r site/requirements.txt pytest
+
+      - name: Test site builder
+        run: python -m pytest tests/site -q
+
+      - name: Build site (fails on broken images or anchors)
+        run: python scripts/build_site.py --out _site
+
+      - uses: actions/configure-pages@v5
+        if: github.event_name != 'pull_request'
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: _site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

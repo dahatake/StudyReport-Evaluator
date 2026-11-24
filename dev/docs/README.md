@@ -71,6 +71,10 @@ flowchart LR
 - `preflight/implementation-task-file-map.md`はtask所有pathの記録です。「future」「pending」は当時の進捗であり、現在状態ではありません。
 - `preflight/sample-workbook-profile.md`は現行sampleのread-only構造profileとして有効です。
 
+## 公開版の確認範囲
+
+- [`release/verification-scope-0.8.6.md`](release/verification-scope-0.8.6.md)：公開`v0.8.6`の確認範囲（T36〜T39、native probe、CH-01〜06 `NOT_RUN`）と、2026-11-25の再確認結果です。先生向け文書は要約だけを持ち、詳細はここを正本とします。
+
 ## Source of truthの優先順位
 
 1. current production source

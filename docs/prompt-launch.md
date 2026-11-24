@@ -2,7 +2,7 @@
 
 通常利用ではアプリをダブルクリックすればよく、コマンド入力は不要です。最初の採点は[はじめに](getting-started.md)、AIへの指示文を書く方法は[独自の評価指示を書く](custom-evaluator-guide.md)を参照してください。
 
-**確認日：2026-11-07。公開`v0.8.6`と現行ソース`0.8.8`で、`--prompt`の扱いが違います。** 起動を依頼する文章と、採点に使う指示文は別物です。
+**確認日：2026-11-25。公開`v0.8.6`と現行ソース`0.8.8`で、`--prompt`の扱いが違います。** 起動を依頼する文章と、採点に使う指示文は別物です。
 
 ## 版による違い
 
@@ -33,7 +33,7 @@ StudyReportEvaluator.App.exe --input "<xlsx-path>" --prompt "<txt-path>" [--prom
 & "C:\配布 アプリ\StudyReportEvaluator-win-x64.exe" --input "C:\授業 データ\回答.xlsx"
 ```
 
-公開版は[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6)から入手します。`0.8.8`は未公開のローカル候補です。公開版のclean-host試験CH-01〜06と本人loginは公開前に実施していません。[検証範囲](getting-started.md#v086の検証範囲)を確認してください。
+公開版は[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6)から入手します。`0.8.8`は未公開のローカル候補です。公開版のclean-host試験CH-01〜06と本人loginは公開前に実施していません。[検証範囲](getting-started.md#公開版の確認状況)を確認してください。
 
 ## 引数の規則
 

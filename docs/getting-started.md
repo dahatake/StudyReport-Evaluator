@@ -8,14 +8,63 @@
 > 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません
 
 > [!IMPORTANT]
-> 確認日：2026-11-07。公開`v0.8.6`と、未公開の現行ソース`0.8.8`には操作の違いがあります。変更点は本文で分けて説明します。公開版も、追加ソフトのない新しいWindows環境での動作と本人ログインの確認は公開前に完了していません。学校の端末で起動を拒否されたら、保護機能を無効にせず管理者に相談してください。[詳しい検証範囲](#v086の検証範囲)は末尾にあります。
+> 確認日：2026-11-25。公開`v0.8.6`と、未公開の現行ソース`0.8.8`には操作の違いがあります。変更点は本文で分けて説明します。公開版も、追加ソフトのない新しいWindows環境での動作と本人ログインの確認は公開前に完了していません。学校の端末で起動を拒否されたら、保護機能を無効にせず管理者に相談してください。[公開版の確認状況](#公開版の確認状況)は末尾にあります。
+
+## 最短で始める（3ステップ）
+
+**インストーラーも、セットアップ用のスクリプトも、追加のソフトも要りません。** 配布している`.exe`ファイル1つに、動かすために必要なものが全部入っています。Excel／Office、.NET、PowerShell、Git、別のCopilotのソフトを、先に入れる必要はありません。
+
+### 始める前の確認（1分）
+
+| 確認すること | 見方・補足 |
+|---|---|
+| Windows 11の64ビット版である | **設定 → システム → バージョン情報**の「システムの種類」に「x64 ベースプロセッサ」とあれば大丈夫です |
+| GitHub Copilotを使えるGitHubアカウントがある | AIの評価に使います。アカウントの種類や権限は学校・所属先の案内に従ってください |
+| インターネットにつながる | ダウンロードとAI評価に使います（Excelを読む・採点を設計する作業は、つながっていなくてもできるように作っています） |
+| 学校の利用許可を確認した | 学生の回答を外部へ送ってよいかの確認です。[データと個人情報の扱い](privacy-and-data-handling.md)を読んでください |
+
+### ステップ1　ダウンロードする
+
+1. [`StudyReportEvaluator-win-x64.exe`をダウンロード](https://github.com/dahatake/StudyReport-Evaluator/releases/latest/download/StudyReportEvaluator-win-x64.exe)します（約270MB。回線によっては数分かかります）。
+2. 保存先は「ダウンロード」フォルダーのままで構いません。デスクトップなど、あとで見つけやすい場所へ移しても動きます。
+3. ブラウザーが「一般的にダウンロードされていません」などと表示することがあります。入手元がこのプロジェクトの[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/latest)であることを確認してから保存してください。
+
+### ステップ2　ダブルクリックして起動する
+
+1. ダウンロードした`StudyReportEvaluator-win-x64.exe`をダブルクリックします。
+2. 初回は、中身の展開のため**画面が出るまで少し（数十秒）かかる**ことがあります。もう一度ダブルクリックせず、そのままお待ちください。
+3. 「StudyReport Evaluator」という名前のウィンドウが開き、**1 入力**の画面が出れば起動は成功です。
+
+> [!NOTE]
+> このアプリは電子署名がありません。そのため、Windowsが「WindowsによってPCが保護されました」などの警告を出したり、学校のパソコンの管理設定で起動を止められたりすることがあります。入手元を確認できないときや、止められたときは**そこで中止**し、保護機能を無効にせず、学校の管理者に相談してください。詳しくは[Windowsの警告・実行拒否](#windowsの警告実行拒否)を参照してください。
+
+### ステップ3　GitHubにログインする
+
+1. 起動すると、アプリがこのパソコンのGitHubログインを自動で確認します。すでにログイン済みなら、**何もする必要はありません**。
+2. ログインが見つからないときは、ブラウザーが**1回だけ自動で開きます**。画面の案内に従い、ご自分のGitHubアカウントでサインインしてください。
+3. **アプリの中に、パスワードやトークン、確認コードを入力しないでください。** 入力はブラウザー側だけで行います。
+4. ブラウザーが開かなかったり、取り消してしまったりしたときは、アプリの**GitHubにログイン**を選ぶと、もう一度始められます。**Copilot 状態を確認**で、ログインできたかを確かめられます。
+
+ここまでで準備は完了です。AIの評価は、あとで**定量化を開始**を選ぶまで始まりません。次は[Excelを用意する](#excelを用意する)へ進み、**架空の回答を数件**だけ入れたExcelで試してください。
+
+### うまく動かないとき
+
+| 症状 | まず試すこと |
+|---|---|
+| ダブルクリックしても何も起きない | 数十秒待ちます。タスクバーにアプリが出ていないか確認してください。それでも出ないときは、学校の管理者に相談します |
+| 青い「WindowsによってPCが保護されました」が出た | 入手元が公式の[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/latest)か確認します。学校のパソコンで止められたときは管理者に相談します。保護機能は無効にしません |
+| ダウンロードが途中で止まる／ファイルが壊れている気がする | 一度削除してダウンロードし直します。[SHA-256の確認](#sha-256を確認する手動比較は任意推奨)もできます |
+| ログインのブラウザーが開かない／失敗した | **GitHubにログイン**をもう一度選びます。直らないときは[トラブルシューティング](troubleshooting.md#copilotを利用できない)を見てください |
+| モデルの一覧が空／AIが使えない | ネットワーク、GitHub Copilotの利用権限、学校の許可を確認します（[トラブルシューティング](troubleshooting.md#copilotを利用できない)） |
+
+ZIP版を使う方法や、ダウンロードしたファイルが本物かを確かめる方法は、このあとの各節にあります。どれも、最短手順では必須ではありません。
 
 ## 最初の1回で行うこと
 
 ![準備から、入力・採点設計・実行・結果確認までの流れ](../images/teacher-workflow.svg)
 
 1. 学校の利用許可を確認し、**架空の回答を少数**まとめた`.xlsx`で試します。
-2. 下の入手手順でアプリを開きます。起動後にログイン用ブラウザーが開く場合があります。
+2. 上の[最短で始める（3ステップ）](#最短で始める3ステップ)でアプリを開きます。起動後にログイン用ブラウザーが開く場合があります。
 3. [1. 入力](#1-入力)で対象のシート・行・列を確認します。
 4. [2. 採点設計](#2-採点設計)で評価項目と配点を確認します。
 5. [3. 実行](#3-実行)でモデル・保存先を確認し、開始します。
@@ -48,7 +97,7 @@
 - 評価対象の標準`.xlsx`
 - AI処理を行う場合は、本人のGitHub Copilot利用権限、ログイン、インターネット接続、利用可能なモデル、学校の利用許可
 
-GUI起動に.NET Runtime／SDK、PowerShell、Node.js／npm、Git、GitHub CLI（`gh`）、別Copilot CLI、Microsoft Excel／Office／LibreOffice、IDEの導入を要求しないself-contained設計です。GUI起動とAI利用の前提は別です。Windows EXE／ZIP候補では検証済み同梱CLIを使用し、外部CLIは不要です。開発build／UnixはOSにインストールしたGitHub Copilot CLIを使用します。修正版`0.8.8`は未公開のローカル候補で、新bytesのclean-host／本人login／実AI検証を旧版の結果で代替しません。
+追加のソフトは不要です。Excel／Office、.NET、PowerShell、Git、別のCopilotのソフトなどを先に入れる必要はありません。AIを使うときは、上の「始める前の確認」にあるGitHub Copilotの利用権限・ログイン・インターネット接続などが別に必要です。アプリの画面を開いてExcelを読み込む作業は、インターネットにつながっていなくてもできるように作っています。配布版（EXE／ZIP）には動作確認済みのCopilot CLIが同梱されているため、別にインストールする必要はありません。開発build／UnixはOSにインストールしたGitHub Copilot CLIを使用します（下の「開発者向け」の欄を参照）。修正版`0.8.8`は未公開のローカル候補で、新しい配布物としての確認は別に必要です。
 
 <details>
 <summary>開発者向け：ソースコードから起動する場合だけの準備（通常の先生の利用には不要）</summary>
@@ -72,21 +121,21 @@ development MSIXは非公開の開発検証専用であり、一般利用者向�
 
 ## 単一EXEから起動する（v0.8.6の主導線）
 
-1. [`StudyReportEvaluator-win-x64.exe`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe)をdownloadします。
-2. 任意・推奨のhash確認を行う場合は、同じreleaseの[`StudyReportEvaluator-win-x64.exe.sha256`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe.sha256)も取得し、下記の方法で照合します。
+1. [`StudyReportEvaluator-win-x64.exe`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe)をダウンロードします。
+2. 任意・推奨のハッシュ（SHA-256）確認を行う場合は、同じreleaseの[`StudyReportEvaluator-win-x64.exe.sha256`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe.sha256)も取得し、下記の方法で照合します。
 3. `StudyReportEvaluator-win-x64.exe`をダブルクリックします。
 4. 入力画面が表示されたら、本ガイドの「1. 入力」へ進みます。
 
-**ダブルクリックを1起動gestureと数えます。** download、任意の手動hash比較、Windowsの警告への操作、本人loginはこの1操作に含めません。警告・拒否や追加操作を隠して、無条件に1操作で起動できるとは表示しません。
+**操作の回数は「ダブルクリック1回」です。** ダウンロード、任意のハッシュ確認、Windowsの警告への対応、本人のGitHubログインは、この1回には含みません。警告や追加の操作を隠して、必ず1回で起動できるとは言いません。
 
-標準userがofflineでGUI、Excel読込、mapping、採点設計を利用できることを要求しています。ただし、**fresh OS-only環境での実証は未完了**です。手動展開、setup script、terminalへのcommand入力、管理者昇格、repository、隣接DLL／manifest、既存CLI cache・認証情報、sidecarをGUI起動の前提にしません。GUI表示後に既存ログインを自動確認し、未認証ならブラウザー認証を1回だけ自動開始します。**AI評価は自動開始しません。**
+標準ユーザーがインターネットなしで、画面の表示、Excelの読込、設問の対応づけ（mapping）、採点設計を使えるように作っています。ただし、**追加ソフトのない新しいWindowsでの実証は未完了**です。手動の展開、セットアップ用スクリプト、コマンドの入力、管理者への昇格、リポジトリの取得、既存のCopilot CLIや認証情報は、起動の前提にしません。画面が出たあとに、既存のGitHubログインを自動で確認し、未ログインならブラウザーでの認証を1回だけ自動で始めます。**AI評価は自動では始まりません。**
 
 repository内の`artifacts`を一般配布先として扱わず、公開`v0.8.6`のGitHub Release assetを利用してください。
 
 ## ZIPを起動する（v0.8.6の代替経路）
 
-1. [`StudyReportEvaluator-win-x64.zip`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip)をdownloadします。
-2. 任意・推奨のhash確認を行う場合は、同じreleaseの[`StudyReportEvaluator-win-x64.zip.sha256`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip.sha256)も取得し、下記の方法で照合します。
+1. [`StudyReportEvaluator-win-x64.zip`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip)をダウンロードします。
+2. 任意・推奨のハッシュ（SHA-256）確認を行う場合は、同じreleaseの[`StudyReportEvaluator-win-x64.zip.sha256`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip.sha256)も取得し、下記の方法で照合します。
 3. ZIPを新しいdirectoryへ展開します。
 4. `StudyReportEvaluator-win-x64\StudyReportEvaluator.App.exe`を起動します。
 
@@ -94,9 +143,9 @@ repository内の`artifacts`を一般配布先として扱わず、公開`v0.8.6`
 
 ## SHA-256を確認する（手動比較は任意・推奨）
 
-EXE／ZIPそれぞれのsidecar公開と、CI・公開判定での最終配布bytesとのSHA-256完全一致確認は必須です。一方、**利用者の手動hash比較は任意の推奨であり、sidecarはアプリ起動の依存fileではありません。** 確認のためだけにPowerShell等を導入する必要はありません。
+EXE／ZIPそれぞれの`.sha256`ファイルの公開と、公開前の検証での最終配布ファイルとのSHA-256の完全一致確認は、配布側で必須としています。一方、**利用者による手動のハッシュ比較は任意の推奨であり、`.sha256`ファイルはアプリの起動に必要なファイルではありません。** 確認のためだけにPowerShell等を導入する必要はありません。
 
-確認する場合は、取得したEXEまたはZIPのSHA-256を、同じrelease・同じ形式のsidecarの先頭64文字と照合してください。不一致なら実行せず、正式配布元からの再取得を確認します。同じ配布元のhash一致だけでは、発行者の真正性やSmartScreen reputationは保証されません。
+確認する場合は、取得したEXEまたはZIPのSHA-256を、同じrelease・同じ形式の`.sha256`ファイルの先頭64文字と照合してください。不一致なら実行せず、正式配布元からの再取得を確認します。同じ配布元のハッシュ一致だけでは、発行者が本人であることや、SmartScreenでの信頼実績は保証されません。
 
 PowerShell 7が既にある場合の、公開ZIPのSHA-256確認例（任意）:
 
@@ -104,7 +153,13 @@ PowerShell 7が既にある場合の、公開ZIPのSHA-256確認例（任意）:
 (Get-FileHash -Algorithm SHA256 .\StudyReportEvaluator-win-x64.zip).Hash
 ```
 
-Windows 11標準の`certutil`の`-hashfile`機能でも、取得した配布fileを指定し、アルゴリズムを`SHA256`として確認できます。単一EXEを確認する場合は対象を`StudyReportEvaluator-win-x64.exe`とし、EXE用sidecarと照合します。どちらの確認方法もGUI起動の必須操作ではありません。
+Windows 11標準の`certutil`の`-hashfile`機能でも、取得した配布fileを指定し、アルゴリズムを`SHA256`として確認できます。たとえば、「ダウンロード」フォルダーのEXEなら、コマンドプロンプトで次のように入力します。表示された64文字を、同じreleaseのEXE用sidecar（`.sha256`ファイル）の先頭64文字と見比べます（大文字・小文字の違いは同じ値です）。どちらの確認方法もGUI起動の必須操作ではありません。
+
+```
+certutil -hashfile "%USERPROFILE%\Downloads\StudyReportEvaluator-win-x64.exe" SHA256
+```
+
+単一EXEを確認する場合は対象を`StudyReportEvaluator-win-x64.exe`とし、EXE用sidecarと照合します。ZIPを確認する場合は、ZIP用sidecarと照合します。
 
 ## Windowsの警告・実行拒否
 
@@ -243,7 +298,7 @@ run開始時に入力・採点定義・実効model・並列度・出力条件を
 
 再起動後に再開する場合、採点設計は設定へ保存した定義からだけ復元できます。中断前の設計を設定の**設定を保存**で保存しておき、再起動後に設定の保存定義タブで**現在の入力に適用**を選んでから再開元を指定してください。保存していない設計の編集は、再起動後に同じ設計として判定されません。
 
-再開にはinput、definition、modelの一致とruntimeの互換性が必要です。アプリidentityを`アプリ名/バージョン`として解釈できる場合は、**アプリ名とmajor版の一致**を求め、minor／patchの差だけでは拒否しません。解釈できないidentityは文字列の完全一致が必要です。**SDK informational version、CLI version、CLI SHA-256は完全一致**を求めます。
+再開にはinput、definition、modelの一致とruntimeの互換性が必要です。アプリの識別名を`アプリ名/バージョン`として解釈できる場合は、**アプリ名とmajor版の一致**を求め、minor／patchの差だけでは拒否しません。解釈できない識別名は文字列の完全一致が必要です。**SDK informational version、CLI version、CLI SHA-256は完全一致**を求めます。
 
 保存済み参照回答とcomplete student rowを再利用し、最初の未完了rowから続けます。共通設定の新規出力先でcheckpoint内の予約済みpathを置き換えません。partialを書換えて一致を回避しないでください。
 
@@ -251,11 +306,11 @@ run開始時に入力・採点定義・実効model・並列度・出力条件を
 
 ### 中断（cancel）
 
-**中断（cancel）**後は新しいAI送信を開始せず、最後にatomic保存されたcomplete rowまでのpartialを保持します。処理中だったrowはcomplete扱いにしません。停止完了後、同じ起動中なら**中断した処理を再開準備**で再開元を設定・確認できます。これは実行を開始しないため、確認後に**定量化を開始**を選びます。実行中は他ステップ・設定でも下部の**進捗へ／停止**を利用できます。loginの取消や結果fileの**出力取消**とは別の操作です。
+**中断（cancel）**後は新しいAI送信を開始せず、最後に確実に保存された完了行までのpartialを保持します。処理中だったrowはcomplete扱いにしません。停止完了後、同じ起動中なら**中断した処理を再開準備**で再開元を設定・確認できます。これは実行を開始しないため、確認後に**定量化を開始**を選びます。実行中は他ステップ・設定でも下部の**進捗へ／停止**を利用できます。loginの取消や結果fileの**出力取消**とは別の操作です。
 
 ### 現在runと次回設定
 
-実行中も戻って次回用の入力・設計・共通設定を編集できますが、**開始済みrunのrequest／immutable snapshot・予約済みpathは変わりません**。実行画面は今回／前回runの固定条件と次回条件を分けて表示します。入力画面から設定へ直接移った場合も、次回の実効出力先は現在の入力と明示指定を基準にします。
+実行中も戻って次回用の入力・設計・共通設定を編集できますが、**開始済みrunの依頼内容・固定された条件のコピー・予約済みの出力先は変わりません**。実行画面は今回／前回runの固定条件と次回条件を分けて表示します。入力画面から設定へ直接移った場合も、次回の実効出力先は現在の入力と明示指定を基準にします。
 
 設定表示中の完了で結果画面へ強制移動しません。必要なときに**4 結果**で到着した結果を確認してください。前回結果は次回draftの編集から自動再評価されません。
 
@@ -338,33 +393,22 @@ final/partialには入力全体、Prompt、参照回答、AI結果が含まれ�
 
 問題がある場合は[トラブルシューティング](troubleshooting.md)を参照してください。
 
-## v0.8.6の検証範囲
+## 公開版の確認状況
 
-公開`v0.8.6`は、clean-host試験CH-01〜06と本人loginを実施しないまま公開しました。development MSIXは非公開の開発検証専用です。以下の履歴は先生の操作手順ではなく、管理者が確認範囲を判断するための情報です。現行候補`0.8.8`にも別の公開前確認が必要で、文書の更新だけで配布物や確認状況は変わりません。
+公開`v0.8.6`は、**追加ソフトが何も入っていない新しいWindows 11での動作確認（clean-host試験CH-01〜06）と、本人のGitHubログインでの確認を実施しないまま公開**しました（リポジトリ管理者の判断です）。先生にとっての意味は次のとおりです。
 
-以下は2026-09-07、版更新前の**製品`0.8.4`で得た検証履歴**です。**T01〜T38は対象範囲でREVIEWED**です。文書・実成果物・full required gateの実績を、版更新後の`0.8.6`の最終成果物や未完了のnative確認のPASSへ読み替えません。
+- **ご自分のパソコンで起動・ログイン・AI評価が動くことまでは、保証していません。** 最初は架空の回答を少数だけ使って試し、止まったら管理者に相談してください。
+- 開発用のパソコンでの自動試験は行っていますが、学校の実際の環境での確認の代わりにはなりません。
+- 画面読み上げ（Narrator）での確認や、本人による通し確認も、まだ行っていません。
+- 開発者向けの検証記録（どの試験を、どの版で、何件確認したか）は、[v0.8.6の検証範囲](https://github.com/dahatake/StudyReport-Evaluator/blob/main/dev/docs/release/verification-scope-0.8.6.md)にあります。先生が読む必要はありません。
+- 現行ソースの`0.8.8`は、別の公開前確認が必要な、未公開の候補です。文書を更新しても、配布済みのアプリや確認状況は変わりません。
 
-| 対象 | 確認状況 |
-|---|---|
-| 文書・画像contract（T36） | **21/21成功**。文書の整合性確認であり、native操作の成功ではない |
-| ZIP実成果物・MSIX静的検証（T37） | **ZIP実検証3件＋MSIX静的検証6件＝9/9成功**。`0.8.4`時点の対象範囲に限定 |
-| 単一EXEの対象検証（T38） | **114/114成功**。開発hostのP06実EXE試験も**7/7成功**。fresh OS-onlyや本人loginの確認とは別 |
-| full required gate（T39） | **Core 190 + App 1702 = 1892/1892成功、skip 0**。`0.8.4`の結果であり、追加native確認を含むT39全体の完了ではない |
-| development MSIX | **`PASS_MECHANISM`**。開発用の方式検証に限定し、一般配布・署名・公開成功を示さない |
-| 追加native probe | **NOT COMPLETE（FAIL）**。3回の試行後、最終試行はUIAの行を一意に特定する段階で停止。アプリ不具合の確定ではない |
-| Space／Narrator・本人walkthrough・隔離利用者環境のnative保存 | **NOT_RUN** |
-| fresh Windows 11 x64のclean-host試験CH-01〜06／本人login | **NOT_RUN** |
-
-**T39全体は`BLOCKED`です。** 追加native probeで観測できたのは、**120 DPI、実client 1475 × 1000 pixels（1180 × 800 DIP）**での入力読込、入力hashの保持、設定fileが存在しないことまでです。主画面4ステップと設定を通した確認は完了していません。既存P06の実EXE観測まで未実施とするものではありません。
-
-開発環境の実EXE試験やUIのfake認証試験を、追加ソフト未導入のOS-only試験、MOTW／Windows保護の実測、本人認証成功の代わりにはしません。新EXEの公開判定には最終成果物と一致するCH-01〜06の必須PASSが必要であり、現時点では公開条件を満たしていません。
+development MSIXは非公開の開発検証専用です。
 
 ## 対象版
 
 単一EXEとlogin button、4ステップ、ページ切替、設定保存・明示適用は公開`v0.8.6`にあります。通常評価の編集場所など、現行ソースとの差は本文の版表示を確認してください。[画像一覧](../images/README.md)の**8枚（01〜08）**は説明用synthetic／fake状態です。02・04は公開版当時の設定画面で、現行ソースとは配置が異なります。05は認証未確認、06はfake結果、07は未保存override、08はstore未構成の合成Common画面です。初回生成は`0.8.4`、最新の再生成は2026-09-27の`0.8.6`です。画像を実認証・実保存・native確認の証拠や、現行ソースとの一致保証に読み替えません。
 
 旧公開`v0.8.1`にこれらのUI・設定保存を追加したわけではありません。**要求文書v4.6、公開`v0.8.6`、旧公開`v0.8.1`は別**です。
-
-本ガイドは配布物へ同梱するsourceです。同梱文書や製品版を変更すると最終EXE／ZIPのbytesとSHA-256も変わるため、**公開判定は対象版の最終成果物・sidecarと、その成果物に対応する検証に基づきます。** 過去のPASSでこの条件やclean-host条件を省略しません。
 
 **対象版: 公開`v0.8.6`。旧`v0.8.1`は前回公開版のZIPです。**
