@@ -942,7 +942,7 @@ public sealed class SettingsViewTests
         {
             root = root.Parent ?? throw new InvalidOperationException("Repository root not found.");
         }
-        string evidence = Path.Combine(root.FullName, "work", "evidence", "output-picker");
+        string evidence = Path.Combine(root.FullName, "artifacts", "test", "output-picker");
         Directory.CreateDirectory(evidence);
         using FileStream image = File.Create(Path.Combine(evidence, $"{width}-{height}-{(dark ? "dark" : "light")}.png"));
         frame.Save(image, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
