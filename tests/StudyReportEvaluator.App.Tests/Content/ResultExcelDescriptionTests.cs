@@ -37,8 +37,9 @@ public sealed class ResultExcelDescriptionTests
         Assert.Contains("(result-excel-description.md)", userIndex, StringComparison.Ordinal);
         Assert.Contains(EthicsWarningText.Message, description, StringComparison.Ordinal);
         Assert.DoesNotContain("UNRELEASED", description, StringComparison.Ordinal);
-        Assert.Contains("公開`v0.8.6`", description, StringComparison.Ordinal);
-        Assert.Contains("clean-host試験CH-01〜06と本人loginは公開前に実施していません", description, StringComparison.Ordinal);
+        Assert.Contains("公開`v0.8.9`の出力", description, StringComparison.Ordinal);
+        Assert.Contains("旧公開`v0.8.6`の出力には", description, StringComparison.Ordinal);
+        Assert.Contains("新しいWindows 11標準ユーザーでの実機確認と本人loginは公開前に実施していません", description, StringComparison.Ordinal);
         Assert.Contains("大学・高校の先生", description, StringComparison.Ordinal);
         foreach (string sheet in SheetNames)
         {

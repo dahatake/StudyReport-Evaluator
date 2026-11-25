@@ -2,13 +2,13 @@
 
 このガイドでは、回答をまとめたExcelから最初の採点結果を作る手順を説明します。プログラミングやコマンド入力は不要です。ボタン名に英語が残る箇所は、画面と同じ名前に説明を添えます。
 
-現在の公開版は`v0.8.6`です。[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6)で取得できる`StudyReportEvaluator-win-x64.exe`、`StudyReportEvaluator-win-x64.exe.sha256`、`StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`の4件が公開assetです。単一EXEが主導線で、ZIPは代替経路として維持します。旧`v0.8.1`は前回公開版です。
+現在の公開版は`v0.8.9`（2026-11-25公開）です。[GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.9)で取得できる`StudyReportEvaluator-win-x64.exe`、`StudyReportEvaluator-win-x64.exe.sha256`、`StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`の4件が公開assetです。単一EXEが主導線で、ZIPは代替経路として維持します。旧公開版は`v0.8.6`、その前は`v0.8.1`です。
 
 > [!WARNING]
 > 生成AIが行う評価には正確性が欠ける可能性があるため、必ず自分で責任をもって評点を行ってください。このツールや生成AIは評価結果に対しては一切の責任を負えません
 
 > [!IMPORTANT]
-> 確認日：2026-11-25。公開`v0.8.6`と、未公開の現行ソース`0.8.8`には操作の違いがあります。変更点は本文で分けて説明します。公開版も、追加ソフトのない新しいWindows環境での動作と本人ログインの確認は公開前に完了していません。学校の端末で起動を拒否されたら、保護機能を無効にせず管理者に相談してください。[公開版の確認状況](#公開版の確認状況)は末尾にあります。
+> 確認日：2026-11-25。公開`v0.8.9`と旧公開`v0.8.6`には操作の違いがあります。違いは本文で分けて説明します。`v0.8.9`も、追加ソフトのない新しいWindows環境での動作と本人ログインの確認は公開前に実施していません。学校の端末で起動を拒否されたら、保護機能を無効にせず管理者に相談してください。[公開版の確認状況](#公開版の確認状況)は末尾にあります。
 
 ## 最短で始める（3ステップ）
 
@@ -97,14 +97,14 @@ ZIP版を使う方法や、ダウンロードしたファイルが本物かを�
 - 評価対象の標準`.xlsx`
 - AI処理を行う場合は、本人のGitHub Copilot利用権限、ログイン、インターネット接続、利用可能なモデル、学校の利用許可
 
-追加のソフトは不要です。Excel／Office、.NET、PowerShell、Git、別のCopilotのソフトなどを先に入れる必要はありません。AIを使うときは、上の「始める前の確認」にあるGitHub Copilotの利用権限・ログイン・インターネット接続などが別に必要です。アプリの画面を開いてExcelを読み込む作業は、インターネットにつながっていなくてもできるように作っています。配布版（EXE／ZIP）には動作確認済みのCopilot CLIが同梱されているため、別にインストールする必要はありません。開発build／UnixはOSにインストールしたGitHub Copilot CLIを使用します（下の「開発者向け」の欄を参照）。修正版`0.8.8`は未公開のローカル候補で、新しい配布物としての確認は別に必要です。
+追加のソフトは不要です。Excel／Office、.NET、PowerShell、Git、別のCopilotのソフトなどを先に入れる必要はありません。AIを使うときは、上の「始める前の確認」にあるGitHub Copilotの利用権限・ログイン・インターネット接続などが別に必要です。アプリの画面を開いてExcelを読み込む作業は、インターネットにつながっていなくてもできるように作っています。配布版（EXE／ZIP）には動作確認済みのCopilot CLIが同梱されているため、別にインストールする必要はありません。開発build／UnixはOSにインストールしたGitHub Copilot CLIを使用します（下の「開発者向け」の欄を参照）。同梱CLIを配布版で一貫して使う修正は`v0.8.9`に含まれます。
 
 <details>
 <summary>開発者向け：ソースコードから起動する場合だけの準備（通常の先生の利用には不要）</summary>
 
 ### 開発build／UnixのCLIセットアップ
 
-Windowsの開発buildでは次を実行します（既にCLIが導入されていれば再installは不要です。EXE／ZIP候補では不要です）。
+Windowsの開発buildでは次を実行します（既にCLIが導入されていれば再installは不要です。EXE／ZIP配布版では不要です）。
 
 ```powershell
 winget install --id GitHub.Copilot --exact
@@ -119,10 +119,10 @@ copilot --version
 
 development MSIXは非公開の開発検証専用であり、一般利用者向けの入手・起動手順には含めません。
 
-## 単一EXEから起動する（v0.8.6の主導線）
+## 単一EXEから起動する（v0.8.9の主導線）
 
-1. [`StudyReportEvaluator-win-x64.exe`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe)をダウンロードします。
-2. 任意・推奨のハッシュ（SHA-256）確認を行う場合は、同じreleaseの[`StudyReportEvaluator-win-x64.exe.sha256`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe.sha256)も取得し、下記の方法で照合します。
+1. [`StudyReportEvaluator-win-x64.exe`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.9/StudyReportEvaluator-win-x64.exe)をダウンロードします。
+2. 任意・推奨のハッシュ（SHA-256）確認を行う場合は、同じreleaseの[`StudyReportEvaluator-win-x64.exe.sha256`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.9/StudyReportEvaluator-win-x64.exe.sha256)も取得し、下記の方法で照合します。
 3. `StudyReportEvaluator-win-x64.exe`をダブルクリックします。
 4. 入力画面が表示されたら、本ガイドの「1. 入力」へ進みます。
 
@@ -130,16 +130,16 @@ development MSIXは非公開の開発検証専用であり、一般利用者向�
 
 標準ユーザーがインターネットなしで、画面の表示、Excelの読込、設問の対応づけ（mapping）、採点設計を使えるように作っています。ただし、**追加ソフトのない新しいWindowsでの実証は未完了**です。手動の展開、セットアップ用スクリプト、コマンドの入力、管理者への昇格、リポジトリの取得、既存のCopilot CLIや認証情報は、起動の前提にしません。画面が出たあとに、既存のGitHubログインを自動で確認し、未ログインならブラウザーでの認証を1回だけ自動で始めます。**AI評価は自動では始まりません。**
 
-repository内の`artifacts`を一般配布先として扱わず、公開`v0.8.6`のGitHub Release assetを利用してください。
+repository内の`artifacts`を一般配布先として扱わず、公開`v0.8.9`のGitHub Release assetを利用してください。
 
-## ZIPを起動する（v0.8.6の代替経路）
+## ZIPを起動する（v0.8.9の代替経路）
 
-1. [`StudyReportEvaluator-win-x64.zip`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip)をダウンロードします。
-2. 任意・推奨のハッシュ（SHA-256）確認を行う場合は、同じreleaseの[`StudyReportEvaluator-win-x64.zip.sha256`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip.sha256)も取得し、下記の方法で照合します。
+1. [`StudyReportEvaluator-win-x64.zip`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.9/StudyReportEvaluator-win-x64.zip)をダウンロードします。
+2. 任意・推奨のハッシュ（SHA-256）確認を行う場合は、同じreleaseの[`StudyReportEvaluator-win-x64.zip.sha256`](https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.9/StudyReportEvaluator-win-x64.zip.sha256)も取得し、下記の方法で照合します。
 3. ZIPを新しいdirectoryへ展開します。
 4. `StudyReportEvaluator-win-x64\StudyReportEvaluator.App.exe`を起動します。
 
-旧`v0.8.1`の配布物は履歴として残りますが、現在の案内は`v0.8.6`の4 assetを対象にします。
+旧公開`v0.8.6`と旧`v0.8.1`の配布物は履歴として残りますが、現在の案内は`v0.8.9`の4 assetを対象にします。
 
 ## SHA-256を確認する（手動比較は任意・推奨）
 
@@ -206,9 +206,9 @@ flowchart LR
 
 ![03 DesignのKnowledge概要。合成2設問の配点20/20・Base 60と採点計算式。Prompt editorではない](../images/03-design-knowledge.png)
 
-1. **基礎配点**（回答にかかわらず与える点、既定60）、**固有配点**（追加の評価に使う点、既定0）、**類似度減点係数**（範囲0〜1）を確認します。係数は公開`v0.8.6`の新規定義で0.1、現行ソース`0.8.8`の新規定義では0です。保存済み定義の値はそのまま使います。類似度だけで不正と判断しないでください。
+1. **基礎配点**（回答にかかわらず与える点、既定60）、**固有配点**（追加の評価に使う点、既定0）、**類似度減点係数**（範囲0〜1）を確認します。係数は公開`v0.8.9`の新規定義では0、旧公開`v0.8.6`の新規定義で0.1です。保存済み定義の値はそのまま使います。類似度だけで不正と判断しないでください。
 2. **前の設問／次の設問**で全設問の有効状態と配点を確認し、選択した設問の**有効／配点**を編集します。ページを切り替えるだけでは編集中の設問を変更しません。
-3. 通常評価の概要と**計算式**を確認します。公開`v0.8.6`では**通常評価**から**設定 → 通常評価**を開きます。現行ソース`0.8.8`では同じ採点設計画面の中で設問・評価方法・評価項目を編集します。定義名・revision・丸め桁数は**設定 → 共通 → 共通設定**にあります。
+3. 通常評価の概要と**計算式**を確認します。公開`v0.8.9`では同じ採点設計画面の中で設問・評価方法・評価項目を編集します。旧公開`v0.8.6`では**通常評価**から**設定 → 通常評価**を開きます。定義名・revision・丸め桁数は**設定 → 共通 → 共通設定**にあります。
 
 **例：設問が2つで、基礎60・固有0なら、設問配点を20ずつにすると合計100です。** 基礎点を与えない授業なら基礎0にし、設問配点の合計を100にします。アプリの初期値をそのまま成績基準としないでください。
 
@@ -228,18 +228,18 @@ $$
 
 ![05 ExecutionのNotChecked・ログイン未開始の合成画面。モデル未選択、reasoning effort未選択、並列度2、実効出力先は読取専用。認証成功の証跡ではない](../images/05-execution-auto.png)
 
-実行画面の**モデル・並列度・実効出力先は確認用**です。編集は**変更 → 設定の共通**で行います。**定量化を開始／cancel**は実行画面です。現行ソース`0.8.8`の認証確認・login開始／取消、新規／再開の準備は入力画面の**実行の準備を開く**から行います（入力値は保持されます）。公開`v0.8.6`では実行画面にあります。
+実行画面の**モデル・並列度・実効出力先は確認用**です。編集は**変更 → 設定の共通**で行います。**定量化を開始／cancel**は実行画面です。公開`v0.8.9`の認証確認・login開始／取消、新規／再開の準備は入力画面の**実行の準備を開く**から行います（入力値は保持されます）。旧公開`v0.8.6`では実行画面にあります。
 
 ### GitHubにログイン（v0.8.6）
 
-1. 起動直後に、アプリが**このPCで利用中のGitHubアカウントのログインを自動確認**します。Windows配布版・配布候補は同梱CLI、開発ビルドはOSのCLIが資格情報を解決します。既に利用できるログインがあれば、操作は不要です。
+1. 起動直後に、アプリが**このPCで利用中のGitHubアカウントのログインを自動確認**します。Windows配布版は同梱CLI、開発ビルドはOSのCLIが資格情報を解決します。既に利用できるログインがあれば、操作は不要です。
 2. 利用できるログインがない場合は、CLIの認証用ブラウザーを**1回だけ自動で開きます**。手動では**GitHubにログイン**を選んでも同じ処理を開始できます。確認だけを手動で繰り返すには**Copilot 状態を確認**を選びます。
 3. 本人のaccountで、CLI／ブラウザー上の対話を完了します。アプリへpassword、PAT、token、device codeを入力しないでください。環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`を`0`または`false`にすると、自動のブラウザー認証だけを止められます。
 4. login processが正常終了すると、認証状態とmodel一覧を自動で再確認します。取消・失敗後や自動再確認に失敗した場合は、**Copilot 状態を確認**で再試行します。processの起動・終了codeだけを認証成功とは扱いません。
 
 認証・一覧取得に成功すると、モデル一覧だけを利用者別`setting.txt`へ自動保存します。未保存の共通設定・採点定義は保存しません。次回は保存済み一覧を表示しますが、一覧だけでは利用可能と判断しません。**キャッシュの有無にかかわらず、起動時の認証確認が別途動きます。** 詳細は[設定ガイド](settings.md#model一覧のキャッシュと自動再確認)を参照してください。
 
-認証とcredential保管はCLI／ブラウザーに委譲します。アプリの認証処理はpassword、PAT、secret、token、device codeを入力・収集・解析・保存・log出力しません。これらを設問文やPromptへ貼り付けないでください。貼付内容は設定の明示保存時に平文で残り得ます。PowerShell等を介したlogin用commandの入力は、この候補版buttonの利用に不要です。
+認証とcredential保管はCLI／ブラウザーに委譲します。アプリの認証処理はpassword、PAT、secret、token、device codeを入力・収集・解析・保存・log出力しません。これらを設問文やPromptへ貼り付けないでください。貼付内容は設定の明示保存時に平文で残り得ます。PowerShell等を介したlogin用commandの入力は、このbuttonの利用に不要です。
 
 起動時の自動確認・自動login以外では、起動引数、画面遷移、状態確認からloginを暗黙に開始せず、AI評価は一切自動開始しません。自動loginを取消・失敗した後は、同じ起動中に自動では再試行しません。login後の自動再確認では希望modelが利用可能な場合に実効選択へ反映しますが、別modelへfallbackしません。AI評価は**定量化を開始**を選ぶまで行いません。GUI表示やlogin完了だけではAI利用可能とは判断せず、network、account、列挙されたmodel、組織policy上の許可を別途確認してください。
 
@@ -253,7 +253,7 @@ loginの二重開始と評価中の開始はできません。取消・失敗後
 
 ### 同梱CLIで手動loginする（旧公開v0.8.1のみ）
 
-**この手動操作は、login buttonがない旧公開`v0.8.1`のZIP向けです。** 公開`v0.8.6`の通常のGUI起動・login buttonの利用手順ではありません。
+**この手動操作は、login buttonがない旧公開`v0.8.1`のZIP向けです。** `v0.8.6`以降の通常のGUI起動・login buttonの利用手順ではありません。
 
 1. 展開済みZIP内の`StudyReportEvaluator-win-x64\runtimes\win-x64\native\copilot.exe`を指定して、同梱CLIの対話loginを本人が行います。認証はCLI／ブラウザー上で完了してください。
 2. アプリへ戻り、既存の**Copilot 状態を確認**を選びます。
@@ -263,7 +263,7 @@ loginの二重開始と評価中の開始はできません。取消・失敗後
 ### 新規run
 
 1. **Copilot 状態を確認**を選びます。未認証なら上記の対象版に合ったlogin手順を行い、再確認します。
-2. 候補版では**変更 → 共通 → 共通設定**で、ログイン後に利用できる全**通常モデル**、**思考レベル**、**Context Size**、**並列度**（1〜16、既定8）、**指定出力先**を確認・変更します。思考レベルは対応値だけ選べ、非対応モデルでは未指定です。Context Sizeは入力tokenの枠で、拡張対応モデルだけ大きい枠も選べます。高い思考レベルや拡張contextで使用量が変わる場合があります。変更だけでは評価を開始しません。選択はモデル別に保持し、次回起動でも使う場合は**設定を保存**してください。保存希望model・選択値が利用不可なら別値へfallbackせず、選び直しを求めます。
+2. 公開版では**変更 → 共通 → 共通設定**で、ログイン後に利用できる全**通常モデル**、**思考レベル**、**Context Size**、**並列度**（1〜16、既定8）、**指定出力先**を確認・変更します。思考レベルは対応値だけ選べ、非対応モデルでは未指定です。Context Sizeは入力tokenの枠で、拡張対応モデルだけ大きい枠も選べます。高い思考レベルや拡張contextで使用量が変わる場合があります。変更だけでは評価を開始しません。選択はモデル別に保持し、次回起動でも使う場合は**設定を保存**してください。保存希望model・選択値が利用不可なら別値へfallbackせず、選び直しを求めます。
 3. **設定から戻る**で実行画面へ戻り、実効model、次回runのreasoning effort、並列度を確認します。入力画面の**実行の準備を開く**で**checkpoint から再開**をoffにします。
 4. **次回新規runの実効出力先**、実行予定、技術検証を確認します。指定出力先が空欄の場合だけ入力隣接`result`となり、利用できない指定先から別pathへ自動退避しません。
 5. **定量化を開始**を選びます。設定を次回起動にも残すには別途**設定を保存**が必要ですが、設定fileの保存自体はrun開始操作ではありません。
@@ -354,7 +354,7 @@ run開始時に入力・採点定義・実効model・並列度・出力条件を
 3. **別名 workbook 出力**の既定値は出力先directoryで未使用の`eval-yyyyMMdd-HHmm[-NN].xlsx`です。そのまま、または既存directory内の未使用の新しい`.xlsx` pathへ変えて、**検証して出力**を選びます。入力・既存final／partialは上書きしません。ジョブのログは同じ出力先に`yyyyMMddHHmm-log.txt`として保存されます。
 4. 成功後の**保存済み修正版**とpathを確認します。出力先候補の入力や「出力可能」の表示だけでは保存されません。出力中の再編集は、先の出力が成功しても未保存として残り得ます。
 
-### 選んだ行だけを再実行する（現行ソース`0.8.8`のみ）
+### 選んだ行だけを再実行する（`v0.8.9`から）
 
 これは**途中経過からの再開**とも、**overrideによる点の修正**とも違う操作です。新たなAI評価のため、追加の利用量が発生し得ます。
 
@@ -376,7 +376,7 @@ finalは入力workbookの全sheetとdataを保持し、次の4sheetを追加し�
 - `Quantification_Results`
 - `Quantification_Run`
 
-現行ソース`0.8.8`の完成版には、点数だけを見やすくまとめた**採点結果**シートも追加します。公開`v0.8.6`では上の4シートで確認してください。
+公開`v0.8.9`の完成版には、点数だけを見やすくまとめた**採点結果**シートも追加します。旧公開`v0.8.6`では上の4シートで確認してください。
 
 入力に同名sheetがある場合は、既存sheetを変更せず` (2)`等の一意名を使います。partialは入力全体と`Quantification_Checkpoint`を含みます。各sheet・各列の意味は[実行結果Excelの見方](result-excel-description.md)を参照してください。
 
@@ -395,20 +395,23 @@ final/partialには入力全体、Prompt、参照回答、AI結果が含まれ�
 
 ## 公開版の確認状況
 
-公開`v0.8.6`は、**追加ソフトが何も入っていない新しいWindows 11での動作確認（clean-host試験CH-01〜06）と、本人のGitHubログインでの確認を実施しないまま公開**しました（リポジトリ管理者の判断です）。先生にとっての意味は次のとおりです。
+`v0.8.9`はCIと`release.yml`のcandidate run（GitHub-hostedのWindows x64 runnerでのP07、ZIP／MSIX証跡、C03／C02検証、digest照合）の成功と、保護された`publish` environmentの承認を経て公開しました。追加ソフトのない新しいWindows 11標準ユーザーでの実機確認（公開条件ではありません）、本人のGitHubログイン、実AI評価（ADV-01）は実施していません。先生にとっての意味は次のとおりです。
 
 - **ご自分のパソコンで起動・ログイン・AI評価が動くことまでは、保証していません。** 最初は架空の回答を少数だけ使って試し、止まったら管理者に相談してください。
-- 開発用のパソコンでの自動試験は行っていますが、学校の実際の環境での確認の代わりにはなりません。
+- GitHubの検証用Windows環境での自動試験は行っていますが、学校の実際の環境での確認の代わりにはなりません。
 - 画面読み上げ（Narrator）での確認や、本人による通し確認も、まだ行っていません。
-- 開発者向けの検証記録（どの試験を、どの版で、何件確認したか）は、[v0.8.6の検証範囲](https://github.com/dahatake/StudyReport-Evaluator/blob/main/dev/docs/release/verification-scope-0.8.6.md)にあります。先生が読む必要はありません。
-- 現行ソースの`0.8.8`は、別の公開前確認が必要な、未公開の候補です。文書を更新しても、配布済みのアプリや確認状況は変わりません。
+
+旧公開`v0.8.6`は、**追加ソフトが何も入っていない新しいWindows 11での動作確認（clean-host試験CH-01〜06）と、本人のGitHubログインでの確認を実施しないまま公開**しました（リポジトリ管理者の判断です）。
+
+- 旧公開版の開発者向けの検証記録（どの試験を、どの版で、何件確認したか）は、[v0.8.6の検証範囲](https://github.com/dahatake/StudyReport-Evaluator/blob/main/dev/docs/release/verification-scope-0.8.6.md)にあります。先生が読む必要はありません。
+- 未公開の`0.8.7`／`0.8.8`（Draft／tagのみ）の確認結果を公開版の確認状況に流用しません。
 
 development MSIXは非公開の開発検証専用です。
 
 ## 対象版
 
-単一EXEとlogin button、4ステップ、ページ切替、設定保存・明示適用は公開`v0.8.6`にあります。通常評価の編集場所など、現行ソースとの差は本文の版表示を確認してください。[画像一覧](../images/README.md)の**8枚（01〜08）**は説明用synthetic／fake状態です。02・04は公開版当時の設定画面で、現行ソースとは配置が異なります。05は認証未確認、06はfake結果、07は未保存override、08はstore未構成の合成Common画面です。初回生成は`0.8.4`、最新の再生成は2026-09-27の`0.8.6`です。画像を実認証・実保存・native確認の証拠や、現行ソースとの一致保証に読み替えません。
+単一EXEとlogin button、4ステップ、ページ切替、設定保存・明示適用は公開`v0.8.9`と旧公開`v0.8.6`にあります。通常評価の編集場所など、両者の差は本文の版表示を確認してください。[画像一覧](../images/README.md)の**8枚（01〜08）**は説明用synthetic／fake状態です。02・04は旧公開`v0.8.6`当時の設定画面で、`v0.8.9`とは配置が異なります。05は認証未確認、06はfake結果、07は未保存override、08はstore未構成の合成Common画面です。初回生成は`0.8.4`、最新の再生成は2026-09-27の`0.8.6`です。`v0.8.9`では再生成していないため、画面配置と一致しない場合があります。画像を実認証・実保存・native確認の証拠や、`v0.8.9`との一致保証に読み替えません。
 
-旧公開`v0.8.1`にこれらのUI・設定保存を追加したわけではありません。**要求文書v4.6、公開`v0.8.6`、旧公開`v0.8.1`は別**です。
+旧公開`v0.8.1`にこれらのUI・設定保存を追加したわけではありません。**要求文書v4.6、公開`v0.8.9`、旧公開`v0.8.6`、旧公開`v0.8.1`は別**です。
 
-**対象版: 公開`v0.8.6`。旧`v0.8.1`は前回公開版のZIPです。**
+**対象版: 公開`v0.8.9`。旧公開`v0.8.6`は前回公開版、旧`v0.8.1`はさらに前のZIPです。**

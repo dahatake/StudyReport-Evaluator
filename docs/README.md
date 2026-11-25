@@ -18,17 +18,17 @@ StudyReport Evaluatorは、Excelにまとめた学生の回答をAIで評価し�
 
 ## 使っている版を確認してください
 
-**確認日：2026-11-25。現在の公開版は`0.8.6`です。** 確認日は、公開状況・版・入手手順を実際に確かめた日です（2026-11-25に、公開ファイルの取得とSHA-256の照合、起動までを確かめました。ログインやAI評価までは確かめていません）。 [GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6)には、`v0.8.6`の`StudyReportEvaluator-win-x64.exe`、`StudyReportEvaluator-win-x64.exe.sha256`、`StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`があります。
+**確認日：2026-11-25。現在の公開版は`v0.8.9`（2026-11-25公開）です。** 確認日は、公開状況・版・入手手順を確かめた日です（本人のGitHubログインやAI評価までは確かめていません）。 [GitHub Releases](https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.9)には、`v0.8.9`の`StudyReportEvaluator-win-x64.exe`、`StudyReportEvaluator-win-x64.exe.sha256`、`StudyReportEvaluator-win-x64.zip`、`StudyReportEvaluator-win-x64.zip.sha256`があります。
 
 | 対象 | このガイドでの扱い |
 |---|---|
-| 公開`v0.8.6` | 通常の入手先。EXEを優先し、ZIPは代替。通常評価の詳細は**設定 → 通常評価**で編集します |
-| 現行ソース`0.8.8` | 未公開のローカル候補。通常評価を**2 採点設計**内で編集するなど、公開版とは異なります。文書では変更点に版を付けます |
+| 公開`v0.8.9` | 通常の入手先。EXEを優先し、ZIPは代替。通常評価を**2 採点設計**内で編集し、Prompt評価・参照回答5件・`採点結果`シートなどを含みます |
+| 旧公開`v0.8.6` | 前回の公開版。通常評価の詳細は**設定 → 通常評価**で編集するなど、`v0.8.9`とは異なります。文書では違いに版を付けます |
 | 旧`v0.8.1` | 過去のZIP版。ログインボタンや本頁の設定保存・適用を前提にしないでください |
 
-公開済みであることと動作確認が完了していることは別です。`v0.8.6`の公開前のCH-01〜06 `NOT_RUN`は維持します（追加ソフトのない新しいWindows環境での確認・本人ログインは未実施）。その後の候補版の確認結果を公開版に流用しません。[検証範囲](getting-started.md#公開版の確認状況)を参照してください。
+公開済みであることと動作確認が完了していることは別です。`v0.8.9`は、CIと`release.yml`のcandidate run、保護environmentの承認を経て公開しましたが、追加ソフトのない新しいWindows 11標準ユーザーでの実機確認（公開条件ではありません）・本人ログイン・実AI評価は未実施です。旧公開`v0.8.6`の公開前のCH-01〜06 `NOT_RUN`の記録は履歴として維持します。[検証範囲](getting-started.md#公開版の確認状況)を参照してください。
 
-画面画像8枚は合成データ・仮のAI応答による説明用です。2026-09-27の生成時点の画面であり、現行ソースの画面と一致する保証はありません。[画像一覧](../images/README.md)で対象と限界を確認できます。
+画面画像8枚は合成データ・仮のAI応答による説明用です。2026-09-27に製品`0.8.6`で生成した画面であり、`v0.8.9`の画面配置と一致しない場合があります。[画像一覧](../images/README.md)で対象と限界を確認できます。
 
 ## やりたいことから探す
 
@@ -48,7 +48,7 @@ StudyReport Evaluatorは、Excelにまとめた学生の回答をAIで評価し�
 
 - [製品README](../README.md)：配布形式、動作環境、任意のSHA-256確認、Windowsの警告
 - [技術ガイド](technical-guid.md)：内部構成、変更・拡張時の注意
-- [起動引数のガイド](prompt-launch.md)：任意のコマンド起動。現行ソースでは`--prompt`を採点に使いません
+- [起動引数のガイド](prompt-launch.md)：任意のコマンド起動。`v0.8.9`では`--prompt`を採点に使いません
 - [Release自動化](https://github.com/dahatake/StudyReport-Evaluator/blob/main/docs/release-automation.md)：配布物の作成・公開前の検証
 
 対応は**Windows 11 x64、標準`.xlsx`**です。公開EXE／ZIPともunsigned（電子署名なし）で、Windowsや学校の端末管理により起動を拒否される場合があります。保護機能を無効にせず、管理者へ相談してください。macOS、Linux、Windows Arm64、暗号化Excel、マクロ付きExcelは対象外です。development MSIXは検証専用で、一般配布しません。

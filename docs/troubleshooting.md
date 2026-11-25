@@ -4,7 +4,7 @@
 
 ## 先生向け：症状から探す
 
-**確認日：2026-11-25。** 公開版は`v0.8.6`、現行ソース`0.8.8`は未公開の候補です。候補だけの操作は下で区別します。
+**確認日：2026-11-25。** 公開版は`v0.8.9`、旧公開版は`v0.8.6`です。版による操作の違いは下で区別します。
 
 | 困っていること | まず行うこと | 詳細 |
 |---|---|---|
@@ -19,9 +19,9 @@
 
 本番の回答で何度もやり直す前に原因を確認してください。再実行は追加のAI利用量が発生し得ます。問い合わせには版、症状、秘密を除いたエラーコード、どの操作の直後かを添えます。
 
-> **対象版・確認範囲:** 本頁の単一EXE、login button、`setting.txt`の説明は、公開`v0.8.6`向けです。旧`v0.8.1`はZIP配布で、単一EXE、「GitHubにログイン」button、本頁の設定保存・適用機能はありません。
+> **対象版・確認範囲:** 本頁の単一EXE、login button、`setting.txt`の説明は、公開`v0.8.9`向けです（旧公開`v0.8.6`にもあります）。旧`v0.8.1`はZIP配布で、単一EXE、「GitHubにログイン」button、本頁の設定保存・適用機能はありません。
 >
-> 版更新前の製品`0.8.4`では、P06の実EXE試験は開発hostで**7件すべてPASS・独立レビュー指摘0**です。この履歴を版更新後の最終成果物の検証結果へ流用しません。一方、**clean-host（MOTW／Windows保護の実測を含む）と本人loginは`NOT_RUN`**です。`v0.8.6`は公開済みですが、最終成果物のCH-01〜06を実施しないままrepository ownerの明示判断で公開されました。同梱文書や製品版の変更でEXEのbytesが変われば、再package・当該EXEの再検証が必要です。
+> 版更新前の製品`0.8.4`では、P06の実EXE試験は開発hostで**7件すべてPASS・独立レビュー指摘0**です。この履歴を版更新後の最終成果物の検証結果へ流用しません。一方、**clean-host（MOTW／Windows保護の実測を含む）と本人loginは`NOT_RUN`**です。旧公開`v0.8.6`は、最終成果物のCH-01〜06を実施しないままrepository ownerの明示判断で公開されました。`v0.8.9`はCIと`release.yml`のcandidate run、保護environmentの承認を経て公開しましたが、追加ソフトのない新しいWindows 11標準ユーザーでの実機確認（公開条件ではありません）と本人loginは未実施です。同梱文書や製品版の変更でEXEのbytesが変われば、再package・当該EXEの再検証が必要です。
 >
 > 一時保存先の実設定fileとfake AI境界を使うdeterministic E2Eの成功は、native WindowsのUI／DPI／Narrator確認・本人walkthroughやrelease完了の証拠ではありません。追加native確認は**NOT COMPLETE（FAIL）**で、Space／Narrator、本人walkthrough、隔離利用者環境のnative保存は`NOT_RUN`です。UIAの行特定段階の失敗をアプリ不具合と断定せず、P06の実測と追加probeの到達範囲は[検証範囲](getting-started.md#公開版の確認状況)で区別してください。
 
@@ -40,9 +40,9 @@
 
 `nano-AI units`とpremium request消費量はSDK報告値です。AIクレジットは`nano-AI units`を1,000,000,000で割った表示時の換算値で、請求確定額ではありません。アプリは円・ドル・アカウント残量へ換算しません。結果画面の`AIクレジット —（未取得）`はSDKから値を観測できなかった状態、`—（コスト記録なし）`はその結果にコスト記録が付属していない状態、`（一部取得）`は一部の試行の値が部分取得の状態で、いずれも0を意味しません。入力／出力tokenと重複し得る推論／cache内訳を合計tokenとして加算しないでください。記録対象、保存先、保持期間は[データとprivacy](privacy-and-data-handling.md#ジョブコストログ)を確認してください。
 
-## 単一EXEを起動できない（v0.8.6）
+## 単一EXEを起動できない（v0.8.6以降）
 
-公開`v0.8.6`の`StudyReportEvaluator-win-x64.exe`は.NET標準hostが、通常は標準userの一時領域`%TEMP%/.net/<app>/<bundle-id>/`へ内容を展開してからGUIを起動します。**EXEの配置先と抽出先は別**で、EXEを置いたdirectoryがread-onlyであることと、抽出先へ書き込めないことを区別します。
+公開`v0.8.9`の`StudyReportEvaluator-win-x64.exe`は.NET標準hostが、通常は標準userの一時領域`%TEMP%/.net/<app>/<bundle-id>/`へ内容を展開してからGUIを起動します。**EXEの配置先と抽出先は別**で、EXEを置いたdirectoryがread-onlyであることと、抽出先へ書き込めないことを区別します。
 
 | 状況 | 対処 |
 |---|---|
@@ -56,7 +56,7 @@
 
 ## ZIPを起動できない
 
-公開`v0.8.6`では単一EXEが主導線ですが、`StudyReportEvaluator-win-x64.zip`も代替経路として維持します。旧`v0.8.1`のZIPは前回公開版です。
+公開`v0.8.9`では単一EXEが主導線ですが、`StudyReportEvaluator-win-x64.zip`も代替経路として維持します。旧`v0.8.1`のZIPは過去の公開版です。
 
 | 状況 | 対処 |
 |---|---|
@@ -91,7 +91,7 @@ native pickerが開かない場合はfull pathを直接入力できます。pick
 
 ### 起動引数の入力・Promptが見つからない
 
-候補の`StudyReportEvaluator-win-x64.exe`とZIP内の`StudyReportEvaluator.App.exe`は、同じ`--input`／`--prompt`契約です。
+公開版の`StudyReportEvaluator-win-x64.exe`とZIP内の`StudyReportEvaluator.App.exe`は、同じ`--input`／`--prompt`契約です。
 
 - 相対pathの基準は**起動時のcwd**です。EXE配置先や.NET抽出cacheではありません。起動時の作業directoryと指定pathの組合せを確認するか、実在するfull pathを指定してください。入力やPromptをcacheへ移動する必要はありません。
 - 日本語・空白を含むpathは1つのargumentとして引用します。`--input`は0または1回、`--prompt`は複数指定でき、指定順を維持します。同じPrompt pathの重複は最初の1件だけを使います。
@@ -183,38 +183,38 @@ Windowsのフォルダーの**ReadOnly属性だけでは書込拒否を保証し
 
 ## Copilotを利用できない
 
-Windows EXE／ZIP候補は既存resolverがmanifestと照合した同梱CLIをSDK・login・全AIで使います。欠損・破損時もPATHの別CLIへfallbackしません。開発build（`CopilotSkipCliDownload=true`）／Unixだけは従来のPATH契約です。GUI起動とAI利用は別条件で、AIにはnetwork、本人login、利用可能なCopilot account／model、組織policy上の許可が必要です。修正版`0.8.8`はローカル候補で、既存公開assetを変更しません。
+Windows EXE／ZIP配布版は既存resolverがmanifestと照合した同梱CLIをSDK・login・全AIで使います。欠損・破損時もPATHの別CLIへfallbackしません。開発build（`CopilotSkipCliDownload=true`）／Unixだけは従来のPATH契約です。GUI起動とAI利用は別条件で、AIにはnetwork、本人login、利用可能なCopilot account／model、組織policy上の許可が必要です。この修正は公開`v0.8.9`に含まれ、旧公開版のassetは変更しません。
 
 | 表示 | 確認 |
 |---|---|
-| CLI unavailable | 開発buildのみ`winget install --id GitHub.Copilot --exact`でCLIを導入し、`copilot --version`を確認。terminal／VS Codeとアプリを再起動してPATHを反映。Windows配布候補は同梱物の検証失敗もloginを拒否するため、配布元に同じ候補の再取得・再展開を確認 |
-| runtime確認失敗 | Windows配布候補のmanifest／CLI欠損・不一致は拒否される。配布元に同じ候補の再取得・再展開を確認し、PATH導入やhash緩和で回避しない。Start／Ping、SDK互換性、認証・model取得、timeout、終了処理でも発生する。network・現在の処理状態・組織policyを確認し、所有CLIの終了後に**Copilot 状態を確認**を明示的に再実行 |
+| CLI unavailable | 開発buildのみ`winget install --id GitHub.Copilot --exact`でCLIを導入し、`copilot --version`を確認。terminal／VS Codeとアプリを再起動してPATHを反映。Windows配布版は同梱物の検証失敗もloginを拒否するため、配布元に同じ版の再取得・再展開を確認 |
+| runtime確認失敗 | Windows配布版のmanifest／CLI欠損・不一致は拒否される。配布元に同じ版の再取得・再展開を確認し、PATH導入やhash緩和で回避しない。Start／Ping、SDK互換性、認証・model取得、timeout、終了処理でも発生する。network・現在の処理状態・組織policyを確認し、所有CLIの終了後に**Copilot 状態を確認**を明示的に再実行 |
 | checkpointのCLI hash／版が一致しない | OSのCLI更新でruntime identityが変わる場合もある。checkpoint互換性と実行時のCLI探索は別。旧CLIを無断でcopyしたりcheckpointを改変せず、新規runか互換性の確認を行う |
-| loginが必要 | Windows配布候補は検証済み同梱CLI、開発build／UnixはPATHのCLIで本人対話loginを完了。login buttonでは正常終了後に自動再確認し、失敗時は**Copilot 状態を確認**で再試行。Start／Ping失敗・timeout・不正応答・取消をlogin要求とは扱わない |
+| loginが必要 | Windows配布版は検証済み同梱CLI、開発build／UnixはPATHのCLIで本人対話loginを完了。login buttonでは正常終了後に自動再確認し、失敗時は**Copilot 状態を確認**で再試行。Start／Ping失敗・timeout・不正応答・取消をlogin要求とは扱わない |
 | modelがない | accountで利用できるmodelを確認。model IDを推測入力しない |
 | 保存したmodelが選択されない／`MODEL_SELECTION_REQUIRED` | 保存する希望IDと実効選択は別。明示または自動の認証・一覧再確認に成功し、希望IDが候補に存在するときだけ選択へ反映する。不在なら未選択・no fallbackなので、候補を確認し**設定 → 共通**で明示的に選び直す。認証確認の失敗だけでは希望IDを消さない |
 | model容量を取得できない（上限が「SDK未公開」） | `auto`などのrouterでは正常な状態。runは開始できるが、model相対の容量検査を行わない。上限を推測して回避せず、事前検査が必要なら上限を公開しているmodelを選ぶ |
 
-**設定 → 共通 → 診断**の認証状態・runtime情報は読取専用の表示で、保存対象外です。希望model IDが未指定の初回は、従来どおり確認成功後に初期選択を表示しますが、それだけで希望IDを保存しません。候補版では保存済み`cachedModels`がある場合（空配列を含む）だけ、起動時に一覧を表示用に復元して認証・一覧を自動再確認します。キャッシュなしの旧設定・初回起動は明示確認またはloginを待ちます。再確認失敗ではキャッシュを保持しても実行用の認証・model選択は解除され、一覧が見えても評価できません。設定の明示再読込・保存では認証確認やloginを始めません。
+**設定 → 共通 → 診断**の認証状態・runtime情報は読取専用の表示で、保存対象外です。希望model IDが未指定の初回は、従来どおり確認成功後に初期選択を表示しますが、それだけで希望IDを保存しません。公開版では保存済み`cachedModels`がある場合（空配列を含む）だけ、起動時に一覧を表示用に復元して認証・一覧を自動再確認します。キャッシュなしの旧設定・初回起動は明示確認またはloginを待ちます。再確認失敗ではキャッシュを保持しても実行用の認証・model選択は解除され、一覧が見えても評価できません。設定の明示再読込・保存では認証確認やloginを始めません。
 
-公開`v0.8.6`以前の既存assetでCLI欠落・不一致時は処理を止め、利用中と**同じ製品版の正式配布物を再取得**してください。ZIP版はpackage全体を新しいdirectoryへ展開します。.NET標準抽出は書換え済みcacheの完全性を保証せず、再取得したEXEでも同じcacheを再利用し得ます。不一致が続く場合は、提供元が同じ製品版・runtime identityのZIPを提供していれば新しいdirectoryへ全体を展開し、なければ提供元へ確認してください。公開`v0.8.6`の代わりに旧公開`v0.8.1`を使ってcheckpoint互換を推測しないでください。
+旧公開`v0.8.6`以前の既存assetでCLI欠落・不一致時は処理を止め、利用中と**同じ製品版の正式配布物を再取得**してください。ZIP版はpackage全体を新しいdirectoryへ展開します。.NET標準抽出は書換え済みcacheの完全性を保証せず、再取得したEXEでも同じcacheを再利用し得ます。不一致が続く場合は、提供元が同じ製品版・runtime identityのZIPを提供していれば新しいdirectoryへ全体を展開し、なければ提供元へ確認してください。新しい公開版の代わりに旧公開版を使ってcheckpoint互換を推測しないでください。
 
-開発build／UnixだけはOSのCLIのinstallとPATH設定が必要です。アプリは自動install／更新しません。Windows配布候補・既存公開版の同梱物検証をmanifest変更やhash検証緩和で回避しないでください。`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN=0`による自動login抑止は変更していません。
+開発build／UnixだけはOSのCLIのinstallとPATH設定が必要です。アプリは自動install／更新しません。Windows配布版・旧公開版の同梱物検証をmanifest変更やhash検証緩和で回避しないでください。`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN=0`による自動login抑止は変更していません。
 
 ### 本人loginと完了後の再確認
 
-**「GitHubにログイン」「ログインを取り消す」は公開`v0.8.6`のbuttonです。**旧公開`v0.8.1`にはこのbuttonがなく、従来どおり同梱CLIで本人loginを行い、既存の状態確認buttonを使います。buttonがないことだけを不具合と判断しないでください。
+**「GitHubにログイン」「ログインを取り消す」は`v0.8.6`以降のbuttonです。**旧公開`v0.8.1`にはこのbuttonがなく、従来どおり同梱CLIで本人loginを行い、既存の状態確認buttonを使います。buttonがないことだけを不具合と判断しないでください。
 
-1. 起動直後に既存のGitHubログインを自動確認します。手動で再確認するには、現行ソースでは**1 入力 → 実行の準備を開く → Copilot 状態を確認**を選びます。公開`v0.8.6`では実行画面にあります。
-2. 利用できるログインがない場合、Windows配布版・配布候補は同梱CLI、開発ビルドはOSのCLIを直接起動し、ブラウザー認証を1回だけ自動で開始します。CLIのconsole／ブラウザーの案内に従って本人のGitHub accountで対話認証を完了します。取消・失敗後は自動では再試行しないので、必要なら**GitHubにログイン**を選びます。ブラウザーを開きたくない環境では環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`を`0`または`false`にします。
+1. 起動直後に既存のGitHubログインを自動確認します。手動で再確認するには、公開`v0.8.9`では**1 入力 → 実行の準備を開く → Copilot 状態を確認**を選びます。旧公開`v0.8.6`では実行画面にあります。
+2. 利用できるログインがない場合、Windows配布版は同梱CLI、開発ビルドはOSのCLIを直接起動し、ブラウザー認証を1回だけ自動で開始します。CLIのconsole／ブラウザーの案内に従って本人のGitHub accountで対話認証を完了します。取消・失敗後は自動では再試行しないので、必要なら**GitHubにログイン**を選びます。ブラウザーを開きたくない環境では環境変数`STUDY_REPORT_EVALUATOR_AUTO_COPILOT_LOGIN`を`0`または`false`にします。
 3. login processが正常終了すると、認証状態とmodel一覧を自動再確認します。取消・失敗後や自動再確認に失敗した場合は、**Copilot 状態を確認**で再試行します。CLI processの起動・終了やexit codeだけを認証成功とは扱いません。
-4. 状態と列挙されたmodelを確認し、候補版では必要な変更を**設定 → 共通**で行います。AI評価は**定量化を開始**の明示操作まで始まりません。
+4. 状態と列挙されたmodelを確認し、公開版では必要な変更を**設定 → 共通**で行います。AI評価は**定量化を開始**の明示操作まで始まりません。
 
 起動時の自動確認・自動login以外では、起動引数・Prompt適用・画面遷移・状態確認からloginを暗黙に開始せず、いずれの場合もAI評価を自動開始しません。環境変数`GH_TOKEN`等に無効なtoken（例: 非対応のclassic PAT `ghp_`）が設定されていると、保存済みログインより優先されるため、自動loginを完了しても認証確認が失敗し得ます。その場合は該当の環境変数を解除して再起動してください。実効modelは自動再確認の結果に従って反映し、希望modelが不在でも別modelへfallbackしません。アプリへPAT、token、password、client secret、device codeを入力しないでください。認証とcredential保管はCLI／ブラウザーに委譲し、アプリの認証処理はこれらを収集・解析・保存・log出力しません。設問textやPrompt等へ貼り付けると、明示保存した定義に平文で残り得ます。認証console／ブラウザーの秘密情報をerror reportへ貼らないでください。
 
 ### loginの失敗・取消・終了処理
 
-次は公開`v0.8.6`のlogin専用処理です。評価runの`CLEANUP_FAILED`や、final完成後の`PARTIAL_CLEANUP_FAILED`とは区別します。
+次は`v0.8.6`以降のlogin専用処理です。評価runの`CLEANUP_FAILED`や、final完成後の`PARTIAL_CLEANUP_FAILED`とは区別します。
 
 | 状況 | 対処 |
 |---|---|
@@ -270,7 +270,7 @@ Windows EXE／ZIP候補は既存resolverがmanifestと照合した同梱CLIをSD
 
 条件を満たさない場合はpartialを変更せず、同じ入力・設計・model・packageで再試行するか、新規runを開始します。保存済みfinalはcheckpointとして指定できません。
 
-現行ソースでは**1 入力 → 実行の準備を開く**、公開`v0.8.6`では実行画面で`.partial.xlsx`を選択または入力し、**再開元を確認**を選ぶと、開始前に各条件を表示します。入力・modelの不一致は表示された明示操作で合わせられます。採点設計またはruntimeの不一致は自動変更されないため、中断時の条件へ戻すか新規runを開始してください。
+公開`v0.8.9`では**1 入力 → 実行の準備を開く**、旧公開`v0.8.6`では実行画面で`.partial.xlsx`を選択または入力し、**再開元を確認**を選ぶと、開始前に各条件を表示します。入力・modelの不一致は表示された明示操作で合わせられます。採点設計またはruntimeの不一致は自動変更されないため、中断時の条件へ戻すか新規runを開始してください。
 
 ## finalが作られない
 

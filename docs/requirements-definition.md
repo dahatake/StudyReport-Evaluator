@@ -5,7 +5,7 @@
 | 文書版 | 4.6 |
 | 基準日 | 2026-09-07 |
 | 同版内追補 | 文書版4.6・基準日は承認baselineとして固定し、2026-09-15以降の要求追加・変更は版を上げずに同版内追補として扱う。各追補は節見出しの日付と§22のsource行に記録する。最終追補は2026-10-05の要求定義書レビュー指摘の整合（§22） |
-| 状態 | 要求承認済み。UI・設定保存差分と記録済み文書contractはVERIFIED_SCOPED。T01〜T38はREVIEWED、T39は追加native FAIL・本人確認等の外部前提によりBLOCKED。製品0.8.6は2026-10-01に公開済み、F01はREVIEWED。公開はrepository ownerの明示判断でclean-host試験CH-01〜06を実施せず、protected publish-release workflowではなくdraft解除で行った。追加native FAIL、Narrator／本人walkthrough／隔離利用者native保存の未実施、T39 BLOCKEDは維持。fresh Windows実機確認は未検証だが、2026-11-25のrepository owner判断で公開条件ではない（§13.7） |
+| 状態 | 要求承認済み。UI・設定保存差分と記録済み文書contractはVERIFIED_SCOPED。T01〜T38はREVIEWED、T39は追加native FAIL・本人確認等の外部前提によりBLOCKED。製品0.8.6は2026-10-01に公開済み、F01はREVIEWED。製品0.8.9は2026-11-25にCI・`release.yml` candidate run・protected publish承認を経て公開（最新）。公開はrepository ownerの明示判断でclean-host試験CH-01〜06を実施せず、protected publish-release workflowではなくdraft解除で行った。追加native FAIL、Narrator／本人walkthrough／隔離利用者native保存の未実施、T39 BLOCKEDは維持。fresh Windows実機確認は未検証だが、2026-11-25のrepository owner判断で公開条件ではない（§13.7） |
 | 入力 | Microsoft Forms または Google Forms から export した標準 `.xlsx` 1ファイル |
 | 出力 | 入力を変更せず作成する別の標準 `.xlsx` 1ファイル |
 | 対応環境 | Windows 11 x64。macOS、Linux、Windows Arm64は現版の正式公開対象外 |

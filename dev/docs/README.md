@@ -2,7 +2,7 @@
 
 対象読者は開発者、アーキテクト、QA、リリース担当です。利用者向け文書は[`docs/`](../../docs/README.md)を参照してください。
 
-現在の公開版は**`0.8.6`**、要求版はv4.6、前回公開版は`v0.8.1`のunsigned ZIP／sidecarです。`v0.8.6`の公開assetはunsigned EXE／EXE sidecar／ZIP／ZIP sidecarの4件です。T01〜T38とF01はREVIEWED、T39は追加native FAILと本人確認等の外部前提によりBLOCKEDです。repository ownerの明示判断でclean-host試験CH-01〜06を実施せず、protected `publish-release.yml` workflowではなくdraft解除で公開しましたが、G4・全タスクDONE・clean-host PASSを付与しません。
+現在の公開版は**`0.8.9`**（2026-11-25公開）、要求版はv4.6、前回公開版は`v0.8.6`です。`v0.8.9`はCIと`release.yml`のcandidate run（GitHub-hostedのWindows x64 runnerでのP07、ZIP／MSIX証跡、C03／C02検証、digest照合）の成功と、protected `publish` environmentの承認を経て公開し、公開assetはunsigned EXE／EXE sidecar／ZIP／ZIP sidecarの4件です。fresh Windows 11標準userでの実機確認（公開条件ではない）、本人login、実AI評価（ADV-01）は未実施です。`0.8.7`／`0.8.8`はDraft／tagのみで公開していません。以下は旧公開`v0.8.6`の記録です。`v0.8.1`はunsigned ZIP／sidecarの旧公開版です。`v0.8.6`の公開assetはunsigned EXE／EXE sidecar／ZIP／ZIP sidecarの4件です。T01〜T38とF01はREVIEWED、T39は追加native FAILと本人確認等の外部前提によりBLOCKEDです。repository ownerの明示判断でclean-host試験CH-01〜06を実施せず、protected `publish-release.yml` workflowではなくdraft解除で公開しましたが、G4・全タスクDONE・clean-host PASSを付与しません。
 
 Release candidate run 36860591724は成功し、`v0.8.6`は2026-10-01に公開済みです。[実装状態](implementation-status.md)は、0.8.4のT36文書contract・T37実ZIP・T38実EXE・T39自動回帰／MSIX機構確認と、追加native FAIL／Narrator・本人walkthrough・隔離利用者保存の未実施を分けています。旧証跡を0.8.6最終artifactの成功へ流用しません。
 
@@ -73,6 +73,7 @@ flowchart LR
 
 ## 公開版の確認範囲
 
+- 公開`v0.8.9`：CIと`release.yml`のcandidate run（GitHub-hostedのWindows x64 runnerでのP07、ZIP／MSIX証跡、C03／C02検証、digest照合）の成功と、protected `publish` environmentの承認で公開。fresh Windows 11標準userでの実機確認・本人login・実AI評価は未実施（未検証として記録）。
 - [`release/verification-scope-0.8.6.md`](release/verification-scope-0.8.6.md)：公開`v0.8.6`の確認範囲（T36〜T39、native probe、CH-01〜06 `NOT_RUN`）と、2026-11-25の再確認結果です。先生向け文書は要約だけを持ち、詳細はここを正本とします。
 
 ## Source of truthの優先順位

@@ -11,6 +11,11 @@
 - `tests/toolkit`は`conftest.py`（EABK toolkitの標準のもの）と`tools/templates`を追加して全24件成功。
 - 既知の失敗は`SampleWorkbookStructuralTests.Repository_sample_…`の1件のみ継続中: 主作業ツリーのgit管理外`sample/SampleReport.xlsx`が`A1:L6`で、要求定義書の現行契約`A1:J531`（2026-09-16測定）と一致しない。テスト期待は契約どおりなので変更せず、現行契約のsample（A1:J531）の再配置が必要。
 
+## 2026-11-25 — v0.8.9公開状態
+
+- **公開状態**: StudyReport Evaluator `v0.8.9`は2026-11-25にGitHub Releasesへ公開（最新）。CIと`release.yml`のcandidate run（GitHub-hostedのWindows x64 runnerでのP07、ZIP／MSIX証跡、C03／C02検証、digest照合）の成功と、protected `publish` environmentの承認を経た。公開assetは`StudyReportEvaluator-win-x64.exe`、`.exe.sha256`、`.zip`、`.zip.sha256`の4件。`0.8.7`／`0.8.8`はDraft／tagのみで公開していない。
+- **未実施**: fresh Windows 11標準userでの実機確認（公開条件ではない）、本人login、実AI評価（ADV-01）。追加native UI確認FAIL、Narrator／本人walkthrough／隔離利用者設定保存の未実施、T39 BLOCKED、未署名／SmartScreen非保証は解除しない。
+
 ## 2026-10-01 — v0.8.6公開状態
 
 - **公開状態**: StudyReport Evaluator `v0.8.6`は2026-10-01 21:42 JSTにGitHub Releasesへ公開済み。release candidate run 36860591724は成功し、公開assetは`StudyReportEvaluator-win-x64.exe`、`.exe.sha256`、`.zip`、`.zip.sha256`の4件。

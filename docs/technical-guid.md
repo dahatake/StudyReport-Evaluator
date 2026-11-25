@@ -2,7 +2,7 @@
 
 本書は、StudyReport Evaluatorを保守・拡張するソフトウェアエンジニア向けの実装ガイドです。利用手順は[製品README](../README.md)、評価Promptだけを編集する場合は[Custom evaluatorガイド](custom-evaluator-guide.md)を先に参照してください。
 
-本書の実装説明は2026-11-07時点の現行ソース（`0.8.8`ローカル候補）を対象にしています。公開済みの最新版`v0.8.6`（2026-10-01公開）と同じ機能・画面であるとは限りません。候補のビルドやテスト成功は、公開完了を意味しません。型名とfile pathはrepository sourceの所在を示します。配布物にはsourceが含まれないため、source pathはリンクではなくcode表記にしています。
+本書の実装説明は公開`v0.8.9`（2026-11-25公開）のソースを対象にしています。旧公開`v0.8.6`（2026-10-01公開）とは機能・画面が異なります。型名とfile pathはrepository sourceの所在を示します。配布物にはsourceが含まれないため、source pathはリンクではなくcode表記にしています。
 
 教員の方が仕組みを確認する場合は「まず見る3つの図」「Loginと状態確認」「評価方式と類似度」を参照してください。「安全なカスタマイズ手順」以降はコードを変更する開発者向けです。
 
@@ -97,7 +97,7 @@ GitHubの公式説明では、Copilot SDKの基本構成は「application → SD
 
 開発build／Unixの`SystemCopilotCliPathResolver`は起動時のPATHを順に調べ、Windowsは`copilot.exe`、Unix source buildは実行権限のある`copilot`を探します。空・相対PATHは無視し、作業directoryや同梱CLIを探索しません。Windows配布では既存`BundledCopilotCliPathResolver`がmanifest・RID・SDK版・CLI版・相対path・SHA-256を検証し、成功した絶対pathだけをSDKとlogin serviceへ返します。全AIも同じfactoryを使用します。起動・RPC・認証・モデル取得失敗はSDK互換性を含むruntime failureとして明示します。
 
-通常の開発ビルドは`CopilotSkipCliDownload=true`でCLIを取得せず、PATHを使用します。Windows配布scriptは`CopilotSkipCliDownload=false`を渡し、Appだけの`BUNDLED_COPILOT_RUNTIME`コンパイル定数で既定resolverを固定します（UnixはPATHを維持）。manifestの存在ではモードを切り替えず、欠損・破損はruntime failureで拒否し、PATHへfallbackしません。実際のCLI版・SHA-256とSDK版は引き続き診断とcheckpoint互換性に使用します。修正版`0.8.8`はローカル候補のみです。外部CLIのない新しいWindowsでの実機確認・本人login・実AI評価（ADV-01）はfake system回帰では代替されず、未検証です（公開条件ではありません）。既存公開assetは変更しません。
+通常の開発ビルドは`CopilotSkipCliDownload=true`でCLIを取得せず、PATHを使用します。Windows配布scriptは`CopilotSkipCliDownload=false`を渡し、Appだけの`BUNDLED_COPILOT_RUNTIME`コンパイル定数で既定resolverを固定します（UnixはPATHを維持）。manifestの存在ではモードを切り替えず、欠損・破損はruntime failureで拒否し、PATHへfallbackしません。実際のCLI版・SHA-256とSDK版は引き続き診断とcheckpoint互換性に使用します。この修正（`0.8.8`で実装）は公開`v0.8.9`に含まれます。外部CLIのない新しいWindowsでの実機確認・本人login・実AI評価（ADV-01）はfake system回帰では代替されず、未検証です（公開条件ではありません）。旧公開版のassetは変更しません。
 
 > [!IMPORTANT]
 > 公式SDKの認証優先順位では、明示token、Copilot API用token、対応する環境変数token、保存済みCopilot CLI credential、GitHub CLI credentialの順です。現行Appはtokenを注入しませんが、子process環境を全面的には消去しません。UIは本人のCLI loginを主導線としています。認証方式を変更する場合は、`UseLoggedInUser`だけでなく、子process環境、credential優先順位、multi-user isolation、logとtest fixtureを一緒に設計してください。

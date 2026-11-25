@@ -400,36 +400,36 @@ public sealed class DocumentationContractTests
             readme,
             "Windows 11 x64",
             ".NET 10 self-contained",
-            "公開`v0.8.6`はunsigned単一EXEを主導線とし、unsigned ZIPも提供",
+            "公開`v0.8.9`はunsigned単一EXEを主導線とし、unsigned ZIPも提供",
             "StudyReportEvaluator-win-x64.zip",
             "StudyReportEvaluator-win-x64.zip.sha256",
             "StudyReportEvaluator-win-x64.exe",
             "StudyReportEvaluator-win-x64.exe.sha256",
-            "現在の公開版は`0.8.6`です",
-            "https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6",
+            "現在の公開版は`v0.8.9`です",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.9",
             "fresh Windows 11 x64でのclean-host試験CH-01〜06と本人loginを実施しないまま公開",
             "macOS、Linux、Windows Arm64は初版対応対象外",
             "installer、code signing、notarizationを提供しません");
 
         AssertContainsAll(
             readme,
-            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe",
-            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.exe.sha256",
-            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip",
-            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.6/StudyReportEvaluator-win-x64.zip.sha256");
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.9/StudyReportEvaluator-win-x64.exe",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.9/StudyReportEvaluator-win-x64.exe.sha256",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.9/StudyReportEvaluator-win-x64.zip",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/download/v0.8.9/StudyReportEvaluator-win-x64.zip.sha256");
         AssertContainsAll(
             userIndex,
             "Windows 11 x64",
             "公開EXE／ZIPともunsigned",
-            "現在の公開版は`0.8.6`です",
-            "`v0.8.6`の`StudyReportEvaluator-win-x64.exe`",
-            "CH-01〜06 `NOT_RUN`は維持します",
+            "現在の公開版は`v0.8.9`（2026-11-25公開）です",
+            "`v0.8.9`の`StudyReportEvaluator-win-x64.exe`",
+            "CH-01〜06 `NOT_RUN`の記録は履歴として維持します",
             "development MSIXは検証専用で、一般配布しません",
             "macOS、Linux、Windows Arm64");
         AssertContainsAll(
             Read("docs/getting-started.md"),
-            "現在の公開版は`v0.8.6`です",
-            "https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.6",
+            "現在の公開版は`v0.8.9`（2026-11-25公開）です",
+            "https://github.com/dahatake/StudyReport-Evaluator/releases/tag/v0.8.9",
             "（clean-host試験CH-01〜06）と、本人のGitHubログインでの確認を実施しないまま公開",
             "development MSIXは非公開の開発検証専用");
         AssertContainsAll(
@@ -524,7 +524,7 @@ public sealed class DocumentationContractTests
         string guide = Read("docs/prompt-launch.md");
         AssertContainsAll(
             readme,
-            "公開`v0.8.6`の`StudyReportEvaluator-win-x64.exe`と、同じ`v0.8.6` ZIPの`StudyReportEvaluator.App.exe`",
+            "公開`v0.8.9`の`StudyReportEvaluator-win-x64.exe`と、同じ`v0.8.9` ZIPの`StudyReportEvaluator.App.exe`",
             "[Promptファイルから起動](docs/prompt-launch.md)",
             "`--input`は0または1回",
             "`--prompt`は0回以上",
@@ -860,39 +860,43 @@ public sealed class DocumentationContractTests
     }
 
     [Fact]
-    public void Published_0_8_6_ui_and_screenshots_are_explicitly_distinguished_from_historical_0_8_1()
+    public void Published_0_8_9_docs_distinguish_previous_0_8_6_and_historical_0_8_1()
     {
-        // FR-121 AC-028/100: the local source candidate is 0.8.8; public documentation
-        // remains on 0.8.6 until publication, with 0.8.1 historical.
-        Assert.Contains("<VersionPrefix>0.8.8</VersionPrefix>", Read("Directory.Build.props"), StringComparison.Ordinal);
-        AssertContainsAll(Read("README.md"), "修正版`0.8.8`はローカル候補のみ", "今回公開しません");
-        foreach ((string path, string candidate, string published) in new[]
+        // v0.8.9 is the latest public release; v0.8.6 is the previous public release and
+        // 0.8.1 is historical. 0.8.7/0.8.8 were never published.
+        Assert.Contains("<VersionPrefix>0.8.9</VersionPrefix>", Read("Directory.Build.props"), StringComparison.Ordinal);
+        AssertContainsAll(Read("README.md"), "最新公開版は`v0.8.9`（2026-11-25公開）", "`0.8.7`／`0.8.8`はDraft／tagだけで、公開版ではありません");
+        foreach ((string path, string current, string previous) in new[]
                  {
-                     ("README.md", "現在の公開版は`0.8.6`です", "fresh Windows 11 x64でのclean-host試験CH-01〜06と本人loginを実施しないまま公開"),
-                     ("docs/README.md", "現在の公開版は`0.8.6`です", "CH-01〜06 `NOT_RUN`は維持します"),
-                     ("docs/getting-started.md", "現在の公開版は`v0.8.6`です", "（clean-host試験CH-01〜06）と、本人のGitHubログインでの確認を実施しないまま公開"),
-                     ("docs/settings.md", "公開`v0.8.6`", "旧`v0.8.1`はZIP配布で、本頁の設定保存・適用機能はありません"),
-                     ("docs/features.md", "公開`v0.8.6`", "現行ソース`0.8.8`"),
-                     ("docs/custom-evaluator-guide.md", "公開`v0.8.6`", "現行ソース`0.8.8`"),
-                     ("docs/prompt-launch.md", "公開`v0.8.6`", "現行ソース`0.8.8`"),
-                     ("docs/privacy-and-data-handling.md", "公開`v0.8.6`向け", "旧`v0.8.1`はZIP配布"),
-                     ("docs/troubleshooting.md", "公開`v0.8.6`向け", "旧`v0.8.1`はZIP配布"),
-                     ("docs/result-excel-description.md", "現行ソース`0.8.8`の出力", "clean-host試験CH-01〜06と本人loginは公開前に実施していません"),
-                     ("images/README.md", "公開`v0.8.6`のUI説明用", "旧`0.8.1`の画面を示すものではありません"),
+                     ("README.md", "現在の公開版は`v0.8.9`です", "旧公開`v0.8.6`は、repository ownerの明示判断により、fresh Windows 11 x64でのclean-host試験CH-01〜06と本人loginを実施しないまま公開"),
+                     ("docs/README.md", "現在の公開版は`v0.8.9`（2026-11-25公開）です", "旧公開`v0.8.6`"),
+                     ("docs/getting-started.md", "現在の公開版は`v0.8.9`（2026-11-25公開）です", "旧公開`v0.8.6`は、**追加ソフトが何も入っていない新しいWindows 11での動作確認（clean-host試験CH-01〜06）と、本人のGitHubログインでの確認を実施しないまま公開"),
+                     ("docs/settings.md", "公開`v0.8.9`", "旧`v0.8.1`はZIP配布で、本頁の設定保存・適用機能はありません"),
+                     ("docs/features.md", "公開`v0.8.9`に基づき", "旧公開`v0.8.6`"),
+                     ("docs/custom-evaluator-guide.md", "公開`v0.8.9`", "旧公開`v0.8.6`"),
+                     ("docs/prompt-launch.md", "公開`v0.8.9`", "旧公開`v0.8.6`"),
+                     ("docs/privacy-and-data-handling.md", "公開`v0.8.9`向け", "旧`v0.8.1`はZIP配布"),
+                     ("docs/troubleshooting.md", "公開`v0.8.9`向け", "旧`v0.8.1`はZIP配布"),
+                     ("docs/result-excel-description.md", "公開`v0.8.9`の出力", "旧公開`v0.8.6`の出力には"),
+                     ("images/README.md", "旧公開`v0.8.6`のUI説明用", "旧`0.8.1`の画面を示すものではありません"),
                  })
         {
             string content = Read(path);
-            AssertContainsAll(content, candidate, published);
+            AssertContainsAll(content, current, previous);
             Assert.DoesNotContain("UNRELEASED", content, StringComparison.Ordinal);
+            AssertDoesNotContainAny(content, "現行ソース`0.8.8`", "未公開のローカル候補", "ローカル候補のみ", "今回公開しません");
         }
 
         AssertContainsAll(Read("images/README.md"), "一時directoryへ描画", "2回生成の一致", "finally",
-            "生成時の製品版: `0.8.6`", "その時点ではPNGを再生成していません");
-        AssertContainsAll(Read("CHANGELOG.md"), "## [Unreleased]", "## [0.8.8] - 2026-11-07", "## [0.8.7] - 2026-11-07", "## [0.8.6] - 2026-10-01");
+            "生成時の製品版: `0.8.6`", "その時点ではPNGを再生成していません",
+            "公開`v0.8.9`の画面配置と一致しない場合があります");
+        AssertContainsAll(Read("CHANGELOG.md"), "## [Unreleased]", "## [0.8.9] - 2026-11-25", "## [0.8.8] - 2026-11-07", "## [0.8.7] - 2026-11-07", "## [0.8.6] - 2026-10-01");
         AssertContainsAll(
             Read("docs/getting-started.md"),
             "確認のためだけにPowerShell等を導入する必要はありません",
             "certutil",
+            "`v0.8.9`はCIと`release.yml`のcandidate run",
+            "本人のGitHubログイン、実AI評価（ADV-01）は実施していません",
             "（clean-host試験CH-01〜06）と、本人のGitHubログインでの確認を実施しないまま公開",
             "dev/docs/release/verification-scope-0.8.6.md");
         AssertContainsAll(
@@ -910,8 +914,8 @@ public sealed class DocumentationContractTests
         AssertContainsAll(
             Read("docs/README.md"),
             "確認日：2026-11-25",
-            "現行ソース`0.8.8`",
-            "未公開のローカル候補",
+            "公開`v0.8.9`",
+            "旧公開`v0.8.6`",
             "(getting-started.md)",
             "(privacy-and-data-handling.md)",
             "(../images/teacher-workflow.svg)");
@@ -919,20 +923,20 @@ public sealed class DocumentationContractTests
             Read("docs/getting-started.md"),
             "架空の回答を少数",
             "キャッシュの有無にかかわらず",
-            "公開`v0.8.6`の新規定義で0.1",
-            "現行ソース`0.8.8`の新規定義では0",
+            "旧公開`v0.8.6`の新規定義で0.1",
+            "公開`v0.8.9`の新規定義では0",
             "空欄・`—`の行は0点として転記しません",
             "(../images/teacher-result-review.svg)");
         AssertContainsAll(
             Read("docs/features.md"),
             "参照回答を**5件**",
-            "公開`v0.8.6`は設問ごとに1件",
+            "旧公開`v0.8.6`は設問ごとに1件",
             "一部が失敗した場合",
             "採点用の類似度は空欄");
         AssertContainsAll(
             Read("docs/result-excel-description.md"),
-            "現行ソース`0.8.8`の出力",
-            "公開`v0.8.6`の出力には",
+            "公開`v0.8.9`の出力",
+            "旧公開`v0.8.6`の出力には",
             "必要な類似度が失敗で空欄の場合、0に置き換えません",
             "元のファイルを保管");
         AssertContainsAll(
@@ -958,7 +962,7 @@ public sealed class DocumentationContractTests
             "すべての端末で無警告・無条件に1操作で起動できるとは表示しません",
             "1ファイル配布は「ディスク上も1ファイル」「痕跡なし」ではありません",
             "保存済みfinal workbookのアプリへの再importと、複数definition profileの管理・切替は提供しません",
-            "公開`v0.8.6`の採点定義1件の明示保存・適用とは別です",
+            "`v0.8.6`以降の採点定義1件の明示保存・適用とは別です",
             "[MIT License](LICENSE)");
         AssertDoesNotContainAny(
             readme,

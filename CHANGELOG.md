@@ -4,6 +4,11 @@ StudyReport Evaluatorの利用者に影響する変更をこのファイルへ�
 
 ## [Unreleased]
 
+## [0.8.9] - 2026-11-25
+
+- 公開条件からclean-host試験CH-01〜06とclean-host証跡入力を削除しました。公開判定はCI、release.yml候補run（x64 runnerでのP07・ZIP／MSIX証跡、C03 matrix、C02検証、digest照合）と保護environmentの承認で行います。追加ソフトのない新しいWindows 11標準ユーザーでの実機確認は未実施です。
+- 0.8.8のEXE同梱CLI一貫使用の修正を含めて公開します。
+
 ## [0.8.8] - 2026-11-07
 
 - Windows EXE／ZIP候補のSDK・login・全AI処理で、既存resolverがmanifestと照合した同梱CLIを一貫使用するよう修正。欠損・破損時はPATHへfallbackせず拒否します。開発／UnixのPATH利用は維持します。
