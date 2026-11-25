@@ -84,9 +84,7 @@ read-onlyジョブにはRelease書込権限を与えず、run metadata/artifact�
 ## ローカル検証（外部操作なし）
 
 ```powershell
-python -m pytest -q tests/packaging/test_release_automation.py
-python scripts/ledger.py run --cases IT-006,IT-007,IT-008,IT-009,IT-010 --no-record
-python scripts/verify.py --quick
+python -m pytest -q tests/packaging tests/system
 ```
 
 先行System TestのHTTP fakeは本番と同じdriverへ

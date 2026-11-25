@@ -206,7 +206,7 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\publish-windows.ps1
 
 配布対象は引き続きWindows 11 x64です。ARM64版の配布は追加しません。
 ローカル検証は `python scripts/release_test_selection.py --run-local` を使用します
-（`verify.py` の既存`app-unit`と同一。標準の`--results-directory`、`--logger`を転送）。
+（標準の`--results-directory`、`--logger`を転送）。
 ARM64でもRelease契約・入力拒否・Workbook処理を実行しますが、
 実x64の包装・起動・性能3試験は **x64 NOT_RUN（未実行）** と表示します。
 private sampleがなければその実ファイル試験も別に未実行と表示し、

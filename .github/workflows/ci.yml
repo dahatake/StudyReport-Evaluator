@@ -71,6 +71,22 @@ jobs:
         shell: pwsh
         run: pwsh.exe -NoLogo -NoProfile -File .\dev\version.ps1 verify
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install Python test dependencies
+        shell: pwsh
+        run: python -m pip install pytest PyYAML
+
+      # The AC-103 local-gate test re-runs the whole .NET suite; the next steps run it natively.
+      - name: Run Python release contract tests
+        shell: pwsh
+        run: >-
+          python -m pytest -q tests/packaging tests/system
+          --deselect tests/system/fr121/test_ac103_host_gate.py::test_FR121_AC103_native_profile_and_x64_evidence_boundary
+
       - name: Run product version tool self-tests
         shell: pwsh
         run: pwsh.exe -NoLogo -NoProfile -File .\dev\version.tests.ps1

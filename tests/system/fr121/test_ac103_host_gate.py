@@ -1,16 +1,17 @@
 """FR-121 AC-103: native local gate is not x64 publication evidence.
 
-Boundary: existing verify.commands[name=app-unit].run, with the standard
-dotnet test --results-directory/--logger arguments forwarded unchanged.
+Boundary: the local app-unit gate (release_test_selection.py --run-local),
+with the standard dotnet test --results-directory/--logger arguments forwarded
+unchanged.
 No new API/driver is required. This contract does not certify a synthetic
 package or this ARM64 host as a successful real-x64 packaging/performance run.
 """
 import copy
-import json
 import os
 import platform
 import re
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 
 import yaml
@@ -48,16 +49,10 @@ def _required_windows_runs(workflow):
 
 
 def test_FR121_AC103_native_profile_and_x64_evidence_boundary(tmp_path):
-    # FR-121 AC-103: run the configured local gate, not a duplicated selection.
-    config = json.loads((ROOT / "scripts" / "ebak.config.json").read_text("utf-8"))
-    entries = [
-        entry for entry in config["verify"]["commands"]
-        if isinstance(entry, dict) and entry.get("name") == "app-unit"
-    ]
-    assert len(entries) == 1, "Keep the existing app-unit verify entry"
+    # FR-121 AC-103: run the local gate, not a duplicated selection.
     results = tmp_path / "local-trx"
     command = (
-        entries[0]["run"]
+        f'"{sys.executable}" scripts/release_test_selection.py --run-local'
         + f' --results-directory "{results}" --logger "trx;LogFileName=ac103.trx"'
     )
     run = subprocess.run(
