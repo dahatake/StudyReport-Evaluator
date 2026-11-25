@@ -203,4 +203,4 @@ run完了後の結果画面で、行ごとのチェックと**技術エラーの
 
 本頁と[はじめに](getting-started.md)が参照する画像は、[画像一覧](../images/README.md)の**8枚（01〜08）**です。05の認証未確認、06のfake結果、07の未保存修正版、08のNO STOREを実認証・実出力・実設定保存の証拠にしません。画像は製品`0.8.4`の時点で生成し、版更新に伴う再生成はしていません。
 
-既存の対象検証とレビューは[v0.8.6の検証範囲](getting-started.md#公開版の確認状況)を参照してください。追加native確認は**NOT COMPLETE（FAIL）**で、版更新前のP06で実測済みの実EXE確認とは区別します。Space／Narrator、本人walkthrough、隔離利用者環境のnative保存、fresh clean-host CH-01〜06・本人loginは未実施です。過去の成功で変更後の最終EXE／ZIP・sidecarの検証や公開条件を省略しません。
+既存の対象検証とレビューは[v0.8.6の検証範囲](getting-started.md#公開版の確認状況)を参照してください。追加native確認は**NOT COMPLETE（FAIL）**で、版更新前のP06で実測済みの実EXE確認とは区別します。Space／Narrator、本人walkthrough、隔離利用者環境のnative保存、追加ソフトのない新しいWindows 11標準ユーザーでの実機確認・本人loginは未実施です（新しいWindowsでの実機確認は公開条件ではありません）。過去の成功で変更後の最終EXE／ZIP・sidecarの検証や公開条件を省略しません。

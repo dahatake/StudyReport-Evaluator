@@ -5,7 +5,7 @@ StudyReport EvaluatorのWindows公開物を、GitHub.com上のGitHub Releaseと�
 - **リリースは自動で公開されません。** [`release.yml`](../../.github/workflows/release.yml)（draft作成）と[`publish-release.yml`](../../.github/workflows/publish-release.yml)（公開）は、どちらも`workflow_dispatch`の手動起動のみです。tag push、`release`イベント、`schedule`、`workflow_run`での自動起動はありません。
 - [`ci.yml`](../../.github/workflows/ci.yml)はbuildとtestだけで、Releaseを作りません。
 - 版の決め方、`version.ps1`、失敗時の方針は[アプリケーション版管理手順](version-management.md)（以下「版管理手順」）が正本です。この文書は、GitHub.comでの操作を順番に実行するための手順書です。方針や契約は版管理手順、ADR-0014、ADR-0016に従います。
-- この文書は手順を定義するもので、特定版の公開済み・clean-host PASSを主張しません。
+- この文書は手順を定義するもので、特定版の公開済みや、新しいWindows実機での動作確認済みを主張しません。
 
 ## 1. 全体像
 
@@ -15,7 +15,7 @@ flowchart LR
     B --> C[3 Release candidate実行\nrelease.yml]
     C --> D[draft Release\n4 asset]
     C --> E[control artifact\nrelease-candidate-record.json]
-    D --> F[4 clean-host試験\n人が実施しJSON作成]
+    D --> F[4 candidate結果の確認\nCI・P07・digest]
     F --> G[5 Publish release実行\npublish-release.yml]
     E --> G
     G --> H{6 publish環境の承認}
@@ -27,7 +27,7 @@ flowchart LR
 |---|---|---|---|
 | 1〜2 | リリース担当 | ローカルPC | release commitと`vX.Y.Z` annotated tagをremoteへpush |
 | 3 | リリース担当 | Actions: **Release candidate** | draft Release（4 asset）、candidate control artifact。status `PASS_CANDIDATE`（非公開扱い） |
-| 4 | clean-host担当（人） | 別のfresh Windows 11 x64 | CH-01〜06のclean-host証跡JSON |
+| 4 | リリース担当 | GitHub.com | candidate run・CI・P07 `PASS_REQUIRED`・ZIP／MSIX証跡の確認 |
 | 5〜7 | リリース担当＋承認者 | Actions: **Publish release** | protected environment `publish`の承認後にdraftを公開 |
 | 8 | リリース担当 | GitHub.com | 公開後確認 |
 
@@ -134,32 +134,19 @@ gh release view vX.Y.Z --repo dahatake/StudyReport-Evaluator --json isDraft,asse
 
 - `isDraft`が`true`、assetが上記4件だけであること。
 - run IDを控えます。**手順5の`candidate_run_id`に使います**。
-- **`PASS_CANDIDATE`は公開不可です。** clean-host試験と保護された公開workflowが未実施です。
+- **`PASS_CANDIDATE`は公開不可です。** 保護された公開workflow（C03 Final matrix、C02検証、digest照合、`publish`環境の承認）が未実施です。
 
 > 既に同名のReleaseがある場合、このworkflowは「replaceしない」として失敗します。既存のdraftは自動では上書きされません（§4）。
 
-### 手順4: clean-host試験を実施し証跡JSONを作る
+### 手順4: candidateの結果を確認する
 
-candidateの**exact EXE**（手順3のdraftまたは`release-assets-*` artifactのEXE）を、fresh Windows 11 x64（標準ユーザー）で人が試験します。試験項目は[ADR-0016](adr/0016-windows-one-action-startup.md)のCH-01〜06です。
+公開ゲートは、CI、`release.yml` candidate run、protected `publish`環境の承認です。publish前に次を確認します。
 
-| ID | 内容（要約） |
-|---|---|
-| CH-01 | fresh OS。追加の.NET SDK／Runtime、PowerShell 6+、Node／npm、Git／gh、別CLI、Office、IDEが未導入 |
-| CH-02 | EXE単体でoffline GUI起動、Excel読込、設計 |
-| CH-03 | 外部ツールなしで同梱CLIのStart／Ping／認証状態確認 |
-| CH-04 | 移動・再起動・同時起動、args／任意cwd、日本語・空白path、read-only配置先、data保護 |
-| CH-05 | ブラウザー取得のMOTW付きEXE、SmartScreen／SAC／企業policyの警告・拒否と実操作数 |
-| CH-06 | fresh userの本人login、再確認、取消／終了時の所有processだけの終了 |
+- 対象commitのCIが成功していること。
+- 手順3のcandidate runが成功し、CI windows-latest x64 runnerでのP07（single-file required test）が`PASS_REQUIRED`、ZIP証跡とunsigned MSIX mechanism証跡、C03 Candidate／C02が揃っていること。
+- draftの4 assetとcandidate control artifactが手順3のrunのものであること。
 
-- CH-01〜06は**すべて必須PASS**です。`ADV-01`（実AI評価）と`ADV-02`（外部再計算）は任意で`NOT_RUN`可です。
-- SmartScreenやWindows保護機能を無効化・回避して成功にしません。拒否された場合はFAILまたは公開保留として記録します。
-- **証跡JSON**は、スキーマ[`platform-release-matrix-v2.schema.json`](../../eng/schemas/platform-release-matrix-v2.schema.json)の`cleanHostEvidence`に従います。
-  - 主な項目: `schemaVersion`（`1`）、`evidenceKind`（`windows-singlefile-clean-host`）、`measuredAtUtc`、`productVersion`、`sourceCommit`、`candidate`（repository、run ID）、`package`（EXE名、bytes、SHA-256）、`runtime`、`host`（OS edition／build／architecture）、`protection`、`measurements`、`tests`（CH-01〜06、ADV-01、ADV-02の8件。各`id`／`status`（`PASS`／`FAIL`／`NOT_RUN`）／`operations`／`record`）
-  - `candidate`、`package`、`runtime`は手順3のcandidate record・EXE evidenceと一致させます。一致しないと公開workflowが拒否します。
-  - username、credential／device code、学生本文、Prompt、環境変数値一覧、生ログは**含めません**。製品repositoryへcommitもしません。
-  - UTF-8（BOMなし）、**64 KiB以下**の1つのJSONです。
-
-> 公開workflowはJSONを検証・束縛するだけで、試験が実施された事実は人の記録に依存します（ハッシュ一致は人の実施を証明しません）。EXEのbytesが変わった場合（再ビルド、docs同梱、PATCH変更）は、旧結果を流用せず再試験します。
+追加ソフトのない新しいWindows 11標準ユーザーでの実機確認、本人login、実AI評価（`ADV-01`）、外部再計算（`ADV-02`）は公開条件ではありません。実施していない場合は未検証として記録し、成功と書きません。SmartScreenやWindows保護機能を無効化・回避した結果を成功として扱いません。EXEのbytesが変わった場合（再ビルド、docs同梱、PATCH変更）は、新しいcandidate runを使います。
 
 ### 手順5: Publish releaseを実行する
 
@@ -169,14 +156,12 @@ candidateの**exact EXE**（手順3のdraftまたは`release-assets-*` artifact�
 |---|---|
 | `tag` | `vX.Y.Z`（draftのtag） |
 | `candidate_run_id` | 手順3のRelease candidateのrun ID（数字） |
-| `clean_host_evidence_json` | 手順4のJSON本文（1行または整形済みのままそのまま貼り付け） |
 
 **CLI:**
 
 ```powershell
-$json = Get-Content -LiteralPath .\clean-host-evidence.json -Raw -Encoding utf8
 gh workflow run publish-release.yml --repo dahatake/StudyReport-Evaluator --ref main `
-    -f tag=vX.Y.Z -f candidate_run_id=<run-id> -f clean_host_evidence_json="$json"
+    -f tag=vX.Y.Z -f candidate_run_id=<run-id>
 ```
 
 workflowの唯一のjobは`environment: publish`で実行されるため、**最初のstepの前に承認待ちで停止します**。承認（手順6）後に次の検証が始まります。
@@ -184,16 +169,15 @@ workflowの唯一のjobは`environment: publish`で実行されるため、**最
 検証内容（すべてfail-closed）:
 
 1. tagの実在、annotated、tag＝checkout commit、作業ツリーclean、`version.ps1 verify -Tag`、CHANGELOG節。
-2. `clean_host_evidence_json`が空でなく、UTF-8で64 KiB以下であること。
-3. `candidate_run_id`のrunが、同一repositoryの`release.yml`の`workflow_dispatch`実行で、`success`、tag commitの`head_sha`と一致すること。control artifact（5ファイル、MSIX本体なし）が有効期限内に1件だけあること。
-4. draft Releaseが実在し、tag一致、assetが4件だけ（MSIXなし）であること。
-5. draftの4 assetと、candidate control evidence、受領clean-host JSONから`build-platform-release-matrix.ps1 -Mode Final`で最終matrix（v2）を作ります。`release-final-control-<tag>-<run-id>` artifactに保存されます（公開assetには含まれません）。
-6. 公開直前に、draftの4 assetを再downloadし、`validate-platform-release-matrix.ps1`（C02）でsource／version／hash／sidecar／candidate runを再検証します。asset ID・size・digest・updatedAtが検証前後で変わっていないことも確認します。
+2. `candidate_run_id`のrunが、同一repositoryの`release.yml`の`workflow_dispatch`実行で、`success`、tag commitの`head_sha`と一致すること。control artifact（5ファイル、MSIX本体なし）が有効期限内に1件だけあること。
+3. draft Releaseが実在し、tag一致、assetが4件だけ（MSIXなし）であること。
+4. draftの4 assetとcandidate control evidenceから`build-platform-release-matrix.ps1 -Mode Final`で最終matrix（v2）を作ります。`release-final-control-<tag>-<run-id>` artifactに保存されます（公開assetには含まれません）。
+5. 公開直前に、draftの4 assetを再downloadし、`validate-platform-release-matrix.ps1`（C02）でsource／version／hash／sidecar／candidate runを再検証します。asset ID・size・digest・updatedAtが検証前後で変わっていないことも確認します。
 
 ### 手順6: 公開を承認する
 
 1. GitHub.comのrun画面に「Review pending deployments」が表示されます。reviewer（`publish`環境のRequired reviewers）が確認します。
-2. 承認は自動検証より前に行われます。承認者は、入力した`candidate_run_id`が対象tagのものか、clean-host JSONの`productVersion`／`sourceCommit`／EXE SHA-256が手順3の成果物と一致するか、CH-01〜06がすべて`PASS`かを人の目で確認します（run画面の入力値で確認できます）。
+2. 承認は自動検証より前に行われます。承認者は、入力した`candidate_run_id`が対象tagのものか、手順3のcandidate runが成功しP07が`PASS_REQUIRED`か、draftの4 assetが手順3の成果物と一致するかを人の目で確認します（run画面の入力値で確認できます）。
 3. 問題がなければ**Approve and deploy**、問題があれば**Reject**します。承認後も、手順5の自動検証に1つでも失敗すれば公開されません。
 
 ### 手順7: 公開（draft解除）
@@ -214,7 +198,7 @@ gh release list --repo dahatake/StudyReport-Evaluator --limit 3
    (Get-FileHash .\verify\StudyReportEvaluator-win-x64.exe -Algorithm SHA256).Hash
    Get-Content .\verify\StudyReportEvaluator-win-x64.exe.sha256
    ```
-3. 実在するdownload URLを確認してから、利用者文書（README等）へ記載します。公開前にURLやclean-host成功を書きません。
+3. 実在するdownload URLを確認してから、利用者文書（README等）へ記載します。公開前にURLや未実施の実機確認の成功を書きません。
 4. 実施結果（run ID、承認者、日時）を、別途execution recordなどへ残します。この文書へ特定版の実績は追記しません。
 
 ## 4. 失敗時の対応
@@ -233,7 +217,7 @@ gh release list --repo dahatake/StudyReport-Evaluator --limit 3
 | Publishが`The candidate run must have succeeded for the exact tagged commit.` | 誤った`candidate_run_id`、失敗run、tag移動後のrun | 対象tagで成功したRelease candidateのrun IDを指定 |
 | candidate control artifactが見つからない | 30日の保持期限切れ | Release candidateを再実行（新draftが必要ならdraft削除後） |
 | `The draft must carry exactly EXE/ZIP assets...` | assetの追加・削除・MSIX混入 | draftを手で編集せず、正しいdraftを作り直す |
-| clean-host JSONが不正／C02検証失敗 | 版・commit・hash・run IDの不一致、CHのFAIL／NOT_RUN | 手順4のJSONを作り直す（EXEが変わったなら再試験）。公開しない |
+| C02／C03検証失敗 | 版・commit・hash・run IDの不一致、P07が`PASS_REQUIRED`でない | 原因を修正し、新しいcandidate runで再作成する。公開しない |
 | Approveをrejectした・タイムアウト | — | 公開されない。draftはそのまま残る。原因解消後にPublishを再実行 |
 | `Post-publication verification failed; the release was restored to draft state.` | 公開後にasset identityが変化 | draftへ自動的に戻る。原因を調査し、再度Publishを実行 |
 
@@ -244,8 +228,8 @@ gh release list --repo dahatake/StudyReport-Evaluator --limit 3
 - [ ] 版・CHANGELOG・release commitが`main`にあり、CIが成功している（手順1）
 - [ ] `vX.Y.Z` annotated tagをpushし、`ls-remote`で確認した（手順2）
 - [ ] Release candidateが成功し、draftに4 assetだけがある（手順3）
-- [ ] fresh Windows 11 x64でexact EXEのCH-01〜06が全PASSとなり、JSONを作成した（手順4）
-- [ ] Publish releaseにtag、run ID、JSONを入力した（手順5）
+- [ ] candidate runのP07 `PASS_REQUIRED`、ZIP／MSIX証跡、C03 Candidate／C02を確認した（手順4）
+- [ ] Publish releaseにtagとrun IDを入力した（手順5）
 - [ ] `publish`環境の承認前に内容を確認し、承認した（手順6）
 - [ ] Releaseが公開され、4 assetのSHA-256を確認した（手順7〜8）
 - [ ] 利用者文書へ実在URLだけを記載した（手順8）
@@ -254,7 +238,7 @@ gh release list --repo dahatake/StudyReport-Evaluator --limit 3
 
 - [アプリケーション版管理手順](version-management.md)（SemVer、`version.ps1`、tag、failure handling）
 - [ADR-0014 製品版管理](adr/0014-product-versioning.md)
-- [ADR-0016 Windows単一EXE・clean-host公開境界](adr/0016-windows-one-action-startup.md)
+- [ADR-0016 Windows単一EXE・candidate拘束公開境界](adr/0016-windows-one-action-startup.md)
 - [Traceability — Final gate prerequisites](traceability.md#final-gate-prerequisites)
 - [GitHub Docs: Managing releases](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository)
 - [GitHub Docs: Reviewing deployments](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/reviewing-deployments)

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:study-report-evaluator:platform-release-matrix:v2",
   "title": "StudyReport Evaluator Windows release matrix v2",
-  "$comment": "C01 structural contract for requirements v4.5 sections 13.6/13.7 and ADR-0016. Schema validity is necessary, never sufficient for publication. C02 must reject duplicate JSON member names before validation; bind the expected repository, successful .github/workflows/release.yml candidate run, tag/source commit and stable product version; and cross-bind this matrix, the separately received candidateRecord, cleanHostEvidence and singleFilePackageEvidence. Validate those documents through their $defs entry points with this document's complete $defs available. C02 must compare exact basenames, byte counts, SHA-256 values, sidecar bytes, package/runtime identities and candidate descriptors against the actual candidate records and re-downloaded EXE/ZIP assets. C03 may generate this final matrix only after those checks and required clean-host results pass. Candidate creation must verify the actual development MSIX before recording its descriptors; final validation uses only its candidate-bound descriptors, evidence and sidecar, never requires or claims re-validation of an uploaded MSIX binary. Only EXE, ZIP and their two sidecars are public assets. No schema match, hash, PASS field or human attestation automatically proves execution, a fresh host, authentication, publisher identity or production trust. No new platform, workflow or storage contract is introduced.",
+  "$comment": "C01 structural contract for requirements v4.5 sections 13.6/13.7 and ADR-0016. Schema validity is necessary, never sufficient for publication. C02 must reject duplicate JSON member names before validation; bind the expected repository, successful .github/workflows/release.yml candidate run, tag/source commit and stable product version; and cross-bind this matrix, the separately received candidateRecord and singleFilePackageEvidence. Validate those documents through their $defs entry points with this document's complete $defs available. C02 must compare exact basenames, byte counts, SHA-256 values, sidecar bytes, package/runtime identities and candidate descriptors against the actual candidate records and re-downloaded EXE/ZIP assets. C03 may generate this final matrix only after those checks pass. Candidate creation must verify the actual development MSIX before recording its descriptors; final validation uses only its candidate-bound descriptors, evidence and sidecar, never requires or claims re-validation of an uploaded MSIX binary. Only EXE, ZIP and their two sidecars are public assets. No schema match, hash or PASS field automatically proves execution, a fresh host, authentication, publisher identity or production trust. No new platform, workflow or storage contract is introduced.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,7 +11,6 @@
     "sourceCommit",
     "candidate",
     "candidateRecord",
-    "cleanHostEvidence",
     "rows"
   ],
   "properties": {
@@ -29,9 +28,6 @@
     },
     "candidateRecord": {
       "$ref": "#/$defs/candidateRecordDescriptor"
-    },
-    "cleanHostEvidence": {
-      "$ref": "#/$defs/cleanHostEvidenceDescriptor"
     },
     "rows": {
       "type": "array",
@@ -101,7 +97,7 @@
       "maximum": 2147483647
     },
     "windowsVerification": {
-      "$comment": "P07 reports Windows, not Windows 11 inferred from a build number. A hosted Windows server/package test is not Windows 11 clean-host evidence. C02 must bind this metadata to the corresponding package evidence; the separately received cleanHostEvidence requires Windows 11.",
+      "$comment": "P07 reports Windows, not Windows 11 inferred from a build number. C02 must bind this metadata to the corresponding package evidence.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -159,22 +155,6 @@
       "properties": {
         "fileName": {
           "const": "release-candidate-record.json"
-        },
-        "bytes": {
-          "$ref": "#/$defs/positiveFileSize"
-        },
-        "sha256": {
-          "$ref": "#/$defs/sha256"
-        }
-      }
-    },
-    "cleanHostEvidenceDescriptor": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["fileName", "bytes", "sha256"],
-      "properties": {
-        "fileName": {
-          "const": "windows-singlefile-clean-host.evidence.json"
         },
         "bytes": {
           "$ref": "#/$defs/positiveFileSize"
@@ -462,7 +442,7 @@
       }
     },
     "candidateRecord": {
-      "$comment": "Separately received release-candidate-record.json. This is a package/descriptors record, not the final matrix or clean-host eligibility. Its three rows intentionally have no platform, runtimeIdentifier, publish or status fields. C02 must verify the candidate's actual package/mechanism test record, identities and descriptors; C03 must not invent a clean-host result while creating a candidate.",
+      "$comment": "Separately received release-candidate-record.json. This is a package/descriptors record, not the final matrix. Its three rows intentionally have no platform, runtimeIdentifier, publish or status fields. C02 must verify the candidate's actual package/mechanism test record, identities and descriptors.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -592,7 +572,7 @@
       }
     },
     "singleFileRuntime": {
-      "$comment": "Exactly the five runtime fields emitted by P07. cliSha256 is measured uppercase SHA-256, not an invented fixed hash. C02 must verify the actual bundled CLI identity and cross-bind it and all four fixed versions across package and clean-host evidence; the observer's installed runtime is not the bundled runtime.",
+      "$comment": "Exactly the five runtime fields emitted by P07. cliSha256 is measured uppercase SHA-256, not an invented fixed hash. C02 must verify the actual bundled CLI identity and cross-bind it and all four fixed versions across package evidence; the observer's installed runtime is not the bundled runtime.",
       "type": "object",
       "additionalProperties": false,
       "required": ["dotnetSdk", "dotnetRuntime", "copilotSdk", "cliVersion", "cliSha256"],
@@ -614,356 +594,8 @@
         }
       }
     },
-    "observationRecord": {
-      "$comment": "Metadata-only descriptor of a sanitized human observation record: fileName, bytes and sha256. Its bounded ASCII basename is neither a path nor a URL; traversal, trailing dots, control characters and DOS device basenames are rejected. Do not embed usernames, tokens, device codes, student content, environment dumps or raw logs. A reference/hash identifies a human record, not cryptographic proof of execution; receiving JSON does not fetch or publish that record.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["fileName", "bytes", "sha256"],
-      "properties": {
-        "fileName": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 96,
-          "pattern": "^(?!.*\\.\\.)(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.|$))[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9_-])?$(?![\\s\\S])"
-        },
-        "bytes": {
-          "$ref": "#/$defs/positiveFileSize"
-        },
-        "sha256": {
-          "$ref": "#/$defs/sha256"
-        }
-      }
-    },
-    "cleanHostTestResult": {
-      "$comment": "CH-01 through CH-06 require PASS and a non-null record even when operations is zero. D-06 is adopted: CH-06 cannot be omitted, NOT_RUN or N/A. ADV-01/02 may fail or remain NOT_RUN without blocking required acceptance; NOT_RUN means zero operations and null record, whereas executed advisory tests require a record.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "status", "operations", "record"],
-      "properties": {
-        "id": {
-          "enum": ["CH-01", "CH-02", "CH-03", "CH-04", "CH-05", "CH-06", "ADV-01", "ADV-02"]
-        },
-        "status": {
-          "enum": ["PASS", "FAIL", "NOT_RUN"]
-        },
-        "operations": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 1000
-        },
-        "record": {
-          "oneOf": [
-            { "$ref": "#/$defs/observationRecord" },
-            { "type": "null" }
-          ]
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "required": ["id"],
-            "properties": {
-              "id": {
-                "enum": ["CH-01", "CH-02", "CH-03", "CH-04", "CH-05", "CH-06"]
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "status": { "const": "PASS" }
-            }
-          }
-        },
-        {
-          "if": {
-            "required": ["status"],
-            "properties": {
-              "status": { "const": "NOT_RUN" }
-            }
-          },
-          "then": {
-            "properties": {
-              "operations": { "const": 0 },
-              "record": { "type": "null" }
-            }
-          },
-          "else": {
-            "properties": {
-              "record": { "$ref": "#/$defs/observationRecord" }
-            }
-          }
-        }
-      ]
-    },
-    "cleanHostEvidence": {
-      "$comment": "Separately received windows-singlefile-clean-host.evidence.json, never a synthesized result from P07. This closed document carries sanitized human attestations about the exact candidate EXE on a fresh Windows 11 x64 standard-user host. C02 must bind candidate/source/version/package/runtime to independently checked candidate data, validate the UTC calendar timestamp and compare observed protection/operations with the approved scope. Schema validity and hashes alone do not establish the truth of the attestations, personal login, offline operation or unchanged protection settings. Never place the received JSON or observation records among the four public assets.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "schemaVersion",
-        "evidenceKind",
-        "measuredAtUtc",
-        "productVersion",
-        "sourceCommit",
-        "candidate",
-        "package",
-        "runtime",
-        "host",
-        "protection",
-        "measurements",
-        "tests"
-      ],
-      "properties": {
-        "schemaVersion": {
-          "const": 1
-        },
-        "evidenceKind": {
-          "const": "windows-singlefile-clean-host"
-        },
-        "measuredAtUtc": {
-          "$comment": "UTC ISO 8601 with literal T/Z only, at most 40 characters. Draft 2020-12 format may be annotation-only; C02 must also parse and reject invalid calendar dates rather than treating a regex match as sufficient.",
-          "type": "string",
-          "minLength": 20,
-          "maxLength": 40,
-          "format": "date-time",
-          "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,19})?Z$(?![\\s\\S])"
-        },
-        "productVersion": {
-          "$ref": "#/$defs/stableProductVersion"
-        },
-        "sourceCommit": {
-          "$ref": "#/$defs/sourceCommit"
-        },
-        "candidate": {
-          "$ref": "#/$defs/candidateIdentity"
-        },
-        "package": {
-          "$ref": "#/$defs/windowsSingleFileArtifact"
-        },
-        "runtime": {
-          "$ref": "#/$defs/singleFileRuntime"
-        },
-        "host": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "osName",
-            "edition",
-            "osVersion",
-            "osBuild",
-            "architecture",
-            "standardUser",
-            "fresh",
-            "additionalDependencies"
-          ],
-          "properties": {
-            "osName": {
-              "const": "Windows 11"
-            },
-            "edition": {
-              "enum": ["Home", "Pro", "Enterprise", "Education", "ProEducation", "ProWorkstations", "EnterpriseLTSC"]
-            },
-            "osVersion": {
-              "$ref": "#/$defs/windowsOsVersion"
-            },
-            "osBuild": {
-              "$ref": "#/$defs/windowsOsBuild"
-            },
-            "architecture": {
-              "const": "X64"
-            },
-            "standardUser": {
-              "const": true
-            },
-            "fresh": {
-              "const": true
-            },
-            "additionalDependencies": {
-              "$comment": "All nine additional dependencies must be absent; OS-supplied .NET Framework is not an additional .NET runtime. A development host with PATH/environment isolation is not an OS-only host.",
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["dotnetSdk", "dotnetRuntime", "powerShell6Plus", "nodeNpm", "git", "githubCli", "copilotCli", "office", "ide"],
-              "properties": {
-                "dotnetSdk": { "const": false },
-                "dotnetRuntime": { "const": false },
-                "powerShell6Plus": { "const": false },
-                "nodeNpm": { "const": false },
-                "git": { "const": false },
-                "githubCli": { "const": false },
-                "copilotCli": { "const": false },
-                "office": { "const": false },
-                "ide": { "const": false }
-              }
-            }
-          }
-        },
-        "protection": {
-          "$comment": "Protection settings are observations, not instructions to disable protection. Pre-existing Disabled/Off states are permitted only with unchanged settings and approval attested; never remove MOTW or bypass a refusal. One launch gesture excludes warning actions. C02 must enforce WarnedThenAllowed => positive warningActions, Allowed => zero, and compare the observations to the approved scope; withinApprovedScope=true alone proves nothing.",
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "motw",
-            "smartScreen",
-            "smartAppControl",
-            "enterprisePolicy",
-            "settingsUnchanged",
-            "launchOutcome",
-            "launchGestures",
-            "warningActions",
-            "withinApprovedScope"
-          ],
-          "properties": {
-            "motw": {
-              "const": true
-            },
-            "smartScreen": {
-              "enum": ["Enabled", "Disabled", "Managed"]
-            },
-            "smartAppControl": {
-              "enum": ["On", "Evaluation", "Off", "NotAvailable"]
-            },
-            "enterprisePolicy": {
-              "enum": ["NotConfigured", "Allowed", "Warning"]
-            },
-            "settingsUnchanged": {
-              "const": true
-            },
-            "launchOutcome": {
-              "enum": ["Allowed", "WarnedThenAllowed"]
-            },
-            "launchGestures": {
-              "const": 1
-            },
-            "warningActions": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 100
-            },
-            "withinApprovedScope": {
-              "const": true
-            }
-          },
-          "allOf": [
-            {
-              "if": {
-                "required": ["launchOutcome"],
-                "properties": {
-                  "launchOutcome": { "const": "WarnedThenAllowed" }
-                }
-              },
-              "then": {
-                "properties": {
-                  "warningActions": { "minimum": 1 }
-                }
-              },
-              "else": {
-                "properties": {
-                  "warningActions": { "const": 0 }
-                }
-              }
-            }
-          ]
-        },
-        "measurements": {
-          "$comment": "Observed sizes and timings only. Safe integer bounds protect interchange precision, not a performance SLA; there is no maximum startup-time acceptance target.",
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["extractedBytes", "coldStartMilliseconds", "warmStartMilliseconds"],
-          "properties": {
-            "extractedBytes": {
-              "$ref": "#/$defs/positiveFileSize"
-            },
-            "coldStartMilliseconds": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9007199254740991
-            },
-            "warmStartMilliseconds": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9007199254740991
-            }
-          }
-        },
-        "tests": {
-          "type": "array",
-          "minItems": 8,
-          "maxItems": 8,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/cleanHostTestResult"
-          },
-          "allOf": [
-            {
-              "contains": {
-                "$ref": "#/$defs/cleanHostTestResult",
-                "properties": { "id": { "const": "CH-01" } }
-              },
-              "minContains": 1,
-              "maxContains": 1
-            },
-            {
-              "contains": {
-                "$ref": "#/$defs/cleanHostTestResult",
-                "properties": { "id": { "const": "CH-02" } }
-              },
-              "minContains": 1,
-              "maxContains": 1
-            },
-            {
-              "contains": {
-                "$ref": "#/$defs/cleanHostTestResult",
-                "properties": { "id": { "const": "CH-03" } }
-              },
-              "minContains": 1,
-              "maxContains": 1
-            },
-            {
-              "contains": {
-                "$ref": "#/$defs/cleanHostTestResult",
-                "properties": { "id": { "const": "CH-04" } }
-              },
-              "minContains": 1,
-              "maxContains": 1
-            },
-            {
-              "contains": {
-                "$ref": "#/$defs/cleanHostTestResult",
-                "properties": { "id": { "const": "CH-05" } }
-              },
-              "minContains": 1,
-              "maxContains": 1
-            },
-            {
-              "contains": {
-                "$ref": "#/$defs/cleanHostTestResult",
-                "properties": { "id": { "const": "CH-06" } }
-              },
-              "minContains": 1,
-              "maxContains": 1
-            },
-            {
-              "contains": {
-                "$ref": "#/$defs/cleanHostTestResult",
-                "properties": { "id": { "const": "ADV-01" } }
-              },
-              "minContains": 1,
-              "maxContains": 1
-            },
-            {
-              "contains": {
-                "$ref": "#/$defs/cleanHostTestResult",
-                "properties": { "id": { "const": "ADV-02" } }
-              },
-              "minContains": 1,
-              "maxContains": 1
-            }
-          ]
-        }
-      }
-    },
     "singleFilePackageEvidence": {
-      "$comment": "Separately received StudyReportEvaluator-win-x64.exe.evidence.json: the exact closed P07 scripts/test-windows-singlefile.ps1 shape, restricted to clean-checkout PASS_REQUIRED. PASS_DEVELOPMENT is never accepted or upgraded, even after seven passed tests and nine P06 observations. sourceStatusSha256 is SHA-256 of empty porcelain-v1 -z bytes; sourceContentSha256 is the P07 source-inventory digest, not sourceCommit. C02 must bind these claims to the actual candidate/source/package evidence and check the referenced files, not merely trust counters, check flags or renamed evidence. P07 verifies its seven exact TRX methods and nine observation ownerships; raw observations/logs are not exported here. This remains development-host package evidence, never CH-01..06, network isolation, personal authentication or live-AI proof.",
+      "$comment": "Separately received StudyReportEvaluator-win-x64.exe.evidence.json: the exact closed P07 scripts/test-windows-singlefile.ps1 shape, restricted to clean-checkout PASS_REQUIRED. PASS_DEVELOPMENT is never accepted or upgraded, even after seven passed tests and nine P06 observations. sourceStatusSha256 is SHA-256 of empty porcelain-v1 -z bytes; sourceContentSha256 is the P07 source-inventory digest, not sourceCommit. C02 must bind these claims to the actual candidate/source/package evidence and check the referenced files, not merely trust counters, check flags or renamed evidence. P07 verifies its seven exact TRX methods and nine observation ownerships; raw observations/logs are not exported here. This remains development-host package evidence, never network isolation, personal authentication or live-AI proof.",
       "type": "object",
       "additionalProperties": false,
       "required": [

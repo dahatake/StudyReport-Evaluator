@@ -24,7 +24,6 @@ PUBLIC = (EXE, EXE + ".sha256", ZIP, ZIP + ".sha256")
 KINDS = ("windows-singlefile-exe", "windows-zip", "windows-development-msix")
 REQUIRED = ("core", "app", "exe-package", "zip-package", "zip-clean-extract",
             "zip-launch", "zip-cli", "zip-data-protection", "msix-mechanism")
-CH = tuple(f"CH-{n:02}" for n in range(1, 7))
 WORKFLOW = ".github/workflows/release.yml"
 
 
@@ -223,18 +222,6 @@ def validate_request(request):
                              sidecar, re.I), "sidecar mismatch")
     if request["phase"] == "publish":
         require(request.get("protected_approval") is True, "protected publish approval required")
-        clean = request.get("clean_host")
-        require(isinstance(clean, dict), "exact EXE clean-host evidence required")
-        require(clean["identity"] == identity and clean["product_version"] == version,
-                "clean-host candidate mismatch")
-        actual = descriptor(EXE, assets[EXE])
-        require(clean["exe"]["fileName"] == EXE and clean["exe"]["bytes"] == actual["bytes"] and
-                clean["exe"]["sha256"].lower() == actual["sha256"], "clean-host EXE mismatch")
-        require(all(clean["tests"].get(key) == "PASS" for key in CH), "clean-host required test incomplete")
-        host = clean["host"]
-        require(host["os"] in ("Windows 10", "Windows 11") and host["architecture"].lower() == "x64" and
-                host["fresh"] is True and host["standard_user"] is True and
-                host["extra_dependencies"] is False, "clean-host boundary mismatch")
     return assets
 
 

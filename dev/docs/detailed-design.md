@@ -22,7 +22,7 @@
 - Prompt text fileによるGUI prefill
 - Windows 11 x64 App限定self-contained単一EXE（主配布候補）とZIP（代替）の併存
 - 同梱CLIの明示login開始/取消/所有process cleanupと、login後の利用者明示再確認
-- candidate → 人手clean-host証跡受領 → protected publish Final v2の公開制御
+- candidate（CI windows-latest x64 runnerでのP07 `PASS_REQUIRED`）→ protected publish Final v2の公開制御
 - 4ステップ＋独立した設定5カテゴリ、ページ一覧／選択詳細、未確定text・対象・設定往復の保持
 - 共通設定＋任意の採点定義1件の明示保存、保存定義の検証後明示適用、次回draft／現在run／前回結果の分離
 
@@ -814,21 +814,21 @@ checkpointとRun sheetへ次を保存する。
 - [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)はsecretなしでlocked restore、Release build、決定的test、Windows legacy package、MSIX mechanismを検査する。macOS jobsはlocked restore／Release build後に`MacOsPublishPackageTests`のstatic source contractと`CopilotClientFactoryTests`のresolver contractを実行するだけで、macOS RID publish／bundle生成／署名／公証／実app起動は実施しない。
 - `sample/SampleReport.xlsx`はprivate local inputとしてGit追跡・package同梱を禁止する。platform package acceptanceはsynthetic fixtureで行い、canonical sampleのlocal technical E2Eと分離する。
 - [`.github/workflows/release.yml`](../../.github/workflows/release.yml)はcandidateとしてEXE/ZIPと各sidecarの4 assetだけをdraftへ添付し、development MSIX本体を添付しない。
-- [`.github/workflows/publish-release.yml`](../../.github/workflows/publish-release.yml)は受領したhuman clean-host JSONを検証し、candidate runと再downloadした4 assetのidentity一致を確認してからpublishする。
-- 受領clean-host証跡は人手実施記録であり、hash一致だけでは実行事実そのものを自動証明しない。
+- [`.github/workflows/publish-release.yml`](../../.github/workflows/publish-release.yml)はcandidate runと再downloadした4 assetのidentity・digest一致を確認し、protected `publish` environmentの承認後にpublishする。clean-host証跡の入力はない。
+- fresh Windows 11標準userでの実機確認は公開条件ではなく、未実施なら未検証として記録する。
 - Live Copilot、canonical sample technical E2E、external spreadsheet recalculationは各scopeを分離し、未実行を成功扱いにしない。
 
 #### 13.5.1 Platform release matrix v2（candidate拘束）
 
 - schema正本は[`eng/schemas/platform-release-matrix-v2.schema.json`](../../eng/schemas/platform-release-matrix-v2.schema.json)、validator正本は[`scripts/validate-platform-release-matrix.ps1`](../../scripts/validate-platform-release-matrix.ps1)とする。
 - candidate modeは`release-candidate-record.json`を生成し、固定3種（single-file EXE / ZIP / development MSIX）のdescriptorを同一runへ拘束する。
-- final modeはcandidate record + 受領clean-host JSONで`platform-release-matrix.json`（schemaVersion 2）を確定する。
+- final modeはcandidate recordから`platform-release-matrix.json`（schemaVersion 2）を確定する。
 - rowはclosed 3件固定：
     1. `windows-singlefile-exe`: `publish=true`、`PASS_REQUIRED`、公開asset対象
     2. `windows-zip`: `publish=true`、`PASS_REQUIRED`、公開asset対象
     3. `windows-development-msix`: `publish=false`、`PASS_MECHANISM`、non-public記録対象
 - validatorはstrict UTF-8、duplicate JSON property、row重複、unsafe basename、reparse point、size/hash drift、sidecar exact bytes、artifact-kind別evidence contract、publishable asset集合をfail-closedで検査する。
-- matrix validatorの`PASS`はcandidate/run/source/version/bytes/hash/sidecar/evidenceの整合を示す。clean-host実行そのものの証明には人手記録と運用承認を別途要する。
+- matrix validatorの`PASS`はcandidate/run/source/version/bytes/hash/sidecar/evidenceの整合を示す。fresh OS実機での動作の証明ではない。
 
 ### 13.6 製品版
 
@@ -946,7 +946,7 @@ error messageはsafe ID、field、actual dimension、limitだけを持ち、cont
 - development MSIX manifest/version/layout、unpack、block map、bundled CLI、sidecar、policy negative、cleanup
 - macOS RID別bundle/sign/notary source foundationのstatic contractと未実測artifact非公開
 - public EXE + ZIPの4 asset再download照合、candidate拘束matrix v2、secret isolation
-- clean-host CH-01〜06と本人login実測は別証跡（現時点`NOT_RUN_EXTERNAL_PREREQUISITE`）
+- fresh OS実機確認と本人login実測は未実施（公開条件ではなく、未検証として記録）
 
 ### 16.6 UI／Settingsの直接検証範囲
 
@@ -1009,11 +1009,10 @@ v4.6のUIプランT番号に対応する追加・更新箇所（上表の既存�
 - 各taskの敵対的reviewで再現したfindingを修正し、同じ観点のfollow-upで0件を確認する。
 - full required testsが成功する。
 - candidate段階でEXE/ZIP 4 assetと対応evidenceが整合し、development MSIXはnon-public recordのみで扱う。
-- protected publishでcandidate run・受領clean-host記録・再download 4 asset照合・v2 final matrix確定が成功する。
-- 受領human証跡は実行事実の自動証明ではないことを維持する。
+- protected publishでcandidate run・再download 4 asset照合・v2 final matrix確定が成功する。
 - `0.8.6` single-file EXE candidateは未公開で、公開済み`v0.8.1` ZIPとの境界を崩さない。0.8.3 baseline・0.8.4のR03／V01・T28画像生成・T36〜T39の証跡はそれぞれの履歴として保持する。
 - 利用者不在時の自律続行指示によりT39をBLOCKEDのままF01／F02を進める。F01はREVIEWED、親担当によるPATCH `0.8.4` → `0.8.5`は反映済みだが、0.8.5最終版の再検証結果は実行記録の最新F02欄で確認する。headless・局所試験・0.8.4の自動回帰成功だけでnative／本人walkthrough、G4・全タスクDONEを付与しない。
-- clean-host CH-01〜06と本人login実測が`NOT_RUN_EXTERNAL_PREREQUISITE`の間は、新EXE公開完了を主張しない。
+- fresh OS実機確認と本人login実測は未検証として記録し、公開済みであってもそれらの成功を主張しない。
 - macOS source foundationのstatic contractが成功し、production artifactを公開しない。
 - Linux、Windows Arm64、macOS 13以前、未実測installer／signing／notarizationを対応済みと記録しない。
 - 実在学生本文、Prompt、reference、AI reason/evidenceをlog、test artifact、review recordへ追加しない。

@@ -93,21 +93,16 @@ public sealed class ReleaseWorkflowContractTests
     }
 
     [Fact]
-    public void Publish_workflow_requires_protected_environment_permissions_and_clean_host_json_via_env_only()
+    public void Publish_workflow_requires_protected_environment_permissions_without_clean_host_input()
     {
         string workflow = ReadWorkflow("publish-release.yml");
-        string normalized = NormalizeNewlines(workflow);
 
         Assert.Contains("environment: publish", workflow, StringComparison.Ordinal);
         Assert.Contains("actions: read", workflow, StringComparison.Ordinal);
         Assert.Contains("contents: write", workflow, StringComparison.Ordinal);
-        Assert.Contains("clean_host_evidence_json:", workflow, StringComparison.Ordinal);
-        Assert.Contains("CLEAN_HOST_EVIDENCE_JSON: ${{ inputs.clean_host_evidence_json }}", workflow, StringComparison.Ordinal);
-        Assert.Equal(1, CountOccurrences(workflow, "${{ inputs.clean_host_evidence_json }}"));
-        Assert.Contains("windows-singlefile-clean-host.evidence.json", workflow, StringComparison.Ordinal);
-        Assert.Contains("[System.Text.UTF8Encoding]::new($false, $true)", workflow, StringComparison.Ordinal);
-        Assert.Contains("65536", workflow, StringComparison.Ordinal);
-        Assert.DoesNotContain("Write-Output $env:CLEAN_HOST_EVIDENCE_JSON", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("clean_host", workflow, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("clean-host", workflow, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("CleanHost", workflow, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -154,7 +149,6 @@ public sealed class ReleaseWorkflowContractTests
         Assert.Contains("-ExpectedRepository $env:GITHUB_REPOSITORY", workflow, StringComparison.Ordinal);
         Assert.Contains("-CandidateRunId $env:CANDIDATE_RUN_ID", workflow, StringComparison.Ordinal);
         Assert.Contains("-CandidateRecordPath (Join-Path $candidateRoot 'release-candidate-record.json')", workflow, StringComparison.Ordinal);
-        Assert.Contains("-CleanHostEvidencePath (Join-Path $env:RUNNER_TEMP 'windows-singlefile-clean-host.evidence.json')", workflow, StringComparison.Ordinal);
 
         int uploadIndex = normalized.IndexOf("- name: Upload final publish control evidence", StringComparison.Ordinal);
         int publishIndex = normalized.IndexOf("- name: Revalidate exact draft bytes and publish", StringComparison.Ordinal);
@@ -173,7 +167,6 @@ public sealed class ReleaseWorkflowContractTests
                 "${{ runner.temp }}/final-control/StudyReportEvaluator-win-x64.unsigned.test.msix.sha256",
                 "${{ runner.temp }}/final-control/platform-release-matrix.json",
                 "${{ runner.temp }}/final-control/release-candidate-record.json",
-                "${{ runner.temp }}/final-control/windows-singlefile-clean-host.evidence.json",
             },
             ExtractUploadPaths(finalControlUpload));
     }

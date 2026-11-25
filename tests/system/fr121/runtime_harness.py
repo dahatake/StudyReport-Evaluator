@@ -1,6 +1,6 @@
 """FR-121 AC-030/033: compile once, isolate build products, never authenticate.
 
-The CLI is a local tripwire. Its success cannot certify CH-03, CH-06 or ADV-01.
+The CLI is a local tripwire. Its success cannot certify real Start/Ping, authentication or AI.
 No real candidate or old release is modified by this harness.
 """
 import os

@@ -3,7 +3,7 @@
 
 <#
 .SYNOPSIS
-Read-only v1 legacy, v2 final-matrix, or pre-clean-host candidate validation.
+Read-only v1 legacy, v2 final-matrix, or candidate validation.
 .DESCRIPTION
 Use the latest pwsh on PATH with -NoLogo -NoProfile. MatrixPath and
 CandidateRecordPath are mutually exclusive. V2/candidate requires explicit
@@ -12,22 +12,21 @@ Product version/source defaults remain the repository version tool and Git HEAD.
 
 CandidateRecordPath must be ArtifactDirectory/release-candidate-record.json.
 Candidate validation requires local EXE, ZIP and development MSIX bytes, their
-sidecars and package evidence; it never reads or invents clean-host evidence.
-Final v2 additionally binds the two fixed root descriptors candidateRecord and
-cleanHostEvidence, but NEVER opens, downloads or rebuilds the MSIX binary.
+sidecars and package evidence. Final v2 additionally binds the fixed root
+descriptor candidateRecord, but NEVER opens, downloads or rebuilds the MSIX binary.
 
 C01's complete draft-2020-12 $defs validate each separate document. Control JSON
-is limited to 1 MiB, clean-host JSON to 64 KiB, with strict UTF-8/no BOM, duplicate
+is limited to 1 MiB, with strict UTF-8/no BOM, duplicate
 member rejection and DateKind String (v2 requires PowerShell 7.5+). All v2 input
 files and ancestors must be plain, non-hardlinked paths. Read handles deny writes
 and deletes until validation completes. No file is created, changed or cleaned.
 
 Success is one JSON object: schemaVersion=2, productVersion, sourceCommit,
-candidate, candidateRecord, cleanHostEvidence (null for candidate), runtime,
+candidate, candidateRecord, runtime,
 rowCount=3, publishableAssets (the fixed EXE/ZIP and two sidecars), status,
-developmentMsixVerification, cleanHostVerification, candidateRunVerification,
+developmentMsixVerification, candidateRunVerification,
 exeVersionVerification and limitations. PASS_CANDIDATE is NOT publication PASS.
-Final PASS reports CANDIDATE_RECORD_ONLY and HUMAN_RECORDED, not execution proof.
+Final PASS reports CANDIDATE_RECORD_ONLY, not execution proof.
 The upstream workflow must independently verify the successful trusted
 .github/workflows/release.yml run and its tag/commit. TRX/observation descriptors
 are upstream/human records, not local raw-file requirements or public assets.
@@ -980,37 +979,6 @@ function Assert-C02ZipRuntime {
     finally { $archive.Dispose() }
 }
 
-function Assert-C02CleanHost {
-    param([System.Collections.IDictionary] $Evidence, [System.Collections.IDictionary] $SingleFileEvidence)
-
-    if (-not (Test-C02SameValue -Left $Evidence.package -Right $SingleFileEvidence.package) -or
-        -not (Test-C02SameValue -Left $Evidence.runtime -Right $SingleFileEvidence.runtime)) {
-        throw 'C02_CLEAN_HOST_BINDING'
-    }
-    Assert-C02WindowsVersion -Value $Evidence.host
-    # C01 permits up to 19 fractional digits. Parse the calendar at seconds,
-    # then round any sub-tick remainder UP solely for the future-time bound.
-    $timestampMatch = [System.Text.RegularExpressions.Regex]::Match(
-        $Evidence.measuredAtUtc, '\A([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})(?:\.([0-9]{1,19}))?Z\z')
-    $time = [System.DateTimeOffset]::MinValue
-    if (-not $timestampMatch.Success -or -not [System.DateTimeOffset]::TryParseExact(
-            $timestampMatch.Groups[1].Value + 'Z', "yyyy-MM-dd'T'HH:mm:ss'Z'",
-            [System.Globalization.CultureInfo]::InvariantCulture,
-            [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal,
-            [ref]$time)) { throw 'C02_CLEAN_HOST_TIME' }
-    $fraction = $timestampMatch.Groups[2].Value
-    $ticks = [long]::Parse($fraction.PadRight(7, '0').Substring(0, 7), [System.Globalization.CultureInfo]::InvariantCulture)
-    if ($fraction.Length -gt 7 -and $fraction.Substring(7).Trim('0').Length -ne 0) { $ticks++ }
-    if ($time.AddTicks($ticks) -gt [System.DateTimeOffset]::UtcNow.AddMinutes(5)) { throw 'C02_CLEAN_HOST_TIME' }
-    # The full C01 schema already requires CH-01..06 PASS/non-null records and
-    # the nine absent dependencies. There is no JSON switch to downgrade them.
-    $protection = $Evidence.protection
-    if (($protection.launchOutcome -ceq 'Allowed' -and $protection.warningActions -ne 0) -or
-        ($protection.launchOutcome -ceq 'WarnedThenAllowed' -and $protection.warningActions -le 0)) {
-        throw 'C02_PROTECTION_CONSISTENCY'
-    }
-}
-
 function Invoke-C02Validation {
     param([string] $InputPath, [string] $RepositoryRoot, [switch] $CandidateOnly)
 
@@ -1053,7 +1021,7 @@ function Invoke-C02Validation {
         $schemaText = Get-C02JsonText -Bytes (Read-C02BoundedBytes -Stream $schemaFile.Stream -Length $schemaFile.Descriptor.bytes)
         $schema = ConvertFrom-C02Json -Json $schemaText
         $schemas = @{}
-        foreach ($definition in @('candidateRecord', 'cleanHostEvidence', 'singleFilePackageEvidence')) {
+        foreach ($definition in @('candidateRecord', 'singleFilePackageEvidence')) {
             # Never validate a detached nested definition: its refs need ALL defs.
             $schemas[$definition] = [ordered]@{
                 '$schema' = $schema['$schema']
@@ -1138,21 +1106,12 @@ function Invoke-C02Validation {
             throw 'C02_CLI_BINDING'
         }
         Assert-C02ZipRuntime -Stream $zipFile.Stream -Runtime $singleFile.runtime
-        $cleanHostDescriptor = $null
-        if (-not $CandidateOnly) {
-            $cleanHostFile = Open-C02Descriptor -ArtifactRoot $artifactRoot -Descriptor $matrix.cleanHostEvidence -Holds $holds -MaximumBytes 64KB
-            $cleanHost = Read-C02Document -File $cleanHostFile -Schema $schemas.cleanHostEvidence -SchemaError 'C02_CLEAN_HOST_SCHEMA' -MaximumBytes 64KB
-            Assert-C02Identity -Value $cleanHost -Version $version -Commit $commit -Repository $ExpectedRepository -RunId $ExpectedCandidateRunId
-            Assert-C02CleanHost -Evidence $cleanHost -SingleFileEvidence $singleFile
-            $cleanHostDescriptor = $cleanHostFile.Descriptor
-        }
         [ordered]@{
             schemaVersion = 2
             productVersion = $version
             sourceCommit = $commit
             candidate = $candidate.candidate
             candidateRecord = $candidateFile.Descriptor
-            cleanHostEvidence = $cleanHostDescriptor
             runtime = $singleFile.runtime
             rowCount = 3
             publishableAssets = @(
@@ -1160,13 +1119,12 @@ function Invoke-C02Validation {
                 'StudyReportEvaluator-win-x64.zip', 'StudyReportEvaluator-win-x64.zip.sha256')
             status = if ($CandidateOnly) { 'PASS_CANDIDATE' } else { 'PASS' }
             developmentMsixVerification = if ($CandidateOnly) { 'LOCAL_BINARY_AND_EVIDENCE' } else { 'CANDIDATE_RECORD_ONLY' }
-            cleanHostVerification = if ($CandidateOnly) { 'NOT_RUN' } else { 'HUMAN_RECORDED' }
             candidateRunVerification = 'CALLER_BOUND_UPSTREAM_REQUIRED'
             exeVersionVerification = 'P07_RECORD_AND_PACKAGE_HASH_BOUND'
             limitations = @(
                 'Offline validation does not verify GitHub run success, workflow trust or tag identity; the upstream workflow must verify them.',
                 'EXE internal version/layout and TRX execution are upstream P07 records bound to package hashes, not independent PE inspection or test execution here.',
-                'Clean-host evidence and observation descriptors are human records, not execution proof; raw records are not fetched or published.',
+                'Observation descriptors are records, not execution proof; raw records are not fetched or published.',
                 'PASS_CANDIDATE is not publication eligibility; unsigned hashes do not establish publisher identity or production trust.')
         } | ConvertTo-Json -Depth 8
     }

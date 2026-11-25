@@ -53,34 +53,23 @@ matrix v2は次の**固定3行**だけとし、unknown／duplicate／missing row
 
 | Row | Artifact / sidecar | publish | Required evidence |
 |---|---|---|---|
-| Windows x64 single-file | `StudyReportEvaluator-win-x64.exe` / `StudyReportEvaluator-win-x64.exe.sha256` | `true` | package required tests＋exact EXEのCH-01〜06 |
+| Windows x64 single-file | `StudyReportEvaluator-win-x64.exe` / `StudyReportEvaluator-win-x64.exe.sha256` | `true` | package required tests（CI windows-latest x64 runnerでのP07 `PASS_REQUIRED`） |
 | Windows x64 ZIP | `StudyReportEvaluator-win-x64.zip` / `StudyReportEvaluator-win-x64.zip.sha256` | `true` | 既存package／clean extract／apphost起動／CLI identity／data保護のrequired tests |
 | Windows x64 development MSIX | 同candidateで実物検証したartifact／sidecarのdescriptor | `false` | 既存範囲の`PASS_MECHANISM`記録 |
 
-1. 順序は**候補生成 → exact EXEのclean-host試験 → protected publishでv2最終matrix確定**。同じsource commit・製品版・SDK／CLI版でEXE／ZIPを作り、candidateのpackage／mechanism required tests成功後だけ4 assetをdraftへ添付する。未実施のclean-host結果や公開可能matrixをcandidate段階で生成しない。
-2. candidate run ID／commit、artifact basename／bytes／SHA-256／製品版、sidecar、package evidence、clean-host evidenceを同じ成果物へ拘束する。doc同梱・最終PATCH等でEXE bytesが変われば旧結果を流用せず、再package・必要な試験とexact EXEのclean-host試験を再実行する。
+1. 順序は**候補生成 → protected publishでv2最終matrix確定**。同じsource commit・製品版・SDK／CLI版でEXE／ZIPを作り、candidateのpackage／mechanism required tests成功後だけ4 assetをdraftへ添付する。公開可能matrixをcandidate段階で生成しない。
+2. candidate run ID／commit、artifact basename／bytes／SHA-256／製品版、sidecar、package evidenceを同じ成果物へ拘束する。doc同梱・最終PATCH等でEXE bytesが変われば旧結果を流用せず、再package・必要な試験を再実行する。
 3. development MSIXは同candidate runで実物検証し、結果とartifact／sidecar descriptorを既存内部control artifactへ保存する。**MSIX本体はGitHub ReleaseにもActions artifactにもuploadしない。** 公開時はこのcandidate-bound記録を照合し、本体を再取得・再作成・再検証したと扱わない。既存package／unpack／integrity回帰だけを保持し、installer機能やrequired install試験を増やさない。
-4. clean-host担当者が同candidateのEXEで試験し、sanitized metadata限定のclosed JSONを供給する。run ID／commit、EXE名／bytes／SHA-256／製品版、OS edition／build／architecture、標準user・追加依存・保護状態、実build SDK／bundled runtime／Copilot SDK・CLI版／CLI hash、試験ID別結果・操作数、実施記録の参照／hashを含める。username、credential／device code、学生本文、Prompt、環境変数値一覧、生ログは含めず、公開前に製品repositoryへcommitしない。
-5. 既存protected publish workflowの`clean_host_evidence_json`入力を環境変数経由で一時file化し、型・長さ・許可field・必須試験IDを検証する。workflow式をshell本文へ直接埋め込まない。人の試験記録であり、hash一致だけで実施事実が自動証明されたとはしない。新storage／workflow／証跡基盤は追加しない。
-6. protected publishは指定repositoryの`release.yml`による成功candidate runとtag commitの一致を確認する。EXE／ZIPの4 assetを再downloadし、version／bytes／hash／sidecar、package evidenceを照合する。MSIXは同runの記録だけを照合し、v2最終matrixと受領JSONを内部control artifactへ保存する。これらをpublic assetに含めない。
-7. 既存Core／App／package required testsと必須CHすべてのPASSを公開条件とする。欠落・FAIL・NOT_RUN、別candidate／source／version／hash、sidecar不一致を拒否する。unsignedの`PASS_REQUIRED`を署名／installer等の`PASS_PRODUCTION`へ読み替えない。tag／push／draft／public Release操作は実装承認と別承認とし、public化にはprotected environmentの公開承認を要求する。
+4. protected publishは指定repositoryの`release.yml`による成功candidate runとtag commitの一致を確認する。EXE／ZIPの4 assetを再downloadし、version／bytes／hash／sidecar、package evidenceを照合する。MSIXは同runの記録だけを照合し、v2最終matrixを内部control artifactへ保存する。これらをpublic assetに含めない。
+5. CI、`release.yml` candidate（CI windows-latest x64 runnerでのP07 `PASS_REQUIRED`、ZIP／MSIX証跡、C03 Final matrix、C02検証、digest照合）と既存Core／App／package required testsのPASSを公開条件とする。欠落・FAIL・NOT_RUN、別candidate／source／version／hash、sidecar不一致を拒否する。unsignedの`PASS_REQUIRED`を署名／installer等の`PASS_PRODUCTION`へ読み替えない。tag／push／draft／public Release操作は実装承認と別承認とし、public化にはprotected environmentの公開承認を要求する。
 
 ## Validation boundary
 
-要求v4.5 §13.7／TR-30〜33を後続実装・試験の正本とする。fresh Windows 11 x64実機またはVMの標準userで、最終candidateと一致するEXEを使用する。開発hostのPATH／.NET環境変数隔離、hosted CI、fake、CLI helpをOS-only／本人認証の証拠にしない。guestへ検証用SDK／PowerShellを入れてからOS-onlyとは呼ばない。
+要求§13.6〜13.7／TR-30〜33を後続実装・試験の正本とする。公開判定はCI、`release.yml` candidate（P07 `PASS_REQUIRED`）、C03／C02、digest照合とprotected `publish` approvalで行う。
 
-| ID | 公開必須の観測／判定 |
-|---|---|
-| CH-01 | fresh OS edition／build／x64・標準user、追加.NET SDK／Runtime、PowerShell 6+、Node／npm、Git／gh、別CLI、Office、IDEの未導入。OS付属.NET Framework等と区別 |
-| CH-02 | sidecar／隣接file／repository／既存CLI cache・認証なしのEXE1個でoffline GUI・Excel読込・設計。保護機能による拒否を成功としない |
-| CH-03 | 外部PowerShell／Node／Git／gh／CLIなしの同梱CLI Start／Ping／auth状態確認。正常な未認証応答とruntime failureを区別 |
-| CH-04 | 移動・再起動・同時起動、args／任意cwd、日本語・空白path、read-only EXE配置先、cache欠落復元、data保護 |
-| CH-05 | 標準ブラウザー取得のMOTW付きEXE、SmartScreen／SAC／企業policy、警告・拒否と実操作数を承認範囲と比較。追加操作を1操作へ丸めない |
-| CH-06 | fresh user本人login、完了後・再起動後の既存buttonでの再確認、取消／app終了時の所有login processだけの終了、他process／data／credential保護。D-06採用済みのため必須PASS、JSONで任意化・N/A化しない |
+**2026-11-25改訂（repository owner判断）:** 当初本ADRが公開必須としていたfresh Windows 11 x64標準userでのclean-host試験（旧CH-01〜06）と、そのmetadata JSONのworkflow入力は、要求および公開gateから削除した。開発hostのPATH／.NET環境変数隔離、hosted CI、fake、CLI helpはOS-only／本人認証の証拠にならないため、fresh OS、MOTW／Windows保護、本人login、実AI評価（`ADV-01`）、外部再計算（`ADV-02`）は未検証として正直に記録し、成功を補完しない。
 
-CH-01〜06はすべて必須PASS。実AI評価`ADV-01`は本人の明示承認とsynthetic入力で行う任意試験、Office等の外部再計算`ADV-02`も任意とし、両者は`NOT_RUN`可。必須GUI／CLI／login試験を代替しない。EXE size、展開容量、初回／再起動時間は実測を記録し、数値SLAを追加しない。
-
-**現時点でclean-host、MOTW／Windows保護、本人loginは`NOT_RUN`。本ADRはそれらの成功を主張しない。** S01は機構適合だけであり、新EXEの公開資格を与えない。
+**現時点でfresh OS、MOTW／Windows保護、本人loginは`NOT_RUN`（公開条件ではない）。本ADRはそれらの成功を主張しない。** S01は機構適合だけであり、新EXEの公開資格を与えない。
 
 ## Approval record / Version override
 
@@ -100,6 +89,6 @@ CH-01〜06はすべて必須PASS。実AI評価`ADV-01`は本人の明示承認�
 
 - 手動展開を主導線から除き、既存2-projectとCLI integrityを維持できる一方、非推奨互換モード、抽出容量・残存cache、unsignedの警告／拒否を受け入れる。ZIPは変更しない代替経路として残す。
 - 新installer、custom launcher／自己展開engine、online bootstrap、自動／差分更新、cache cleaner、registry／PATH恒久変更、file association、常駐service、他OS対応、SDK／CLI／Avalonia更新、Native AOT／trimming全面適用は追加しない。
-- 標準方式で成立せず追加runtime同梱・独自launcher・resolver緩和等が必要なら停止し、実測と最小差分を示して再承認を求める。clean-host証跡が用意できなければ`NOT_RUN`のまま新経路の公開を止め、成功を補完しない。
+- 標準方式で成立せず追加runtime同梱・独自launcher・resolver緩和等が必要なら停止し、実測と最小差分を示して再承認を求める。未実施の実機確認は`NOT_RUN`として記録し、成功を補完しない。
 
 **APPROVED — V4.5 SCOPE.** 条件付き標準single-file主配布・既存ZIP代替・App所有login・candidate拘束公開gateを採用する。旧ADRを改変せず、未実測のclean-host／本人認証／署名／installer claimを追加しない。

@@ -28,7 +28,7 @@ Coverage within the existing case:
 
 | AC | Observations and negative boundaries |
 |---|---|
-| AC-028 | Existing closed required gates retained. Same product version with changed EXE bytes and stale CH proof; changed ZIP bytes with stale package proof; mismatched source; CH-06 PASS claim with CH-01–05 NOT_RUN all stop without public mutation. |
+| AC-028 | Existing closed required gates retained. Same product version with changed ZIP bytes and stale package proof, and every missing/failed required package test, stop without public mutation. |
 | AC-030 | Default SDK/login composition chooses validated absolute bundled path, not fake PATH; distribution manifest deletion with fake PATH still rejects through **both** default consumers. Choice must be compiled/configured independently of manifest existence. Explicit real resolver rejects missing/corrupt CLI/manifest and RID/SDK/CLI-version/path/hash mismatch before SDK creation or login start. Development with a manifest still uses PATH. |
 | AC-033 | Observe default authentication/normal/reference/special SDK consumer factories against the same CLI path/hash, without creating sessions. Real authentication service → execution boundary → startup state handles available/valid unauthenticated/Start/Ping failure/timeout/incompatibility/invalid auth/cancellation. Only valid unauthenticated auto-starts login; suppression leaves manual command usable. Process exit is not authentication; normal completion rechecks auth/models, manual check can observe later authentication. One-shot startup cannot restart login. Owned-process cancellation and overlapping-login refusal; no AI run. One headless GUI remains usable and loads synthetic Excel/navigates design after cancellation. |
 
@@ -41,12 +41,9 @@ assert private field names or introduce an alternative resolver policy.
 After implementation, build a **new local** candidate using the existing ADR
 version policy, keeping the old v0.8.7/6AF… candidate untouched. Record actual
 source, chosen product version, final EXE/ZIP bytes, sizes, SHA-256 and sidecars.
-Run existing real packaging checks plus IT-006 against that source. Record all
-CH-01–06 against the exact new EXE; a historical PASS or user CH-06 statement is
-not new evidence. Real Start/Ping is CH-03, user authentication is CH-06, real AI
-is ADV-01. The current-native synthetic fixture (including ARM64 hosts) proves
-none of those real-x64 outcomes. Missing/failed/cancelled/skipped CH remains
-NOT_RUN/failed in the actual evidence; fake TRX must never populate it. The
+Run existing real packaging checks plus IT-006 against that source. The
+current-native synthetic fixture (including ARM64 hosts) proves no real-x64
+outcome; fake TRX must never populate actual evidence. The
 run's product version is intentionally not pinned here. No actual Release,
 push, deployment or publication is authorized by this test design.
 
@@ -68,10 +65,10 @@ seam for observations from existing build/package/version validators, NOT a new
 public evidence schema and NOT a replacement for their closed JSON validation.
 Production must derive these observations from actual build outputs/validators;
 accepting arbitrary request booleans from a public workflow input is not allowed.
-Synthetic EXE/ZIP bytes are never executed and do not demonstrate CH-01–06.
-The existing P07/C02/C03/package/clean-host validators and required tests must still
+Synthetic EXE/ZIP bytes are never executed.
+The existing P07/C02/C03/package validators and required tests must still
 run against real artifacts, preserving closed matrix v2 and the existing MSIX
-descriptor-only boundary. No clean-host automation or new install scope is added.
+descriptor-only boundary. No new install scope is added.
 
 ### Input fields
 
@@ -85,9 +82,7 @@ descriptor-only boundary. No clean-host automation or new install scope is added
   observations from existing checkout / `dev/version.ps1 verify` / CHANGELOG gates.
 - `asset_paths`: four exact final local files; `package`: candidate-bound required
   test observations, artifact descriptors, EXE/ZIP product versions, tool versions,
-  internal MSIX descriptor/status. `clean_host`: candidate-bound EXE descriptor,
-  host boundary, CH-01–06 and optional advisory observations. Null clean-host is
-  valid for candidate only. Candidate must not emit a publishable final matrix.
+  internal MSIX descriptor/status. Candidate must not emit a publishable final matrix.
 - `protected_approval`: observation of the existing protected `publish` environment,
   **not** a substitute for that environment. In production, the publish job only
   runs after approval; an untrusted request cannot grant itself approval.

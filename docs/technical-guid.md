@@ -97,7 +97,7 @@ GitHubの公式説明では、Copilot SDKの基本構成は「application → SD
 
 開発build／Unixの`SystemCopilotCliPathResolver`は起動時のPATHを順に調べ、Windowsは`copilot.exe`、Unix source buildは実行権限のある`copilot`を探します。空・相対PATHは無視し、作業directoryや同梱CLIを探索しません。Windows配布では既存`BundledCopilotCliPathResolver`がmanifest・RID・SDK版・CLI版・相対path・SHA-256を検証し、成功した絶対pathだけをSDKとlogin serviceへ返します。全AIも同じfactoryを使用します。起動・RPC・認証・モデル取得失敗はSDK互換性を含むruntime failureとして明示します。
 
-通常の開発ビルドは`CopilotSkipCliDownload=true`でCLIを取得せず、PATHを使用します。Windows配布scriptは`CopilotSkipCliDownload=false`を渡し、Appだけの`BUNDLED_COPILOT_RUNTIME`コンパイル定数で既定resolverを固定します（UnixはPATHを維持）。manifestの存在ではモードを切り替えず、欠損・破損はruntime failureで拒否し、PATHへfallbackしません。実際のCLI版・SHA-256とSDK版は引き続き診断とcheckpoint互換性に使用します。修正版`0.8.8`はローカル候補のみで、実CH-03・本人CH-06・実AI ADV-01はfake system回帰とは独立してexact bytesで再検証が必要です。既存公開assetは変更しません。
+通常の開発ビルドは`CopilotSkipCliDownload=true`でCLIを取得せず、PATHを使用します。Windows配布scriptは`CopilotSkipCliDownload=false`を渡し、Appだけの`BUNDLED_COPILOT_RUNTIME`コンパイル定数で既定resolverを固定します（UnixはPATHを維持）。manifestの存在ではモードを切り替えず、欠損・破損はruntime failureで拒否し、PATHへfallbackしません。実際のCLI版・SHA-256とSDK版は引き続き診断とcheckpoint互換性に使用します。修正版`0.8.8`はローカル候補のみです。外部CLIのない新しいWindowsでの実機確認・本人login・実AI評価（ADV-01）はfake system回帰では代替されず、未検証です（公開条件ではありません）。既存公開assetは変更しません。
 
 > [!IMPORTANT]
 > 公式SDKの認証優先順位では、明示token、Copilot API用token、対応する環境変数token、保存済みCopilot CLI credential、GitHub CLI credentialの順です。現行Appはtokenを注入しませんが、子process環境を全面的には消去しません。UIは本人のCLI loginを主導線としています。認証方式を変更する場合は、`UseLoggedInUser`だけでなく、子process環境、credential優先順位、multi-user isolation、logとtest fixtureを一緒に設計してください。
@@ -384,7 +384,7 @@ pwsh.exe -NoLogo -NoProfile -Command "dotnet build .\StudyReportEvaluator.slnx -
 pwsh.exe -NoLogo -NoProfile -Command "dotnet test .\StudyReportEvaluator.slnx --no-restore -c Release"
 ```
 
-これは開発・テスト用のbuildで、Windows同梱CLI配布物の生成ではありません。ARM64など実x64ではないホストでは[Release自動化](https://github.com/dahatake/StudyReport-Evaluator/blob/main/docs/release-automation.md)のローカルselectorとNOT_RUNの扱いを確認してください。正式配布の包装・起動・clean-host証跡は別に必要です。
+これは開発・テスト用のbuildで、Windows同梱CLI配布物の生成ではありません。ARM64など実x64ではないホストでは[Release自動化](https://github.com/dahatake/StudyReport-Evaluator/blob/main/docs/release-automation.md)のローカルselectorとNOT_RUNの扱いを確認してください。正式配布の包装・起動検証は実x64 CIと`release.yml` candidateで別に必要です。
 
 live Copilot、本人login、実データ、repository画像更新、package実物の生成は通常unit testの代替ではなく、明示opt-inと別証跡が必要です。fake transportの成功をlive AI品質や本人認証成功へ拡張しないでください。
 

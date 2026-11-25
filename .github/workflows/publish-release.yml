@@ -11,10 +11,6 @@ on:
         description: Successful release.yml candidate run ID
         required: true
         type: string
-      clean_host_evidence_json:
-        description: Human-recorded exact-EXE clean-host evidence JSON
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -101,16 +97,6 @@ jobs:
           run-id: ${{ inputs.candidate_run_id }}
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/original-observations
-      - name: Validate and persist received clean-host evidence
-        shell: pwsh
-        env:
-          CLEAN_HOST_EVIDENCE_JSON: ${{ inputs.clean_host_evidence_json }}
-        run: |
-          $utf8 = [System.Text.UTF8Encoding]::new($false, $true)
-          $bytes = $utf8.GetBytes($env:CLEAN_HOST_EVIDENCE_JSON)
-          if ($bytes.Length -le 0 -or $bytes.Length -gt 65536) { throw 'Invalid clean-host JSON size.' }
-          [System.IO.File]::WriteAllBytes(
-            (Join-Path $env:RUNNER_TEMP 'windows-singlefile-clean-host.evidence.json'), $bytes)
       - name: Build and validate final publish controls
         shell: pwsh
         env:
@@ -123,7 +109,6 @@ jobs:
             -Mode Final -ExpectedRepository $env:GITHUB_REPOSITORY `
             -CandidateRunId $env:CANDIDATE_RUN_ID `
             -CandidateRecordPath (Join-Path $candidateRoot 'release-candidate-record.json') `
-            -CleanHostEvidencePath (Join-Path $env:RUNNER_TEMP 'windows-singlefile-clean-host.evidence.json') `
             -OutputDirectory $finalRoot
           if (-not $?) { throw 'Final C02/C03 validation failed.' }
           .\scripts\prepare-release-automation.ps1 -Mode Publish `
@@ -136,7 +121,6 @@ jobs:
           name: release-final-control-${{ inputs.tag }}-${{ github.run_id }}
           path: |
             ${{ runner.temp }}/final-control/platform-release-matrix.json
-            ${{ runner.temp }}/final-control/windows-singlefile-clean-host.evidence.json
             ${{ runner.temp }}/final-control/release-candidate-record.json
             ${{ runner.temp }}/final-control/StudyReportEvaluator-win-x64.exe.evidence.json
             ${{ runner.temp }}/final-control/StudyReportEvaluator-win-x64.evidence.json

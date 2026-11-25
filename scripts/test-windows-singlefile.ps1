@@ -18,7 +18,7 @@ existing TRX is reused and no directory is recursively cleaned. Raw TRX stays ig
 Allows an unchanged dirty checkout, always returns PASS_DEVELOPMENT, never publishable.
 Writes artifacts/test/singlefile/StudyReportEvaluator-win-x64.exe.evidence.json without
 touching artifacts/package/StudyReportEvaluator-win-x64.exe.evidence.json. Without this
-switch, a clean checkout is required and success is PASS_REQUIRED, not clean-host PASS.
+switch, a clean checkout is required and success is PASS_REQUIRED (not a fresh-host observation).
 .NOTES
 C01 schema v1: exactly schemaVersion, evidenceKind, status, sourceCommit,
 sourceStatusEntryCount, sourceStatusSha256, sourceContentSha256, productVersion,

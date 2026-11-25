@@ -78,7 +78,7 @@ Component図、認証から出力までのmessage flow、変更時に同期す�
 
 Windowsの開発buildでは`winget install --id GitHub.Copilot --exact`でCLIを導入し、`copilot --version`を確認してください。導入後はterminal／VS Codeとアプリを再起動してPATHを反映します。既存CLIの本人loginを再利用し、未認証ならアプリの**GitHubにログイン**からCLI／ブラウザーで認証します。開発buildはCLIの自動install／更新や同梱manifest検証を行いません。CLIの版・SHA-256は診断とcheckpoint互換性のために記録し、SDK互換性は接続時に確認します。
 
-Windows配布候補は既存publish scriptの`CopilotSkipCliDownload=false`で同梱方式をビルド時に固定します。manifestの有無でモードは変わらず、同梱物の欠損・破損は拒否し、外部CLIの導入では回避できません。修正版`0.8.8`はローカル候補のみで、新bytes固有のCH-01〜06・ADV-01は別途実施が必要です。既存`0.8.7`のasset／tag／Releaseは変更せず、今回公開しません。
+Windows配布候補は既存publish scriptの`CopilotSkipCliDownload=false`で同梱方式をビルド時に固定します。manifestの有無でモードは変わらず、同梱物の欠損・破損は拒否し、外部CLIの導入では回避できません。修正版`0.8.8`はローカル候補のみです。追加ソフトのない新しいWindows 11標準ユーザーでの実機確認と実AI評価（ADV-01）は未検証です（公開条件ではありません）。既存`0.8.7`のasset／tag／Releaseは変更せず、今回公開しません。
 
 ## 公開状況・SHA-256確認・起動
 
@@ -140,7 +140,7 @@ pwsh -NoLogo -NoProfile -File .\build-singlefile.ps1 -SkipPull
 
 現在の作業ツリーから同梱Copilot CLIを含む単一EXEとSHA-256 sidecarを生成し、`artifacts\package\StudyReportEvaluator-win-x64.exe`を起動します。ビルドのみの場合は`-SkipLaunch`を追加します。`-SkipPull`を省略すると、先に`git pull --ff-only`で最新化します（tracked fileに変更がある場合は停止）。各段階の失敗時は古いEXEを起動しません。
 
-詳細・検証方法はリポジトリの`dev/README.md`（単一EXEをビルドして起動する）を参照してください（配布パッケージには含まれません）。これはローカルのunsigned成果物であり、公開済み配布物やclean-host試験の完了を意味しません。
+詳細・検証方法はリポジトリの`dev/README.md`（単一EXEをビルドして起動する）を参照してください（配布パッケージには含まれません）。これはローカルのunsigned成果物であり、公開済み配布物や新しいWindowsでの動作確認を意味しません。
 
 ## ローカルビルドから起動するクイックスタート
 
@@ -198,7 +198,7 @@ pwsh.exe -NoLogo -NoProfile -File .\scripts\publish-windows.ps1
 
 - `artifacts`配下の出力はgit管理外の作業成果で、公開配布物ではありません（[`.gitignore`](https://github.com/dahatake/StudyReport-Evaluator/blob/main/.gitignore)）。第三者への配布・公開に使わないでください。
 - unsignedのため、SmartScreen、Smart App Control（SAC）、企業policyによる警告・実行拒否は配布物と同様に起こり得ます。保護機能の無効化、MOTW除去、execution policy変更、UAC回避は案内しません。
-- ローカルビルドの成功は、fresh Windowsのclean-host試験、本人login、公開判定の完了を意味しません。
+- ローカルビルドの成功は、新しいWindowsでの動作、本人login、公開判定の完了を意味しません。
 
 ### ARM64開発ホストでの検証
 
@@ -209,7 +209,7 @@ ARM64でもRelease契約・入力拒否・Workbook処理を実行しますが、
 実x64の包装・起動・性能3試験は **x64 NOT_RUN（未実行）** と表示します。
 private sampleがなければその実ファイル試験も別に未実行と表示し、
 同じ構造assertを合成Workbookで実行します。これは実ファイルの合格ではありません。
-ローカル成功は公開資格ではなく、実x64 CI/candidateとclean-host・公開ゲートの
+ローカル成功は公開資格ではなく、実x64 CI/candidateと公開承認の
 必須証跡を代替しません。詳細は[Release自動化](https://github.com/dahatake/StudyReport-Evaluator/blob/main/docs/release-automation.md)。
 
 ## 操作の概要

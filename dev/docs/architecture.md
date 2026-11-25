@@ -13,7 +13,7 @@
 
 v4.6のUI／設定保存はT01〜T38の実装・対象検証・レビュー完了を反映する。製品版正本は親担当が`0.8.6`未公開候補（UNRELEASED）へ更新済み、F01はREVIEWED、公開済みは`v0.8.1` ZIPのままである。`0.8.4`のT36文書contract、T37実ZIP、T38実EXE、T39自動回帰／MSIX機構確認は記録済みだが、T39は追加native FAILと本人確認等の外部前提によりBLOCKED。F02の最終版再検証は本同期時点では親担当で未完了、以後は[実行記録](archive/work/20260907-ui-settings-execution-record.md)の最新F02欄を参照する。日付・製品版・証跡範囲を分けた[現在状態](implementation-status.md)を正本とし、G4・全タスクDONE・公開PASSを付与しない。
 
-v4.5のdelivery追加では、実装済みの起動経路／deterministic公開contractと、未実行のcandidate workflow／clean-host／protected publishを分ける（§8・10）。新EXEの公開済み・OS-only受入完了を意味しない。
+v4.5のdelivery追加では、実装済みの起動経路／deterministic公開contractと、未実行のcandidate workflow／protected publishを分ける（§8・10）。新EXEの公開済み・OS-only受入完了を意味しない。
 
 ## 1. Project境界
 
@@ -247,20 +247,18 @@ flowchart LR
 
 ### 8.3 Candidateからprotected publish（contract実装済み・live未実行）
 
-matrix v1は公開`v0.8.1`のZIP＋development MSIX記録という履歴契約として残す。C01〜C03は新規`eng/schemas/platform-release-matrix-v2.schema.json`、validator、builderと直接testを実装し、v1を上書きしていない。C05〜C07はcandidate／protected publish workflowとcontract testを実装済みである。ただしlive workflow、exact最終EXEのCH-01〜06、公開承認、公開後re-downloadは未実行であり、local deterministic成功を実公開gate完了へ読み替えない。
+matrix v1は公開`v0.8.1`のZIP＋development MSIX記録という履歴契約として残す。C01〜C03は新規`eng/schemas/platform-release-matrix-v2.schema.json`、validator、builderと直接testを実装し、v1を上書きしていない。C05〜C07はcandidate／protected publish workflowとcontract testを実装済みである。ただしlive workflow、公開承認、公開後re-downloadは未実行であり、local deterministic成功を実公開gate完了へ読み替えない。
 
 | v2のclosed row | Artifact／sidecar | publish | Required evidence |
 |---|---|---|---|
-| Windows x64単一EXE | `StudyReportEvaluator-win-x64.exe` / `StudyReportEvaluator-win-x64.exe.sha256` | `true` | package required tests＋exact EXEのCH-01〜06 |
+| Windows x64単一EXE | `StudyReportEvaluator-win-x64.exe` / `StudyReportEvaluator-win-x64.exe.sha256` | `true` | package required tests（CI windows-latest x64 runnerでのP07 `PASS_REQUIRED`） |
 | Windows x64 ZIP | `StudyReportEvaluator-win-x64.zip` / `StudyReportEvaluator-win-x64.zip.sha256` | `true` | 既存package／clean extract／起動／CLI identity／data保護 |
 | Windows x64 development MSIX | 同candidateで実物検証したartifact／sidecarのdescriptor | `false` | 既存範囲の`PASS_MECHANISM`記録 |
 
-- 固定3行のunknown／duplicate／missingを拒否する。candidateのpackage／mechanism required tests成功後だけ、EXE／ZIPと各sidecarの計4 assetをdraftへ添付する。この段階で未実施のclean-host結果や公開可能な最終matrixを生成しない。
+- 固定3行のunknown／duplicate／missingを拒否する。candidateのpackage／mechanism required tests成功後だけ、EXE／ZIPと各sidecarの計4 assetをdraftへ添付する。この段階で公開可能な最終matrixを生成しない。
 - MSIXは同candidate runで実物検証し、結果とartifact／sidecar descriptorだけを既存内部control artifactへ保存する。**MSIX本体はGitHub ReleaseにもActions artifactにもuploadしない。** 公開時はcandidate-bound記録を照合し、本体を再取得・再作成・再検証したと扱わない。
-- clean-host担当者は当該candidateのexact EXEを試験し、run ID／commit、EXE basename／bytes／SHA-256／製品版、OS／標準user／追加依存／保護状態、実build SDK／bundled runtime／SDK・CLI版とCLI hash、試験ID別結果・操作数・実施記録の参照／hashをmetadata限定closed JSONで渡す。username、token／device code、学生本文、Prompt、環境変数値一覧、生ログを含めず、公開前に製品repositoryへcommitしない。
-- 既存protected publishの`clean_host_evidence_json`入力を環境変数経由で一時file化し、型・長さ・許可field・必須試験IDを検証する。workflow式をshell本文へ直接埋め込まず、新しいstorage／workflow／証跡基盤を追加しない。人の試験記録であり、hash一致だけで実施事実が自動証明されたとは扱わない。
-- protected publishは指定repositoryの`release.yml`による成功candidate runとtag commitの一致を確認する。4 assetsを再downloadしてversion／bytes／hash／sidecarとpackage evidenceを照合し、MSIXの同run記録を照合した後、v2最終matrixと受領JSONを内部control artifactへ保存する。公開assetは同じ4個だけとする。
-- 既存Core／App／package required testsとCH-01〜06すべてのPASSを要求し、必須結果の欠落・FAIL・NOT_RUN、別candidate／source／version／hash、sidecar不一致を拒否する。同梱docや最終製品版変更でEXE bytesが変われば再package・再検証し、以前のclean-host結果を流用しない。tag／push／draft／public Releaseの操作承認は実装承認と分け、公開にはprotected environmentの承認を必要とする。
+- protected publishは指定repositoryの`release.yml`による成功candidate runとtag commitの一致を確認する。4 assetsを再downloadしてversion／bytes／hash／sidecarとpackage evidenceを照合し、MSIXの同run記録を照合した後、v2最終matrixを内部control artifactへ保存する。公開assetは同じ4個だけとする。
+- CI、`release.yml` candidate（CI windows-latest x64 runnerでのP07 `PASS_REQUIRED`、ZIP／MSIX証跡、C03 Final matrix、C02検証、digest照合）と既存Core／App／package required testsのPASSを要求し、必須結果の欠落・FAIL・NOT_RUN、別candidate／source／version／hash、sidecar不一致を拒否する。同梱docや最終製品版変更でEXE bytesが変われば再package・再検証する。fresh Windows 11標準userでの実機確認は公開条件ではなく、未実施なら未検証として記録する。tag／push／draft／public Releaseの操作承認は実装承認と分け、公開にはprotected environmentの承認を必要とする。
 
 ```mermaid
 flowchart LR
@@ -271,9 +269,8 @@ flowchart LR
     Single --> Candidate[候補生成 / package required tests]
     ZIP --> Candidate
     DevMSIX -->|記録・descriptorのみ / 本体uploadなし| Candidate
-    Candidate --> Draft[Draft / 計4 assets / clean-host待ち]
-    Draft --> CH[exact EXE / CH-01〜06]
-    CH --> Publish[Protected publish / 再download照合 / v2最終matrix確定]
+    Candidate --> Draft[Draft / 計4 assets]
+    Draft --> Publish[Protected publish / 再download照合 / v2最終matrix確定]
     Candidate -. candidate-bound記録 .-> Publish
     Publish -->|全必須PASS + 公開承認| Release[Public / 同じ4 assets]
 ```
@@ -301,7 +298,7 @@ flowchart LR
 | Checkpoint save | package、checkpoint sheet、JSON chunk/hash、input identity |
 | Final write | sheets、formula/ref/DAG/cached values、original preservation |
 | Final commit | input identity、target absence、same-volume atomic rename |
-| Protected publish（contract実装済み・live未実行） | candidate run／source／version／bytes／hash／sidecar、exact EXEのCH-01〜06、closed v2／4 assets |
+| Protected publish（contract実装済み・live未実行） | candidate run／source／version／bytes／hash／sidecar、P07 `PASS_REQUIRED`、closed v2／4 assets |
 
 ## 10. Evidence boundary
 
@@ -311,17 +308,17 @@ flowchart LR
 |---|---|
 | P01〜P07 | レビューPASS。P04だけは変更不要の`N/A_REVIEWED`であり、独立した変更・実行成功とはしない |
 | P06実EXE試験 | 7 tests PASS、失敗／skip 0。開発hostでの機構・GUI・data保護の実測 |
-| P07実行 | `PASS_DEVELOPMENT`、7 tests／9 observations。公開用`PASS_REQUIRED`やclean-host PASSへ昇格させない |
+| P07実行 | `PASS_DEVELOPMENT`、7 tests／9 observations。公開用`PASS_REQUIRED`やfresh OS実機PASSへ昇格させない |
 | A01〜A03 | レビューPASS。login専用service／Execution UIのdeterministic検証であり、本人login実測ではない |
 | C01〜C03 | matrix v2 schema／validator／builderと直接testを実装済み。C03は18/18 PASS。live candidate／publish実行を意味しない |
 | C04〜C07 | CI、candidate、protected publishのworkflow／contract testを実装済み。実workflow、draft、public Releaseは未実行 |
-| CH-01〜06（fresh OS／MOTW・Windows保護／本人loginを含む） | `NOT_RUN`。新EXEの公開条件は未達 |
+| fresh OS／MOTW・Windows保護／本人loginの実機確認 | `NOT_RUN`。2026-11-25以降は公開条件ではない（未検証として記録） |
 
-`scripts/test-windows-singlefile.ps1`は既にbuild／publish／packageされたEXEを検査し、再build・再package・認証を行わない。既定実行は前後でclean checkoutを必須とし、source content、EXE／sidecar、fresh TRXのexact 7 testsと9 observationsを照合して初めてpackageの`PASS_REQUIRED`を出す。`-DevelopmentOnly`はdirty checkoutでもsource／package不変を要求し、`artifacts/test/singlefile/`へ`PASS_DEVELOPMENT`を出すだけで、`artifacts/package/`の公開用evidenceを置き換えない。いずれもCHの代替ではない。
+`scripts/test-windows-singlefile.ps1`は既にbuild／publish／packageされたEXEを検査し、再build・再package・認証を行わない。既定実行は前後でclean checkoutを必須とし、source content、EXE／sidecar、fresh TRXのexact 7 testsと9 observationsを照合して初めてpackageの`PASS_REQUIRED`を出す。`-DevelopmentOnly`はdirty checkoutでもsource／package不変を要求し、`artifacts/test/singlefile/`へ`PASS_DEVELOPMENT`を出すだけで、`artifacts/package/`の公開用evidenceを置き換えない。いずれもfresh OS実機確認の代替ではない。
 
 P06／P07で未実測のnetwork隔離、本人認証、disk-full、抽出中断、directory ACL fault、EXE／ZIP間checkpoint再開をPASSで補完しない。開発hostのPATH／.NET環境変数隔離、hosted CI、fake、CLI help、process終了だけをOS-only／本人認証の成功に読み替えない。
 
-新経路の公開ではCH-01〜06すべてが必須であり、採用済みD-06の本人login（CH-06）を任意・N/Aにしない。一方、本人が明示承認したsynthetic実AI評価（ADV-01）とexternal spreadsheet再計算（ADV-02）はadvisoryで、`NOT_RUN`可。必須GUI／CLI／loginやrequired fake/oracle evidenceの代替にしない。unsignedの`PASS_REQUIRED`と署名・installer等の`PASS_PRODUCTION`、test-only mechanismとproduction trustを分離し、未実測platform／installer／signing／notarizationを対応表示しない。
+fresh Windows 11標準userでのclean-host試験（旧CH-01〜06、本人loginを含む）は2026-11-25のrepository owner判断で公開条件から外した。未実施の場合は未検証として記録し、成功を補完しない。本人が明示承認したsynthetic実AI評価（ADV-01）とexternal spreadsheet再計算（ADV-02）はadvisoryで、`NOT_RUN`可。required fake/oracle evidenceの代替にしない。unsignedの`PASS_REQUIRED`と署名・installer等の`PASS_PRODUCTION`、test-only mechanismとproduction trustを分離し、未実測platform／installer／signing／notarizationを対応表示しない。
 
 ### 10.1 UI／Settings差分の証跡（2026-09-07）
 
@@ -329,4 +326,4 @@ T01〜T38の`REVIEWED`、T39の`BLOCKED`と対象試験件数は[現在状態](i
 
 `0.8.4`ではT36が21/21、T37が実ZIP＋MSIX静的契約9/9、T38がcontract 114/114とP06 7/7・P07 `PASS_DEVELOPMENT`、T39が自動回帰1892/1892（Core 190＋App 1702、skip 0）とMSIX `PASS_MECHANISM`。これらを合算してfull gateを作らず、`0.8.6`の最終artifactや未実施faultの成功へ拡張しない。
 
-T39の追加nativeは3試行後に停止し、最新`artifacts/test/ui-settings/t39/native-final-attempt.json`は`CONTROL_ID_PREDICATE_NOT_UNIQUE`でFAIL。120 DPI・実client 1475×1000 pixel＝1180×800 DIP、合成入力読込、入力／EXE不変・実利用者設定非作成は確認したが、4画面・5カテゴリ・1024×720・実keyboardは未検証。Narrator、本人walkthrough4項目、隔離利用者のnative保存とCH-01〜06は`NOT_RUN_EXTERNAL_PREREQUISITE`であり、headlessやP06によって成功にしない。利用者不在時のF01／F02続行はこの未達・公開境界を解除しない。
+T39の追加nativeは3試行後に停止し、最新`artifacts/test/ui-settings/t39/native-final-attempt.json`は`CONTROL_ID_PREDICATE_NOT_UNIQUE`でFAIL。120 DPI・実client 1475×1000 pixel＝1180×800 DIP、合成入力読込、入力／EXE不変・実利用者設定非作成は確認したが、4画面・5カテゴリ・1024×720・実keyboardは未検証。Narrator、本人walkthrough4項目、隔離利用者のnative保存は`NOT_RUN_EXTERNAL_PREREQUISITE`、fresh OS実機確認は`NOT_RUN`（公開条件ではない）であり、headlessやP06によって成功にしない。利用者不在時のF01／F02続行はこの未達・公開境界を解除しない。

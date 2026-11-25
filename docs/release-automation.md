@@ -8,7 +8,7 @@
 
 現行ソースの通常開発buildは`CopilotSkipCliDownload=true`でPATHのCLIを使います。Windows配布scriptは`false`で同梱CLIを取得し、Appの`BUNDLED_COPILOT_RUNTIME`をコンパイル時に有効にします。配布runtimeはmanifest・RID・SDK／CLI版・相対path・SHA-256を検証し、不一致時にPATHへfallbackしません。開発buildでの起動成功は、この配布経路の検証になりません。
 
-同梱CLI修正後のexact bytesについて、実CH-03、本人CH-06、実AI ADV-01の再検証はfake system回帰とは独立です。ローカル候補の確認記録を、正式clean-host検証の完了や公開許可へ読み替えないでください。ADV項目は下記の公開ゲートでは任意ですが、実施・未実施を正確に記録します。
+公開ゲートは、CI、`release.yml` candidate run（CI windows-latest x64 runnerでのP07 `PASS_REQUIRED`、ZIP／MSIX証跡、C03 Final matrix、C02検証、digest照合）、およびprotected `publish` environmentの承認です。追加ソフトのない新しいWindows 11標準ユーザーでの実機確認、本人login、実AI評価（ADV-01）は公開条件ではなく、未実施の場合は未検証として正確に記録します。fake system回帰やローカル候補の確認記録を、これらの実機確認の完了や公開許可へ読み替えないでください。
 
 ## 実行前の条件
 
@@ -42,17 +42,14 @@
 
 ## exact EXEを承認して公開する
 
-1. 元candidate runのEXEを対象clean hostで人が検証し、既存の
-   `windows-singlefile-clean-host` 証跡を用意する。CH-01–06必須、ADV-01/02は任意。
-   Windows hosted runnerやfixtureの合格はclean-host実測の代わりにならない。
-   同梱CLIを含む最終EXEそのものを検証し、開発PATHのCLIでの成功を代用しない。
-   起動時は既存認証の確認、必要時だけ1回のloginが起こり得る。login process終了と
-   認証／model一覧取得の成功、実AI評価の成功は分けて記録する。
-2. `publish-release.yml` にtag、元candidate run ID、clean-host JSONを渡す。
-   JSONは環境変数経由で64 KiB以下のUTF-8ファイルにし、shellへ展開しない。
+1. 元candidate runが成功し、CI windows-latest x64 runnerでのP07 `PASS_REQUIRED`、
+   ZIP/MSIX証跡、C03 Candidate/C02の結果が揃っていることを確認する。
+   新しいWindows 11標準ユーザーでの実機確認や本人loginは公開条件ではない。
+   実施した場合も公開workflowへ入力せず、未実施なら未検証として記録する。
+2. `publish-release.yml` にtagと元candidate run IDを渡す。
 3. read-onlyの `validate` ジョブが元runの成功・repository/workflow/sourceを確認し、
    元のcontrol/public bytes/automation observationsを取得する。
-   既存C03 Final/C02がcandidateとexact EXEの人手証跡を照合し、
+   既存C03 Final/C02がcandidateのidentityとdigestを照合し、
    closed schemaVersion 2の3行とpublish/statusを検証する。
    EXEやZIPを再ビルド・再包装しない。
 4. `publish` environmentの承認後、別のwriterジョブが同じ共通driverを実行する。
@@ -95,7 +92,7 @@ python scripts/verify.py --quick
 `-RequestPath -ResultPath -GitHubApiUrl http://127.0.0.1:<port>` で接続する。
 driverにghフォールバックはなく、GitHubへの全呼出しは注入したtransportに従う。
 normalized requestは既存validatorの観測境界であって新しい公開証跡schemaではない。
-fixtureは合成bytesを実行せず、正式x64包装・clean-host実測・GitHubのenvironment設定・
+fixtureは合成bytesを実行せず、正式x64包装・GitHubのenvironment設定・
 実Actions実行の証明にはならない。実環境での承認設定とrunner実行は別途必要。
 
 ### ARM64と実x64の検証境界（AC-103）
@@ -127,5 +124,5 @@ python scripts/release_test_selection.py --run-local --results-directory work/lo
   CI/candidate/publishはOSとプロセス両方のx64を要求し、ARM64上のx64エミュレーションも拒否する。
 - candidate adapterはCore/App全必須観測の合格に加え、実x64起動・性能の
   **名前付きTRX結果の存在とPassed**を必須にする。欠落・NotExecuted・NOT_RUN・Failedは停止する。
-  ZIP/single-file包装、clean-host検証、Final matrixの既存必須条件も維持する。
+  ZIP/single-file包装、Final matrixの既存必須条件も維持する。
   ローカルのportable成功や合成bytesから正式publishable証跡を作ることはできない。

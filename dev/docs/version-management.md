@@ -279,11 +279,10 @@ GitHubはdraftへ全assetを添付してから公開する手順を推奨して�
 
 1. `release.yml`（candidate）は、同一tag/commitからEXE・ZIP・development MSIX検証記録を作成し、`release-candidate-record.json`（candidate identity）を含むcontrol artifactを保存します。ここでのstatusは`PASS_CANDIDATE`であり、公開完了ではありません。
 2. development MSIXは**non-public record**として扱い、公開assetへMSIX本体を添付しません。拘束対象は`.msix.sha256`とevidence JSONです。
-3. clean-host証跡は人が実行した記録を`clean_host_evidence_json`として受領し、`publish-release.yml`がUTF-8・長さ・許可fieldを検証して一時file化します（受領記録の拘束であり、workflow内でV02実行を代替しません）。
-4. `build-platform-release-matrix.ps1 -Mode Final`（C03）が、candidate record + 受領clean-host recordから`platform-release-matrix.json`（v2 final）を生成します。
-5. `publish-release.yml`はprotected environment承認の後、draftの4 assetを再downloadし、`validate-platform-release-matrix.ps1`（C02）でsource/version/hash/sidecar/candidate run拘束を再検証してから、最後のwrite操作として`--draft=false`を実行します。
+3. `build-platform-release-matrix.ps1 -Mode Final`（C03）が、candidate recordから`platform-release-matrix.json`（v2 final）を生成します。fresh Windows 11標準userでのclean-host証跡は2026-11-25のrepository owner判断で公開条件から外し、workflow入力もありません。
+4. `publish-release.yml`はprotected environment承認の後、draftの4 assetを再downloadし、`validate-platform-release-matrix.ps1`（C02）でsource/version/hash/sidecar/candidate run拘束を再検証してから、最後のwrite操作として`--draft=false`を実行します。
 
-この文書は手順契約を定義するものであり、live workflow実行済みやV02実行済みを主張しません。実行有無は別途execution recordで管理します。
+この文書は手順契約を定義するものであり、live workflow実行済みを主張しません。実行有無は別途execution recordで管理します。
 
 ## 7. prereleaseとcheckpoint
 
@@ -335,7 +334,7 @@ self-testは実repositoryの`show/verify`と、一時copyに対するset、bump�
 
 ## 10. 完了条件
 
-以下は版の正式公開までの完了条件で、F02の候補版同期と公開承認は別です。チェックリストは手順契約であり、現在すべてを達成した状態表ではありません。最終版の検証結果は実行記録の最新F02欄で確認し、T39のBLOCKEDとCH-01〜06未実施を版変更だけで解除しません。
+以下は版の正式公開までの完了条件で、F02の候補版同期と公開承認は別です。チェックリストは手順契約であり、現在すべてを達成した状態表ではありません。最終版の検証結果は実行記録の最新F02欄で確認し、T39のBLOCKEDを版変更だけで解除しません。
 
 - [ ] bump根拠がMAJOR/MINOR/PATCH規則へ追跡できる。
 - [ ] `Directory.Build.props`が合意した版を示す。
@@ -348,7 +347,7 @@ self-testは実repositoryの`show/verify`と、一時copyに対するset、bump�
 - [ ] working treeがcleanである。
 - [ ] EXE/ZIPそれぞれと対応sidecarが一致する。
 - [ ] GitHub Releaseのtag、prerelease状態、asset（EXE+sidecar、ZIP+sidecar）、notesが一致する。
-- [ ] candidate run identity、受領clean-host record、C03 final matrix、C02再検証、protected publish順序が一致する。
+- [ ] candidate run identity（CI windows-latest x64でのP07 `PASS_REQUIRED`を含む）、C03 final matrix、C02再検証、digest照合、protected publish順序が一致する。
 - [ ] 公開済み版を差し替えていない。
 - [ ] schema/component versionを理由なく連動更新していない。
 

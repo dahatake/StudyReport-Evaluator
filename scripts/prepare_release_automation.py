@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 
-from release_automation import (CH, EXE, ZIP, PUBLIC, REQUIRED, WORKFLOW, GitHub,
+from release_automation import (EXE, ZIP, PUBLIC, REQUIRED, WORKFLOW, GitHub,
                                 descriptor, read_json, require, write_json)
 from release_test_selection import GROUPS, REQUIRED_X64_METHODS, required_group
 
@@ -154,7 +154,7 @@ def prepare(args):
         request = {"phase": "candidate", "identity": identity, "checkout_commit": git("rev-parse", "HEAD"),
                    "recorded_start": copy.deepcopy(identity),
                    "product_version": tag[1:], "version_verified": True, "changelog_verified": True,
-                   "protected_approval": False, "package": package, "clean_host": None,
+                   "protected_approval": False, "package": package,
                    "asset_paths": copy_public(root, output)}
     else:
         request = read_json(args.candidate)
@@ -166,24 +166,12 @@ def prepare(args):
         require(request["package"]["candidate_record"] ==
                 descriptor("release-candidate-record.json", (root / "release-candidate-record.json").read_bytes()),
                 "original candidate record changed")
-        clean = read_json(root / "windows-singlefile-clean-host.evidence.json")
-        require(clean["candidate"] == {"repository": identity["repository"],
-                "workflow": WORKFLOW, "runId": identity["run_id"]} and
-                clean["sourceCommit"] == identity["commit"], "clean-host candidate mismatch")
-        tests = {v["id"]: v["status"] for v in clean["tests"]}
-        host = clean["host"]
         request.update(phase="publish", checkout_commit=git("rev-parse", "HEAD"),
                        product_version=tag[1:], version_verified=True, changelog_verified=True,
                        # Authority is the protected writer job, never this observation alone.
                        protected_approval=True,
                        asset_paths=copy_public(root, output),
-                       final_matrix_path=str(output / "platform-release-matrix.json"),
-                       clean_host={"identity": copy.deepcopy(identity), "exe": clean["package"],
-                                   "product_version": clean["productVersion"],
-                                   "tests": {key: tests[key] for key in CH},
-                                   "host": {"os": host["osName"], "architecture": host["architecture"],
-                                            "fresh": host["fresh"], "standard_user": host["standardUser"],
-                                            "extra_dependencies": any(host["additionalDependencies"].values())}})
+                       final_matrix_path=str(output / "platform-release-matrix.json"))
         shutil.copyfile(root / "platform-release-matrix.json", output / "platform-release-matrix.json")
     write_json(output / "request.json", request)
 

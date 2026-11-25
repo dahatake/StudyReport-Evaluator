@@ -106,7 +106,7 @@ def test_FR121_AC103_native_profile_and_x64_evidence_boundary(tmp_path):
                   "package-windows-singlefile.ps1", "test-windows-singlefile.ps1"):
         assert token in candidate, f"Required x64 candidate validation lost: {token}"
     assert "build-platform-release-matrix.ps1" in publish
-    assert "-CleanHostEvidencePath" in publish and "-Mode Final" in publish
+    assert "-Mode Final" in publish and "CleanHostEvidence" not in publish
     readme = (ROOT / "README.md").read_text("utf-8")
     assert re.search(r"ARM64", readme, re.I)
     assert re.search(r"NOT[_ -]?RUN|未実行", readme, re.I)
@@ -117,11 +117,11 @@ def test_FR121_AC103_native_profile_and_x64_evidence_boundary(tmp_path):
     ), "AC-103 adds no ARM64 distribution"
 
     # Negative: a locally successful portable gate cannot authorize publication
-    # when representative required x64 package/clean-host evidence is NOT_RUN.
+    # when representative required x64 package evidence is NOT_RUN.
     request, assets = fixture(tmp_path / "input")
-    for index, group in enumerate(("package", "clean_host")):
+    for index, group in enumerate(("package",)):
         bad = copy.deepcopy(request)
-        statuses = bad[group]["required" if group == "package" else "tests"]
+        statuses = bad[group]["required"]
         for key in statuses:
             statuses[key] = "NOT_RUN"
         with GitHub(bad, assets) as gh:

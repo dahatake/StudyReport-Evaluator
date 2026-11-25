@@ -13,7 +13,7 @@
 | 必須決定的fixture | `tests/fixtures/system-test/SystemTest-10Students.xlsx` |
 | 注意 | 本書はテスト結果ではない。未実施、過去結果、文書上の期待値を今回のPASSとして扱わない |
 
-> **V02境界の明記:** P06/P07の開発host観測は`PASS_DEVELOPMENT`またはpackage機構確認であり、fresh標準user clean-host（CH-01〜CH-06）の公開判定試験（V02）を充足しない。未実施項目は`NOT_RUN`のまま保持し、`PASS_REQUIRED`/`PASS_PRODUCTION`へ読み替えない。
+> **V02境界の明記:** P06/P07の開発host観測は`PASS_DEVELOPMENT`またはpackage機構確認であり、fresh標準userでの実機確認（V02、2026-11-25以降は公開条件ではない任意観測）を充足しない。未実施項目は`NOT_RUN`のまま保持し、`PASS_REQUIRED`/`PASS_PRODUCTION`へ読み替えない。
 
 > **捏造禁止:** 期待結果は要求、実装、固定fixture、独立oracleから導出し、実測結果は今回の実行証跡だけから記録する。過去のtest件数、性能値、package hash、Live AI結果、未対応platformの結果を今回値として流用しない。
 
@@ -193,7 +193,7 @@ Base 60、Special 0、SimilarityPenaltyWeight 0.1、RoundingDigits 1、allocatio
 | `SKIPPED_NOT_INSTALLED` | optional external spreadsheetが未install |
 | `NOT_RUN_EXTERNAL_PREREQUISITE` | requiredなfresh OS／本人／Narrator／隔離利用者等、またはoptional external recalculationの前提がなく未実施。必須と任意を別記する |
 | `PASS_MECHANISM` | test certificateまたはunsigned artifactでpackage mechanismだけを今回確認 |
-| `PASS_DEVELOPMENT` | 開発hostの明記したartifact／観測範囲だけの成功。clean-host／本人認証／公開の成功へ拡張しない |
+| `PASS_DEVELOPMENT` | 開発hostの明記したartifact／観測範囲だけの成功。fresh OS実機／本人認証／公開の成功へ拡張しない |
 | `PASS_PRODUCTION` | production identityとclean target OSでrequired trust/journeyを今回確認 |
 | `BLOCKED_EXTERNAL` | signing identity、credential、native test host等がなくproduction scopeを開始不能 |
 
@@ -219,7 +219,7 @@ T01で追加したAC-035〜037／TR-34〜36／ST-UC-27〜29／C-045〜047は維�
 
 `VERIFIED_SCOPED`は追跡上の限定確認で、§6のscenario `PASS`とは別。T35の対象文書試験は4/4成功・敵対的レビュー済み（指摘0）。T35は画像bytesの読込・目視・再生成を行っていない。T36は別scopeの21/21でAC-022／TR-22へ接続し、T38のP06 7/7はAC-032／TR-31の限定確認とする。disk-full／directory ACL／抽出中断／EXE・ZIP間checkpoint再開は未実施で、全faultのPASS_REQUIREDではない。
 
-C-045〜047のBLOCKEDはT36待ちではなく、T39追加native FAILと人手確認等の未達を維持する判定である。最新`artifacts/test/ui-settings/t39/native-final-attempt.json`はCONTROL_ID_PREDICATE_NOT_UNIQUEでFAIL、3試行後は再試行を停止した。120 DPI・実client 1475×1000 pixel＝1180×800 DIP・合成入力読込・入力／EXE不変・実利用者設定非作成だけを観測し、4画面・5カテゴリ・1024×720・実keyboardは未完了。Narrator、本人walkthrough4項目、隔離利用者native保存とCH-01〜06はNOT_RUN_EXTERNAL_PREREQUISITE。本人login・実AI・実学生data・公開操作は未実施で、F01／F02の自律続行をG4・全タスクDONE・公開PASSへ拡張しない。
+C-045〜047のBLOCKEDはT36待ちではなく、T39追加native FAILと人手確認等の未達を維持する判定である。最新`artifacts/test/ui-settings/t39/native-final-attempt.json`はCONTROL_ID_PREDICATE_NOT_UNIQUEでFAIL、3試行後は再試行を停止した。120 DPI・実client 1475×1000 pixel＝1180×800 DIP・合成入力読込・入力／EXE不変・実利用者設定非作成だけを観測し、4画面・5カテゴリ・1024×720・実keyboardは未完了。Narrator、本人walkthrough4項目、隔離利用者native保存とfresh Windows実機確認はNOT_RUN_EXTERNAL_PREREQUISITE（fresh Windows実機確認は公開条件ではない）。本人login・実AI・実学生data・公開操作は未実施で、F01／F02の自律続行をG4・全タスクDONE・公開PASSへ拡張しない。
 
 ## 7. 共通報告契約
 
@@ -266,7 +266,7 @@ C-045〜047のBLOCKEDはT36待ちではなく、T39追加native FAILと人手確
 | ST-UC-23 | macOS source foundation static contract | TR-26 / AC-024 |
 | ST-UC-24 | macOS future trust order static contract | TR-27 / AC-025 |
 | ST-UC-25 | Windows ZIP E2E、release matrix、secret boundary | TR-28、TR-29 / AC-026〜AC-028 |
-| ST-UC-26 | clean-host単一EXE起動・同梱CLI状態確認・本人login・公開境界 | TR-30〜TR-33 / AC-029〜AC-034 |
+| ST-UC-26 | fresh Windows単一EXE起動・同梱CLI状態確認・本人loginの任意観測（公開条件外） | TR-30〜TR-33 / AC-029〜AC-034 |
 | ST-UC-27 | 共通＋定義1件の明示保存、平文境界、atomic失敗、明示出力先復元／null | TR-34 / AC-035 |
 | ST-UC-28 | 保存定義の明示適用、別header検証、失敗・取消無変更、ID／Prompt保持 | TR-35 / AC-036 |
 | ST-UC-29 | 設定往復、model希望、no-auto、現在snapshot／前回結果保持、保存→再読込→fake run E2E | TR-36 / AC-016〜AC-019、AC-035〜AC-037 |
@@ -990,7 +990,7 @@ Delivery transition oracle:
 - current READMEと利用者文書は公開`v0.8.1`のZIPと、UNRELEASED `0.8.5`候補の将来EXE主導線／ZIP代替を明確に分離する。0.8.4のT28画像生成履歴とF02の現在ソース版を混同しない。
 - T01の未実装・NOT_RUNは当時の履歴。T01〜T38はREVIEWED、実装と記録済み局所試験はVERIFIED_SCOPED。T35の対象文書試験4/4成功・レビュー済みとT36の21/21は別scopeで、それぞれのTRXへ接続する。C-045〜047のBLOCKEDはT39追加native FAIL／人手未実施等のためで、T36待ちを理由にしない。T28の216/216に8画像の生成・2回一致が含まれてもnative・実保存を成功扱いにしない。F01はREVIEWED、親担当は0.8.5へPATCH済み。F02最終再検証は実行記録の最新欄で確認し、T39をBLOCKEDのまま進める指示をG4・全タスクDONE・公開成功へ読み替えない。
 - single-file／ZIP package testsはそれぞれの実成果物とsidecarを検証し、development MSIXは`PASS_MECHANISM`として非公開に分離する。
-- 開発hostのP06／P07、fake login、CLI helpをfresh OSのCH-01〜06や本人login成功へ読み替えず、新EXEを公開済みと記載しない。
+- 開発hostのP06／P07、fake login、CLI helpをfresh OS実機確認や本人login成功へ読み替えず、新EXEを公開済みと記載しない。
 - development MSIX、macOS、installer、code signing、notarization、SmartScreen／Gatekeeper結果を対応済みまたはpublic assetと記載しない。
 - packageにsample、user workbook、未生成macOS runtime、署名済みmarkerを現在のpublic成果物として要求しない。
 - framework support、cross-publish、test certificateを現在のproduction PASSへ算入しない。
@@ -1414,24 +1414,24 @@ Requirement: TR-28 / TR-29 / AC-026 / AC-027 / AC-028
 1. Windows単一EXEとZIPを同じsource／versionから今回build/packageし、各sidecar、safe layout、bundled CLI、sample/user workbook不在を確認します。ZIPのclean extract/launch回帰を維持します。
 2. matrix v2をclosed schemaで検証します。single-file EXEとZIPは`publish=true`、development MSIXは`publish=false`かつ`PASS_MECHANISM`のcandidate-bound descriptorであることを要求します。
 3. draft／public assetのexact setがEXE／ZIPと各sidecarの4件で、development MSIX本体、control JSON、macOS未実測artifactが含まれないことを確認します。
-4. candidate workflowがPR/forkでwrite権限やsecretを使用せず、verified annotated tagのdraftへ4 assetだけを添付し、clean-host待ちのcandidate recordを内部control artifactへ保存することを確認します。
-5. publish workflowが成功candidate run／tag commit、metadata限定clean-host JSON、4 assetの再download、C03 final matrix、C02再検証を要求し、protected approval後の最後のwrite操作だけで公開することを確認します。
-6. live candidateが存在する場合だけ、そのrun ID／commitとfresh downloadした4 assetを再検証します。存在しないURL、hash、run ID、CH結果を作りません。
-7. documentationが未公開EXE主候補と公開`v0.8.1` ZIP代替を分離し、development MSIX/macOSを一般利用者へ案内せず、CH-01〜06未実施を開示することを確認します。
+4. candidate workflowがPR/forkでwrite権限やsecretを使用せず、verified annotated tagのdraftへ4 assetだけを添付し、candidate recordを内部control artifactへ保存することを確認します。
+5. publish workflowがtagとcandidate run IDだけを入力とし、成功candidate run／tag commit、P07 `PASS_REQUIRED`、4 assetの再download、C03 final matrix、C02再検証を要求し、protected approval後の最後のwrite操作だけで公開することを確認します。
+6. live candidateが存在する場合だけ、そのrun ID／commitとfresh downloadした4 assetを再検証します。存在しないURL、hash、run ID、実機確認結果を作りません。
+7. documentationが未公開EXE主候補と公開`v0.8.1` ZIP代替を分離し、development MSIX/macOSを一般利用者へ案内せず、fresh Windows実機確認の未実施を公開条件ではない未検証事項として開示することを確認します。
 
-全deterministic oracleが一致した場合だけlocal contract scopeを`PASS_REQUIRED`とします。GitHub draft/public candidateがまだ存在しない段階ではfresh-download scopeを`NOT_RUN_NO_CANDIDATE`、CH-01〜06を`NOT_RUN`とし、公開完了とは報告しません。
+全deterministic oracleが一致した場合だけlocal contract scopeを`PASS_REQUIRED`とします。GitHub draft/public candidateがまだ存在しない段階ではfresh-download scopeを`NOT_RUN_NO_CANDIDATE`とし、公開完了とは報告しません。
 
 報告順: Test ID / UTC / source / ZIP identity・launch / matrix rows / excluded assets / workflow boundary / docs / fresh-download status / evidence / Status / 非保証事項。
 ```
 
-### ST-UC-26: clean-host単一EXE・同梱CLI状態確認・本人login・公開境界
+### ST-UC-26: fresh Windows単一EXE・同梱CLI状態確認・本人loginの任意観測
 
 ```text
-あなたはStudyReport Evaluator v4.6のclean-host公開判定システムテスト担当者です。
+あなたはStudyReport Evaluator v4.6のfresh Windows実機観測（任意）システムテスト担当者です。
 Test ID: ST-UC-26
 Requirement: TR-30 / TR-31 / TR-32 / TR-33 / AC-029 / AC-030 / AC-031 / AC-032 / AC-033 / AC-034
 
-このscenarioは、P06/P07（開発host観測）と独立したV02公開判定用です。捏造禁止。P06/P07のPASS_DEVELOPMENTや過去reportをclean-host PASSへ転記しません。未実施はNOT_RUNのまま保持します。
+このscenarioは、P06/P07（開発host・CI runner観測）と独立したV02の任意観測です。2026-11-25のrepository owner判断により、この観測は公開条件ではありません。公開gateはCI、`release.yml` candidate run（P07 `PASS_REQUIRED`、ZIP／MSIX証跡、C03 Final matrix、C02検証、digest照合）、protected `publish`環境の承認です。結果を公開workflowへ入力しません。捏造禁止。P06/P07のPASS_DEVELOPMENTや過去reportをfresh OS実機のPASSへ転記しません。未実施はNOT_RUNのまま保持します。
 
 絶対規則:
 1. 候補EXE identity（candidate run/commit/productVersion/bytes/SHA-256）に**完全一致**する実物だけを対象にする。別EXE・再build・類似版を代用しない。
@@ -1442,39 +1442,35 @@ Requirement: TR-30 / TR-31 / TR-32 / TR-33 / AC-029 / AC-030 / AC-031 / AC-032 /
 6. EXEの移動、再起動、同時起動、任意cwd、相対`--input`、複数`--prompt`、日本語/空白path、read-only配置先、cache欠落復元で契約が維持されることを確認する。
 7. input/final/partial/workbook data不変を検証する。cacheと利用者dataの領域を混同しない。
 8. 本人loginは「GitHubにログイン」の明示操作だけで開始する。cancelとアプリ終了時は、当該login processだけを終了し、ブラウザー/他CLI/credentialへ干渉しない。
-9. secret、token、device code、学生data、Prompt本文、生ログ、環境変数一覧を証跡へ含めない。metadata限定JSONのみを作成する。
-10. optional authenticated live AI（ADV-01）はsynthetic入力だけで別scenarioとして扱う。CH-01〜CH-06の必須判定へ代用しない。
+9. secret、token、device code、学生data、Prompt本文、生ログ、環境変数一覧を記録へ含めない。
+10. optional authenticated live AI（ADV-01）はsynthetic入力だけで別scenarioとして扱う。他の観測項目へ代用しない。
 
 準備:
 1. `StudyReportEvaluator.slnx`を上位探索してrepository rootへ移動し、HEADとworktree status hashを記録する。
-2. candidate control artifact（release-candidate-record、EXE/ZIP evidence、MSIX descriptor）と受領したclean-host JSONの整合を検証する。
+2. candidate control artifact（release-candidate-record、EXE/ZIP evidence、MSIX descriptor）を取得し、対象EXEとの整合を検証する。
 3. EXEのbasename/bytes/SHA-256、sidecar、source commit、candidate run IDが一致しない場合は`FAIL_CANDIDATE_IDENTITY_MISMATCH`で停止する。
 4. 試験中にsource、package、evidenceを改変しない。再packageや再publishが必要ならこのscenarioを中断して別runとして扱う。
 
-実行（必須CH）:
-- CH-01: fresh OS/architecture/標準user/追加依存未導入を確認。
-- CH-02: EXE1個からoffline GUI起動、Input/Design利用、no-auto-run、追加導入不要。
-- CH-03: bundled CLIのStart/Ping/auth状態確認（未認証とfailureの区別）。
-- CH-04: 移動/再起動/同時起動/args/cwd/path/cacherecovery/data不変。
-- CH-05: MOTW・保護状態・警告/拒否・実操作数を記録し承認範囲と比較。
-- CH-06: 本人login、完了後/再起動後の既存buttonで再確認、cancel/close時の所有process限定終了。
+観測項目:
+- host前提: fresh OS/architecture/標準user/追加依存未導入。
+- offline GUI: EXE1個からoffline GUI起動、Input/Design利用、no-auto-run、追加導入不要。
+- bundled CLI state: Start/Ping/auth状態確認（未認証とfailureの区別）。
+- lifecycle invariants: 移動/再起動/同時起動/args/cwd/path/cacherecovery/data不変。
+- MOTW-protection-operations: MOTW・保護状態・警告/拒否・実操作数。
+- personal login-cancel-close: 本人login、完了後/再起動後の既存buttonで再確認、cancel/close時の所有process限定終了。
 
 任意ADV:
 - ADV-01（optional authenticated live AI）は、本人が明示承認したsynthetic入力のみ。`NOT_RUN`可。
 - ADV-02（optional external recalculation）は従来どおり任意。`NOT_RUN`可。
 
 判定:
-- CH-01〜CH-06が全て今回PASSし、candidate拘束（run/commit/version/hash/sidecar）とpublic 4 assets再照合が一致した場合のみ`PASS_REQUIRED`。
-- CHの欠落、`FAIL`、`NOT_RUN`、別candidate証跡、機微field混入、MSIX本体の公開混入、public asset差替えはFAIL。
-- ADV-01/ADV-02の`NOT_RUN`は許容し、必須CHの失敗へ変換しない。
+- 各観測項目を`PASS`／`FAIL`／`NOT_RUN`で個別に記録する。全項目が今回PASSし、candidate拘束（run/commit/version/hash/sidecar）が一致した場合だけ、観測scopeを`PASS`と報告する（`PASS_PRODUCTION`や公開判定ではない）。
+- 別candidate証跡、機微field混入はFAIL。実施しなかった項目は`NOT_RUN`のまま残し、成功へ丸めない。
+- この結果は公開可否を変えない。`FAIL`を観測した場合は不具合として報告し、修正版の判断はrepository ownerに委ねる。
 
-証跡契約（metadata only）:
-- 含める: run ID、timestamp、candidate/source/productVersion、artifact basename/bytes/SHA-256、host依存有無フラグ、CH/ADV status、operation count、記録参照hash。
-- 含めない: username、secret、token、device code、学生本文、Prompt本文、response本文、生ログ、private absolute path。
+報告順: Test ID / candidate identity binding / host前提 / offline GUI / bundled CLI state / lifecycle invariants / MOTW-protection-operations / personal login-cancel-close / optional ADV status / Status / 差異 / 非保証事項。
 
-報告順: Test ID / candidate identity binding / host前提(CH-01) / offline GUI(CH-02) / bundled CLI state(CH-03) / lifecycle invariants(CH-04) / MOTW-protection-operations(CH-05) / personal login-cancel-close(CH-06) / optional ADV status / metadata-only evidence / public 4 assets再照合 / Status / 差異 / 非保証事項。
-
-最後に、P06/P07はdevelopment-host試験でありV02 clean-host判定を代替しないこと、CH未実施はNOT_RUNのままであることを明記します。
+最後に、P06/P07はdevelopment-host／CI runner試験でありfresh OS実機観測を代替しないこと、未実施はNOT_RUNのままであること、この観測が公開条件ではないことを明記します。
 ```
 
 ### ST-UC-27: 共通＋定義1件の明示保存、atomic失敗、出力先復元

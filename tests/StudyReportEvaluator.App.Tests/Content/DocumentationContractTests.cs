@@ -250,7 +250,7 @@ public sealed class DocumentationContractTests
             "[ADR-0016](adr/0016-windows-one-action-startup.md)",
             "[Windows単一EXEの方式適合](preflight/windows-singlefile-feasibility.md)",
             "`PASS_DEVELOPMENT`",
-            "CH-01〜06");
+            "repository owner判断で公開条件から外しました");
         AssertContainsAll(
             Read("dev/README.md"),
             "[Windows単一EXEの設計決定](docs/adr/0016-windows-one-action-startup.md)",
@@ -1001,7 +1001,7 @@ public sealed class DocumentationContractTests
             "ADR-0016",
             "| 対応環境 | Windows 11 x64。macOS、Linux、Windows Arm64は現版の正式公開対象外 |",
             "StudyReportEvaluator-win-x64.exe",
-            "CH-01〜06",
+            "### 13.7 fresh Windows実機確認（公開条件外）",
             "`sample/SampleReport.xlsx`",
             "| Bytes | 470,806 |",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
@@ -1022,6 +1022,8 @@ public sealed class DocumentationContractTests
             "`HEADER_METADATA_MISMATCH`で再読込を要求");
         AssertDoesNotContainAny(
             requirements,
+            "### 13.7 clean-host公開必須試験",
+            "| CH-06 |",
             "sample/realdata.xlsx",
             "469,995",
             "F7C5364449B1026F2725828F47418B8E105D7E50CF4DF0B224FE4EAF134A2E3D");
@@ -1065,7 +1067,7 @@ public sealed class DocumentationContractTests
             "`docs/requirements-definition.md` v4.6",
             "`tests/SystemTest-prompt.md` v4.6、ST-UC-01〜29、TR-01〜36",
             "`PASS_DEVELOPMENT`",
-            "fresh user本人login／再起動後確認のCH-06は`NOT_RUN`");
+            "fresh user本人login／再起動後確認は`NOT_RUN`（公開条件ではない）");
 
         int[] scenarioHeadingIds = Regex.Matches(
                 prompts,
@@ -1141,7 +1143,7 @@ public sealed class DocumentationContractTests
             "| 要求正本 | `docs/requirements-definition.md` v4.6 |",
             "ST-UC-26",
             "ST-UC-29",
-            "CH-01〜CH-06",
+            "この観測は公開条件ではありません",
             "`sample/SampleReport.xlsx`",
             "73883CE3BBB86B93AF8825C04F596434CF82A2C6309A7F4CC5835AE8F3E542EA",
             "2026-09-16 現行sample採用追補",
@@ -1282,8 +1284,12 @@ public sealed class DocumentationContractTests
             "Real_atomic_final_validation_rejects_a_corrupted_cached_score_and_does_not_publish_it",
             "Manual user-visible UI at 200%",
             "overall PASSには両scopeの実測PASSが必要",
-            "CHの欠落、`FAIL`、`NOT_RUN`",
-            "ADV-01/ADV-02の`NOT_RUN`は許容");
+            "この結果は公開可否を変えない",
+            "ADV-02（optional external recalculation）は従来どおり任意。`NOT_RUN`可。");
+        AssertDoesNotContainAny(
+            prompts,
+            "CH-01〜CH-06",
+            "CHの欠落、`FAIL`、`NOT_RUN`");
 
         AssertSequentialTableIds(traceability, "AC-", 53);
         Assert.Equal(
@@ -1306,9 +1312,9 @@ public sealed class DocumentationContractTests
             ("AC-017", ["VERIFIED_SCOPED"], "EthicsWarningTests"),
             ("AC-018", ["VERIFIED_SCOPED"], "LaunchOptionsTests"),
             ("AC-022", ["NOT_RUN_CURRENT_CANDIDATE", "VERIFIED_SCOPED", "PASS_REQUIRED"], "DocumentationContractTests"),
-            ("AC-029", ["NOT_RUN_EXTERNAL_PREREQUISITE"], "CH-01"),
+            ("AC-029", ["NOT_RUN_EXTERNAL_PREREQUISITE"], "WindowsSingleFilePackageTests"),
             ("AC-032", ["VERIFIED_SCOPED"], "WindowsSingleFilePackageTests"),
-            ("AC-033", ["NOT_RUN_EXTERNAL_PREREQUISITE"], "CH-06"),
+            ("AC-033", ["NOT_RUN_EXTERNAL_PREREQUISITE"], "BundledCopilotLoginServiceTests"),
             ("AC-034", ["NOT_RUN_EXTERNAL_PREREQUISITE"], "ReleaseMatrixContractTests"),
             ("AC-035", ["VERIFIED_SCOPED"], "SettingsFileStoreTests"),
             ("AC-036", ["VERIFIED_SCOPED"], "SavedDefinitionApplicationTests"),

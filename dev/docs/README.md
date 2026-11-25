@@ -12,7 +12,7 @@ Release candidate run 36860591724は成功し、`v0.8.6`は2026-10-01に公開�
 |---|---|---|
 | [実装状態](implementation-status.md) | 開発、QA、リリース | 現在の実装済みsurface、生成gate、post-gate gap closure |
 | [アプリケーション版管理手順](version-management.md) | 開発、QA、リリース | SemVer、版変更tool、検証、tag、GitHub Release、failure handling |
-| [GitHub.comリリース作成手順書](release.md) | リリース | tag、Release candidate、clean-host、承認付きpublishの操作手順とfailure対応 |
+| [GitHub.comリリース作成手順書](release.md) | リリース | tag、Release candidate、承認付きpublishの操作手順とfailure対応 |
 | [アーキテクチャ](architecture.md) | 開発、アーキテクト | dependency、run、Copilot、UI、output data flow |
 | [詳細設計書](detailed-design.md) | 開発、アーキテクト、QA | v4 domain、AI operation、formula、checkpoint、UI、Windows/macOS delivery設計 |
 | [UI・設定のlayout契約](ui-layout-contract.md) | UI開発、QA | T01契約履歴、T26 headless測定、T27実file E2E、T28画像、T39追加native／人手確認の分離 |
@@ -24,16 +24,16 @@ Release candidate run 36860591724は成功し、`v0.8.6`は2026-10-01に公開�
 | [ADR-0013](adr/0013-windows-only-public-release.md) | アーキテクト、リリース | 現行platform/release scope decision |
 | [ADR-0014](adr/0014-product-versioning.md) | アーキテクト、リリース | 製品SemVer、単一正本、tag/release identity |
 | [ADR-0015](adr/0015-windows-macos-installer-delivery.md) | アーキテクト、リリース、QA | Windows ZIP public、development MSIX、macOS source foundation |
-| [ADR-0016](adr/0016-windows-one-action-startup.md) | アーキテクト、リリース、QA | App限定Windows単一EXE、login導線、matrix v2、clean-host公開境界 |
+| [ADR-0016](adr/0016-windows-one-action-startup.md) | アーキテクト、リリース、QA | App限定Windows単一EXE、login導線、matrix v2、candidate／protected publish公開境界 |
 | [ADR-0018](adr/0018-job-cost-observability.md) | アーキテクト、QA | ジョブ単位のAI使用量観測、JSONLログ、単位・換算の境界 |
-| [Windows単一EXEの方式適合](preflight/windows-singlefile-feasibility.md) | 開発、QA、リリース | 固定.NET／SDK／CLIでの開発host適合結果と未実施clean-host境界 |
+| [Windows単一EXEの方式適合](preflight/windows-singlefile-feasibility.md) | 開発、QA、リリース | 固定.NET／SDK／CLIでの開発host適合結果と未検証範囲 |
 | [Screenshot manifest](../../images/README.md) | UI開発、QA、利用者支援 | 8枚の合成説明画像。T28の生成履歴は`0.8.4`・1440×1050・2回hash一致。`0.8.6`公開後のnative／実保存の証拠ではない |
 
 ## 履歴文書
 
 過去の計画・実行記録・証跡は[作業記録アーカイブ](archive/work/README.md)から参照できます。
 
-ADR-0012はADR-0011のv3評価契約をsupersedeし、入力不変、closed AI result、Excel formula ownership、2-project構成等をcarry forwardします。ADR-0013はcurrent public evidenceをWindows 11 x64初版へ限定した記録です。ADR-0014は製品SemVerとrelease identityを定義します。ADR-0015はv4.3でWindows ZIPをpublic artifact、development MSIXをnon-public mechanism、macOSをsource foundationとするdelivery境界を定義します。ADR-0016はv4.5でApp限定single-file EXEを将来の主配布、ZIPを代替とし、fresh clean-host CH-01〜06とprotected publishを公開条件に追加します。
+ADR-0012はADR-0011のv3評価契約をsupersedeし、入力不変、closed AI result、Excel formula ownership、2-project構成等をcarry forwardします。ADR-0013はcurrent public evidenceをWindows 11 x64初版へ限定した記録です。ADR-0014は製品SemVerとrelease identityを定義します。ADR-0015はv4.3でWindows ZIPをpublic artifact、development MSIXをnon-public mechanism、macOSをsource foundationとするdelivery境界を定義します。ADR-0016はv4.5でApp限定single-file EXEを将来の主配布、ZIPを代替とし、protected publishを公開条件に追加します。fresh clean-host試験（旧CH-01〜06）は2026-11-25のrepository owner判断で公開条件から外しました。
 
 ```mermaid
 flowchart LR
@@ -98,7 +98,7 @@ flowchart LR
 | login導線 | [`BundledCopilotLoginService.cs`](../../src/StudyReportEvaluator.App/Copilot/BundledCopilotLoginService.cs)、[`BundledCopilotLoginServiceTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Copilot/BundledCopilotLoginServiceTests.cs)、[`CopilotLoginCommandTests.cs`](../../tests/StudyReportEvaluator.App.Tests/UI/CopilotLoginCommandTests.cs) |
 | matrix v2／公開制御 | [`platform-release-matrix-v2.schema.json`](../../eng/schemas/platform-release-matrix-v2.schema.json)、[`ReleaseMatrixBuilderTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseMatrixBuilderTests.cs)、[`ReleaseWorkflowContractTests.cs`](../../tests/StudyReportEvaluator.App.Tests/Packaging/ReleaseWorkflowContractTests.cs) |
 
-`test-windows-singlefile.ps1`の`-DevelopmentOnly`での成功statusは`PASS_DEVELOPMENT`、clean sourceを要求する既定モードでは`PASS_REQUIRED`です。どちらもfresh Windows 11 x64、MOTW／Windows保護、本人loginのCH-01〜06を代替せず、新EXEの公開資格を単独では与えません。正確な状態は[実装状態](implementation-status.md)と[Traceability](traceability.md)を参照してください。
+`test-windows-singlefile.ps1`の`-DevelopmentOnly`での成功statusは`PASS_DEVELOPMENT`、clean sourceを要求する既定モードでは`PASS_REQUIRED`です。どちらもfresh Windows 11 x64、MOTW／Windows保護、本人loginの実機確認を代替せず（これらは未検証で、公開条件ではありません）、新EXEの公開資格を単独では与えません。公開にはCI windows-latest x64 runnerでの`release.yml` candidate（P07 `PASS_REQUIRED`）、C03／C02とprotected `publish` approvalが必要です。正確な状態は[実装状態](implementation-status.md)と[Traceability](traceability.md)を参照してください。
 
 2026-09-05の[敵対的レビューと修正記録](archive/work/20260905-adversarial-review.md)の最終検証は、`artifacts/test/adversarial-review/final/summary.json`で対象commit、全体status、TRX件数・SHA-256、前後のsource不変を照合してください。これは当時の履歴で、F02の0.8.6再検証ではありません。記録がない／`RUNNING`／`FAILED`の場合は完了扱いにしません。
 

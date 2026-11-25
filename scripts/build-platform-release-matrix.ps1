@@ -8,10 +8,9 @@ Creates a validated v2 release candidate record or final platform release matrix
 Candidate mode copies the three fixed Windows package kinds and their sidecars and
 evidence into a private staging directory, writes only release-candidate-record.json,
 and invokes the public C02 candidate CLI against those local bytes. PASS_CANDIDATE
-is explicitly not publication eligibility and no clean-host result is generated.
+is explicitly not publication eligibility.
 
-Final mode receives a candidate record and independently supplied clean-host record.
-It copies the fixed EXE/ZIP packages, package evidence, and MSIX sidecar/evidence,
+Final mode receives a candidate record. It copies the fixed EXE/ZIP packages, package evidence, and MSIX sidecar/evidence,
 but neither requires nor copies the development MSIX binary. It projects the three
 candidate rows into schemaVersion 2 and invokes the public C02 final CLI.
 
@@ -52,10 +51,6 @@ param(
     [ValidateNotNullOrEmpty()]
     [string] $CandidateRecordPath,
 
-    [Parameter(Mandatory, ParameterSetName = 'Final')]
-    [ValidateNotNullOrEmpty()]
-    [string] $CleanHostEvidencePath,
-
     [Parameter(ParameterSetName = 'Candidate')]
     [Parameter(ParameterSetName = 'Final')]
     [string] $OutputDirectory
@@ -68,10 +63,8 @@ $ProgressPreference = 'SilentlyContinue'
 $Utf8NoBom = [System.Text.UTF8Encoding]::new($false, $true)
 $MaximumArtifactBytes = 2GB
 $MaximumJsonBytes = 1MB
-$MaximumCleanHostBytes = 64KB
 $MaximumSidecarBytes = 64KB
 $CandidateFileName = 'release-candidate-record.json'
-$CleanHostFileName = 'windows-singlefile-clean-host.evidence.json'
 $MatrixFileName = 'platform-release-matrix.json'
 $WorkflowPath = '.github/workflows/release.yml'
 $FilesByKind = [ordered]@{
@@ -522,7 +515,7 @@ function Assert-C03OwnedOutputDirectory {
     foreach ($files in $FilesByKind.Values) {
         foreach ($name in $files.Values) { [void]$allowed.Add([string]$name) }
     }
-    foreach ($name in @($CandidateFileName, $CleanHostFileName, $MatrixFileName)) {
+    foreach ($name in @($CandidateFileName, $MatrixFileName)) {
         [void]$allowed.Add($name)
     }
 
@@ -822,9 +815,7 @@ try {
     else {
         $stage = 'final-input-paths'
         $candidatePath = Resolve-C03Path -Path $CandidateRecordPath -Base $repositoryRoot
-        $cleanHostPath = Resolve-C03Path -Path $CleanHostEvidencePath -Base $repositoryRoot
-        if ([System.IO.Path]::GetFileName($candidatePath) -cne $CandidateFileName -or
-            [System.IO.Path]::GetFileName($cleanHostPath) -cne $CleanHostFileName) {
+        if ([System.IO.Path]::GetFileName($candidatePath) -cne $CandidateFileName) {
             throw 'C03_FIXED_BASENAME'
         }
         $candidateRoot = [System.IO.Path]::GetDirectoryName($candidatePath)
@@ -836,11 +827,6 @@ try {
             -ExpectedFileName $CandidateFileName `
             -DestinationDirectory $stagingRoot `
             -MaximumBytes $MaximumJsonBytes
-        $cleanHostDescriptor = Copy-C03FixedFile `
-            -SourcePath $cleanHostPath `
-            -ExpectedFileName $CleanHostFileName `
-            -DestinationDirectory $stagingRoot `
-            -MaximumBytes $MaximumCleanHostBytes
         [void](Copy-C03Kind `
                 -Kind 'windows-singlefile-exe' `
                 -SourceDirectory $candidateRoot `
@@ -857,9 +843,6 @@ try {
         $candidate = Read-C03StrictJson `
             -Path (Join-Path $stagingRoot $CandidateFileName) `
             -MaximumBytes $MaximumJsonBytes
-        [void](Read-C03StrictJson `
-                -Path (Join-Path $stagingRoot $CleanHostFileName) `
-                -MaximumBytes $MaximumCleanHostBytes)
         foreach ($kind in $FilesByKind.Keys) {
             [void](Read-C03StrictJson `
                     -Path (Join-Path $stagingRoot $FilesByKind[$kind].Evidence) `
@@ -911,7 +894,6 @@ try {
                 runId = $CandidateRunId
             }
             candidateRecord = $candidateDescriptor
-            cleanHostEvidence = $cleanHostDescriptor
             rows = $rows
         }
         $matrixPath = Join-Path $stagingRoot $MatrixFileName
@@ -925,7 +907,6 @@ try {
             -SourceCommit $sourceBefore.Commit
         $expectedOutputFiles = @(
             $CandidateFileName
-            $CleanHostFileName
             $FilesByKind['windows-singlefile-exe'].Values
             $FilesByKind['windows-zip'].Values
             $FilesByKind['windows-development-msix'].Sidecar
@@ -1024,7 +1005,7 @@ try {
 
     if ($Mode -ceq 'Candidate') {
         Write-Output 'C03_PASS status=PASS_CANDIDATE publicationEligible=false'
-        Write-Output 'PASS_CANDIDATE is not publication eligible; clean-host evidence and a final matrix were not generated.'
+        Write-Output 'PASS_CANDIDATE is not publication eligible; a final matrix was not generated.'
     }
     else {
         Write-Output 'C03_PASS status=PASS upstreamCandidateRunVerificationRequired=true'

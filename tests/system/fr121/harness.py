@@ -1,4 +1,4 @@
-"""FR-121: independent HTTP observer; synthetic bytes are NEVER clean-host proof."""
+"""FR-121: independent HTTP observer; synthetic bytes are NEVER executed."""
 from __future__ import annotations
 
 import copy
@@ -23,7 +23,6 @@ EXE = "StudyReportEvaluator-win-x64.exe"
 ZIP = "StudyReportEvaluator-win-x64.zip"
 PUBLIC = (EXE, EXE + ".sha256", ZIP, ZIP + ".sha256")
 KINDS = ("windows-singlefile-exe", "windows-zip", "windows-development-msix")
-CH = tuple(f"CH-{n:02}" for n in range(1, 7))
 REQUIRED = ("core", "app", "exe-package", "zip-package", "zip-clean-extract",
             "zip-launch", "zip-cli", "zip-data-protection", "msix-mechanism")
 
@@ -60,13 +59,6 @@ def fixture(directory: Path):
         "run_id": RUN, "tag": TAG, "tag_object_sha": TAG_OBJECT,
         "commit": COMMIT, "main_tip_at_start": COMMIT, "product_version": "0.8.1",
     }
-    clean = {
-        "identity": copy.deepcopy(identity), "exe": descriptor(EXE, assets[EXE]),
-        "product_version": "0.8.1", "tests": dict.fromkeys(CH, "PASS"),
-        "advisory": {"ADV-01": "NOT_RUN", "ADV-02": "NOT_RUN"},
-        "host": {"os": "Windows 11", "architecture": "x64", "fresh": True,
-                 "standard_user": True, "extra_dependencies": False},
-    }
     package = {
         "identity": copy.deepcopy(identity), "required": dict.fromkeys(REQUIRED, "PASS"),
         "assets": [descriptor(n, assets[n]) for n in PUBLIC],
@@ -81,7 +73,7 @@ def fixture(directory: Path):
         "phase": "publish", "identity": identity, "checkout_commit": COMMIT,
         "product_version": "0.8.1", "version_verified": True,
         "changelog_verified": True, "protected_approval": True,
-        "asset_paths": paths, "package": package, "clean_host": clean,
+        "asset_paths": paths, "package": package,
     }
     return request, assets
 

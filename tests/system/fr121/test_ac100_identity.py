@@ -9,7 +9,6 @@ def test_FR121_AC100_identity_snapshot_and_no_rebuild(tmp_path):
     request, assets = fixture(tmp_path / "input")
     candidate = copy.deepcopy(request)
     candidate["phase"] = "candidate"
-    candidate["clean_host"] = None  # Candidate cannot pretend CH has already run.
     with GitHub(candidate, assets, existing=False) as gh:
         result = success(invoke(tmp_path / "candidate", candidate, gh))
         assert result["identity"]["main_tip_at_start"] == COMMIT
@@ -18,7 +17,7 @@ def test_FR121_AC100_identity_snapshot_and_no_rebuild(tmp_path):
         assert any(c["path"] in (f"/repos/{REPO}/commits/main",
                                 f"/repos/{REPO}/git/ref/heads/main") for c in gh.journal)
         assert not gh.public_calls()
-        assert not result.get("matrix_path"), "Candidate is non-publishable before exact-EXE CH"
+        assert not result.get("matrix_path"), "Candidate is non-publishable before the final matrix"
 
     # main moving AFTER verification does not invalidate or silently rebuild the candidate.
     with GitHub(request, assets) as gh:

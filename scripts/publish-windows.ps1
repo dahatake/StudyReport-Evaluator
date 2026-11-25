@@ -1193,7 +1193,7 @@ function Assert-ApplicationLaunch {
         Wait-NoStartupChildProcesses -ProcessId $process.Id
         if (-not [string]::IsNullOrWhiteSpace($SingleFileProbeDirectory)) {
             # No nonzero window handle requirement on headless CI; this proves liveness, not UI readiness.
-            Write-Verbose 'Single-file startup liveness checked with an isolated environment; not GUI or clean-host evidence.'
+            Write-Verbose 'Single-file startup liveness checked with an isolated environment; not GUI or fresh-host evidence.'
         }
 
         $closedGracefully = $process.CloseMainWindow() -and $process.WaitForExit(5000)

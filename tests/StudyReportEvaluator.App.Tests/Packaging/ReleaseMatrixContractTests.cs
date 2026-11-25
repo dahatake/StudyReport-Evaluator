@@ -198,7 +198,7 @@ public sealed class ReleaseMatrixContractTests
     }
 
     // These are structural/byte-binding fixtures, not launch, PE/MSIX integrity,
-    // trusted GitHub-run, personal authentication or clean-host execution proof.
+    // trusted GitHub-run, personal authentication or host execution proof.
     // Every invocation runs the real validator via its public pwsh CLI contract.
     [Fact]
     public async Task V2_final_matrix_binds_four_assets_without_msix_or_raw_records()
@@ -206,7 +206,6 @@ public sealed class ReleaseMatrixContractTests
         using V2Fixture fixture = new();
         File.Delete(fixture.Resolve(MatrixFixture.MsixFileName));
         Assert.False(File.Exists(fixture.Resolve("windows-singlefile.trx")));
-        Assert.False(File.Exists(fixture.Resolve("CH-01.txt")));
         string[] before = fixture.Snapshot();
 
         ProcessResult result = await fixture.ValidateAsync(TestContext.Current.CancellationToken);
@@ -216,11 +215,10 @@ public sealed class ReleaseMatrixContractTests
     }
 
     [Fact]
-    public async Task V2_candidate_requires_packages_but_not_matrix_or_clean_host()
+    public async Task V2_candidate_requires_packages_but_not_matrix()
     {
         using V2Fixture fixture = new();
         File.Delete(fixture.Resolve("matrix.json"));
-        File.Delete(fixture.Resolve(V2Fixture.CleanHostFileName));
         string[] before = fixture.Snapshot();
 
         ProcessResult result = await fixture.ValidateAsync(
@@ -254,30 +252,6 @@ public sealed class ReleaseMatrixContractTests
     }
 
     [Theory]
-    [InlineData("NOT_RUN")]
-    [InlineData("FAIL")]
-    public async Task V2_advisory_results_and_recorded_warning_actions_do_not_block_required_pass(string status)
-    {
-        using V2Fixture fixture = new();
-        foreach (JsonNode? test in fixture.CleanHost["tests"]!.AsArray().Skip(6))
-        {
-            test!["status"] = status;
-            test["operations"] = status == "NOT_RUN" ? 0 : 1;
-            test["record"] = status == "NOT_RUN" ? null : V2Fixture.Observation("advisory.txt");
-        }
-        fixture.CleanHost["protection"]!["launchOutcome"] = "WarnedThenAllowed";
-        fixture.CleanHost["protection"]!["warningActions"] = 2;
-        // C01 permits fractional precision beyond DateTime's seven digits.
-        fixture.CleanHost["measuredAtUtc"] = "2024-02-29T12:34:56.1234567890123456789Z";
-        fixture.SaveCleanHost();
-        fixture.SaveMatrix();
-
-        ProcessResult result = await fixture.ValidateAsync(TestContext.Current.CancellationToken);
-
-        AssertV2Succeeded(result, fixture, candidateOnly: false);
-    }
-
-    [Theory]
     [InlineData("missing-row", "C02_MATRIX_SCHEMA")]
     [InlineData("unknown-row", "C02_MATRIX_SCHEMA")]
     [InlineData("duplicate-row", "C02_MATRIX_SCHEMA")]
@@ -290,21 +264,7 @@ public sealed class ReleaseMatrixContractTests
     [InlineData("p07-development", "C02_P07_SCHEMA")]
     [InlineData("p07-credential", "C02_P07_SCHEMA")]
     [InlineData("p07-source", "C02_P07_BINDING")]
-    [InlineData("missing-clean-host", "C02_MISSING_FILE")]
-    [InlineData("ch06-missing", "C02_CLEAN_HOST_SCHEMA")]
-    [InlineData("ch06-not-run", "C02_CLEAN_HOST_SCHEMA")]
-    [InlineData("ch06-na", "C02_CLEAN_HOST_SCHEMA")]
-    [InlineData("ch06-fail", "C02_CLEAN_HOST_SCHEMA")]
-    [InlineData("clean-host-hash", "C02_CLEAN_HOST_BINDING")]
-    [InlineData("clean-host-version", "C02_SOURCE_VERSION_BINDING")]
-    [InlineData("clean-host-runtime", "C02_CLEAN_HOST_BINDING")]
-    [InlineData("clean-host-calendar", "C02_CLEAN_HOST_")]
-    [InlineData("clean-host-future", "C02_CLEAN_HOST_TIME")]
-    [InlineData("clean-host-candidate", "C02_CANDIDATE_IDENTITY")]
-    [InlineData("clean-host-source", "C02_SOURCE_VERSION_BINDING")]
-    [InlineData("clean-host-dependency", "C02_CLEAN_HOST_SCHEMA")]
-    [InlineData("protection-actions", "C02_CLEAN_HOST_SCHEMA")]
-    [InlineData("advisory-record", "C02_CLEAN_HOST_SCHEMA")]
+    [InlineData("clean-host-property", "C02_MATRIX_SCHEMA")]
     [InlineData("sidecar-content", "C02_SIDECAR_CONTENT")]
     [InlineData("candidate-size", "C02_DESCRIPTOR_SIZE")]
     [InlineData("candidate-hash", "C02_DESCRIPTOR_HASH")]
@@ -380,9 +340,6 @@ public sealed class ReleaseMatrixContractTests
 
     [Theory]
     [InlineData("duplicate-p07", "C02_JSON_DUPLICATE_PROPERTY")]
-    [InlineData("bom-clean-host", "C02_UTF8")]
-    [InlineData("invalid-utf8-clean-host", "C02_UTF8")]
-    [InlineData("oversized-clean-host", "C02_FILE_SIZE_LIMIT")]
     [InlineData("oversized-candidate", "C02_FILE_SIZE_LIMIT")]
     public async Task V2_rejects_unsafe_json_before_conversion(string mutation, string expectedCode)
     {
@@ -439,21 +396,13 @@ public sealed class ReleaseMatrixContractTests
         Assert.Equal(
             candidateOnly ? "LOCAL_BINARY_AND_EVIDENCE" : "CANDIDATE_RECORD_ONLY",
             value.GetProperty("developmentMsixVerification").GetString());
-        Assert.Equal(candidateOnly ? "NOT_RUN" : "HUMAN_RECORDED", value.GetProperty("cleanHostVerification").GetString());
+        Assert.False(value.TryGetProperty("cleanHostVerification", out _));
         Assert.Equal("CALLER_BOUND_UPSTREAM_REQUIRED", value.GetProperty("candidateRunVerification").GetString());
         Assert.Equal("P07_RECORD_AND_PACKAGE_HASH_BOUND", value.GetProperty("exeVersionVerification").GetString());
         Assert.True(JsonNode.DeepEquals(
             fixture.Descriptor(V2Fixture.CandidateFileName), JsonNode.Parse(value.GetProperty("candidateRecord").GetRawText())));
         Assert.True(JsonNode.DeepEquals(fixture.P07["runtime"], JsonNode.Parse(value.GetProperty("runtime").GetRawText())));
-        if (candidateOnly)
-        {
-            Assert.Equal(JsonValueKind.Null, value.GetProperty("cleanHostEvidence").ValueKind);
-        }
-        else
-        {
-            Assert.True(JsonNode.DeepEquals(
-                fixture.Descriptor(V2Fixture.CleanHostFileName), JsonNode.Parse(value.GetProperty("cleanHostEvidence").GetRawText())));
-        }
+        Assert.False(value.TryGetProperty("cleanHostEvidence", out _));
         Assert.Equal(4, value.GetProperty("limitations").GetArrayLength());
     }
 
@@ -839,7 +788,6 @@ public sealed class ReleaseMatrixContractTests
         internal const string ExeSidecarFileName = ExeFileName + ".sha256";
         internal const string ExeEvidenceFileName = ExeFileName + ".evidence.json";
         internal const string CandidateFileName = "release-candidate-record.json";
-        internal const string CleanHostFileName = "windows-singlefile-clean-host.evidence.json";
         internal const string Repository = "fixture-owner/fixture-repository";
         // Intentionally exceeds Int64: identity is a decimal STRING, never coerced.
         internal const string RunId = "98765432109876543210";
@@ -896,8 +844,6 @@ public sealed class ReleaseMatrixContractTests
                 ["rows"] = CandidateRows(),
             };
             legacy.WriteJson(CandidateFileName, Candidate);
-            CleanHost = CreateCleanHost();
-            legacy.WriteJson(CleanHostFileName, CleanHost);
             Matrix = new JsonObject
             {
                 ["schemaVersion"] = 2,
@@ -905,7 +851,6 @@ public sealed class ReleaseMatrixContractTests
                 ["sourceCommit"] = MatrixFixture.SourceCommit,
                 ["candidate"] = Identity(),
                 ["candidateRecord"] = Descriptor(CandidateFileName),
-                ["cleanHostEvidence"] = Descriptor(CleanHostFileName),
                 ["rows"] = Rows,
             };
             SaveMatrix();
@@ -916,7 +861,6 @@ public sealed class ReleaseMatrixContractTests
         internal JsonObject ExeRow { get; }
         internal JsonObject Candidate { get; }
         internal JsonObject P07 { get; }
-        internal JsonObject CleanHost { get; }
         private static string CliHash => Convert.ToHexString(SHA256.HashData(CliBytes));
 
         internal string Resolve(string name) => legacy.Resolve(name);
@@ -962,12 +906,6 @@ public sealed class ReleaseMatrixContractTests
                 arguments.AddRange(["-CandidateRecordPath", Resolve(CandidateFileName)]);
             }
             return legacy.RunValidatorAsync(cancellationToken, arguments);
-        }
-
-        internal void SaveCleanHost()
-        {
-            legacy.WriteJson(CleanHostFileName, CleanHost);
-            Matrix["cleanHostEvidence"] = Descriptor(CleanHostFileName);
         }
 
         private void SaveCandidate()
@@ -1023,32 +961,7 @@ public sealed class ReleaseMatrixContractTests
                 case "p07-development": P07["status"] = "PASS_DEVELOPMENT"; SaveEvidence(); break;
                 case "p07-credential": P07["runtime"]!["accessToken"] = SensitiveSentinel; SaveEvidence(); break;
                 case "p07-source": P07["sourceCommit"] = new string('b', 40); SaveEvidence(); break;
-                case "missing-clean-host": File.Delete(Resolve(CleanHostFileName)); break;
-                case "ch06-missing": CleanHost["tests"]!.AsArray().RemoveAt(5); SaveCleanHost(); break;
-                case "ch06-not-run":
-                case "ch06-na":
-                case "ch06-fail":
-                    JsonNode required = CleanHost["tests"]![5]!;
-                    required["status"] = mutation == "ch06-na" ? "N/A" : mutation == "ch06-fail" ? "FAIL" : "NOT_RUN";
-                    if (mutation == "ch06-not-run")
-                    {
-                        required["operations"] = 0;
-                        required["record"] = null;
-                    }
-                    SaveCleanHost();
-                    break;
-                case "clean-host-hash": CleanHost["package"]!["sha256"] = new string('0', 64); SaveCleanHost(); break;
-                case "clean-host-version": CleanHost["productVersion"] = "0.8.1"; SaveCleanHost(); break;
-                case "clean-host-runtime": CleanHost["runtime"]!["cliSha256"] = new string('0', 64); SaveCleanHost(); break;
-                case "clean-host-calendar": CleanHost["measuredAtUtc"] = "2024-02-30T12:00:00Z"; SaveCleanHost(); break;
-                case "clean-host-future":
-                    CleanHost["measuredAtUtc"] = DateTime.UtcNow.AddHours(1).ToString("O", CultureInfo.InvariantCulture);
-                    SaveCleanHost(); break;
-                case "clean-host-candidate": CleanHost["candidate"]!["runId"] = "123"; SaveCleanHost(); break;
-                case "clean-host-source": CleanHost["sourceCommit"] = new string('b', 40); SaveCleanHost(); break;
-                case "clean-host-dependency": CleanHost["host"]!["additionalDependencies"]!["nodeNpm"] = true; SaveCleanHost(); break;
-                case "protection-actions": CleanHost["protection"]!["warningActions"] = 1; SaveCleanHost(); break;
-                case "advisory-record": CleanHost["tests"]![6]!["record"] = Observation("advisory.txt"); SaveCleanHost(); break;
+                case "clean-host-property": Matrix["cleanHostEvidence"] = Descriptor(CandidateFileName); break;
                 case "sidecar-content":
                     File.WriteAllText(Resolve(ExeSidecarFileName),
                         $"{Descriptor(ExeFileName)["sha256"]!.GetValue<string>()}  {ExeFileName}\r\n", MatrixFixture.Utf8NoBom);
@@ -1097,18 +1010,6 @@ public sealed class ReleaseMatrixContractTests
                     File.WriteAllText(Resolve(ExeEvidenceFileName), json, MatrixFixture.Utf8NoBom);
                     ExeRow["evidence"] = Descriptor(ExeEvidenceFileName);
                     RebindCandidateRows();
-                    break;
-                case "bom-clean-host":
-                    File.WriteAllBytes(Resolve(CleanHostFileName), [0xEF, 0xBB, 0xBF, .. File.ReadAllBytes(Resolve(CleanHostFileName))]);
-                    Matrix["cleanHostEvidence"] = Descriptor(CleanHostFileName);
-                    break;
-                case "invalid-utf8-clean-host":
-                    File.WriteAllBytes(Resolve(CleanHostFileName), [0xC3, 0x28]);
-                    Matrix["cleanHostEvidence"] = Descriptor(CleanHostFileName);
-                    break;
-                case "oversized-clean-host":
-                    File.WriteAllBytes(Resolve(CleanHostFileName), new byte[(64 * 1024) + 1]);
-                    Matrix["cleanHostEvidence"] = Descriptor(CleanHostFileName);
                     break;
                 case "oversized-candidate":
                     File.WriteAllBytes(Resolve(CandidateFileName), new byte[(1024 * 1024) + 1]);
@@ -1241,67 +1142,6 @@ public sealed class ReleaseMatrixContractTests
                     "Development-host observations are not clean-host evidence.",
                     "Network isolation, personal authentication and live AI were not run.",
                     "Disk-full, interrupted extraction, directory ACL faults and cross-format checkpoint resume were not run."),
-            };
-        }
-
-        private JsonObject CreateCleanHost()
-        {
-            JsonArray tests = [];
-            for (int index = 1; index <= 6; index++)
-            {
-                string id = "CH-" + index.ToString("D2", CultureInfo.InvariantCulture);
-                tests.Add(new JsonObject
-                {
-                    ["id"] = id, ["status"] = "PASS", ["operations"] = 0, ["record"] = Observation(id + ".txt"),
-                });
-            }
-            foreach (string id in new[] { "ADV-01", "ADV-02" })
-            {
-                tests.Add(new JsonObject { ["id"] = id, ["status"] = "NOT_RUN", ["operations"] = 0, ["record"] = null });
-            }
-            return new JsonObject
-            {
-                ["schemaVersion"] = 1,
-                ["evidenceKind"] = "windows-singlefile-clean-host",
-                ["measuredAtUtc"] = DateTime.UtcNow.AddMinutes(-1).ToString("O", CultureInfo.InvariantCulture),
-                ["productVersion"] = MatrixFixture.ProductVersion,
-                ["sourceCommit"] = MatrixFixture.SourceCommit,
-                ["candidate"] = Identity(),
-                ["package"] = Descriptor(ExeFileName),
-                ["runtime"] = Runtime(),
-                ["host"] = new JsonObject
-                {
-                    ["osName"] = "Windows 11",
-                    ["edition"] = "Pro",
-                    ["osVersion"] = "10.0.26200.0", // A different fresh host is allowed.
-                    ["osBuild"] = 26200,
-                    ["architecture"] = "X64",
-                    ["standardUser"] = true,
-                    ["fresh"] = true,
-                    ["additionalDependencies"] = new JsonObject
-                    {
-                        ["dotnetSdk"] = false, ["dotnetRuntime"] = false, ["powerShell6Plus"] = false,
-                        ["nodeNpm"] = false, ["git"] = false, ["githubCli"] = false,
-                        ["copilotCli"] = false, ["office"] = false, ["ide"] = false,
-                    },
-                },
-                ["protection"] = new JsonObject
-                {
-                    ["motw"] = true,
-                    ["smartScreen"] = "Enabled",
-                    ["smartAppControl"] = "Off",
-                    ["enterprisePolicy"] = "NotConfigured",
-                    ["settingsUnchanged"] = true,
-                    ["launchOutcome"] = "Allowed",
-                    ["launchGestures"] = 1,
-                    ["warningActions"] = 0,
-                    ["withinApprovedScope"] = true,
-                },
-                ["measurements"] = new JsonObject
-                {
-                    ["extractedBytes"] = 1234, ["coldStartMilliseconds"] = 20, ["warmStartMilliseconds"] = 10,
-                },
-                ["tests"] = tests,
             };
         }
 

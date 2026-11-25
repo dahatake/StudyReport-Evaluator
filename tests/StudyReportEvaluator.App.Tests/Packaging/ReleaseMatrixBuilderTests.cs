@@ -55,7 +55,6 @@ public sealed class ReleaseMatrixBuilderTests
             BuilderFixture.CandidateOutputNames.Order(StringComparer.Ordinal).ToArray(),
             fixture.GetOutputNames());
         Assert.False(File.Exists(Path.Combine(fixture.OutputDirectory, BuilderFixture.MatrixFileName)));
-        Assert.False(File.Exists(Path.Combine(fixture.OutputDirectory, BuilderFixture.CleanHostFileName)));
         AssertStrictUtf8WithoutBom(Path.Combine(fixture.OutputDirectory, BuilderFixture.CandidateFileName));
 
         using JsonDocument document = JsonDocument.Parse(
@@ -86,7 +85,7 @@ public sealed class ReleaseMatrixBuilderTests
         AssertSucceeded(validation);
         using JsonDocument validationOutput = JsonDocument.Parse(validation.StandardOutput);
         Assert.Equal("PASS_CANDIDATE", validationOutput.RootElement.GetProperty("status").GetString());
-        Assert.Equal("NOT_RUN", validationOutput.RootElement.GetProperty("cleanHostVerification").GetString());
+        Assert.False(validationOutput.RootElement.TryGetProperty("cleanHostVerification", out _));
         Assert.Equal(string.Empty, fixture.GetGitStatus());
         fixture.AssertNoTransientDirectories();
     }
@@ -198,8 +197,6 @@ public sealed class ReleaseMatrixBuilderTests
         AssertSucceeded(await fixture.BuildCandidateAsync(TestContext.Current.CancellationToken));
         byte[] candidateBytes = File.ReadAllBytes(
             Path.Combine(fixture.OutputDirectory, BuilderFixture.CandidateFileName));
-        fixture.WriteCleanHostEvidence();
-        byte[] cleanHostBytes = File.ReadAllBytes(fixture.CleanHostEvidencePath);
         File.Delete(Path.Combine(fixture.OutputDirectory, BuilderFixture.MsixFileName));
 
         ProcessResult result = await fixture.BuildFinalAsync(TestContext.Current.CancellationToken);
@@ -214,8 +211,6 @@ public sealed class ReleaseMatrixBuilderTests
         Assert.False(File.Exists(Path.Combine(fixture.OutputDirectory, BuilderFixture.MsixFileName)));
         Assert.Equal(candidateBytes, File.ReadAllBytes(
             Path.Combine(fixture.OutputDirectory, BuilderFixture.CandidateFileName)));
-        Assert.Equal(cleanHostBytes, File.ReadAllBytes(
-            Path.Combine(fixture.OutputDirectory, BuilderFixture.CleanHostFileName)));
         AssertStrictUtf8WithoutBom(Path.Combine(fixture.OutputDirectory, BuilderFixture.MatrixFileName));
 
         using JsonDocument document = JsonDocument.Parse(
@@ -226,9 +221,7 @@ public sealed class ReleaseMatrixBuilderTests
         AssertDescriptor(
             matrix.GetProperty("candidateRecord"),
             Path.Combine(fixture.OutputDirectory, BuilderFixture.CandidateFileName));
-        AssertDescriptor(
-            matrix.GetProperty("cleanHostEvidence"),
-            Path.Combine(fixture.OutputDirectory, BuilderFixture.CleanHostFileName));
+        Assert.False(matrix.TryGetProperty("cleanHostEvidence", out _));
         JsonElement[] rows = matrix.GetProperty("rows").EnumerateArray().ToArray();
         Assert.Equal(3, rows.Length);
         AssertRow(rows[0], "windows-singlefile-exe", publish: true, "PASS_REQUIRED");
@@ -241,29 +234,7 @@ public sealed class ReleaseMatrixBuilderTests
         Assert.Equal("PASS", validationOutput.RootElement.GetProperty("status").GetString());
         Assert.Equal("CANDIDATE_RECORD_ONLY", validationOutput.RootElement
             .GetProperty("developmentMsixVerification").GetString());
-        Assert.Equal("HUMAN_RECORDED", validationOutput.RootElement.GetProperty("cleanHostVerification").GetString());
-        Assert.Equal(string.Empty, fixture.GetGitStatus());
-        fixture.AssertNoTransientDirectories();
-    }
-
-    [Theory(SkipUnless = nameof(RunC03ProcessTests), Skip = SkipReason)]
-    [InlineData("NOT_RUN")]
-    [InlineData("FAIL")]
-    public async Task Final_rejects_required_clean_host_non_pass_and_preserves_prior_candidate_output(
-        string status)
-    {
-        using BuilderFixture fixture = new(RequiredTools);
-        AssertSucceeded(await fixture.BuildCandidateAsync(TestContext.Current.CancellationToken));
-        File.Delete(Path.Combine(fixture.OutputDirectory, BuilderFixture.MsixFileName));
-        fixture.WriteCleanHostEvidence(status);
-        string[] before = fixture.SnapshotOutput();
-
-        ProcessResult result = await fixture.BuildFinalAsync(TestContext.Current.CancellationToken);
-
-        AssertFailed(result);
-        Assert.Equal(before, fixture.SnapshotOutput());
-        Assert.False(File.Exists(Path.Combine(fixture.OutputDirectory, BuilderFixture.MatrixFileName)));
-        Assert.False(File.Exists(Path.Combine(fixture.OutputDirectory, BuilderFixture.CleanHostFileName)));
+        Assert.False(validationOutput.RootElement.TryGetProperty("cleanHostVerification", out _));
         Assert.Equal(string.Empty, fixture.GetGitStatus());
         fixture.AssertNoTransientDirectories();
     }
@@ -277,7 +248,6 @@ public sealed class ReleaseMatrixBuilderTests
         using BuilderFixture fixture = new(RequiredTools);
         AssertSucceeded(await fixture.BuildCandidateAsync(TestContext.Current.CancellationToken));
         File.Delete(Path.Combine(fixture.OutputDirectory, BuilderFixture.MsixFileName));
-        fixture.WriteCleanHostEvidence();
         string[] before = fixture.SnapshotOutput();
 
         ProcessResult result = await fixture.BuildFinalAsync(
@@ -291,20 +261,19 @@ public sealed class ReleaseMatrixBuilderTests
     }
 
     [Fact(SkipUnless = nameof(RunC03ProcessTests), Skip = SkipReason)]
-    public async Task Candidate_never_synthesizes_clean_host_and_final_requires_the_received_record()
+    public async Task Final_rejects_the_removed_clean_host_evidence_parameter()
     {
         using BuilderFixture fixture = new(RequiredTools);
         AssertSucceeded(await fixture.BuildCandidateAsync(TestContext.Current.CancellationToken));
         string[] before = fixture.SnapshotOutput();
 
-        ProcessResult result = await fixture.BuildFinalWithoutCleanHostAsync(
+        ProcessResult result = await fixture.BuildFinalWithRemovedCleanHostParameterAsync(
             TestContext.Current.CancellationToken);
 
         Assert.NotEqual(0, result.ExitCode);
         Assert.True(string.IsNullOrWhiteSpace(result.StandardOutput));
         Assert.False(string.IsNullOrWhiteSpace(result.StandardError));
         Assert.Equal(before, fixture.SnapshotOutput());
-        Assert.False(File.Exists(Path.Combine(fixture.OutputDirectory, BuilderFixture.CleanHostFileName)));
         Assert.False(File.Exists(Path.Combine(fixture.OutputDirectory, BuilderFixture.MatrixFileName)));
         fixture.AssertNoTransientDirectories();
     }
@@ -359,7 +328,6 @@ public sealed class ReleaseMatrixBuilderTests
     {
         using BuilderFixture fixture = new(RequiredTools, failFinalAfterInstall: true);
         AssertSucceeded(await fixture.BuildCandidateAsync(TestContext.Current.CancellationToken));
-        fixture.WriteCleanHostEvidence();
         File.Delete(Path.Combine(fixture.OutputDirectory, BuilderFixture.MsixFileName));
         string[] before = fixture.SnapshotOutput();
 
@@ -370,7 +338,6 @@ public sealed class ReleaseMatrixBuilderTests
         Assert.Contains("code=C03_TEST_COMMITTED_VALIDATION_FAULT", result.StandardError, StringComparison.Ordinal);
         Assert.Equal(before, fixture.SnapshotOutput());
         Assert.False(File.Exists(Path.Combine(fixture.OutputDirectory, BuilderFixture.MatrixFileName)));
-        Assert.False(File.Exists(Path.Combine(fixture.OutputDirectory, BuilderFixture.CleanHostFileName)));
         Assert.Equal(string.Empty, fixture.GetGitStatus());
         fixture.AssertNoTransientDirectories();
     }
@@ -548,7 +515,6 @@ public sealed class ReleaseMatrixBuilderTests
         internal const string Repository = "fixture-owner/fixture-repository";
         internal const string RunId = "98765432109876543210";
         internal const string CandidateFileName = "release-candidate-record.json";
-        internal const string CleanHostFileName = "windows-singlefile-clean-host.evidence.json";
         internal const string MatrixFileName = "platform-release-matrix.json";
         internal const string ExeFileName = "StudyReportEvaluator-win-x64.exe";
         internal const string ExeSidecarFileName = ExeFileName + ".sha256";
@@ -581,7 +547,6 @@ public sealed class ReleaseMatrixBuilderTests
         internal static readonly string[] FinalOutputNames =
         [
             CandidateFileName,
-            CleanHostFileName,
             ExeEvidenceFileName,
             ExeFileName,
             ExeSidecarFileName,
@@ -640,10 +605,7 @@ public sealed class ReleaseMatrixBuilderTests
                 PackageDirectory = Path.Combine(Root, "artifacts", "package");
                 MsixDirectory = Path.Combine(PackageDirectory, "mechanism");
                 OutputDirectory = Path.Combine(PackageDirectory, "matrix");
-                string cleanDirectory = Path.Combine(Root, "artifacts", "clean-host");
                 Directory.CreateDirectory(MsixDirectory);
-                Directory.CreateDirectory(cleanDirectory);
-                CleanHostEvidencePath = Path.Combine(cleanDirectory, CleanHostFileName);
                 WritePackageInputs();
                 Assert.Equal(string.Empty, GetGitStatus());
             }
@@ -659,7 +621,6 @@ public sealed class ReleaseMatrixBuilderTests
         internal string PackageDirectory { get; }
         internal string MsixDirectory { get; }
         internal string OutputDirectory { get; }
-        internal string CleanHostEvidencePath { get; }
 
         internal Task<ProcessResult> BuildCandidateAsync(
             CancellationToken cancellationToken,
@@ -689,12 +650,11 @@ public sealed class ReleaseMatrixBuilderTests
                     "-ExpectedRepository", repository,
                     "-CandidateRunId", runId,
                     "-CandidateRecordPath", Path.Combine(OutputDirectory, CandidateFileName),
-                    "-CleanHostEvidencePath", CleanHostEvidencePath,
                     "-OutputDirectory", OutputDirectory,
                 ],
                 cancellationToken);
 
-        internal Task<ProcessResult> BuildFinalWithoutCleanHostAsync(CancellationToken cancellationToken) =>
+        internal Task<ProcessResult> BuildFinalWithRemovedCleanHostParameterAsync(CancellationToken cancellationToken) =>
             RunPowerShellAsync(
                 builderPath,
                 [
@@ -702,6 +662,7 @@ public sealed class ReleaseMatrixBuilderTests
                     "-ExpectedRepository", Repository,
                     "-CandidateRunId", RunId,
                     "-CandidateRecordPath", Path.Combine(OutputDirectory, CandidateFileName),
+                    "-CleanHostEvidencePath", Path.Combine(Root, "artifacts", "windows-singlefile-clean-host.evidence.json"),
                     "-OutputDirectory", OutputDirectory,
                 ],
                 cancellationToken);
@@ -800,85 +761,6 @@ public sealed class ReleaseMatrixBuilderTests
                 default:
                     throw new ArgumentOutOfRangeException(nameof(mutation));
             }
-        }
-
-        internal void WriteCleanHostEvidence(string requiredStatus = "PASS")
-        {
-            JsonArray tests = [];
-            for (int index = 1; index <= 6; index++)
-            {
-                string id = "CH-" + index.ToString("D2", CultureInfo.InvariantCulture);
-                bool mutate = index == 3 && requiredStatus != "PASS";
-                tests.Add(new JsonObject
-                {
-                    ["id"] = id,
-                    ["status"] = mutate ? requiredStatus : "PASS",
-                    ["operations"] = mutate && requiredStatus == "NOT_RUN" ? 0 : 1,
-                    ["record"] = mutate && requiredStatus == "NOT_RUN" ? null : Observation(id + ".txt"),
-                });
-            }
-            tests.Add(new JsonObject
-            {
-                ["id"] = "ADV-01", ["status"] = "NOT_RUN", ["operations"] = 0, ["record"] = null,
-            });
-            tests.Add(new JsonObject
-            {
-                ["id"] = "ADV-02", ["status"] = "NOT_RUN", ["operations"] = 0, ["record"] = null,
-            });
-
-            JsonObject cleanHost = new()
-            {
-                ["schemaVersion"] = 1,
-                ["evidenceKind"] = "windows-singlefile-clean-host",
-                ["measuredAtUtc"] = DateTime.UtcNow.AddMinutes(-1).ToString("O", CultureInfo.InvariantCulture),
-                ["productVersion"] = ProductVersion,
-                ["sourceCommit"] = SourceCommit,
-                ["candidate"] = Identity(),
-                ["package"] = Descriptor(Path.Combine(OutputDirectory, ExeFileName)),
-                ["runtime"] = Runtime(),
-                ["host"] = new JsonObject
-                {
-                    ["osName"] = "Windows 11",
-                    ["edition"] = "Pro",
-                    ["osVersion"] = "10.0.26200.0",
-                    ["osBuild"] = 26200,
-                    ["architecture"] = "X64",
-                    ["standardUser"] = true,
-                    ["fresh"] = true,
-                    ["additionalDependencies"] = new JsonObject
-                    {
-                        ["dotnetSdk"] = false,
-                        ["dotnetRuntime"] = false,
-                        ["powerShell6Plus"] = false,
-                        ["nodeNpm"] = false,
-                        ["git"] = false,
-                        ["githubCli"] = false,
-                        ["copilotCli"] = false,
-                        ["office"] = false,
-                        ["ide"] = false,
-                    },
-                },
-                ["protection"] = new JsonObject
-                {
-                    ["motw"] = true,
-                    ["smartScreen"] = "Enabled",
-                    ["smartAppControl"] = "Off",
-                    ["enterprisePolicy"] = "NotConfigured",
-                    ["settingsUnchanged"] = true,
-                    ["launchOutcome"] = "Allowed",
-                    ["launchGestures"] = 1,
-                    ["warningActions"] = 0,
-                    ["withinApprovedScope"] = true,
-                },
-                ["measurements"] = new JsonObject
-                {
-                    ["extractedBytes"] = 1234,
-                    ["coldStartMilliseconds"] = 20,
-                    ["warmStartMilliseconds"] = 10,
-                },
-                ["tests"] = tests,
-            };
-            WriteJson(CleanHostEvidencePath, cleanHost);
         }
 
         public void Dispose()
