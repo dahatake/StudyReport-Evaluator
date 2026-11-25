@@ -1067,6 +1067,37 @@ function Assert-NoStartupChildProcesses {
     }
 }
 
+function Invoke-WithTransientFileRetry {
+    param(
+        [Parameter(Mandatory)]
+        [scriptblock] $Operation
+    )
+
+    # Handles on a just-exited executable (image section, antivirus scan) can be released late.
+    $maximumAttempts = 15
+    for ($attempt = 1; ; $attempt++) {
+        try {
+            & $Operation
+            return
+        }
+        catch {
+            $exception = $_.Exception
+            while ($exception -is [System.Management.Automation.MethodInvocationException] -and
+                $null -ne $exception.InnerException) {
+                $exception = $exception.InnerException
+            }
+
+            $transient = $exception -is [System.UnauthorizedAccessException] -or
+                $exception -is [System.IO.IOException]
+            if (-not $transient -or $attempt -ge $maximumAttempts) {
+                throw
+            }
+
+            Start-Sleep -Milliseconds ([Math]::Min(250 * $attempt, 2000))
+        }
+    }
+}
+
 function Wait-NoStartupChildProcesses {
     param(
         [Parameter(Mandatory)]
@@ -1530,10 +1561,10 @@ try {
     }
 
     if (Test-Path -LiteralPath $finalPublishDirectory) {
-        Remove-Item -LiteralPath $finalPublishDirectory -Recurse -Force
+        Invoke-WithTransientFileRetry { Remove-Item -LiteralPath $finalPublishDirectory -Recurse -Force -ErrorAction Stop }
     }
 
-    [System.IO.Directory]::Move($temporaryPublishDirectory, $finalPublishDirectory)
+    Invoke-WithTransientFileRetry { [System.IO.Directory]::Move($temporaryPublishDirectory, $finalPublishDirectory) }
     $published = $true
     if ($SingleFile) {
         Write-Output "Published self-contained unsigned single file: $(Join-Path $finalPublishDirectory "$ApplicationName.exe")"
@@ -1559,7 +1590,7 @@ finally {
                 Assert-OwnedDirectoryPath -Root $repositoryRoot -Path $temporaryPublishDirectory -IncludeChildren
             }
 
-            Remove-Item -LiteralPath $temporaryPublishDirectory -Recurse -Force
+            Invoke-WithTransientFileRetry { Remove-Item -LiteralPath $temporaryPublishDirectory -Recurse -Force -ErrorAction Stop }
         }
 
         if (Test-Path -LiteralPath $temporaryCopilotDirectory) {
