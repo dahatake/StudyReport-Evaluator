@@ -321,6 +321,26 @@ def matrix(request, directory):
     return str(path.resolve())
 
 
+def find_release(api, prefix, tag):
+    # The by-tag endpoint returns published releases only; drafts are found in the writer-visible list.
+    release, etag = api.call("GET", prefix + "/releases/tags/" + urllib.parse.quote(tag, safe=""), absent=True)
+    if release is not None:
+        return release, etag
+    matches = []
+    for page in range(1, 11):
+        listing, _ = api.call("GET", prefix + f"/releases?per_page=100&page={page}")
+        require(isinstance(listing, list), "release listing invalid")
+        matches.extend(item for item in listing if item.get("tag_name") == tag)
+        if len(listing) < 100:
+            break
+    else:
+        raise Stop("release listing too large")
+    require(len(matches) <= 1, "ambiguous releases for tag")
+    if not matches:
+        return None, None
+    return api.call("GET", prefix + f"/releases/{matches[0]['id']}")
+
+
 def execute(request, api, directory, result):
     result["stage"] = "local-gates"
     assets = validate_request(request)
@@ -330,7 +350,7 @@ def execute(request, api, directory, result):
         result["matrix_path"] = matrix(request, directory)
     prefix = "/repos/" + request["identity"]["repository"]
     result["stage"] = "read-release"
-    release, etag = api.call("GET", prefix + "/releases/tags/" + request["identity"]["tag"], absent=True)
+    release, etag = find_release(api, prefix, request["identity"]["tag"])
     if release is None:
         require(request["phase"] == "candidate", "draft candidate missing")
         verify_identity(api, request)

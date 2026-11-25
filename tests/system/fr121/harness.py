@@ -213,7 +213,13 @@ class GitHub:
                              "repository": {"full_name": self.run_repository},
                              "head_sha": self.run_commit, "status": self.run_status,
                              "conclusion": self.run_conclusion, "event": "workflow_dispatch"}
-            if path in (prefix + "/releases/tags/" + TAG, prefix + "/releases/42"):
+            if path == prefix + "/releases/tags/" + TAG:
+                # Like GitHub, the by-tag endpoint does not return drafts.
+                published = self.release and self.release.get("draft") is False
+                return (200, self.response_release()) if published else (404, {"message": "Not Found"})
+            if path == prefix + "/releases":
+                return 200, [self.response_release()] if self.release else []
+            if path == prefix + "/releases/42":
                 return (200, self.response_release()) if self.release else (404, {"message": "Not Found"})
             if path == prefix + "/releases/42/assets":
                 return 200, [self.asset_info(n) for n in self.assets]
