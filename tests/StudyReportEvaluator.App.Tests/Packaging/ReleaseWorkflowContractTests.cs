@@ -197,7 +197,7 @@ public sealed class ReleaseWorkflowContractTests
         Assert.DoesNotContain("--draft=true", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("{\"draft\": True}", driver, StringComparison.Ordinal);
         Assert.DoesNotContain("api.call(\"DELETE\"", driver, StringComparison.Ordinal);
-        Assert.Contains("etag=etag", driver, StringComparison.Ordinal);
+        Assert.DoesNotContain("etag=etag", driver, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -242,8 +242,8 @@ class GitHub:
         if method == "PATCH" and path == prefix + "/releases/42":
             if not self.release:
                 return 404, {"message": "Not Found"}
-            if headers.get("If-Match") not in (None, f'"{self.etag}"'):
-                return 412, {"message": "ETag conflict"}
+            if headers.get("If-Match") is not None:
+                return 400, {"message": "Conditional request headers are not allowed in unsafe requests"}
             self.release.update(body)
             self.etag += 1
             if self.fault == "publish-response":

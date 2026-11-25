@@ -383,7 +383,8 @@ def execute(request, api, directory, result):
             require(release["draft"] is True, "release changed concurrently")
             verify_identity(api, request)
             result["stage"] = "publish"
-            api.call("PATCH", prefix + f"/releases/{release['id']}", {"draft": False}, etag=etag)
+            # GitHub rejects conditional headers on this PATCH (HTTP 400); the lock and reread above guard it.
+            api.call("PATCH", prefix + f"/releases/{release['id']}", {"draft": False})
             result["stage"] = "confirm-public"
             release, _ = api.call("GET", prefix + f"/releases/{release['id']}")
             verify_release(api, request, assets, release)

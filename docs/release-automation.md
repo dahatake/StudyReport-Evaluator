@@ -61,7 +61,8 @@
 candidate/publishのwriterは同じ
 `release-${repository}-${tag}` concurrency group、`cancel-in-progress: false`。
 同じホスト上の直接呼出しもrepository/tag/API単位のOS mutexで直列化し、
-待機後はremote状態を最初から照合する。ETagだけに並行変更の拒否を任せない。
+待機後はremote状態を最初から照合する。GitHubはReleaseのPATCHで条件付きヘッダー(If-Match)を
+受け付けない(HTTP 400)ため、ETagには頼らず、直前の再読込と照合で並行変更を拒否する。
 read-onlyジョブにはRelease書込権限を与えず、run metadata/artifact参照に必要なジョブだけ
 `actions: read` を持つ。checkoutにtokenを永続化しない。
 
